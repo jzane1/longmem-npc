@@ -72,7 +72,15 @@ and the structured behavior output survive the interview. Research publication c
   `db\migrate.py` + `db\smoke_test.py` written; `requirements.txt` pins `psycopg[binary]==3.3.4`
   (global 3.14). floor-verifier returned **pass** on the live DB. **Flag:** floor-verifier couldn't
   call the postgres MCP tools (fell back to `psql`); its `mcpServers` directive isn't yet effective —
-  revisit before the write path.
+  revisit before the write path. **(Resolved 2026-07-13 — see the next entry.)**
+- **2026-07-13** — **Floor-verifier MCP access fixed and verified.** Root cause was the verifier's
+  explicit `tools: Read, Grep, Glob, Bash` allowlist, which filters out every `mcp__postgres__*` tool
+  (the `mcpServers: postgres` line authorizes the server connection but does not override the
+  allowlist — the sub-agents docs use that exact `tools` line as their canonical "can't use any MCP
+  tools" example). Added the `mcp__postgres` pattern to the allowlist in
+  `.claude\agents\floor-verifier.md`. Agent definitions load at Claude Code startup, so the fix took
+  effect only after a restart; a read-only probe then confirmed the floor-verifier can call
+  `mcp__postgres__execute_sql` (`SELECT 1` → ok). Verification is now MCP-driven as intended.
 
 ## Immediate queue
 
