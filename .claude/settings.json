@@ -1,5 +1,31 @@
 {
   "permissions": {
-    "defaultMode": "plan"
+    "defaultMode": "plan",
+    "deny": ["Read(./.env)"]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|MultiEdit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/format-on-edit.ps1",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -NoProfile -ExecutionPolicy Bypass -File .claude/hooks/run-suite.ps1",
+            "timeout": 300
+          }
+        ]
+      }
+    ]
   }
 }
