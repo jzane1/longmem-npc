@@ -1,9 +1,9 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-07-12
-**Phase:** pre-build. Repo initialized; docs are the source of truth; no code yet. All primary and
-downstream architecture decisions are settled (`decisions.md`). First build target:
-`migration-01.md`.
+**Last updated:** 2026-07-13
+**Phase:** pre-build (no application code yet), but the **DB + MCP floor is live** beneath the first
+build target. All primary and downstream architecture decisions are settled (`decisions.md`). First
+build target: `migration-01.md`, now unblocked with a running database to verify against.
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -32,7 +32,7 @@ and the structured behavior output survive the interview. Research publication c
 
 | Layer | Verified against | Date |
 |---|---|---|
-| *(none yet)* | | |
+| Postgres 16 + pgvector 0.8.5 container (`longmem-pg`) + read-only Postgres MCP | live: `docker` health `healthy`, `pg_available_extensions` → `vector 0.8.5`, `claude mcp list` → `postgres ✓ Connected` | 2026-07-13 |
 
 ## Open questions needing Jack's ruling
 
@@ -53,16 +53,27 @@ and the structured behavior output survive the interview. Research publication c
   `identity_components` pruning `[SETTLE-AT-BUILD]` tag. Dated ruling appended to `decisions.md`
   (also fixes the drift-anchor wording to "the corrected head"). Re-audit clean — migration 01 is
   unblocked with no known schema omissions.
+- **2026-07-13** — DB + MCP floor stood up ahead of migration 01. Committed `docker-compose.yml`
+  runs `pgvector/pgvector:pg16` as `longmem-pg` (secrets interpolated from the new gitignored
+  `.env`, the connection-string source); pgvector 0.8.5 confirmed available (extension enable
+  deferred to migration 01). Postgres MCP registered local-scope in restricted (read-only) mode and
+  verified `✓ Connected`; floor-verifier given its `mcpServers: postgres` line + MCP-preference
+  directive. **Runbook deviation:** `postgres-mcp`'s `pglast` dep has no Python 3.14 wheel and won't
+  build on Windows, so the MCP runs in an isolated uv-managed Python 3.13 venv (project stays on
+  3.14; recorded in `decisions.md`, and `mcp-setup.md` §1 wants a matching one-line note). Live
+  in-session `/mcp` tool check still pending a Claude Code restart.
 
 ## Immediate queue
 
-1. Migration 01 (`migration-01.md`) — schema in Postgres, verified by the floor-verifier subagent.
-2. Connect the Postgres MCP per `mcp-setup.md` the moment the container exists, and give
-   floor-verifier its `mcpServers: postgres` line.
-3. Write path (NLP pass + Haiku render/importance + atomic insert).
-4. Read path: dialogue-init top-k with IDs + scores.
-5. CLI harness (vertical slice complete) + synthetic load driver alongside.
-6. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`).
+1. Migration 01 (`migration-01.md`) — schema in Postgres, verified by the floor-verifier subagent
+   against the live DB + MCP floor (now in place). Six `[SETTLE-AT-BUILD]` forks await Jack's ruling.
+2. Write path (NLP pass + Haiku render/importance + atomic insert).
+3. Read path: dialogue-init top-k with IDs + scores.
+4. CLI harness (vertical slice complete) + synthetic load driver alongside.
+5. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`).
+
+*(Done 2026-07-13: connect the Postgres MCP + give floor-verifier its `mcpServers` line — see the
+verified-floors table and session log.)*
 
 ## Open artifact queue (writing tasks against settled decisions — not decisions)
 

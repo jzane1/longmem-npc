@@ -1,0 +1,25 @@
+# Local dev database for longmem-npc.
+# Postgres 16 + pgvector. Secrets are NOT stored here — every value is interpolated
+# from the gitignored .env at repo root (docker compose reads .env automatically).
+# See docs/mcp-setup.md §1. Schema is applied by migration 01, not by this file.
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: longmem-pg
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - longmem-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  longmem-pgdata:

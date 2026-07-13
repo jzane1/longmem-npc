@@ -176,3 +176,21 @@ the schema doc (`migration-01.md`) never gave a home. Jack ruled:
 corrected original") reads, correctly and consistently with `architecture.md` §7, as **authorial →
 the corrected head (the `authorial_correction` row)**. Same row under the derivable-anchor
 definition; this entry fixes the phrasing without editing the append-only original.
+
+## Local DB + MCP infra — 2026-07-13
+
+The migration-01 database floor is a **committed `docker-compose.yml`** (not a bare `docker run`):
+`pgvector/pgvector:pg16` as container `longmem-pg`, named volume `longmem-pgdata`, host port 5432.
+All credentials interpolate from the gitignored `.env`, the single source for `DATABASE_URI`
+(superuser `postgres`, db `longmem`). One full-access connection string; the Postgres MCP enforces
+read-only itself via `--access-mode=restricted`, registered at **local scope** so no secret is
+committed. Rationale: compose is reproducible, holds no secrets, and becomes the seam migration 02+
+and the app pool reuse. pgvector 0.8.5 confirmed available; `CREATE EXTENSION` is deferred to
+migration 01, not this floor.
+
+**Runbook deviation (recorded so a rebuild reproduces it):** `postgres-mcp` → `pglast==7.2` has no
+wheel for Python 3.14 and fails to build from source on Windows (no C toolchain). The MCP therefore
+runs in an isolated **uv-managed Python 3.13** tool venv (`uv tool install postgres-mcp --python
+3.13`). This does not touch the project's Python 3.14 stack constant — the MCP is a standalone
+server process, never imported by project code. `mcp-setup.md` §1 should gain a one-line note to
+this effect until `pglast` ships a 3.14 wheel (flagged to Jack; not yet applied).
