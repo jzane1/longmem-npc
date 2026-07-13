@@ -18,7 +18,7 @@ choosing — confirm with Jack, then record the choice in `decisions.md`.
   DELETE (the purge endpoint is the sole, explicit exception, and it is not part of this migration).
 - All **write-time fact** columns exist now, even where the consuming mechanism is deferred:
   typology + confidence + typology_source, provenance, context components, decay class, gist spans,
-  importance, pin.
+  importance, pin, scoring_failed.
 
 ## Tables
 
@@ -42,6 +42,8 @@ One row per observation. **`observation_text` is immutable after insert.**
 - `observation_text` text NOT NULL.
 - `embedding` vector(1536) — dimension locked.
 - `importance_raw` real — stored raw; normalized at read.
+- `scoring_failed` boolean NOT NULL default false — set true when the importance-scoring model
+  fails; the write still lands with neutral importance (never lose a write). See architecture §2.
 - `typology` text CHECK in (`observed`, `told`, `inferred`, `reflected`).
 - `typology_confidence` real CHECK 0–1.
 - `typology_source` text CHECK in (`declared`, `inferred`).
@@ -82,6 +84,18 @@ The version chain under a stable `memory_id`. The **head** is the row with `inva
 - Verb discrimination lives on the new head's `write_cause`; prior-row invalidation is ordinary
   supersession — no voided-marker column.
 
+### corrections
+The diegetic correction record — one row per in-world confrontation that superseded a chain head.
+Schema now; the dissonance mechanism that writes these lands post-August (the diegetic half of the
+Set A test pair, `test-suite.md`, asserts a correction record is present).
+- `correction_id` UUID PK, server default.
+- `memory_id` FK → memories — the target of the diegetic correction.
+- `detail_id` FK → memory_details — the new head row this correction produced.
+- `verb` text CHECK in (`rationalization`, `update_with_resentment`) — the diegetic subset of the
+  `memory_details.write_cause` enum.
+- `source_event` jsonb — the client-supplied in-world confrontation reference. Nullable.
+- `created_at` / `valid_at` per the bi-temporal rules (world time of the confrontation).
+
 ### reconstruction_cache
 - `memory_id` FK → memories.
 - `identity_version` text — content hash of the rendered identity document.
@@ -111,7 +125,6 @@ The entity/topic index: gist matching + entity-gate tripwire.
 - `category` text.
 - `created_at` / `invalid_at` — reflection-time pruning **invalidates** rather than deletes,
   consistent with non-destructive storage; pruning silently invalidates reconstruction caches.
-  `[SETTLE-AT-BUILD: confirm invalidate-not-delete for pruning]`
 
 ### identity_documents
 - `agent_id` FK → agents.
@@ -126,7 +139,8 @@ The entity/topic index: gist matching + entity-gate tripwire.
   text-embedding-3-small]`
 - **GIN** on `memories.entities`.
 - FK/lookup indexes: `memories(agent_id)`, `memory_details(memory_id)`,
-  `memory_gist_spans(memory_id)`, `reflections(agent_id)`, `identity_components(agent_id)`.
+  `memory_gist_spans(memory_id)`, `corrections(memory_id)`, `reflections(agent_id)`,
+  `identity_components(agent_id)`.
 
 ## Mechanics
 

@@ -151,3 +151,28 @@ Consequences propagated: the one-live-head index in migration 01 is confirmed co
 authorial assertions in `test-suite.md` now assert presence-with-corrected-head instead of absence;
 no voided-marker column on prior rows — the new head's `write_cause` is the sole verb discriminator
 (revisit only if the debug view ever needs retracted-vs-past-telling rendering).
+
+## Schema-gap rulings — 2026-07-12
+
+A doc-auditor sweep found three schema-now omissions where `architecture.md` described a mechanism
+the schema doc (`migration-01.md`) never gave a home. Jack ruled:
+
+1. **`scoring_failed` is a day-one column on `memories`.** `boolean NOT NULL default false`; set true
+   when the importance-scoring model fails and the write lands with neutral importance (architecture
+   §2, `test-suite.md` degradation case). It is a write-time fact — omitting it would force exactly
+   the later migration **Schema now, mechanism later** exists to prevent.
+2. **The diegetic "correction record" lives in a separate `corrections` table**, added to migration
+   01 as schema only (the dissonance mechanism that writes it lands post-August). Columns:
+   `correction_id`, `memory_id` → memories, `detail_id` → memory_details (the new head), `verb`
+   CHECK in `{rationalization, update_with_resentment}` (the diegetic subset of the `write_cause`
+   enum), nullable `source_event` jsonb, and bi-temporal `created_at`/`valid_at`. Chosen over
+   folding it onto the head detail row so the confrontation reference and target have an explicit
+   home. Backs the Set A diegetic pair's "correction record present" assertion.
+3. **The `identity_components` pruning `[SETTLE-AT-BUILD]` tag is removed** — already answered by the
+   non-destructive invariant (never DELETE except purge) and the decay/gist decision (component trim
+   silently invalidates caches). The body text was already correct; only the confirm-tag was stale.
+
+**Drift-anchor wording (standing phrasing):** the re-anchoring line above ("authorial → the
+corrected original") reads, correctly and consistently with `architecture.md` §7, as **authorial →
+the corrected head (the `authorial_correction` row)**. Same row under the derivable-anchor
+definition; this entry fixes the phrasing without editing the append-only original.

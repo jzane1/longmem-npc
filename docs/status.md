@@ -43,15 +43,26 @@ and the structured behavior output survive the interview. Research publication c
 
 - **2026-07-12** — Docs established as the in-repo source of truth. Authorial seam surfaced, ruled
   (replace model), and propagated into `decisions.md`, `test-suite.md`, `migration-01.md`.
+- **2026-07-12** — Claude Code workflow stack completed: CLAUDE.md files, slash commands
+  (/build-task, /log-decision, /wrap-up), plan-mode default, floor-verifier and doc-auditor
+  subagents, format + suite-gate hooks, .env read-deny, and MCP go-live runbooks (`mcp-setup.md`).
+  This repo is now self-sufficient; the Claude Chat Project is no longer load-bearing.
+- **2026-07-12** — Full-tree doc-auditor sweep. Three schema-now gaps surfaced and ruled by Jack,
+  then propagated into `migration-01.md`: `scoring_failed` column on `memories`, a schema-only
+  `corrections` table (diegetic correction record; mechanism deferred), and removal of the stale
+  `identity_components` pruning `[SETTLE-AT-BUILD]` tag. Dated ruling appended to `decisions.md`
+  (also fixes the drift-anchor wording to "the corrected head"). Re-audit clean — migration 01 is
+  unblocked with no known schema omissions.
 
 ## Immediate queue
 
-1. Land docs + repo skeleton (this commit).
-2. Set up Claude Code working conventions (CLAUDE.md files, slash commands, plan-mode discipline).
-3. Migration 01 (`migration-01.md`) — schema in Postgres, verified.
-4. Write path (NLP pass + Haiku render/importance + atomic insert).
-5. Read path: dialogue-init top-k with IDs + scores.
-6. CLI harness (vertical slice complete) + synthetic load driver alongside.
+1. Migration 01 (`migration-01.md`) — schema in Postgres, verified by the floor-verifier subagent.
+2. Connect the Postgres MCP per `mcp-setup.md` the moment the container exists, and give
+   floor-verifier its `mcpServers: postgres` line.
+3. Write path (NLP pass + Haiku render/importance + atomic insert).
+4. Read path: dialogue-init top-k with IDs + scores.
+5. CLI harness (vertical slice complete) + synthetic load driver alongside.
+6. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`).
 
 ## Open artifact queue (writing tasks against settled decisions — not decisions)
 
