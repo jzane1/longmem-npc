@@ -20,3 +20,6 @@ Thumbs.db
 UserSettings/
 *.csproj
 *.sln
+
+# Claude Code personal overrides
+CLAUDE.local.md

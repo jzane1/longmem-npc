@@ -1,0 +1,23 @@
+# tests\ — structural-only discipline
+
+These rules load whenever work touches this folder. Full spec: docs/test-suite.md — read it
+before writing or changing any test.
+
+## The one rule
+Assert ONLY on structure: memory IDs, row types (write_cause, read_mode, typology), chain shape
+(which rows are live vs invalidated), cache presence/absence, timestamps, and byte-identity of
+returned text.
+
+NEVER assert on generated prose: no substring matches, no regex over model output, no semantic
+similarity checks. A model's wording is not a test surface.
+
+## Mechanics
+- Time travel = injected valid_at timestamps. Tests never sleep() and never depend on wall clock.
+- No fixture modes. Correction scenarios are verb-forked structural pairs keyed on write_cause.
+- Deterministic: the suite runs in CI and must pass every run.
+- Judged or LLM-graded evals do not live in this folder — they belong to the separate eval story.
+
+## When blocked
+If an assertion seems to require checking prose, stop and report. The gap is usually in the
+endpoint contract (IDs + scores in payloads) — that is a design conversation, not a test
+workaround.
