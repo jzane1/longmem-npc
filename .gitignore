@@ -1,0 +1,22 @@
+# Secrets — never commit
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# OS / editor noise
+Thumbs.db
+.DS_Store
+
+# Unity (for when the client package lands; harmless now)
+[Ll]ibrary/
+[Tt]emp/
+[Ll]ogs/
+UserSettings/
+*.csproj
+*.sln
