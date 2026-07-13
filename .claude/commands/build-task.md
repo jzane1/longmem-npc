@@ -6,6 +6,9 @@ disable-model-invocation: true
 
 # Build task: $ARGUMENTS
 
+Run this command from plan mode (the session default for this repo). Phase 1 below is the
+content of the plan; Jack's approval of it exits plan mode into Phase 2.
+
 ## Phase 1 — Orient (no file changes)
 1. If the task names or implies a spec in docs\ (e.g. migration-01), read that file in full. Read
    the sections of docs/architecture.md this task touches. status.md is already loaded.
@@ -32,6 +35,8 @@ disable-model-invocation: true
 ## Phase 3 — Prove and close
 - Walk the done-when list one criterion at a time: show the command run and its actual output
   for each.
-- Staged verification: state what floor this layer was verified against and how.
+- Staged verification: state what floor this layer was verified against and how. Then dispatch
+  the floor-verifier subagent (foreground) with the layer name, the done-when list, and the
+  floor. Do not update the verified-floors table in docs/status.md until its verdict is pass.
 - Execute the end-of-task protocol from CLAUDE.md (status.md update; decisions.md if Jack ruled
   on anything; commit, never push).
