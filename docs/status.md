@@ -1,9 +1,10 @@
 # longmem-npc — Status
 
 **Last updated:** 2026-07-13
-**Phase:** pre-build (no application code yet), but the **DB + MCP floor is live** beneath the first
-build target. All primary and downstream architecture decisions are settled (`decisions.md`). First
-build target: `migration-01.md`, now unblocked with a running database to verify against.
+**Phase:** first build target landed — **Migration 01 (foundational schema) is live and
+floor-verified** in the `longmem` DB. All primary and downstream architecture decisions are settled
+(`decisions.md`); the seven `migration-01.md` `[SETTLE-AT-BUILD]` forks are all ruled (dated entry in
+`decisions.md`). Next: the write path.
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -33,6 +34,7 @@ and the structured behavior output survive the interview. Research publication c
 | Layer | Verified against | Date |
 |---|---|---|
 | Postgres 16 + pgvector 0.8.5 container (`longmem-pg`) + read-only Postgres MCP | live: `docker` health `healthy`, `pg_available_extensions` → `vector 0.8.5`, `claude mcp list` → `postgres ✓ Connected` | 2026-07-13 |
+| Migration 01 foundational schema — 9 tables, 7 CHECKs, HNSW cosine + GIN + one-live-head + FK indexes (`db\migrations\001_foundation.sql`, applied by `db\migrate.py`) | floor-verifier **pass** on live `longmem`: every done-when re-run (idempotent second run, CHECK rejection, server UUID defaults, smoke fixture) + `vector 0.8.5` enabled; DB left pristine (only `schema_migrations`) | 2026-07-13 |
 
 ## Open questions needing Jack's ruling
 
@@ -62,18 +64,25 @@ and the structured behavior output survive the interview. Research publication c
   build on Windows, so the MCP runs in an isolated uv-managed Python 3.13 venv (project stays on
   3.14; recorded in `decisions.md`, and `mcp-setup.md` §1 wants a matching one-line note). Live
   in-session `/mcp` tool check still pending a Claude Code restart.
+- **2026-07-13** — **Migration 01 built, verified, and committed.** Seven `[SETTLE-AT-BUILD]` forks
+  ruled by Jack (see the dated `decisions.md` entry): `diagnosticity_goal` text; `decay_class`
+  free-text + config map with a new `decay_class_unknown` degradation flag; `affect` as three columns
+  (valence/arousal/jsonb); gist child table; `identity_relevant` boolean; HNSW cosine; Python runner
+  with an atomic apply-and-record `schema_migrations` ledger. `db\migrations\001_foundation.sql` +
+  `db\migrate.py` + `db\smoke_test.py` written; `requirements.txt` pins `psycopg[binary]==3.3.4`
+  (global 3.14). floor-verifier returned **pass** on the live DB. **Flag:** floor-verifier couldn't
+  call the postgres MCP tools (fell back to `psql`); its `mcpServers` directive isn't yet effective —
+  revisit before the write path.
 
 ## Immediate queue
 
-1. Migration 01 (`migration-01.md`) — schema in Postgres, verified by the floor-verifier subagent
-   against the live DB + MCP floor (now in place). Six `[SETTLE-AT-BUILD]` forks await Jack's ruling.
-2. Write path (NLP pass + Haiku render/importance + atomic insert).
-3. Read path: dialogue-init top-k with IDs + scores.
-4. CLI harness (vertical slice complete) + synthetic load driver alongside.
-5. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`).
+1. Write path (NLP pass + Haiku render/importance + atomic insert).
+2. Read path: dialogue-init top-k with IDs + scores.
+3. CLI harness (vertical slice complete) + synthetic load driver alongside.
+4. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`).
 
-*(Done 2026-07-13: connect the Postgres MCP + give floor-verifier its `mcpServers` line — see the
-verified-floors table and session log.)*
+*(Done 2026-07-13: **Migration 01 foundational schema** — see the verified-floors table and session
+log; and earlier, connect the Postgres MCP + give floor-verifier its `mcpServers` line.)*
 
 ## Open artifact queue (writing tasks against settled decisions — not decisions)
 

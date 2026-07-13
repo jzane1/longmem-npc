@@ -194,3 +194,46 @@ runs in an isolated **uv-managed Python 3.13** tool venv (`uv tool install postg
 3.13`). This does not touch the project's Python 3.14 stack constant — the MCP is a standalone
 server process, never imported by project code. `mcp-setup.md` §1 should gain a one-line note to
 this effect until `pglast` ships a 3.14 wheel (flagged to Jack; not yet applied).
+
+## Migration 01 build — fork rulings & schema deltas — 2026-07-13
+
+Migration 01 built and floor-verifier-passed against the live `longmem` DB. Jack ruled the seven
+`[SETTLE-AT-BUILD]` forks from `migration-01.md` (status.md had said "six"; the doc carried seven):
+
+1. **`agents.diagnosticity_goal` = `text`.** The Haiku importance prompt consumes prose.
+2. **`memories.decay_class` = free-text label + config map.** The label→`tau_base` map lives in
+   `agents.config`. **New column `memories.decay_class_unknown boolean NOT NULL default false`** — a
+   write-time degradation flag mirroring `scoring_failed`: on an unrecognized decay-class label the
+   write lands with a default class and this flag set, never rejected. Validation is write-path
+   (deferred). This column was not in the original migration-01 spec; it is a consequence of the
+   ruling and is now built.
+3. **`memories.affect` = three columns:** `affect_valence real`, `affect_arousal real`,
+   `affect_detail jsonb` (all nullable), fed by the VADER-class write pass. Richer than the suggested
+   valence+jsonb default.
+4. **Gist spans = child table** `memory_gist_spans` (not an int-range array on `memories`) — backs
+   the suite's per-row gist-immutability assertions.
+5. **`reflections.identity_relevant` = `boolean`.**
+6. **HNSW distance op = cosine** (`vector_cosine_ops`), for `text-embedding-3-small`.
+7. **Migration runner = Python** (`db\migrate.py`) with a `schema_migrations` bookkeeping table.
+   **Atomic apply-and-record:** each migration's DDL and its ledger row commit in one transaction, so
+   a half-applied migration can never be logged complete. Idempotency rides on the ledger (a second
+   run is a no-op); DDL also carries `IF NOT EXISTS` as defense-in-depth.
+
+**Schema strengthening beyond the doc's literal column lists (recorded for transparency).** Owner
+foreign keys (`memories.agent_id`, `identity_components.agent_id`, `memory_gist_spans.memory_id`,
+`memory_details.memory_id`, `corrections.memory_id`/`detail_id`, `reflections.agent_id`) and gist
+offsets (`start_char`/`end_char`) are **NOT NULL** — a row cannot exist without its owner, nor a span
+without its offsets. `valid_at` is NOT NULL per the bi-temporal invariant; `invalid_at` nullable. Per
+*nothing-hardcoded*, `reputation`, `rigidity`, `reputation_sensitivity`, `diagnosticity_goal`,
+`decay_class`, and `config` carry **no column default** — the write path supplies them from
+integrator config (reputation → the config scale's neutral point at agent creation).
+
+**Dependency management (backend's first Python dep).** Ruled **global Python 3.14** install (matches
+the stack constant) plus a repo-root **`requirements.txt`** manifest, pinning `psycopg[binary]==3.3.4`
+(a `cp314` Windows wheel exists — unlike `pglast`, no isolation was forced). The Postgres MCP keeps
+its separate uv/3.13 venv.
+
+**Infra note (flagged, not yet fixed).** The `floor-verifier` subagent could not call the `postgres`
+MCP tools despite its `mcpServers: postgres` frontmatter; it verified against the same live container
+via `psql` instead. Verification is sound, but the MCP-preference directive isn't yet effective for
+that subagent — worth revisiting before the write-path build.

@@ -3,6 +3,10 @@
 First build target. Fully unblocked. Everything here is **schema only**: hand-written SQL against
 PostgreSQL 16 + pgvector (Docker, `pgvector/pgvector` image), UUIDs minted server-side.
 
+> **Built & verified 2026-07-13.** All seven `[SETTLE-AT-BUILD]` forks ruled (dated entry in
+> `decisions.md`); tables, CHECKs, and indexes are live in `longmem` and the floor-verifier passed.
+> Applied by `db\migrate.py`. The `[SETTLE-AT-BUILD]` tags below are resolved inline for the record.
+
 **Scope boundary — do NOT build:** API endpoints, the write path, the NLP pass, any model calls,
 seed content beyond a minimal smoke-test fixture, Unity anything, the retrieval gate.
 
@@ -30,8 +34,8 @@ One row per NPC.
 - `reputation` numeric — runtime scalar; starts at the scale's neutral point.
 - `rigidity` numeric, CHECK between 0.5 and 2.0 — dissonance scalar (pushover → zealot).
 - `reputation_sensitivity` numeric.
-- `diagnosticity_goal` — anchor for importance scoring. `[SETTLE-AT-BUILD: numeric target vs short
-  text description; suggested default: text, since the Haiku importance prompt consumes it]`
+- `diagnosticity_goal` text — anchor for importance scoring; the Haiku importance prompt consumes
+  prose. *(Ruled 2026-07-13: text.)*
 - `config` jsonb — remaining integrator knobs (decay constants, drift threshold, habituation
   cap/decay, etc.) until any of them earns a typed column.
 
@@ -49,20 +53,23 @@ One row per observation. **`observation_text` is immutable after insert.**
 - `typology_source` text CHECK in (`declared`, `inferred`).
 - `provenance` text CHECK in (`lived`, `injected`).
 - `pinned` boolean NOT NULL default false.
-- `decay_class` text — integrator vocabulary; selects the base decay constant.
-  `[SETTLE-AT-BUILD: free text vs lookup table; suggested default: free text + config-defined map]`
+- `decay_class` text — integrator vocabulary label; selects the base decay constant. The
+  label→`tau_base` map lives in `agents.config`. *(Ruled 2026-07-13: free-text column + config map.)*
+- `decay_class_unknown` boolean NOT NULL default false — write-time degradation flag (mirrors
+  `scoring_failed`): on an unrecognized decay-class label the write lands with a default class and
+  this flag set, never rejected. Validation is write-path (deferred). *(Ruled 2026-07-13.)*
 - `created_at` / `valid_at` / `invalid_at` per the bi-temporal rules above.
 - Context stamps (all four nullable — optional API fields):
   - `location_embedding` vector(1536) and `location_name` text.
   - `entities` text[] — with a **GIN index** (serves the entity gate now, context boost later).
   - `event_time` timestamptz.
-  - `affect` — `[SETTLE-AT-BUILD: single valence real (−1..1) vs valence+arousal pair vs VADER
-    compound struct; suggested default: valence real + jsonb detail column]`
+  - `affect_valence` real, `affect_arousal` real, `affect_detail` jsonb (all nullable) — from the
+    VADER-class write pass. *(Ruled 2026-07-13: three columns — valence + arousal + jsonb detail.)*
 
 ### memory_gist_spans
 Gist as **span pointers into `observation_text`** — never rewritten text. Child table so spans are
 individually assertable rows (the suite asserts gist rows are immutable).
-`[SETTLE-AT-BUILD: child table (suggested) vs int-range array column on memories]`
+*(Ruled 2026-07-13: child table.)*
 - `span_id` UUID PK, server default.
 - `memory_id` FK → memories.
 - `start_char` int, `end_char` int (half-open, into `observation_text`).
@@ -110,7 +117,7 @@ Set A test pair, `test-suite.md`, asserts a correction record is present).
 - `agent_id` FK → agents.
 - `content` text NOT NULL.
 - `identity_relevant` boolean — gates flow into the rendered identity document.
-  `[SETTLE-AT-BUILD: boolean flag (suggested) vs classification enum]`
+  *(Ruled 2026-07-13: boolean.)*
 - `source_memory_ids` UUID[] — provenance only; intentionally NOT foreign-keyed, so purging an
   episode leaves the derived reflection intact (purge-honesty stance).
 - `created_at` / `valid_at` / `invalid_at` — bi-temporal like memories; invalidation of a reflection
@@ -135,8 +142,8 @@ The entity/topic index: gist matching + entity-gate tripwire.
 
 ## Indexes
 
-- **HNSW** on `memories.embedding`. `[SETTLE-AT-BUILD: distance op — cosine suggested for
-  text-embedding-3-small]`
+- **HNSW** on `memories.embedding`, `vector_cosine_ops`. *(Ruled 2026-07-13: cosine, for
+  text-embedding-3-small.)*
 - **GIN** on `memories.entities`.
 - FK/lookup indexes: `memories(agent_id)`, `memory_details(memory_id)`,
   `memory_gist_spans(memory_id)`, `corrections(memory_id)`, `reflections(agent_id)`,
@@ -144,9 +151,10 @@ The entity/topic index: gist matching + entity-gate tripwire.
 
 ## Mechanics
 
-- Numbered SQL file(s) under `db\migrations\` (e.g. `001_foundation.sql`) plus a minimal runner.
-  `[SETTLE-AT-BUILD: plain psql invocation vs a ~50-line Python runner with a migrations bookkeeping
-  table; suggested default: the Python runner — it becomes the seam where migration 02+ lands]`
+- Numbered SQL file(s) under `db\migrations\` (e.g. `001_foundation.sql`) plus `db\migrate.py`, a
+  minimal Python runner. *(Ruled 2026-07-13: Python runner with a `schema_migrations` bookkeeping
+  table — the seam migration 02+ lands on; each migration's DDL and its ledger row commit in one
+  transaction, so a half-applied migration can never be logged complete.)*
 - Docker: `pgvector/pgvector` for Postgres 16; connection string from `.env`.
 
 ## Done when
