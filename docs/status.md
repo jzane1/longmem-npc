@@ -4,7 +4,8 @@
 **Phase:** first build target landed — **Migration 01 (foundational schema) is live and
 floor-verified** in the `longmem` DB. All primary and downstream architecture decisions are settled
 (`decisions.md`); the seven `migration-01.md` `[SETTLE-AT-BUILD]` forks are all ruled (dated entry in
-`decisions.md`). Next: the write path.
+`decisions.md`). The **write-path v1 build target is now specced** (`write-path.md`), with three scope
+rulings recorded in `decisions.md`. Next: build the write path against that spec.
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -81,10 +82,21 @@ and the structured behavior output survive the interview. Research publication c
   `.claude\agents\floor-verifier.md`. Agent definitions load at Claude Code startup, so the fix took
   effect only after a restart; a read-only probe then confirmed the floor-verifier can call
   `mcp__postgres__execute_sql` (`SELECT 1` → ok). Verification is now MCP-driven as intended.
+- **2026-07-13** — **Write-path v1 build target specced** (`write-path.md`). Consolidates
+  architecture §4–§5 into a build spec over the frozen migration-01 schema (no new migration). Jack
+  ruled three scope forks (dated entry in `decisions.md`): surface = one ingest service (the sole
+  instrumentation seam) with a thin FastAPI route and a structured `IngestResult` (IDs + scores);
+  v1 events = observe + scene-boundary (accept+instrument only) + pin/unpin, with correction/purge
+  deferred; models = per-role provider interfaces with a real impl + a deterministic fake. doc-auditor
+  run clean after fixing one unsatisfiable done-when (byte-identical two-caller payload →
+  route-is-pass-through) and three schema-alignment nits. Remaining physical shapes tagged
+  `[SETTLE-AT-BUILD]` for the build.
 
 ## Immediate queue
 
-1. Write path (NLP pass + Haiku render/importance + atomic insert).
+1. Write path (NLP pass + Haiku render/importance + atomic insert) — **specced in `write-path.md`**
+   (v1: observe + scene-boundary + pin/unpin; one ingest-service seam + thin FastAPI route; real +
+   deterministic-fake providers). Next action: `/build-task write-path`.
 2. Read path: dialogue-init top-k with IDs + scores.
 3. CLI harness (vertical slice complete) + synthetic load driver alongside.
 4. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`).
@@ -94,9 +106,10 @@ log; and earlier, connect the Postgres MCP + give floor-verifier its `mcpServers
 
 ## Open artifact queue (writing tasks against settled decisions — not decisions)
 
-- Event-ingestion API contract: phase tag, the four optional context fields, client-timestamp
-  semantics, idempotency, the explicit scene-boundary event, the diegetic-correction event
-  referencing a target memory_id, pin/unpin, purge.
+- Event-ingestion API contract — **v1 subset specced in `write-path.md`** (observe + scene-boundary +
+  pin/unpin; phase tag, the four optional context fields, client-timestamp semantics, idempotency
+  accepted-not-enforced). Still to spec/build: the diegetic-correction event (references a target
+  memory_id) and purge, plus scene-boundary's deferred consumers.
 - Retrieval scoring function: relevance × recency(decay class) × importance_norm; pin exemption;
   normalization; slots for the future context term and per-call split-brain overrides.
 - Reconstruction call spec: operator-structured prompt with gist as fixed constraint; determinism;

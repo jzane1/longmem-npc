@@ -236,4 +236,35 @@ its separate uv/3.13 venv.
 **Infra note (flagged, not yet fixed).** The `floor-verifier` subagent could not call the `postgres`
 MCP tools despite its `mcpServers: postgres` frontmatter; it verified against the same live container
 via `psql` instead. Verification is sound, but the MCP-preference directive isn't yet effective for
-that subagent — worth revisiting before the write-path build.
+that subagent — worth revisiting before the write-path build. *(Resolved 2026-07-13 — the fix was the
+`tools` allowlist, not `mcpServers`; recorded in `status.md`.)*
+
+## Write-path spec scope rulings — 2026-07-13
+
+Authoring `write-path.md` (the write path & ingestion API v1 build target) required three scope
+rulings; Jack ruled:
+
+1. **Surface = one ingest service, two thin callers.** The write path is a single ingest service that
+   is **the sole instrumentation seam**; the CLI harness calls it in-process and a thin FastAPI route
+   wraps it — neither duplicates the seam. Its return is a **structured `IngestResult` (memory IDs +
+   computed scores/facts, not just prose)**, extending the read-path "IDs + scores in every payload"
+   invariant to writes so the CLI debug view and the scenario suite both assert on structure. The
+   FastAPI route is a pass-through: for one ingest, its JSON is exactly the service's `IngestResult`.
+
+2. **v1 event set = observe + scene-boundary + pin/unpin.** The observe pipeline (NLP → single Haiku
+   call → embedding → atomic insert) is the meat. Scene-boundary is **accepted + instrumented only**
+   in v1 — its three consumers (prompt-head rebuild, identity recompile, reputation snapshot) are
+   deferred and it needs **no new schema**. Pin/unpin toggle `memories.pinned`. Diegetic-correction
+   and purge are written into the contract but their handlers are **deferred** (out of v1 scope).
+
+3. **Models = provider interfaces with real + deterministic fake.** The Haiku
+   render/importance/typology call and the OpenAI 1536-d embedding are each behind a
+   per-role-env-var provider interface with **both** a real implementation (drives the demo) and a
+   **deterministic fake** (so the structural suite / CI run offline, keyless, and never assert on
+   prose).
+
+The spec tags the remaining physical shapes `[SETTLE-AT-BUILD]` (NLP stack, LLM-escalation
+thresholds, idempotency — constrained to no-new-schema, embedding-failure degradation, wire shape)
+and surfaces open flags (scene-boundary needs no migration-02; the render seam — raw
+`observation_text` vs. rendered `original` detail content; VADER lacks an arousal axis). These are
+ruled at the write path's build, not now.
