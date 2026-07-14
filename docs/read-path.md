@@ -168,7 +168,8 @@ role binds at item 3.)
 - **Recency knobs** — `k_importance` name/default; shared-`tau_effective` confirmation.
 - **importance_norm method** — min-max + guard + floor, or an alternative.
 - **k default** — the `retrieval_top_k` service default and per-agent override key.
-- **`as_of` override** — adopt as specced or drop (Set B then asserts with tolerances).
+- **`as_of` override** — adopt as specced or drop (Set B then asserts with tolerances). If
+  adopted, `tests\CLAUDE.md`'s time-travel line (injected `valid_at`) gains the second mechanic.
 - **`weight_overrides` reserved shape.**
 - **Query-embedding failure fallback** — the suggested ladder row above.
 - **Empty/short-store behavior** — 0..k items vs. an error/signal (suggested: not an error).
