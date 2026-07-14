@@ -268,3 +268,63 @@ thresholds, idempotency — constrained to no-new-schema, embedding-failure degr
 and surfaces open flags (scene-boundary needs no migration-02; the render seam — raw
 `observation_text` vs. rendered `original` detail content; VADER lacks an arousal axis). These are
 ruled at the write path's build, not now.
+
+## Write-path build — fork rulings & build notes — 2026-07-13
+
+Write path v1 built and floor-verifier-passed (verification on scratch DB `longmem_test`; product
+`longmem` confirmed untouched). Jack ruled the four majors up front; the minor shapes were approved
+with the build plan.
+
+1. **Render seam — confirmed as specced.** Raw client text → `memories.observation_text`
+   (immutable); the Haiku render → the `original` detail head's `content`; gist spans point into
+   `observation_text`. On write-call failure the head falls back to the raw observation text
+   (never a lost write).
+2. **Embedding failure → the write lands with a NULL embedding.** `embedding IS NULL` is the
+   queryable degradation signal (frozen schema allows no flag column); mirrored in the payload as
+   `IngestResult.embedding_failed` — a payload-only extension of the spec's field list, added so
+   the degradation is assertable without a DB peek. Memory stays reachable via the entity/GIN
+   path; vector backfill is future work.
+3. **NLP stack: spaCy `en_core_web_lg` + fastcoref + VADER + Warriner 2013 VAD lexicon.**
+   - **License gate outcome:** NRC-VAD **rejected** — non-commercial-research-only, incompatible
+     with the planned Apache-2.0 flip. The pre-ruled fallback **Warriner et al. 2013** is CC-BY
+     4.0 (per its NoRaRe database entry) and is bundled, slimmed to Word/V/A/D columns, at
+     `data\lexicons\warriner_2013_vad.csv` with `ATTRIBUTION.md`.
+   - Affect: VADER compound → `affect_valence`; Warriner lemma-lookup means (1–9 normalized to
+     0–1) → `affect_arousal`; **dominance lives in `affect_detail` jsonb** (frozen schema has no
+     dominance column) alongside the raw VADER + Warriner breakdowns. Arousal is therefore
+     populated in v1 — the spec's open flag is closed.
+   - **Environment facts (recorded so a rebuild reproduces them):** fastcoref 2.1.6 is
+     incompatible with transformers 5.x at runtime → `requirements.txt` pins `transformers<5`
+     (4.57.6 verified). fastcoref internally requires `en_core_web_sm` (its tokenizer), installed
+     alongside `en_core_web_lg`. spaCy model downloads must use the pip wheel URLs pinned in
+     `requirements.txt`, NOT `spacy download` — spaCy's downloader shells out to uv on this
+     machine (installed for the Postgres MCP) and dies outside a venv. psycopg async cannot run
+     on Windows' ProactorEventLoop → the API runs via `python -m app.serve` (SelectorEventLoop
+     runner), never bare `uvicorn app.api:app`; the walker passes `loop_factory` to
+     `asyncio.run`.
+   - Coref/NER confidence: fastcoref's public predict API exposes no per-span probability and
+     `en_core_web_lg`'s greedy NER exposes none either, so v1 treats every coref-derived identity
+     span as low-confidence — over-calls only (biased loose), never suppresses.
+4. **LLM escalation: full in v1, gist correctness over speed/cost.** Separate provider + its own
+   env var (`LONGMEM_MODEL_ESCALATION`). Five triggers, any one fires (all integrator-tunable via
+   `agents.config`, defaults in `app\config.py::SERVICE_DEFAULTS`): (1) importance ≥ 0.45;
+   (2) identity/category hit with |valence| ≥ 0.5; (3) any novel entity; (4) unresolved
+   pronoun/noun-chunk co-occurring with an identity/category hit; (5) low NLP confidence on an
+   already-flagged span. `escalated_by` + escalation token counts recorded per write in
+   `IngestResult.instrumentation` (feeds the per-100-turn cost table).
+   **Failure path — BUILD-PHASE STANCE, MUST BE RE-RULED BEFORE THE DEMO PUBLISHES:** retry once,
+   then HARD-STOP the write (fail-loud; nothing inserted — escalation precedes the insert, so a
+   client resend is safe pre-idempotency). This is deliberately not a production posture; the
+   production/demo failure behavior for escalation is an **open decision** owed before the demo
+   video ships.
+5. **Minor shapes (approved with the plan):** wire shape `POST /v1/events/observe`,
+   `POST /v1/events/scene-boundary`, `PUT /v1/memories/{memory_id}/pin`; idempotency stays
+   accept-not-enforce (spec default; needs schema); `phase_tag` and `event_id` are accepted but
+   have no schema home in v1 (not stored, not echoed); per-role env vars retained with a loud
+   startup check that the three write-call roles (importance/render/typology) name the same model
+   (one call serves all three in v1); provider selection `LONGMEM_PROVIDER_MODE = real | fake`
+   (fake = offline default); process env vars override same-named `.env` keys (lets verification
+   target the scratch DB without touching `.env`); verification runs on a scratch DB
+   `longmem_test` created/dropped around the walker via the new `db\migrate.py --database-uri`
+   flag (floor re-verified: no-arg run on `longmem` still a clean no-op); no agent-creation
+   endpoint in v1 — fixtures insert agents via SQL.

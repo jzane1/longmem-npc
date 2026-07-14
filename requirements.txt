@@ -3,4 +3,31 @@
 #
 # The Postgres MCP server runs from its own isolated uv-managed Python 3.13 tool
 # venv and is NOT listed here — see docs\mcp-setup.md and decisions.md.
-psycopg[binary]==3.3.4
+#
+# NOTE (2026-07-13): spaCy model downloads must go through pip URLs below, NOT
+# `python -m spacy download ...` — spaCy's downloader shells out to uv on this
+# machine (uv is installed for the Postgres MCP) and fails outside a venv.
+
+# storage
+psycopg[binary,pool]==3.3.4
+pgvector==0.5.0
+
+# API surface
+fastapi==0.139.0
+uvicorn==0.51.0
+
+# model providers
+anthropic==0.116.0
+openai==2.45.0
+
+# write-time NLP stack (ruled 2026-07-13; see decisions.md)
+spacy==3.8.13
+fastcoref==2.1.6
+vaderSentiment==3.3.2
+# fastcoref 2.1.6 is incompatible with transformers 5.x at runtime
+# (FCorefModel breaks on the renamed all_tied_weights_keys internals) — pin <5.
+transformers<5
+
+# spaCy models: lg = the write pass pipeline; sm = fastcoref's internal tokenizer.
+https://github.com/explosion/spacy-models/releases/download/en_core_web_lg-3.8.0/en_core_web_lg-3.8.0-py3-none-any.whl
+https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl

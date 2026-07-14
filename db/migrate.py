@@ -13,11 +13,15 @@ Environment: Windows 11, global Python 3.14, psycopg v3 (sync — the async pool
 a write-path concern; this is a one-shot admin script). Reads DATABASE_URI from the
 gitignored repo-root .env.
 
-    PowerShell:  python db\\migrate.py
+    PowerShell:  python db\\migrate.py [--database-uri <uri>]
+
+--database-uri overrides the .env DATABASE_URI (used for the write-path
+verification scratch database; added 2026-07-13, floor re-verified).
 """
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -50,7 +54,14 @@ def load_database_uri() -> str:
 
 
 def main() -> None:
-    uri = load_database_uri()
+    parser = argparse.ArgumentParser(description="longmem-npc migration runner")
+    parser.add_argument(
+        "--database-uri",
+        default=None,
+        help="override the .env DATABASE_URI (e.g. the verification scratch DB)",
+    )
+    args = parser.parse_args()
+    uri = args.database_uri or load_database_uri()
     files = sorted(MIGRATIONS_DIR.glob("*.sql"), key=lambda p: p.name)
     if not files:
         sys.exit(f"ERROR: no migration files found in {MIGRATIONS_DIR}.")
