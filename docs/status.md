@@ -2,12 +2,14 @@
 
 **Last updated:** 2026-07-14
 **Phase:** scope re-slated by ruling — **the reconstruction mechanism is now pre-demo** (2026-07-14
-audit + dated ruling in `decisions.md`, superseding-in-part *Schema now, mechanism later*). Two
-floors stand verified: the migration-01 schema and write path v1 (ingest service + thin FastAPI
-route + real/fake providers + NLP pass, per `write-path.md`). **One open decision owed before the
-demo ships:** the escalation hard-stop failure path is a build-phase stance and must be re-ruled
-for production (see the 2026-07-13 write-path build entry in `decisions.md`). The read path is
-**specced** (`read-path.md`, 2026-07-14 — scope rulings dated in `decisions.md`). Next: build it.
+audit + dated ruling in `decisions.md`, superseding-in-part *Schema now, mechanism later*). Three
+floors stand verified: the migration-01 schema, write path v1 (ingest service + thin FastAPI route
++ real/fake providers + NLP pass, per `write-path.md`), and **read path v1** (dialogue-init
+retrieval service + shared decay math + thin route, per `read-path.md` — built & floor-verified
+2026-07-14, all settle-shapes ruled in the dated `decisions.md` entry). **One open decision owed
+before the demo ships:** the escalation hard-stop failure path is a build-phase stance and must be
+re-ruled for production (see the 2026-07-13 write-path build entry in `decisions.md`). Next: the
+CLI harness — the vertical slice's remaining piece.
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -39,6 +41,7 @@ and the structured behavior output survive the interview. Research publication c
 | Postgres 16 + pgvector 0.8.5 container (`longmem-pg`) + read-only Postgres MCP | live: `docker` health `healthy`, `pg_available_extensions` → `vector 0.8.5`, `claude mcp list` → `postgres ✓ Connected` | 2026-07-13 |
 | Migration 01 foundational schema — 9 tables, 7 CHECKs, HNSW cosine + GIN + one-live-head + FK indexes (`db\migrations\001_foundation.sql`, applied by `db\migrate.py`) | floor-verifier **pass** on live `longmem`: every done-when re-run (idempotent second run, CHECK rejection, server UUID defaults, smoke fixture) + `vector 0.8.5` enabled; DB left pristine (only `schema_migrations`) | 2026-07-13 |
 | Write path v1 — ingest service seam (`app\ingest.py`) + thin FastAPI route (`app\api.py`, served via `python -m app.serve`) + real/deterministic-fake providers (`app\providers.py`) + NLP pass (`app\nlp.py`: spaCy lg + fastcoref + VADER + Warriner VAD) + atomic insert (`app\db.py`) | floor-verifier **pass** against the migration-01 floor: structural walker `tests\verify_write_path.py` re-run independently (35 assertions covering all 14 done-when criteria) on scratch `longmem_test`; `db\migrate.py` no-arg still a clean no-op on `longmem`; product `longmem` confirmed pristine via postgres MCP; independent spot-check of live head, span offsets, and degradation rows | 2026-07-13 |
+| Read path v1 — retrieval service seam (`app\retrieval.py`) + shared decay math (`app\decay.py`) + thin `POST /v1/dialogue/init` route (`app\api.py`) + read-only candidate SQL (`app\db.py`) + wire models (`app\schemas.py`) + five knobs (`app\config.py`) | floor-verifier **pass** against the migration-01 + write-path floors: structural walker `tests\verify_read_path.py` re-run independently (34 assertions, done-when 1–11) on scratch `longmem_test`; `tests\verify_write_path.py` re-run (35 assertions — shared files touched, floor intact); `db\migrate.py` no-arg still a clean no-op on `longmem`; `longmem` confirmed pristine; independent read-only SQL spot-checks (live head, NULL-embedding row, one-live-head index); plus a live `python -m app.serve` route session with byte-identical repeated reads | 2026-07-14 |
 
 ## Open questions needing Jack's ruling
 
@@ -168,28 +171,48 @@ and the structured behavior output survive the interview. Research publication c
   the encoding-context term), exclusion now stated in the spec — plus three residuals fixed
   (architecture §6 spec-pending marker, Set B score-surface note, empty-store settle-tag);
   grep-verified.
+- **2026-07-14** — **Read path v1 built, verified, and committed.** Jack ruled the two genuine
+  settle-forks at plan approval (`as_of` **adopted**; query-embedding failure → **fail-quiet
+  fallback** with per-item `relevance = null`) and one build-surfaced conflict
+  (**importance_norm = clamp + floor, superseding the spec's min-max suggestion** — min-max
+  bounds over live rows would let an invalidated extreme row move *other* items' scores, breaking
+  Set B's decay-vs-invalidation separation); the remaining shapes were approved with the plan
+  (dated "Read-path build rulings" entry in `decisions.md` records all nine + the
+  `(−score, memory_id)` determinism sort). New: `app\retrieval.py` (the retrieval seam),
+  `app\decay.py` (THE decay implementation — the reconstruction theta check imports it at
+  item 3), read wire models in `app\schemas.py`, read-only candidate SQL in `app\db.py`,
+  `POST /v1/dialogue/init` in `app\api.py`, five knobs in `app\config.py`,
+  `tests\verify_read_path.py` (34-assertion structural walker), and the `as_of` mechanic added to
+  `tests\CLAUDE.md`'s time-travel line. Verification ran on scratch `longmem_test`
+  (created/migrated/dropped around the walkers); `tests\verify_write_path.py` re-run clean
+  (35/35 — shared files touched, floor intact); a live `python -m app.serve` session returned
+  byte-identical items across repeated reads. floor-verifier **pass** — both walkers re-run
+  independently, `longmem` confirmed pristine, independent read-only SQL spot-checks. **Flag:**
+  the floor-verifier dispatch again had no `mcp__postgres__*` tools (it fell back to equivalent
+  read-only `docker exec psql` checks) — the 2026-07-13 allowlist fix did not hold for this
+  dispatch; revisit before the next verification. Docs propagated: BUILT banner + inline ruling
+  annotations in `read-path.md`, architecture §6 built marker, dated `decisions.md` entry.
 
 ## Immediate queue
 
-1. Read path: dialogue-init top-k with IDs + scores (+ the retrieval scoring function from the
-   artifact queue; `read_mode`/`pinned` in payloads). **Specced 2026-07-14 (`read-path.md`) —
-   build next**; remaining physical shapes settle at build.
-2. CLI harness (vertical slice complete — includes the single Sonnet dialogue call + action
+1. CLI harness (vertical slice complete — includes the single Sonnet dialogue call + action
    directive + reputation delta/snapshot per architecture §9; no gate, no caching, no
    reconstruction in the slice) + synthetic load driver alongside.
-3. **Reconstruction (re-slated pre-demo 2026-07-14):** spec (reconstruction call + seed-only
+2. **Reconstruction (re-slated pre-demo 2026-07-14):** spec (reconstruction call + seed-only
    identity-document rendering + cache + drift budget + write-back + serving shape) → build →
-   verification.
-4. Authorial-correction endpoint (small target; the correction-override demo beat).
-5. Mid-dialogue gate + threshold values, efficacy definitions, per-signal fire logging.
-6. Test-suite scoped session (Sets A-authorial, B, C + degradation cases now mostly runnable).
-7. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
+   verification. Attaches to the read path's serving stage; the theta check imports
+   `app\decay.py`.
+3. Authorial-correction endpoint (small target; the correction-override demo beat).
+4. Mid-dialogue gate + threshold values, efficacy definitions, per-signal fire logging.
+5. Test-suite scoped session (Sets A-authorial, B, C + degradation cases now mostly runnable).
+6. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
    choreography incl. the 60-day drift beat.
-8. Before the demo ships: re-rule the escalation failure path (see open questions) and pick a
+7. Before the demo ships: re-rule the escalation failure path (see open questions) and pick a
    real-provider smoke moment (one live observe with keys) ahead of demo choreography.
 
-*(Done 2026-07-13: **Write path v1** — see the verified-floors table and session log. Earlier same
-day: **Migration 01 foundational schema**; connect the Postgres MCP + floor-verifier MCP access.)*
+*(Done 2026-07-14: **Read path v1** — see the verified-floors table and session log. Done
+2026-07-13: **Write path v1**. Earlier same day: **Migration 01 foundational schema**; connect the
+Postgres MCP + floor-verifier MCP access.)*
 
 ## Open artifact queue (writing tasks against settled decisions — not decisions)
 
@@ -202,7 +225,8 @@ day: **Migration 01 foundational schema**; connect the Postgres MCP + floor-veri
   post-August.
 - Retrieval scoring function: relevance × recency(decay class) × importance_norm; pin exemption;
   normalization; slots for the future context term and per-call split-brain overrides. —
-  **Consolidated into `read-path.md` 2026-07-14** (shapes settle at build).
+  **Consolidated into `read-path.md` 2026-07-14 and now BUILT** (shapes ruled at build; dated
+  `decisions.md` entry).
 - Reconstruction call spec: operator-structured prompt with gist as fixed constraint; determinism;
   batching shape. **Feeds immediate-queue item 3 — pre-demo since the 2026-07-14 re-slating.**
 - Reflection spec end-to-end (mechanism explicitly post-August — ruled 2026-07-14).

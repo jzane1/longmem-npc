@@ -6,11 +6,15 @@ retrieval service. Design truth is [architecture.md](architecture.md) §4.2 + §
 it are in [decisions.md](decisions.md); the schema it reads is frozen in
 [migration-01.md](migration-01.md). This doc points, it does not re-derive.
 
-> **Status: SPECCED 2026-07-14, not yet built.** Two scope forks ruled at spec time (dated
-> "Read-path spec scope rulings" entry in `decisions.md`): query input = **text + reserved
-> context**; v1 serving = **verbatim-only**. The surface was already fixed by the 2026-07-14
-> re-slating ruling: retrieval-only — the Sonnet dialogue call rides with the CLI harness.
-> **No new DB migration — the migration-01 schema stays frozen.** Reconstruction
+> **Status: BUILT & floor-verified 2026-07-14.** Every `[SETTLE-AT-BUILD]` item below was ruled at
+> build time (dated "Read-path build rulings" entry in `decisions.md`); the rulings are annotated
+> inline. One build ruling supersedes a spec suggestion: **importance_norm is clamp + floor, not
+> min-max** (min-max would have let an invalidated extreme row move other items' scores, breaking
+> this spec's own Set B principle). **The build added no new DB migration — the migration-01
+> schema stayed frozen.** Two scope forks had been ruled at spec time (dated "Read-path spec scope
+> rulings" entry in `decisions.md`): query input = **text + reserved context**; v1 serving =
+> **verbatim-only**. The surface was already fixed by the 2026-07-14 re-slating ruling:
+> retrieval-only — the Sonnet dialogue call rides with the CLI harness. Reconstruction
 > (immediate-queue item 3) lands next **on this seam**; the serving boundary below is drawn so it
 > attaches without rework.
 
@@ -77,8 +81,8 @@ reconstruction on miss, `read_mode = "reconstructed"` past threshold.
 | `query_text` | **required** — the relevance probe, embedded **as-is** (ruled 2026-07-14: the integrator authors it — opening utterance or scene blurb; the service never composes prose; a template would be a hidden hardcoded authorial artifact). |
 | `k` | optional; default = integrator knob (per-agent via `agents.config`, service default in `app\config.py`). |
 | `location_name` / `entities[]` / `event_time` | **RESERVED** (ruled 2026-07-14): accepted and shape-validated, **not consumed by v1 scoring, not echoed** — slots for the post-August encoding-context term, mirroring three of the four write-side context stamps. **Affect is deliberately not reserved** (ruled 2026-07-14): a query-side affect field's shape — and whose affect it would carry — is undesigned; it gets its shape with the encoding-context term rather than as a guessed slot. Documented inert (hostile-integrator discipline: per-field behavior stated). |
-| `weight_overrides` | **RESERVED** slot for per-call split-brain scoring overrides (post-August): accepted, not consumed, not echoed. `[SETTLE-AT-BUILD]` exact shape — suggested `{relevance, recency, importance}` float multipliers. |
-| `as_of` | optional world-time override for age computation (time-travel / Set B test surface). `[SETTLE-AT-BUILD]` — suggested: tz-aware timestamp, defaults to server now (UTC), surfaced in instrumentation. |
+| `weight_overrides` | **RESERVED** slot for per-call split-brain scoring overrides (post-August): accepted, not consumed, not echoed. `[SETTLE-AT-BUILD]` exact shape — **ruled 2026-07-14 as suggested:** `{relevance, recency, importance}` optional float multipliers. |
+| `as_of` | optional world-time override for age computation (time-travel / Set B test surface). `[SETTLE-AT-BUILD]` — **ADOPTED as suggested (ruled 2026-07-14):** tz-aware timestamp, defaults to server now (UTC), surfaced in instrumentation as `as_of_effective`; `tests\CLAUDE.md`'s time-travel line carries the second mechanic. |
 
 ## `RetrievalResult` — the structured payload
 
@@ -121,23 +125,30 @@ score = relevance × recency(decay class) × importance_norm
 computed at read time, returned per item with all components.
 
 - **Relevance** — cosine similarity via the HNSW index (`vector_cosine_ops`, locked 1536).
-  `[SETTLE-AT-BUILD]` distance→similarity mapping — suggested `clamp(1 − cosine_distance, 0, 1)` —
-  and the SQL shape: over-fetch N ≥ k candidates by vector distance, then re-rank by full score
-  (suggested over-fetch factor as a knob).
+  `[SETTLE-AT-BUILD]` distance→similarity mapping — **ruled 2026-07-14 as suggested:**
+  `clamp(1 − cosine_distance, 0, 1)`; SQL shape: over-fetch `max(k, ceil(factor × k))` candidates
+  by vector distance over live rows with non-NULL embeddings, re-rank by full score; knob
+  `retrieval_overfetch_factor`, default 4.0.
 - **Recency** — reuses the decay math (architecture §4.2), one implementation later shared by the
   theta check: `tau_effective = tau_base(decay_class) × (1 + k_importance × importance_raw)`;
   `recency = exp(−age / tau_effective)`; `age = as_of − valid_at`. `tau_base` from the agent's
   `decay_classes` config map; rows flagged `decay_class_unknown` use the default class (same rule
-  as write). `[SETTLE-AT-BUILD]` the `k_importance` knob name/default, and confirmation that the
-  recency term and detail decay share `tau_effective` exactly (suggested: yes — one formula, one
-  implementation).
-- **importance_norm** — normalized at read from stored raw. `[SETTLE-AT-BUILD]` method — suggested
-  min-max over the agent's live candidates with a degenerate guard (all equal → 1.0) and a floor
-  > 0 so the multiplicative score never zeroes a memory out of existence.
+  as write). `[SETTLE-AT-BUILD]` — **ruled 2026-07-14:** knob `decay_k_importance`, default 1.0;
+  shared `tau_effective` **confirmed** — one formula, one implementation (`app\decay.py`, which
+  the theta check imports at item 3); age clamps at ≥ 0; a label resolving to neither the map nor
+  a default class takes the `tau_fallback_seconds` knob (default 604800) — a read never fails on
+  a resolvable row.
+- **importance_norm** — normalized at read from stored raw. `[SETTLE-AT-BUILD]` method —
+  **ruled 2026-07-14: clamp + floor, superseding this spec's min-max suggestion:**
+  `clamp(importance_raw, importance_norm_floor, 1.0)`, floor default 0.05 (never zeroes a memory
+  out of existence). Min-max over live rows was rejected at build: invalidating an extreme row
+  would move *other* items' scores, breaking the Set B principle above; raw is already
+  contractually 0..1 from the write call.
 - **Pin exemption** — pinned rows take `recency = 1.0` (pin = decay exemption, architecture §8;
   pin's second meaning, reconstruction exclusion, binds at item 3).
-- **Normalization** — `[SETTLE-AT-BUILD]` — suggested: each component in [0,1] so the product is
-  in [0,1]; no further rescaling.
+- **Normalization** — `[SETTLE-AT-BUILD]` — **ruled 2026-07-14 as suggested:** each component in
+  [0,1] so the product is in [0,1]; no further rescaling. Ties in the final ordering break on
+  `memory_id`, so repeated identical calls are byte-identical.
 - **Reserved slots** — the encoding-context term multiplies in post-August; per-call
   `weight_overrides` apply under the split-brain topology. Neither is consumed in v1.
 - **`scoring_failed` rows** flow through normally (importance was neutral at write; no read-time
@@ -147,9 +158,9 @@ computed at read time, returned per item with all components.
 
 | Condition | Behavior |
 |---|---|
-| query-embedding call fails | `[SETTLE-AT-BUILD]` — suggested: **fail-quiet fallback** — rank all live candidates (including NULL-embedding rows) by `recency × importance_norm`, return with `degraded = true` + reason. Precedent: the gate ladder's embeddings-down rung ranks by recency × importance; the read analog of never-lose-a-write is **never-blank-a-dialogue**. |
+| query-embedding call fails | `[SETTLE-AT-BUILD]` — **ruled 2026-07-14 as suggested: fail-quiet fallback** — rank all live candidates (including NULL-embedding rows) by `recency × importance_norm`, return with `degraded = true` + reason; the per-item `relevance` component is null on this path (none was computed). Precedent: the gate ladder's embeddings-down rung ranks by recency × importance; the read analog of never-lose-a-write is **never-blank-a-dialogue**. |
 | stored row has NULL embedding | absent from vector candidates (documented consequence); reachable via the degraded path now and the gate's GIN path later. |
-| fewer than k live memories (or none) | `[SETTLE-AT-BUILD]` — suggested: return what exists (0..k items), not an error; an empty store is a valid young-NPC state. |
+| fewer than k live memories (or none) | `[SETTLE-AT-BUILD]` — **ruled 2026-07-14 as suggested:** return what exists (0..k items), not an error; an empty store is a valid young-NPC state. |
 
 ## Model provider interfaces
 
@@ -162,17 +173,25 @@ role binds at item 3.)
 
 ## `[SETTLE-AT-BUILD]` — physical shapes, ruled at build (stop and report, never silently choose)
 
-- **Wire shape** — route path/verb (suggested `POST /v1/dialogue/init` — reconstruction's pre-warm
-  hooks here at item 3), Pydantic models in `app\schemas.py`, route pass-through.
-- **Relevance mapping + SQL shape** — distance→similarity; over-fetch factor and its knob.
-- **Recency knobs** — `k_importance` name/default; shared-`tau_effective` confirmation.
-- **importance_norm method** — min-max + guard + floor, or an alternative.
-- **k default** — the `retrieval_top_k` service default and per-agent override key.
-- **`as_of` override** — adopt as specced or drop (Set B then asserts with tolerances). If
-  adopted, `tests\CLAUDE.md`'s time-travel line (injected `valid_at`) gains the second mechanic.
-- **`weight_overrides` reserved shape.**
-- **Query-embedding failure fallback** — the suggested ladder row above.
-- **Empty/short-store behavior** — 0..k items vs. an error/signal (suggested: not an error).
+**All ruled 2026-07-14 with the build plan** (dated "Read-path build rulings" entry in
+`decisions.md`; annotated inline above):
+
+- **Wire shape** — ruled as suggested: `POST /v1/dialogue/init` (reconstruction's pre-warm hooks
+  here at item 3), Pydantic models in `app\schemas.py`, route pass-through, unknown agent → 404.
+- **Relevance mapping + SQL shape** — ruled as suggested: `clamp(1 − cosine_distance, 0, 1)`;
+  over-fetch `retrieval_overfetch_factor` (4.0).
+- **Recency knobs** — ruled: `decay_k_importance` (1.0); shared `tau_effective` confirmed
+  (`app\decay.py`); `tau_fallback_seconds` (604800) for unresolvable labels.
+- **importance_norm method** — ruled: **clamp + floor** (`importance_norm_floor`, 0.05) — the
+  alternative won; min-max rejected for breaking the invalidation principle (see above).
+- **k default** — ruled: `retrieval_top_k` = 8, same-name per-agent override key.
+- **`as_of` override** — **ADOPTED**; `tests\CLAUDE.md`'s time-travel line carries the second
+  mechanic.
+- **`weight_overrides` reserved shape** — ruled as suggested: `{relevance?, recency?,
+  importance?}` float multipliers.
+- **Query-embedding failure fallback** — ruled: the suggested fail-quiet ladder row, with
+  `relevance = null` per item on that path.
+- **Empty/short-store behavior** — ruled as suggested: 0..k items, never an error.
 
 ## Done when
 

@@ -1,4 +1,4 @@
-"""config.py — environment + integrator-knob loading for the write path.
+"""config.py — environment + integrator-knob loading for the write and read paths.
 
 Secrets and connection strings live only in the gitignored repo-root .env
 (same manual parse as db\\migrate.py — no dotenv dependency). Never print or
@@ -59,6 +59,23 @@ SERVICE_DEFAULTS: dict[str, float] = {
     # without a confidence (architecture §5: a default table exists; single
     # scalar default until the table earns per-typology entries).
     "typology_confidence_default": 0.9,
+    # --- read path (read-path.md; build rulings 2026-07-14) -----------------
+    # Default top-k for dialogue-init retrieval.
+    "retrieval_top_k": 8,
+    # Vector over-fetch: fetch ceil(factor * k) candidates by distance, then
+    # re-rank by the full score.
+    "retrieval_overfetch_factor": 4.0,
+    # k in tau_effective = tau_base * (1 + k * importance_raw) — shared by the
+    # recency score component and, at reconstruction, the theta check
+    # (one formula, one implementation: app\decay.py).
+    "decay_k_importance": 1.0,
+    # importance_norm = clamp(importance_raw, floor, 1.0): the floor keeps the
+    # multiplicative score from zeroing a memory out of existence.
+    "importance_norm_floor": 0.05,
+    # tau_base when neither the stored decay-class label nor the agent's
+    # default class resolves in agents.config — a read never fails on a
+    # resolvable row.
+    "tau_fallback_seconds": 604800.0,
 }
 
 

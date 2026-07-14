@@ -417,3 +417,56 @@ shared-`tau_effective` confirmation, importance_norm method, k default, `as_of` 
 `weight_overrides` shape, empty/short-store behavior, query-embedding-failure fallback — suggested
 fail-quiet recency × importance ranking with a `degraded` flag, the read analog of
 never-lose-a-write). These are ruled at the read path's build, not now.
+
+## Read-path build rulings — 2026-07-14
+
+Every `[SETTLE-AT-BUILD]` shape in `read-path.md` was reported with the build plan and ruled by Jack
+before being built. Two genuine forks plus one build-surfaced conflict were ruled explicitly; the
+remaining shapes were approved with the plan (the write-path precedent). All knobs below are
+service defaults in `app\config.py`, per-agent overridable via `agents.config` (`agent_knob`).
+
+1. **`as_of` override — ADOPTED as specced.** Optional tz-aware timestamp on `DialogueInitRequest`;
+   defaults to server now (UTC); echoed in instrumentation as `as_of_effective`. Consequence
+   propagated: `tests\CLAUDE.md`'s time-travel line now names both mechanics (injected `valid_at`
+   + `as_of`).
+2. **Query-embedding failure — FAIL-QUIET fallback** (the spec's suggested ladder row): rank ALL
+   live candidates (NULL-embedding rows included) by `recency × importance_norm`;
+   `degraded = true` + reason in instrumentation. Sub-shape ruled with it: the per-item
+   `relevance` component is **null** on this path — honest self-description, none was computed
+   (the field is `float | None`). Never-blank-a-dialogue, the read analog of never-lose-a-write.
+   **Rejected:** fail-loud — a dead embedding provider would silence every NPC.
+3. **`importance_norm` = clamp + floor, superseding the spec's min-max suggestion.**
+   `importance_norm = clamp(importance_raw, importance_norm_floor, 1.0)`, floor default **0.05**.
+   Ruled on a conflict surfaced at build: min-max bounds over the agent's live rows would let
+   invalidating an extreme row move *other* items' scores, breaking the spec's own Set B principle
+   ("invalidation excludes rows without touching other items' scores"). `importance_raw` is
+   already contractually 0..1 from the write call, so read-time normalization is honestly a
+   floor + clamp, and the invalidation principle now holds exactly, for every row. Tradeoff
+   accepted: a compressed importance distribution is not stretched to full [0,1]. NULL
+   `importance_raw` (fixture-only; the write path never stores it) takes the `importance_neutral`
+   knob before clamping.
+4. **Wire shape:** `POST /v1/dialogue/init`, `response_model = RetrievalResult`, route
+   pass-through; unknown agent → 404 (mirrors the write path). Models in `app\schemas.py`;
+   reconstruction's pre-warm hooks this endpoint at item 3.
+5. **Relevance mapping + SQL shape:** `relevance = clamp(1 − cosine_distance, 0, 1)`; over-fetch
+   `max(k, ceil(retrieval_overfetch_factor × k))` candidates by `<=>` over live rows with
+   non-NULL embeddings joined to the live detail head, re-ranked in Python by the full score.
+   Knob `retrieval_overfetch_factor` default **4.0**.
+6. **Recency knobs:** shared `tau_effective` **CONFIRMED** — one formula, one implementation
+   (`app\decay.py`), which the reconstruction theta check imports at item 3. Knob
+   `decay_k_importance` default **1.0** (named for the shared decay math, not retrieval-only).
+   `age = as_of − valid_at`, clamped at ≥ 0 so a future-dated `valid_at` caps at recency 1.0.
+   Label → tau resolution mirrors the write path's rule (stored label if mapped → the agent's
+   default class → new knob `tau_fallback_seconds`, default **604800** — a read never fails on a
+   resolvable row).
+7. **k default:** knob `retrieval_top_k` = **8**; resolution order request `k` (≥ 1) →
+   `agents.config` → service default; the effective value surfaces as `k_effective`.
+8. **`weight_overrides` reserved shape:** optional `{relevance?, recency?, importance?}` float
+   multipliers; shape-validated, not consumed, not echoed (as suggested).
+9. **Empty/short store:** 0..k items, never an error — a valid young-NPC state (as suggested);
+   `candidate_count` in instrumentation.
+
+Approved with the plan, cross-cutting: component normalization as suggested (each component in
+[0,1], product in [0,1], no further rescaling), and a determinism shape — final ordering
+`(−score, memory_id)` so ties are stable and within-scene byte-identity holds across identical
+calls.

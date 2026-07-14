@@ -149,9 +149,12 @@ write-time facts from day one.
 **Dialogue initialization:** top-k retrieval. Endpoints return **memory IDs and scores alongside
 prose** — this is load-bearing; it is what makes the test suite assertable.
 
-**Retrieval scoring** (specced in `read-path.md`, 2026-07-14; physical shapes settle at build):
-`relevance × recency(decay class) × importance_norm`; pin exemption; normalization; reserved slots
-for a future encoding-context term and per-call overrides under the split-brain topology.
+**Retrieval scoring** (built & floor-verified 2026-07-14, `read-path.md`; shapes ruled in the
+dated `decisions.md` entry): `relevance × recency(decay class) × importance_norm`; pin exemption;
+normalization; reserved slots for a future encoding-context term and per-call overrides under the
+split-brain topology. importance_norm is clamp + floor (ruled over min-max so invalidation can
+never move other items' scores); the decay math lives once, in `app\decay.py`, shared later by
+the reconstruction theta check.
 
 **Mid-dialogue gate (non-LLM hybrid):**
 - **Novelty check** — embed the utterance; measure distance against the loaded set; far from all →

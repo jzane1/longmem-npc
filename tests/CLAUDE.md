@@ -12,7 +12,8 @@ NEVER assert on generated prose: no substring matches, no regex over model outpu
 similarity checks. A model's wording is not a test surface.
 
 ## Mechanics
-- Time travel = injected valid_at timestamps. Tests never sleep() and never depend on wall clock.
+- Time travel = injected valid_at timestamps, plus the read path's `as_of` request override
+  (adopted 2026-07-14). Tests never sleep() and never depend on wall clock.
 - No fixture modes. Correction scenarios are verb-forked structural pairs keyed on write_cause.
 - Deterministic: the suite runs in CI and must pass every run.
 - Judged or LLM-graded evals do not live in this folder — they belong to the separate eval story.

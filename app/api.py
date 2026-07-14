@@ -1,9 +1,10 @@
-"""api.py — thin FastAPI routes over the ingest service.
+"""api.py — thin FastAPI routes over the ingest and retrieval services.
 
-Pass-through by ruling (2026-07-13): for one ingest, the route's JSON response
-is exactly the serialization of the `IngestResult` the service returned — the
-route adds and drops nothing, and records no timing or tokens of its own (the
-seam is `app\\ingest.py`).
+Pass-through by ruling (2026-07-13, mirrored for reads 2026-07-14): for one
+call, the route's JSON response is exactly the serialization of the result
+the service returned — the route adds and drops nothing, and records no
+timing or tokens of its own (the seams are `app\\ingest.py` and
+`app\\retrieval.py`).
 
     PowerShell:  python -m app.serve
 (not bare `uvicorn app.api:app` — see app\\serve.py for the Windows
@@ -27,11 +28,14 @@ from app.ingest import (
 )
 from app.nlp import warm_pipelines
 from app.providers import build_providers
+from app.retrieval import RetrievalService
 from app.schemas import (
+    DialogueInitRequest,
     IngestResult,
     ObserveEvent,
     PinRequest,
     PinResult,
+    RetrievalResult,
     SceneBoundaryEvent,
     SceneResult,
 )
@@ -45,14 +49,26 @@ async def _lifespan(app: FastAPI):
     import asyncio
 
     await asyncio.to_thread(warm_pipelines)  # model load is startup cost
-    app.state.service = IngestService(pool, build_providers(settings), settings)
+    providers = build_providers(settings)
+    app.state.service = IngestService(pool, providers, settings)
+    app.state.retrieval = RetrievalService(pool, providers, settings)
     try:
         yield
     finally:
         await pool.close()
 
 
-app = FastAPI(title="longmem-npc ingestion API", version="1", lifespan=_lifespan)
+app = FastAPI(title="longmem-npc API", version="1", lifespan=_lifespan)
+
+
+@app.post("/v1/dialogue/init", response_model=RetrievalResult)
+async def dialogue_init(request: DialogueInitRequest) -> RetrievalResult:
+    """Dialogue-init retrieval (read-path.md wire shape, ruled 2026-07-14).
+    Reconstruction's pre-warm hooks this same endpoint at item 3."""
+    try:
+        return await app.state.retrieval.retrieve_dialogue_init(request)
+    except UnknownAgentError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.post("/v1/events/observe", response_model=IngestResult)

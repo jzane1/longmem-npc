@@ -1,4 +1,4 @@
-"""db.py — async connection pool + hand-written SQL for the write path.
+"""db.py — async connection pool + hand-written SQL for the write and read paths.
 
 psycopg v3 with AsyncConnectionPool (stack constant; no ORM, no query
 builder). The observe insert is ONE transaction: memories row + `original`
@@ -6,6 +6,12 @@ memory_details head + memory_gist_spans + any new identity_components land
 together or not at all (write-path.md §pipeline step d). Nothing here ever
 UPDATEs stored content or DELETEs rows; `set_pin` flips the runtime `pinned`
 flag only.
+
+Read-path candidate queries (read-path.md, 2026-07-14) are read-only: live
+memories (`memories.invalid_at IS NULL`) joined to the unique live detail
+head (`memory_details.invalid_at IS NULL`; uniqueness guaranteed by the
+one-live-head index). Invalidation excludes rows here, in SQL — decay never
+does (the two mechanisms stay distinct).
 """
 
 from __future__ import annotations
@@ -213,6 +219,62 @@ async def insert_observation(
         gist_span_ids=gist_span_ids,
         new_component_ids=new_component_ids,
     )
+
+
+@dataclass(frozen=True)
+class CandidateRow:
+    """One live memory joined to its live detail head, as retrieval reads it."""
+
+    memory_id: UUID
+    detail_id: UUID
+    content: str
+    importance_raw: float | None
+    pinned: bool
+    decay_class: str | None
+    valid_at: datetime
+    distance: float | None = None  # cosine distance; None on the degraded path
+
+
+_CANDIDATE_COLUMNS = (
+    "m.memory_id, d.detail_id, d.content, m.importance_raw, m.pinned, "
+    "m.decay_class, m.valid_at"
+)
+_CANDIDATE_FROM = (
+    "FROM memories m JOIN memory_details d "
+    "ON d.memory_id = m.memory_id AND d.invalid_at IS NULL "
+    "WHERE m.agent_id = %s AND m.invalid_at IS NULL"
+)
+
+
+async def fetch_vector_candidates(
+    pool: AsyncConnectionPool, agent_id: UUID, embedding: list[float], limit: int
+) -> list[CandidateRow]:
+    """Over-fetched vector probe: live rows with embeddings, nearest first
+    (HNSW cosine). NULL-embedding rows are unreachable here by design — the
+    write path's ruled degradation consequence; they stay reachable on the
+    degraded path below and via the gate's GIN path later."""
+    vec = _vector(embedding)
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            f"SELECT {_CANDIDATE_COLUMNS}, m.embedding <=> %s AS distance "
+            f"{_CANDIDATE_FROM} AND m.embedding IS NOT NULL "
+            "ORDER BY m.embedding <=> %s LIMIT %s",
+            (vec, agent_id, vec, limit),
+        )
+        rows = await cur.fetchall()
+    return [CandidateRow(*row) for row in rows]
+
+
+async def fetch_live_candidates(
+    pool: AsyncConnectionPool, agent_id: UUID
+) -> list[CandidateRow]:
+    """Degraded-path candidates: every live memory, NULL embeddings included
+    (ruled 2026-07-14: never-blank-a-dialogue). Unordered — the service ranks
+    by recency x importance_norm."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(f"SELECT {_CANDIDATE_COLUMNS} {_CANDIDATE_FROM}", (agent_id,))
+        rows = await cur.fetchall()
+    return [CandidateRow(*row) for row in rows]
 
 
 async def set_pinned(pool: AsyncConnectionPool, memory_id: UUID, pinned: bool) -> bool:

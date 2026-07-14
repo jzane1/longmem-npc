@@ -1,8 +1,10 @@
-"""schemas.py — ingestion API v1 wire models (docs\\write-path.md).
+"""schemas.py — ingestion + retrieval API v1 wire models (docs\\write-path.md,
+docs\\read-path.md).
 
-The FastAPI routes are pass-throughs: for one ingest, the route's JSON is
-exactly the serialized `IngestResult` the service returned. These models are
-therefore both the wire shape and the service return shape.
+The FastAPI routes are pass-throughs: for one call, the route's JSON is
+exactly the serialized result the service returned (`IngestResult` /
+`RetrievalResult`). These models are therefore both the wire shape and the
+service return shape.
 
 Structural notes tied to the frozen migration-01 schema:
 - `phase_tag` and `event_id` are accepted but have no schema home in v1
@@ -156,3 +158,96 @@ class PinResult(BaseModel):
     memory_id: UUID
     pinned: bool
     total_ms: float
+
+
+# ---------------------------------------------------------------------------
+# Read path — dialogue-init retrieval (docs\read-path.md, built rulings
+# 2026-07-14)
+# ---------------------------------------------------------------------------
+
+
+class WeightOverrides(BaseModel):
+    """RESERVED (ruled 2026-07-14): per-call split-brain scoring multipliers.
+
+    Accepted and shape-validated, NOT consumed by v1 scoring, not echoed.
+    Becomes live with the post-August split-brain topology.
+    """
+
+    relevance: float | None = None
+    recency: float | None = None
+    importance: float | None = None
+
+
+class DialogueInitRequest(BaseModel):
+    """Dialogue-init retrieval request (read-path.md request contract).
+
+    `query_text` is embedded AS-IS (ruled 2026-07-14: the integrator authors
+    the probe; the service never composes prose). `location_name`/`entities`/
+    `event_time` are RESERVED slots for the post-August encoding-context term:
+    accepted + shape-validated, not consumed, not echoed. Affect is
+    deliberately NOT reserved (ruled 2026-07-14) — its query-side shape
+    arrives with the encoding-context term. `as_of` is the world-time
+    override for age computation (Set B / time-travel surface).
+    """
+
+    agent_id: UUID
+    query_text: str = Field(min_length=1)
+    k: int | None = Field(default=None, ge=1)
+    location_name: str | None = None  # RESERVED — inert in v1
+    entities: list[str] | None = None  # RESERVED — inert in v1
+    event_time: datetime | None = None  # RESERVED — inert in v1
+    weight_overrides: WeightOverrides | None = None  # RESERVED — inert in v1
+    as_of: datetime | None = None  # defaults to server now (UTC)
+
+    @field_validator("event_time", "as_of")
+    @classmethod
+    def _tz_aware(cls, value: datetime | None) -> datetime | None:
+        if value is not None and value.tzinfo is None:
+            raise ValueError("timestamp must be timezone-aware")
+        return value
+
+
+class RetrievedMemory(BaseModel):
+    """One ranked item: IDs + scores alongside prose (load-bearing — the test
+    suite asserts on this structure, never on prose)."""
+
+    memory_id: UUID
+    detail_id: UUID  # the served live head (Set A's corrected-head surface)
+    content: str  # the live head's text, verbatim (v1 serving ruling)
+    read_mode: Literal["verbatim"]  # widens when reconstruction lands (item 3)
+    pinned: bool
+    score: float  # relevance x recency x importance_norm
+    relevance: float | None  # null on the degraded (no-vector) path
+    recency: float
+    importance_norm: float
+    importance_raw: float  # the debug view's raw axis (as fed to the formula)
+
+
+class RetrievalInstrumentation(BaseModel):
+    """Per-stage timing + token accounting, recorded once at the seam.
+
+    Feeds architecture §11's latency decomposition; surfaced verbatim in the
+    CLI debug view. `degraded` mirrors the ruled fail-quiet embedding
+    fallback; `as_of_effective` is the age-computation timestamp actually
+    used.
+    """
+
+    embed_ms: float
+    sql_ms: float
+    score_ms: float
+    total_ms: float
+    embedding_tokens: int
+    candidate_count: int
+    k_effective: int
+    degraded: bool = False
+    degraded_reason: str | None = None
+    as_of_effective: datetime
+
+
+class RetrievalResult(BaseModel):
+    """Structured return of `retrieve_dialogue_init`; the route serves it
+    verbatim (route-is-pass-through). Reserved request fields are never
+    echoed here."""
+
+    items: list[RetrievedMemory]  # ranked, <= k
+    instrumentation: RetrievalInstrumentation
