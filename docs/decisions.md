@@ -13,6 +13,10 @@ was promoted from schema-only to working day-one behavior for the demo. Rational
 API surface early so mechanisms land without migrations, and so the structural test suite can assert
 shape before cognition exists.
 
+*(Superseded in part 2026-07-14 by the re-slating ruling below: the reconstruction mechanism moves
+into pre-demo scope. The schema-now stance itself and the dissonance and reflection deferrals
+stand.)*
+
 **Retrieval gate: non-LLM hybrid (novelty + entity tripwire).** Mid-dialogue fetches are gated by an
 embedding-novelty check plus an identity-components entity tripwire. No LLM in the gate. A **novelty
 kill-switch is reserved** — to be decided later from the per-signal fire logs, which is why every
@@ -332,3 +336,43 @@ with the build plan.
    `longmem_test` created/dropped around the walker via the new `db\migrate.py --database-uri`
    flag (floor re-verified: no-arg run on `longmem` still a clean no-op); no agent-creation
    endpoint in v1 — fixtures insert agents via SQL.
+
+## Re-slating ruling — reconstruction moves pre-demo — 2026-07-14
+
+A full pre-demo/post-demo scope audit (requested by Jack mid-session, aborting a read-path spec
+attempt whose tentative scoping answers were discarded unrecorded) found that the demo as slated
+demonstrated the immutable record — storage, decay, correction-override, gate-recollect — but not
+the thesis: the reconstruction mechanism sat post-August, so every demo read would have been
+`read_mode = verbatim`, no drift would exist, and the 60-day drift plot beat was explicitly
+contingent ("when reconstruction ships"). Jack ruled:
+
+1. **The reconstruction mechanism ships before the August demo.** In scope: identity-conditioned
+   reconstruction as the mandatory read path past theta; the write-back version chain
+   (`write_cause = reconstruction`); the `(memory_id × identity_version)` cache; the drift budget
+   with re-anchoring; batched serving with pre-warm and the block-with-"reconstructing"-signal
+   miss path; a reconstruction model role (`LONGMEM_MODEL_RECONSTRUCTION`) behind a provider
+   interface with a real implementation + a deterministic fake; the Set C suite scenarios.
+   Rationale: the demo video is the introduction artifact and must demonstrate the claim axis —
+   controlled infidelity above an immutable record — not just the record. The prior deferral
+   traced to the deadline, and the standing rule is that the deadline never drives a decision.
+   **Ruled with the schedule cost explicitly flagged:** pulling the largest mechanism into the
+   August window may cost demo beats or the date; Jack accepted that trade. **Supersedes in
+   part** the *Schema now, mechanism later* primary decision (its reconstruction clause only —
+   the schema-now stance and the dissonance/reflection deferrals stand).
+2. **Authorial-correction endpoint → pre-demo**, its own small build target after reconstruction
+   lands. The correction-override demo beat and the Set A authorial pair require it, and it
+   interacts with reconstruction (cache eviction, drift re-anchoring), so it builds on that floor.
+3. **Scene-boundary consumers split:** the reputation snapshot lands with the dialogue turn
+   (architecture §9's August single-call ship injects it); identity-document
+   recompile-at-scene-edge lands with reconstruction (cache keying needs `identity_version`; the
+   pre-demo document is **seed-prose-only**, rendered + content-hashed, since reflection stays
+   deferred); **prompt-head rebuild / prompt caching → post-August** (no demo beat names it;
+   revisit only if demo latency demands).
+4. **Purge → post-August**, explicitly before the public flip (integrator surface; no demo beat).
+5. **Reflection's "if not landed in August" hedge is resolved: explicitly post-August.**
+
+Consequences propagated: `status.md` immediate queue re-slated (read path → CLI harness →
+reconstruction → authorial correction → gate → suite session → Unity/demo); the post-August ledger
+loses its reconstruction items and gains purge and prompt caching explicitly; the demo
+choreography's 60-day drift plot is a planned beat, no longer contingent; `architecture.md` §2 and
+§7 deferral markers updated. Docs only — no code changed with this ruling.

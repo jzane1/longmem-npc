@@ -95,7 +95,9 @@ Returned by `ingest_observation`, surfaced verbatim in the CLI debug view and as
 ### `scene-boundary`
 
 The explicit, client-sent scene edge (architecture §6). Its three consumers — prompt-head rebuild,
-identity-document recompile, reputation snapshot — are **all deferred**. **v1 accepts the event and
+identity-document recompile, reputation snapshot — are **all deferred** *(slated 2026-07-14:
+reputation snapshot → the dialogue turn; identity-document recompile → reconstruction — both
+pre-demo; prompt-head rebuild → post-August; see `decisions.md`)*. **v1 accepts the event and
 instruments it (timing), and does nothing else; it writes no schema.** The contract exists now so the
 demo choreography and the eventual mechanisms hook a stable, tested event.
 
@@ -103,7 +105,8 @@ demo choreography and the eventual mechanisms hook a stable, tested event.
 
 Toggle `memories.pinned` for a `memory_id`. Pin means exactly two things (architecture §8), both
 honored later at read: decay exemption + reconstruction exclusion. **Freezing the head** and
-restoration-as-a-correction-verb are read/reconstruction concerns and are deferred; v1 sets the flag.
+restoration-as-a-correction-verb are read/reconstruction concerns and are deferred *(pre-demo since
+the 2026-07-14 re-slating)*; v1 sets the flag.
 
 ### Deferred, documented only
 

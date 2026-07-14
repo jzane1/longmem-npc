@@ -1,12 +1,13 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-07-13
-**Phase:** second build target landed — **write path v1 is built and floor-verified** (ingest
-service + thin FastAPI route + real/fake providers + NLP pass, per `write-path.md`), on top of the
-floor-verified migration-01 schema. All build-time `[SETTLE-AT-BUILD]` forks are ruled (dated
-entries in `decisions.md`). **One open decision owed before the demo ships:** the escalation
-hard-stop failure path is a build-phase stance and must be re-ruled for production (see the
-2026-07-13 write-path build entry in `decisions.md`). Next: the read path.
+**Last updated:** 2026-07-14
+**Phase:** scope re-slated by ruling — **the reconstruction mechanism is now pre-demo** (2026-07-14
+audit + dated ruling in `decisions.md`, superseding-in-part *Schema now, mechanism later*). Two
+floors stand verified: the migration-01 schema and write path v1 (ingest service + thin FastAPI
+route + real/fake providers + NLP pass, per `write-path.md`). **One open decision owed before the
+demo ships:** the escalation hard-stop failure path is a build-phase stance and must be re-ruled
+for production (see the 2026-07-13 write-path build entry in `decisions.md`). Next: spec the read
+path (`docs\read-path.md`), scoped knowing reconstruction follows it in the queue.
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -133,13 +134,38 @@ and the structured behavior output survive the interview. Research publication c
   reads RESERVED (not consulted in v1 — no confidence source exists). **No floor changed; no new
   decisions ruled** — the escalation failure-path re-rule remains the open question. Doc-auditor
   re-audit clean apart from the two residuals, which were fixed and grep-verified.
+- **2026-07-14** — **Full pre/post-demo scope audit + re-slating ruling.** A read-path spec attempt
+  was aborted mid-scoping at Jack's request (its tentative scoping answers discarded, nothing
+  recorded). The audit found the demo as slated demonstrated the record — storage, decay,
+  correction-override, gate-recollect — but not the thesis: reconstruction, the claim-axis
+  carrier, sat post-August, and the 60-day drift plot beat was contingent. **Jack ruled:
+  reconstruction moves pre-demo** (dated entry in `decisions.md`, superseding-in-part *Schema
+  now, mechanism later*), with the schedule cost explicitly flagged and accepted. Four gap
+  slatings ruled with it: authorial-correction endpoint pre-demo (after reconstruction);
+  scene-boundary consumers split (reputation snapshot → dialogue turn; identity recompile →
+  reconstruction, seed-prose-only document pre-demo; prompt caching → post-August); purge →
+  post-August, before the public flip; reflection's August hedge resolved to explicitly
+  post-August. Immediate queue re-slated; `architecture.md` §2/§7 markers updated. Doc-auditor
+  re-audit: **no contradictions**; two residual annotations for the scene-boundary consumer split
+  (`write-path.md`, `architecture.md` §6) fixed and grep-verified. Docs only — no code, no floors
+  changed.
 
 ## Immediate queue
 
-1. Read path: dialogue-init top-k with IDs + scores.
-2. CLI harness (vertical slice complete) + synthetic load driver alongside.
-3. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`).
-4. Before the demo ships: re-rule the escalation failure path (see open questions) and pick a
+1. Read path: dialogue-init top-k with IDs + scores (+ the retrieval scoring function from the
+   artifact queue; `read_mode`/`pinned` in payloads). Spec first (`docs\read-path.md`), then build.
+2. CLI harness (vertical slice complete — includes the single Sonnet dialogue call + action
+   directive + reputation delta/snapshot per architecture §9; no gate, no caching, no
+   reconstruction in the slice) + synthetic load driver alongside.
+3. **Reconstruction (re-slated pre-demo 2026-07-14):** spec (reconstruction call + seed-only
+   identity-document rendering + cache + drift budget + write-back + serving shape) → build →
+   verification.
+4. Authorial-correction endpoint (small target; the correction-override demo beat).
+5. Mid-dialogue gate + threshold values, efficacy definitions, per-signal fire logging.
+6. Test-suite scoped session (Sets A-authorial, B, C + degradation cases now mostly runnable).
+7. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
+   choreography incl. the 60-day drift beat.
+8. Before the demo ships: re-rule the escalation failure path (see open questions) and pick a
    real-provider smoke moment (one live observe with keys) ahead of demo choreography.
 
 *(Done 2026-07-13: **Write path v1** — see the verified-floors table and session log. Earlier same
@@ -150,26 +176,33 @@ day: **Migration 01 foundational schema**; connect the Postgres MCP + floor-veri
 - Event-ingestion API contract — **v1 subset specced in `write-path.md` and now BUILT** (observe +
   scene-boundary + pin/unpin; phase tag and event_id accepted without a schema home; idempotency
   accepted-not-enforced). Still to spec/build: the diegetic-correction event (references a target
-  memory_id) and purge, plus scene-boundary's deferred consumers.
+  memory_id; mechanism post-August) and purge (post-August, before the public flip — ruled
+  2026-07-14). Scene-boundary's consumers were slated 2026-07-14: reputation snapshot → the
+  dialogue turn (CLI harness), identity recompile → reconstruction, prompt-head rebuild →
+  post-August.
 - Retrieval scoring function: relevance × recency(decay class) × importance_norm; pin exemption;
   normalization; slots for the future context term and per-call split-brain overrides.
 - Reconstruction call spec: operator-structured prompt with gist as fixed constraint; determinism;
-  batching shape.
-- Reflection spec end-to-end.
+  batching shape. **Feeds immediate-queue item 3 — pre-demo since the 2026-07-14 re-slating.**
+- Reflection spec end-to-end (mechanism explicitly post-August — ruled 2026-07-14).
 - Gate threshold values + efficacy definitions wired to instrumentation.
 - Unity client C# API surface: send event, open dialogue, directive callback, reputation read,
   reconstructing-signal hook, scene-boundary emission.
 - Demo choreography: injected-timestamp time travel; decay + correction-override + gate-recollect
-  beats now; the 60-day drift plot when reconstruction ships.
+  beats; the 60-day drift plot — a planned beat since the 2026-07-14 re-slating (reconstruction is
+  pre-demo).
 - README destructive-compression counter-example pick.
 
 ## Post-August ledger
 
-Reflection pipeline mechanism (if not landed in August); reconstruction mechanism + drift budget +
-remaining identity-conditioned-reconstruction suite scenarios; dissonance path + the diegetic suite
-pair; encoding-context read term + habituation; split-brain topology with per-call weights and
-re-run cost/latency instrumentation; reflection → parameter compiler; Unity Package Manager
-packaging; docs final + public flip (Apache-2.0).
+Reflection pipeline mechanism (explicitly post-August — hedge resolved 2026-07-14; the pre-demo
+identity document is seed-prose-only); dissonance path + the diegetic suite pair; the purge
+endpoint (before the public flip — ruled 2026-07-14); prompt caching / prompt-head rebuild
+(revisit only if demo latency demands — ruled 2026-07-14); encoding-context read term +
+habituation; split-brain topology with per-call weights and re-run cost/latency instrumentation;
+reflection → parameter compiler; Unity Package Manager packaging; docs final + public flip
+(Apache-2.0). *(Reconstruction — mechanism, drift budget, Set C scenarios — moved off this ledger
+into the immediate queue by the 2026-07-14 re-slating ruling.)*
 
 **Research track:** asymmetry ablation (on/off, judge-measured explanation-cause divergence); judged
 drift / Bartlett-style evals; unified-thesis write-up (identity-conditioned reconstructive memory +

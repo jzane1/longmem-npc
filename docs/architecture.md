@@ -39,7 +39,8 @@ memory can drift and be defended, while the ground-truth record underneath never
   importance is arguably correct. If dynamic salience ever enters, it enters as a separate runtime
   term.
 - **Schema now, mechanism later.** Schema, caches, and pin behavior are live from day one even where
-  the consuming mechanism (reconstruction, dissonance, reflection) lands after the August demo.
+  the consuming mechanism lands later. Re-slated 2026-07-14: reconstruction ships **pre-demo**;
+  dissonance and reflection land after the August demo.
 - **Integrator-defined vocabulary everywhere.** Observation phase tags, diagnosticity goal, action
   vocabulary, context-match weights, scene-type vocabulary, model roles, rigidity, reputation
   sensitivity, decay knobs, drift threshold, habituation cap/decay — none is ever hardcoded.
@@ -168,7 +169,9 @@ loaded set, **fail-quiet**.
 a marked recollection block; the head is **rebuilt at scene boundaries**, where the cache is cold
 anyway. The **scene boundary is a load-bearing, explicit client-sent API event** with three
 consumers: prompt-head rebuild, identity-document recompile, reputation snapshot. Scene edges settle
-prefix, identity version, and reputation in one heartbeat.
+prefix, identity version, and reputation in one heartbeat. *(Consumer slating ruled 2026-07-14:
+reputation snapshot lands with the dialogue turn; identity recompile with reconstruction — both
+pre-demo; prompt-head rebuild / prompt caching is post-August.)*
 
 **Read-mode boundary (self-describing, not just documented):** every returned memory carries
 `read_mode` (`verbatim | reconstructed`) and `pinned`, in payloads and the debug view. Three states:
@@ -177,7 +180,7 @@ unpinned past the threshold → reconstructed. A fourth enum value, `reconstruct
 only if an async fallback is ever adopted. **Docs purity claim:** no raw access through the
 character read path, except integrator-designated pins; ground truth lives in the debug view.
 
-## 7. Reconstruction (mechanism deferred post-August; schema, caches, and pin behavior live now)
+## 7. Reconstruction (pre-demo scope, ruled 2026-07-14; schema, caches, and pin behavior already live)
 
 Identity-conditioned reconstruction is the **mandatory read path** for unpinned memories past a
 threshold theta, where **theta reuses the decay math** (reconstruct when decayed detail strength
