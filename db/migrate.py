@@ -94,7 +94,9 @@ def main() -> None:
                 conn.commit()
             except Exception as exc:  # noqa: BLE001 — report and stop, no half-apply
                 conn.rollback()
-                sys.exit(f"FAILED on {f.name}: {exc}\nRolled back; no ledger row written.")
+                sys.exit(
+                    f"FAILED on {f.name}: {exc}\nRolled back; no ledger row written."
+                )
             print(f"Applied {f.name}")
 
         print(f"Done: {len(pending)} migration(s) applied.")

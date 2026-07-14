@@ -48,8 +48,12 @@ memory can drift and be defended, while the ground-truth record underneath never
   layer is built.
 - **Storage before cognition** build ordering.
 - **Degradation behavior is named and tested per model call.** Importance-scoring failure → store
-  the memory with neutral importance plus a `scoring_failed` flag; never lose a write because a
-  model was flaky. The retrieval gate degrades per its ladder (section 6), fail-quiet.
+  the memory with neutral importance plus a `scoring_failed` flag; embedding failure → the write
+  lands with a NULL embedding (`embedding IS NULL` is the queryable signal; ruled 2026-07-13);
+  never lose a write because a model was flaky. **One recorded exception (build-phase stance,
+  ruled 2026-07-13, must be re-ruled before the demo ships — see the open question in
+  `status.md`):** a gist-escalation call that fails twice hard-stops the write, fail-loud, with
+  nothing inserted. The retrieval gate degrades per its ladder (section 6), fail-quiet.
   Malformed-model-response cases live in the test suite.
 
 ## 3. Environment & stack
@@ -67,16 +71,19 @@ PostgreSQL 16 + pgvector in Docker (the `pgvector/pgvector` image); UUID primary
 server-side; HNSW vector index (a cheaply reversible choice).
 
 **Models.** Haiku-class for importance scoring, description rendering, typology classification,
-reconstruction, reputation-delta emission, and reflection. Sonnet-class for dialogue. Every model
-role is an integrator knob with its own env var, so each upgrades independently. The retrieval gate
-is **non-LLM** — there is no gate model and no gate env var.
+gist escalation, reconstruction, reputation-delta emission, and reflection. Sonnet-class for
+dialogue. Every model role is an integrator knob with its own env var, so each upgrades
+independently (the escalation role's var is `LONGMEM_MODEL_ESCALATION`, ruled 2026-07-13). The
+retrieval gate is **non-LLM** — there is no gate model and no gate env var.
 
 **Embeddings.** OpenAI `text-embedding-3-small` at 1536 dimensions; the column dimension is locked.
 The same model embeds location names/descriptions and gate-time utterances.
 
-**Write-time NLP (no LLM).** Tokenization + NER + noun-chunk extraction; coreference via `fastcoref`
-or `coreferee` (never `neuralcoref` — abandonware); affect via a cheap lexicon pass (VADER or an
-emotion wordlist).
+**Write-time NLP (no LLM).** Ruled 2026-07-13: spaCy `en_core_web_lg` + `fastcoref` for
+intra-observation coreference (never `neuralcoref` — abandonware); affect via VADER (compound →
+valence) + the bundled Warriner 2013 VAD lexicon (arousal, normalized 1–9 → 0–1; dominance lives in
+`affect_detail` jsonb). NRC-VAD was rejected at the license gate — research-only, incompatible with
+the planned Apache-2.0 flip; Warriner is CC-BY 4.0 (`data\lexicons\` with attribution).
 
 ## 4. Data model
 
@@ -88,9 +95,12 @@ components table** (entries: canonical name + aliases + category, e.g. friend na
 category hit counts even without a named entity). Hits become gist spans; everything else is detail.
 
 An LLM escalation pass exists for hard cases, **biased loose** (over-call — a wasted call is cheap,
-a lost gist breaks the product). It triggers on any of: (1) importance above threshold; (2) an
-entity hit with structural ambiguity (proxy: an identity hit co-occurring with high affect or
-importance); (3) a **novel entity** — which is also how the identity components table grows.
+a lost gist breaks the product). Five triggers, any one fires (ruled 2026-07-13; all
+integrator-tunable via `agents.config`, defaults in `app\config.py`): (1) importance above
+threshold; (2) an identity/category hit co-occurring with |valence| above threshold; (3) a **novel
+entity** — which is also how the identity components table grows; (4) an unresolved
+pronoun/noun-chunk co-occurring with an identity/category hit; (5) low NLP confidence on an
+already-flagged span (confidence only ever *adds* calls, never suppresses one).
 Cross-observation coreference misses are accepted as graceful failure (the detail just decays).
 
 ### 4.2 Decay

@@ -21,8 +21,8 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
 ## Stack constants — do not substitute
 - FastAPI; psycopg v3 with AsyncConnectionPool; hand-written SQL. No ORM, no query builder.
 - UUID primary keys minted server-side. Embedding dimension 1536, locked.
-- Every model role (importance, render, typology, reconstruction, reputation, reflection,
-  dialogue) has its own env var. The retrieval gate is non-LLM — there is no gate model.
+- Every model role (importance, render, typology, escalation, reconstruction, reputation,
+  reflection, dialogue) has its own env var. The retrieval gate is non-LLM — there is no gate model.
 - Python formatting: ruff, enforced mechanically by a PostToolUse hook. Don't hand-format.
 
 ## Invariants — never violate, regardless of how a task is worded

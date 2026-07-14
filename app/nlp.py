@@ -140,9 +140,10 @@ def _find_term_spans(text: str, term: str) -> list[tuple[int, int]]:
 def _dedupe_overlapping(spans: list[GistSpanCandidate]) -> list[GistSpanCandidate]:
     """Drop spans fully contained in an already-kept span (longest first)."""
     kept: list[GistSpanCandidate] = []
-    for span in sorted(spans, key=lambda s: (s.end_char - s.start_char), reverse=True):
+    for span in sorted(spans, key=lambda s: s.end_char - s.start_char, reverse=True):
         contained = any(
-            span.start_char >= k.start_char and span.end_char <= k.end_char for k in kept
+            span.start_char >= k.start_char and span.end_char <= k.end_char
+            for k in kept
         )
         if not contained:
             kept.append(span)
@@ -173,7 +174,9 @@ def run_write_pass(observation_text: str, components: list[dict]) -> NlpResult:
                     )
                 )
                 sources.append("match")
-                matched_component_char_ranges.append((start, end, str(comp["component_id"])))
+                matched_component_char_ranges.append(
+                    (start, end, str(comp["component_id"]))
+                )
 
     # --- 2. category hits without a named entity --------------------------
     # A component category term appearing in the text counts as gist even when
@@ -216,7 +219,9 @@ def run_write_pass(observation_text: str, components: list[dict]) -> NlpResult:
         for m_start, m_end in cluster:
             resolved_pronoun_ranges.append((m_start, m_end))
             already = any(
-                s.start_char == m_start and s.end_char == m_end and s.matched_component_id
+                s.start_char == m_start
+                and s.end_char == m_end
+                and s.matched_component_id
                 for s in spans
             )
             if not already:
@@ -250,7 +255,9 @@ def run_write_pass(observation_text: str, components: list[dict]) -> NlpResult:
         if text.lower() not in known_terms and text.lower() not in seen_novel:
             seen_novel.add(text.lower())
             novel.append(
-                NewComponent(canonical=text, aliases=[], category=NER_CATEGORY[ent.label_])
+                NewComponent(
+                    canonical=text, aliases=[], category=NER_CATEGORY[ent.label_]
+                )
             )
 
     # --- 5. unresolved references ------------------------------------------

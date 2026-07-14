@@ -31,8 +31,15 @@ def main() -> None:
             "INSERT INTO agents (name, seed_identity, reputation, rigidity, "
             "reputation_sensitivity, diagnosticity_goal, config) "
             "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING agent_id",
-            ("Smoke NPC", "A test seed identity.", 0, 1.0, 1.0,
-             "what this NPC finds diagnostic", Jsonb({})),
+            (
+                "Smoke NPC",
+                "A test seed identity.",
+                0,
+                1.0,
+                1.0,
+                "what this NPC finds diagnostic",
+                Jsonb({}),
+            ),
         )
         agent_id = cur.fetchone()[0]
         assert agent_id is not None, "agent_id not returned by server default"
@@ -53,9 +60,20 @@ def main() -> None:
             "valid_at, entities, affect_valence, affect_arousal, affect_detail) "
             f"VALUES (%s, %s, {ZERO_VEC}, %s, %s, %s, %s, %s, %s, now(), %s, %s, %s, %s) "
             "RETURNING memory_id",
-            (agent_id, "Mara sharpened my blade at the forge.", 0.5,
-             "observed", 0.9, "inferred", "lived", "episodic",
-             ["Mara"], 0.2, 0.4, Jsonb({"pos": 0.2})),
+            (
+                agent_id,
+                "Mara sharpened my blade at the forge.",
+                0.5,
+                "observed",
+                0.9,
+                "inferred",
+                "lived",
+                "episodic",
+                ["Mara"],
+                0.2,
+                0.4,
+                Jsonb({"pos": 0.2}),
+            ),
         )
         memory_id = cur.fetchone()[0]
         assert memory_id is not None, "memory_id not returned by server default"

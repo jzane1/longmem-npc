@@ -50,8 +50,10 @@ SERVICE_DEFAULTS: dict[str, float] = {
     # Escalation trigger (2): identity/category hit co-occurring with
     # |valence| >= this.
     "escalation_affect_threshold": 0.5,
-    # Escalation trigger (5): NER/coref confidence below this on a span that
-    # is already flagged (confidence only adds calls, never suppresses).
+    # Escalation trigger (5) threshold — RESERVED, not consulted in v1: neither
+    # fastcoref's predict API nor en_core_web_lg's greedy NER exposes per-span
+    # confidence, so every coref-derived span counts as low-confidence outright
+    # (over-call only; see app\nlp.py). Becomes live when a confidence source exists.
     "nlp_confidence_threshold": 0.5,
     # Default per-typology confidence when the client declares a typology
     # without a confidence (architecture §5: a default table exists; single
@@ -117,7 +119,9 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
 
     mode = env.get(ENV_PROVIDER_MODE, "fake").lower()
     if mode not in ("real", "fake"):
-        raise ConfigError(f"{ENV_PROVIDER_MODE} must be 'real' or 'fake', got {mode!r}.")
+        raise ConfigError(
+            f"{ENV_PROVIDER_MODE} must be 'real' or 'fake', got {mode!r}."
+        )
 
     model_write = ""
     model_escalation = ""
@@ -139,7 +143,9 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
             if not value
         ]
         if missing:
-            raise ConfigError(f"real mode requires model role env vars: {', '.join(missing)}.")
+            raise ConfigError(
+                f"real mode requires model role env vars: {', '.join(missing)}."
+            )
         # One call serves render+importance+typology in v1: the three role
         # vars must agree (documented limitation; error, never a silent pick).
         if not (importance == render == typology):

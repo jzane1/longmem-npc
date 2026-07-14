@@ -47,6 +47,12 @@ touching rows; invalidation stamps rows without touching decay.
 
 - Importance-scoring model failure → the write still lands, with neutral importance and a
   `scoring_failed` flag.
+- Unknown `decay_class` label → the write still lands, with the agent's default class and
+  `decay_class_unknown = true` — never rejected (ruled 2026-07-13; mirrors `scoring_failed`).
+- Embedding-call failure → the write still lands with a NULL embedding; `embedding IS NULL` is the
+  queryable signal and the payload carries `embedding_failed` (ruled 2026-07-13).
+- Escalation call fails twice → **HARD-STOP**, nothing inserted — structurally assertable as zero
+  rows (build-phase stance ruled 2026-07-13; re-rule owed before the demo ships — see `status.md`).
 - Gate degradation ladder: embeddings down → entity-only lexical fetch; no entities → novelty-only;
   both out → gate closed, loaded set served, fail-quiet.
 - Malformed model responses (unparseable structured output, unknown action directive) → log, ignore,

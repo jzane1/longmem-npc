@@ -44,7 +44,9 @@ async def fetch_agent(pool: AsyncConnectionPool, agent_id: UUID) -> dict | None:
     return {"agent_id": row[0], "diagnosticity_goal": row[1], "config": row[2] or {}}
 
 
-async def fetch_live_components(pool: AsyncConnectionPool, agent_id: UUID) -> list[dict]:
+async def fetch_live_components(
+    pool: AsyncConnectionPool, agent_id: UUID
+) -> list[dict]:
     """The agent's live identity components (invalid_at IS NULL)."""
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
@@ -54,7 +56,12 @@ async def fetch_live_components(pool: AsyncConnectionPool, agent_id: UUID) -> li
         )
         rows = await cur.fetchall()
     return [
-        {"component_id": r[0], "canonical": r[1], "aliases": r[2] or [], "category": r[3]}
+        {
+            "component_id": r[0],
+            "canonical": r[1],
+            "aliases": r[2] or [],
+            "category": r[3],
+        }
         for r in rows
     ]
 
@@ -116,7 +123,9 @@ def _vector(values: list[float] | None):
     return Vector(values)
 
 
-async def insert_observation(pool: AsyncConnectionPool, plan: InsertPlan) -> InsertOutcome:
+async def insert_observation(
+    pool: AsyncConnectionPool, plan: InsertPlan
+) -> InsertOutcome:
     """The atomic insert: one transaction, never a partial write."""
     async with pool.connection() as conn:
         async with conn.transaction():
@@ -160,7 +169,9 @@ async def insert_observation(pool: AsyncConnectionPool, plan: InsertPlan) -> Ins
                         plan.event_time,
                         plan.affect_valence,
                         plan.affect_arousal,
-                        Jsonb(plan.affect_detail) if plan.affect_detail is not None else None,
+                        Jsonb(plan.affect_detail)
+                        if plan.affect_detail is not None
+                        else None,
                     ),
                 )
                 memory_id = (await cur.fetchone())[0]

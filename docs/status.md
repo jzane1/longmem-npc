@@ -111,6 +111,28 @@ and the structured behavior output survive the interview. Research publication c
   independently, `longmem` confirmed pristine via the postgres MCP, plus an independent
   spot-check. Route pass-through proven twice: ASGITransport JSON-equality in the walker and a
   live `python -m app.serve` HTTP session (observe + pin + scene-boundary).
+- **2026-07-13** — **Full-project audit (build paused at Jack's request) + remediation.** Three
+  lanes: a doc-auditor full-tree sweep, a code-vs-decisions review of the write path, and
+  operational/toolchain checks. **Code verdict: clean** — the implementation matches every dated
+  ruling; installed deps match the `requirements.txt` pins; live `longmem` re-confirmed pristine
+  (9 tables + ledger, pgvector 0.8.5, product tables empty; the container had been down only
+  because Docker Desktop wasn't started). **Fixed:** (1) the ruff format hook had been silently
+  dormant since it was written — ruff is module-installed, not on PATH — `format-on-edit.ps1` now
+  falls back to `python -m ruff`; proven live, and the accumulated drift was normalized
+  (`python -m ruff format .`, 7 files, formatting only, imports re-verified). (2) Eleven doc
+  findings (4 contradictions, 7 unpropagated rulings) + 2 re-audit residuals propagated:
+  `write-path.md` (BUILT banner, settle-tag/flag ruling annotations, five triggers, hard-stop
+  ladder row + principles exception, IngestResult `embedding_failed`/escalation fields, the four
+  build-ruled done-when bullets), `architecture.md` (five triggers, hard-stop exception in §2,
+  ruled NLP stack, escalation model role), `CLAUDE.md` (escalation in the role list),
+  `mcp-setup.md` (uv `--python 3.13` pglast note — closes the flagged follow-up; floor-verifier
+  runbook now prescribes the `tools: mcp__postgres` allowlist, the proven fix), `test-suite.md`
+  (unknown-decay-class, embedding-failure, and hard-stop degradation cases), and a
+  superseded-in-part note on the 2026-07-12 decay/gist entry in `decisions.md` (the register
+  header's own convention). (3) `app\config.py`'s unused `nlp_confidence_threshold` comment now
+  reads RESERVED (not consulted in v1 — no confidence source exists). **No floor changed; no new
+  decisions ruled** — the escalation failure-path re-rule remains the open question. Doc-auditor
+  re-audit clean apart from the two residuals, which were fixed and grep-verified.
 
 ## Immediate queue
 

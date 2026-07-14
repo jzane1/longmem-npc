@@ -153,7 +153,9 @@ class FakeWriteProvider:
         if declared_typology is None:
             index = int(_stable_unit_float(observation_text, "typology") * 4)
             typology = self.TYPOLOGIES[index]
-            confidence = round(0.5 + _stable_unit_float(observation_text, "conf") / 2, 4)
+            confidence = round(
+                0.5 + _stable_unit_float(observation_text, "conf") / 2, 4
+            )
         words = len(observation_text.split())
         return WriteCallResult(
             rendered_content=f"[fake render] {observation_text}",
@@ -214,7 +216,9 @@ class MalformedWriteProvider:
     """Call 'succeeds' but structured output is unparseable: neutral/default."""
 
     def render_and_score(self, **_kwargs) -> WriteCallResult:
-        raise MalformedOutputError("injected malformed output", input_tokens=7, output_tokens=3)
+        raise MalformedOutputError(
+            "injected malformed output", input_tokens=7, output_tokens=3
+        )
 
 
 class FailingEmbeddingProvider:
@@ -303,8 +307,18 @@ class RealWriteProvider:
             rendered = str(payload["rendered_content"])
             importance = float(payload["importance_raw"])
             typology = payload.get("typology") if declared_typology is None else None
-            confidence = payload.get("typology_confidence") if declared_typology is None else None
-        except (KeyError, ValueError, TypeError, json.JSONDecodeError, IndexError) as exc:
+            confidence = (
+                payload.get("typology_confidence")
+                if declared_typology is None
+                else None
+            )
+        except (
+            KeyError,
+            ValueError,
+            TypeError,
+            json.JSONDecodeError,
+            IndexError,
+        ) as exc:
             raise MalformedOutputError(
                 f"write call output unparseable: {exc}",
                 input_tokens=input_tokens,
@@ -395,7 +409,13 @@ class RealEscalationProvider:
                 )
                 for item in payload["new_components"]
             ]
-        except (KeyError, ValueError, TypeError, json.JSONDecodeError, IndexError) as exc:
+        except (
+            KeyError,
+            ValueError,
+            TypeError,
+            json.JSONDecodeError,
+            IndexError,
+        ) as exc:
             raise MalformedOutputError(
                 f"escalation output unparseable: {exc}",
                 input_tokens=input_tokens,

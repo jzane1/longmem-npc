@@ -90,9 +90,17 @@ def _merge_spans(
     base: list[GistSpanCandidate], extra: list[GistSpanCandidate]
 ) -> list[GistSpanCandidate]:
     merged = list(base)
-    seen = {(s.start_char, s.end_char, s.matched_component_id, s.matched_category) for s in base}
+    seen = {
+        (s.start_char, s.end_char, s.matched_component_id, s.matched_category)
+        for s in base
+    }
     for span in extra:
-        key = (span.start_char, span.end_char, span.matched_component_id, span.matched_category)
+        key = (
+            span.start_char,
+            span.end_char,
+            span.matched_component_id,
+            span.matched_category,
+        )
         if key not in seen:
             seen.add(key)
             merged.append(span)
@@ -114,7 +122,9 @@ def _merge_components(
 class IngestService:
     """One instance per process; both callers share it."""
 
-    def __init__(self, pool: AsyncConnectionPool, providers: Providers, settings: Settings):
+    def __init__(
+        self, pool: AsyncConnectionPool, providers: Providers, settings: Settings
+    ):
         self._pool = pool
         self._providers = providers
         self._settings = settings
@@ -209,12 +219,16 @@ class IngestService:
         esc_in = esc_out = 0
         if triggers:
             t0 = time.perf_counter()
-            escalation = await self._escalate_with_retry(event, components, nlp_result, triggers)
+            escalation = await self._escalate_with_retry(
+                event, components, nlp_result, triggers
+            )
             escalation_ms = _ms(time.perf_counter() - t0)
             esc_in = escalation.input_tokens
             esc_out = escalation.output_tokens
             spans = _merge_spans(spans, escalation.spans)
-            new_components = _merge_components(new_components, escalation.new_components)
+            new_components = _merge_components(
+                new_components, escalation.new_components
+            )
 
         # --- embedding (soft degradation: NULL embedding) -----------------
         t0 = time.perf_counter()
@@ -225,7 +239,9 @@ class IngestService:
         location_text = event.location_description or event.location_name
         texts = [event.observation_text] + ([location_text] if location_text else [])
         try:
-            embed_result = await asyncio.to_thread(self._providers.embedding.embed, texts)
+            embed_result = await asyncio.to_thread(
+                self._providers.embedding.embed, texts
+            )
             embedding = embed_result.vectors[0]
             if location_text:
                 location_embedding = embed_result.vectors[1]
@@ -235,7 +251,9 @@ class IngestService:
         embed_ms = _ms(time.perf_counter() - t0)
 
         # --- assemble facts -----------------------------------------------
-        decay_class, decay_class_unknown = _resolve_decay_class(event.decay_class, config)
+        decay_class, decay_class_unknown = _resolve_decay_class(
+            event.decay_class, config
+        )
 
         valence = nlp_result.affect_valence
         arousal = nlp_result.affect_arousal
@@ -406,5 +424,7 @@ class IngestService:
         if not updated:
             raise UnknownMemoryError(f"unknown memory_id {memory_id}")
         return PinResult(
-            memory_id=memory_id, pinned=pinned, total_ms=_ms(time.perf_counter() - t_total)
+            memory_id=memory_id,
+            pinned=pinned,
+            total_ms=_ms(time.perf_counter() - t_total),
         )

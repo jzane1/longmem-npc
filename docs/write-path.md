@@ -6,10 +6,11 @@ Second build target, on top of migration 01. This specs the **write half of the 
 the schema it writes into is frozen in [migration-01.md](migration-01.md). This doc points, it does
 not re-derive.
 
-> **Status: spec, not built.** Scope, the ingestion contract, and Gherkin done-when are fixed here;
-> the `[SETTLE-AT-BUILD]` items are physical shapes still to be ruled at build time (stop-and-report,
-> then record in `decisions.md`). **This build adds no new DB migration — the migration-01 schema is
-> frozen.**
+> **Status: BUILT & floor-verified 2026-07-13.** Every `[SETTLE-AT-BUILD]` item and open flag below
+> was ruled at build time (dated "Write-path build — fork rulings" entry in `decisions.md`); the
+> rulings are annotated inline. **The build added no new DB migration — the migration-01 schema
+> stayed frozen.** One ruling is an explicit build-phase stance owed a re-rule before the demo
+> ships: the escalation hard-stop (see the degradation ladder and `status.md` open questions).
 
 ## Principles this build honors
 
@@ -29,7 +30,8 @@ not re-derive.
 - **Nothing integrator-configurable is hardcoded** — model roles (per-role env var), decay-class
   map, thresholds, vocabularies.
 - **Degradation is named and tested per model call** (architecture §2) — a flaky model never loses a
-  write.
+  write, with one recorded exception: the escalation hard-stop (build-phase stance; see the
+  degradation ladder).
 
 ## Scope boundary — do NOT build
 
@@ -64,9 +66,14 @@ Returned by `ingest_observation`, surfaced verbatim in the CLI debug view and as
   `new_component_ids[]` (identity components grown by this write).
 - **Computed facts / scores** — `importance_raw`; `typology` + `typology_confidence` +
   `typology_source`; `provenance`; `affect` (`valence`, `arousal`, `detail`); `entities[]`;
-  `decay_class` + `decay_class_unknown`; `scoring_failed`; `pinned`.
-- **Instrumentation** — per-stage timing (`nlp_ms`, `embed_ms`, `haiku_ms`, `insert_ms`, `total_ms`)
-  and token accounting (`haiku_input_tokens`, `haiku_output_tokens`; embedding token count).
+  `decay_class` + `decay_class_unknown`; `scoring_failed`; `embedding_failed` *(payload-only
+  extension ruled 2026-07-13: mirrors the NULL-embedding degradation so it is assertable without a
+  DB peek)*; `pinned`.
+- **Instrumentation** — per-stage timing (`nlp_ms`, `embed_ms`, `haiku_ms`, `insert_ms`, `total_ms`),
+  token accounting (`haiku_input_tokens`, `haiku_output_tokens`; embedding token count), and the
+  escalation record ruled 2026-07-13: `escalated`, `escalated_by[]` (which triggers fired),
+  `escalation_ms`, `escalation_input_tokens`, `escalation_output_tokens` — feeds the per-100-turn
+  cost table.
 
 ## Event contract (ingestion API v1)
 
@@ -76,14 +83,14 @@ Returned by `ingest_observation`, surfaced verbatim in the CLI debug view and as
 |---|---|
 | `agent_id` | target NPC (FK → agents). |
 | `observation_text` | the raw observation. Stored immutable; NLP + embedding run on it. |
-| `phase_tag` | integrator observation-phase vocabulary (passthrough; not interpreted in v1). |
+| `phase_tag` | integrator observation-phase vocabulary. Accepted in v1 but **not stored and not echoed** — it has no schema home yet (ruled 2026-07-13). |
 | `client_timestamp` | world time → `valid_at` (tz-aware, required). |
 | `provenance` | `lived` \| `injected`. |
 | `typology` / `typology_confidence` | optional client declaration — **client wins**; when absent, Haiku classifies and `typology_source = inferred`. |
 | `decay_class` | integrator label; validated against the agent's `config` map. |
 | context (all optional) | `location_name` (stored) + its embedding → `location_embedding`; `entities[]`; `event_time`; `affect` override. A longer location *description*, if supplied, is embed-only (no raw column in the frozen schema). |
 | `pinned` | optional; sets `memories.pinned` at insert. |
-| `event_id` | optional idempotency key; **accepted but not enforced in v1** (dedup needs schema — see forks). |
+| `event_id` | optional idempotency key; **accepted but not enforced in v1** — not stored, not echoed (dedup needs schema; ruled 2026-07-13). |
 
 ### `scene-boundary`
 
@@ -117,8 +124,10 @@ without a named entity. Affect via a cheap lexicon pass → `affect_valence` / `
 §4.1.
 
 An **LLM-escalation pass** exists for hard cases, **biased loose** (over-call — a wasted call is
-cheap, a lost gist breaks the product): triggers on importance-above-threshold, an identity hit
-co-occurring with high affect/importance, or a novel entity.
+cheap, a lost gist breaks the product). Five triggers, any one fires (ruled 2026-07-13):
+importance above threshold; an identity/category hit co-occurring with |valence| above threshold;
+a novel entity; an unresolved pronoun/noun-chunk co-occurring with an identity/category hit; low
+NLP confidence on an already-flagged span (confidence only ever adds calls).
 
 **b. Single Haiku call.** Prose render + importance scoring + typology classification **only when the
 client did not declare it**. Structured output → `{ rendered_content, importance_raw, typology?,
@@ -136,12 +145,12 @@ the location **name** + its embedding only; a longer description is embed-only (
 default class + `decay_class_unknown = true`** (never reject — mirrors `scoring_failed`). Commit,
 then return `IngestResult`.
 
-### The render seam *(stated as design; flag for confirmation)*
+### The render seam *(confirmed as specced — ruled 2026-07-13)*
 
 `observation_text` = the client's **raw** observation, immutable forever (architecture §2, §4.1). The
 Haiku render produces the **`original` detail row's `content`** (the initial telling that
 reconstruction later supersedes). Gist spans point into `observation_text`, not the rendered detail.
-This is the natural reading of architecture §4.1/§5 — flagged below for an explicit ruling.
+On write-call failure the head falls back to the raw observation text — never a lost write.
 
 ## Degradation ladder (write)
 
@@ -150,7 +159,8 @@ This is the natural reading of architecture §4.1/§5 — flagged below for an e
 | importance-scoring model fails | write lands; neutral importance; `scoring_failed = true`. |
 | unknown `decay_class` label | write lands; default class; `decay_class_unknown = true`. |
 | malformed Haiku structured output | log, ignore, apply neutral/default; the write succeeds. |
-| embedding call fails | `[SETTLE-AT-BUILD]` — fail the write vs. store null embedding + a flag. |
+| embedding call fails | write lands; NULL embedding (`embedding IS NULL` is the queryable signal; payload mirror `embedding_failed`). *(Ruled 2026-07-13.)* |
+| escalation call fails twice | **HARD-STOP** — retry once, then abort the write, nothing inserted (fail-loud; escalation precedes the insert, so a client resend is safe pre-idempotency). *(Build-phase stance ruled 2026-07-13 — **must be re-ruled before the demo ships**; open decision in `status.md`.)* |
 
 ## Model provider interfaces
 
@@ -164,31 +174,43 @@ on two provider interfaces — the **Haiku call** (render + importance + typolog
 
 The provider is selected by config; the ingest service is identical under either.
 
-## `[SETTLE-AT-BUILD]` — physical shapes to rule at build time
+## `[SETTLE-AT-BUILD]` — physical shapes, all ruled at build (2026-07-13; see `decisions.md`)
 
 - **NLP stack** — spaCy model choice; coreference library (`fastcoref` vs `coreferee` — never
-  `neuralcoref`); affect lexicon (VADER vs an emotion wordlist) and its mapping to
-  `affect_valence`/`affect_arousal`/`affect_detail`. *(Suggested: spaCy + `fastcoref`; VADER
-  compound → valence, `affect_detail` = raw scores. **VADER has no native arousal → `affect_arousal`
-  null in v1** unless a second source is chosen — see flags.)*
+  `neuralcoref`); affect lexicon and its mapping to
+  `affect_valence`/`affect_arousal`/`affect_detail`. *(Ruled 2026-07-13: spaCy `en_core_web_lg` +
+  `fastcoref`; VADER compound → `affect_valence`; **Warriner 2013 VAD lexicon → `affect_arousal`**
+  (1–9 normalized to 0–1), dominance + raw breakdowns in `affect_detail` jsonb. NRC-VAD rejected at
+  the license gate — research-only; Warriner is CC-BY 4.0, bundled under `data\lexicons\`.)*
 - **LLM-escalation** — the importance threshold value, the structural-ambiguity proxy definition, and
-  novel-entity growth (the spam gate on growth is deferred).
+  novel-entity growth (the spam gate on growth is deferred). *(Ruled 2026-07-13: full escalation in
+  v1 — separate provider + `LONGMEM_MODEL_ESCALATION`; five triggers, any one fires, all
+  integrator-tunable via `agents.config` with defaults in `app\config.py`; novel-entity growth in,
+  spam gate still deferred. Failure path: the build-phase hard-stop in the degradation ladder.)*
 - **Idempotency** — **none in v1** (the frozen schema has no dedup column). A client `event_id` +
   dedup window would need schema this build forbids, so it is deferred to a future migration unless
-  Jack rules otherwise; v1 accepts `event_id` but does not enforce it.
-- **Embedding-failure degradation** — fail the write vs. null embedding + flag.
+  Jack rules otherwise; v1 accepts `event_id` but does not enforce it. *(Ruled 2026-07-13: as
+  specced — accept, don't enforce; no new schema.)*
+- **Embedding-failure degradation** — fail the write vs. null embedding + flag. *(Ruled 2026-07-13:
+  the write lands with a NULL embedding; `embedding IS NULL` is the queryable signal, mirrored in
+  the payload as `embedding_failed`. The memory stays reachable via the entity/GIN path; vector
+  backfill is future work.)*
 - **Wire shape** — the `observe` request/response Pydantic models and the FastAPI route path/verb.
+  *(Ruled 2026-07-13: `POST /v1/events/observe`, `POST /v1/events/scene-boundary`,
+  `PUT /v1/memories/{memory_id}/pin`; models in `app\schemas.py`; the route is a pass-through.)*
 
 *(Settled, not a fork: importance is stored **raw** at write and normalized at read — architecture §2,
 `memories.importance_raw`.)*
 
-## Open flags — surface, do not resolve
+## Open flags — all resolved at build (2026-07-13)
 
 - **scene-boundary has no persistent schema home** and all three consumers are deferred → v1 accepts
-  + instruments only. Confirms **no migration-02 is needed** for this build.
+  + instruments only. Confirms **no migration-02 is needed** for this build. *(Confirmed: built as
+  accept + instrument; no schema written.)*
 - **render seam** — raw `observation_text` vs. rendered `original` detail (above): confirm the
-  mapping.
-- **arousal** — VADER (the likely lexicon) has no arousal axis; `affect_arousal` may stay null in v1.
+  mapping. *(Confirmed as specced — see the render-seam section.)*
+- **arousal** — VADER has no arousal axis. *(Closed: Warriner supplies arousal —
+  `affect_arousal` **is populated** in v1.)*
 
 ## Done when
 
@@ -214,5 +236,18 @@ The provider is selected by config; the ingest service is identical under either
   token counts.
 - **Gist immutability holds.** Gist spans reference `observation_text` offsets; `observation_text` is
   never rewritten by the write path.
+
+*Four criteria added by the 2026-07-13 build rulings (the walker asserts all fourteen):*
+
+- **Escalation hard-stop (build-phase stance).** Given an escalation provider that fails twice on a
+  triggered event, the write is aborted loudly and **nothing** is inserted — no `memories`,
+  `memory_details`, `memory_gist_spans`, or `identity_components` rows.
+- **Arousal populated.** Given observation text covered by the Warriner lexicon, the stored
+  `affect_arousal` is non-null (normalized 0–1) and dominance rides in `affect_detail`.
+- **Escalation accounting.** Given a fired trigger, the `IngestResult` instrumentation carries
+  `escalated = true`, the firing trigger names in `escalated_by[]`, and escalation timing + token
+  counts; given no trigger, those fields sit at their zero-values.
+- **Embedding degradation.** Given a failing embedding provider, the write still lands with
+  `embedding IS NULL` and the payload carries `embedding_failed = true`.
 - Every touched `[SETTLE-AT-BUILD]` was reported and confirmed before being built, and recorded in
   `decisions.md`.

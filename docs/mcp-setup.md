@@ -27,8 +27,14 @@ SQL-injection disclosure that bypassed its read-only mode. Old tutorials still r
 ```powershell
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
 # restart the terminal so uv is on PATH, then:
-uv tool install postgres-mcp
+uv tool install postgres-mcp --python 3.13
 ```
+
+> **Why `--python 3.13`** (deviation recorded in `decisions.md`, 2026-07-13): postgres-mcp's
+> `pglast` dependency has no Python 3.14 wheel and won't build from source on Windows, so the MCP
+> runs in an isolated uv-managed 3.13 venv. The project itself stays on Python 3.14 — the MCP is a
+> standalone server process, never imported by project code. Drop the flag once `pglast` ships a
+> 3.14 wheel.
 
 **Register with Claude Code** (local scope; connection string must match `.env`):
 
@@ -45,15 +51,20 @@ should match docs/migration-01.md column for column.
 and database health checks.
 
 **Follow-up edit — give the verifier eyes.** `.claude/agents/floor-verifier.md` restricts its
-tools, which also excludes MCP. At go-live, add one frontmatter line:
+tools, which also excludes MCP. At go-live, **two** frontmatter changes are required (proven live
+2026-07-13 — the `mcpServers` line alone is NOT sufficient):
 
 ```yaml
+tools: Read, Grep, Glob, Bash, mcp__postgres   # the mcp__postgres pattern is load-bearing
 mcpServers: postgres
 ```
 
-and one line to its body: "Prefer the postgres MCP tools over psql for schema and row-state
-checks." From then on, verification asserts against live rows and constraints, not against what
-the migration script says it did.
+An explicit `tools:` allowlist filters out every `mcp__postgres__*` tool unless the `mcp__postgres`
+pattern is in it; `mcpServers:` only authorizes the server connection. Also add one line to the
+agent body: "Prefer the postgres MCP tools over psql for schema and row-state checks." Agent
+definitions load at Claude Code startup — restart before expecting the tools to appear. From then
+on, verification asserts against live rows and constraints, not against what the migration script
+says it did.
 
 **Defense in depth, later:** restricted mode is fine for the local dev database. If this server
 ever points at anything shared, also connect through a dedicated SELECT-only Postgres role — the

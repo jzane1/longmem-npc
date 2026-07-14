@@ -97,7 +97,12 @@ async def make_agent(pool, name: str) -> tuple:
             "INSERT INTO agents (name, seed_identity, reputation, rigidity, "
             "reputation_sensitivity, diagnosticity_goal, config) "
             "VALUES (%s, %s, 0, 1.0, 1.0, %s, %s) RETURNING agent_id",
-            (name, "A verification NPC.", "what threatens the forge", Jsonb(AGENT_CONFIG)),
+            (
+                name,
+                "A verification NPC.",
+                "what threatens the forge",
+                Jsonb(AGENT_CONFIG),
+            ),
         )
         agent_id = (await cur.fetchone())[0]
         await cur.execute(
@@ -178,7 +183,9 @@ async def main(database_uri: str) -> None:
     )
     mara = [s for s in spans if s[3] == component_id]
     check(bool(mara), "known component (Mara) produced a gist span")
-    check(row[10] == event.client_timestamp, "valid_at = client world time (bi-temporal)")
+    check(
+        row[10] == event.client_timestamp, "valid_at = client world time (bi-temporal)"
+    )
 
     # ------------------------------------------------------------------ #
     print("\n[6] Novel entity grows the index (same transaction)")
@@ -188,7 +195,11 @@ async def main(database_uri: str) -> None:
         "SELECT canonical, category FROM identity_components WHERE component_id = %s",
         result.new_component_ids[0],
     )
-    check(comp is not None, "identity_components row exists for new_component_id", str(comp[0]))
+    check(
+        comp is not None,
+        "identity_components row exists for new_component_id",
+        str(comp[0]),
+    )
 
     # ------------------------------------------------------------------ #
     print("\n[9] Gist immutability")
@@ -230,10 +241,14 @@ async def main(database_uri: str) -> None:
     # ------------------------------------------------------------------ #
     print("\n[fake determinism] same text -> identical scores and vectors")
     write_a = FakeWriteProvider().render_and_score(
-        observation_text=event.observation_text, diagnosticity_goal="", declared_typology=None
+        observation_text=event.observation_text,
+        diagnosticity_goal="",
+        declared_typology=None,
     )
     write_b = FakeWriteProvider().render_and_score(
-        observation_text=event.observation_text, diagnosticity_goal="", declared_typology=None
+        observation_text=event.observation_text,
+        diagnosticity_goal="",
+        declared_typology=None,
     )
     check(write_a == write_b, "FakeWriteProvider deterministic")
     vec_a = FakeEmbeddingProvider().embed([event.observation_text])
@@ -257,8 +272,8 @@ async def main(database_uri: str) -> None:
         "declared typology stored verbatim, typology_source = declared",
     )
     check(
-        result.typology_source == "inferred" and result.typology in
-        ("observed", "told", "inferred", "reflected"),
+        result.typology_source == "inferred"
+        and result.typology in ("observed", "told", "inferred", "reflected"),
         "undeclared typology classified by the write call, source = inferred",
         result.typology,
     )
@@ -288,7 +303,9 @@ async def main(database_uri: str) -> None:
     # ------------------------------------------------------------------ #
     print("\n[3] Importance degradation: failing scorer still lands the write")
     degraded_service = fake_service(pool, settings, write=FailingWriteProvider())
-    degraded = await degraded_service.ingest_observation(observe_event(agent_id=agent_id))
+    degraded = await degraded_service.ingest_observation(
+        observe_event(agent_id=agent_id)
+    )
     row4 = await fetchrow(
         pool,
         "SELECT importance_raw, scoring_failed FROM memories WHERE memory_id = %s",
@@ -301,8 +318,12 @@ async def main(database_uri: str) -> None:
 
     # ------------------------------------------------------------------ #
     print("\n[14] Embedding degradation: write lands, embedding IS NULL")
-    embed_fail_service = fake_service(pool, settings, embedding=FailingEmbeddingProvider())
-    embed_failed = await embed_fail_service.ingest_observation(observe_event(agent_id=agent_id))
+    embed_fail_service = fake_service(
+        pool, settings, embedding=FailingEmbeddingProvider()
+    )
+    embed_failed = await embed_fail_service.ingest_observation(
+        observe_event(agent_id=agent_id)
+    )
     row5 = await fetchrow(
         pool,
         "SELECT embedding IS NULL FROM memories WHERE memory_id = %s",
@@ -317,10 +338,16 @@ async def main(database_uri: str) -> None:
     print("\n[11] Escalation hard-stop: fail twice -> zero rows inserted")
     failing_escalation = FailingEscalationProvider()
     hard_service = fake_service(pool, settings, escalation=failing_escalation)
-    before = (await fetchrow(pool, "SELECT count(*) FROM memories WHERE agent_id = %s", agent_id))[0]
+    before = (
+        await fetchrow(
+            pool, "SELECT count(*) FROM memories WHERE agent_id = %s", agent_id
+        )
+    )[0]
     before_comp = (
         await fetchrow(
-            pool, "SELECT count(*) FROM identity_components WHERE agent_id = %s", agent_id
+            pool,
+            "SELECT count(*) FROM identity_components WHERE agent_id = %s",
+            agent_id,
         )
     )[0]
     try:
@@ -329,10 +356,16 @@ async def main(database_uri: str) -> None:
     except EscalationHardStopError:
         pass
     check(failing_escalation.calls == 2, "escalation retried exactly once (2 calls)")
-    after = (await fetchrow(pool, "SELECT count(*) FROM memories WHERE agent_id = %s", agent_id))[0]
+    after = (
+        await fetchrow(
+            pool, "SELECT count(*) FROM memories WHERE agent_id = %s", agent_id
+        )
+    )[0]
     after_comp = (
         await fetchrow(
-            pool, "SELECT count(*) FROM identity_components WHERE agent_id = %s", agent_id
+            pool,
+            "SELECT count(*) FROM identity_components WHERE agent_id = %s",
+            agent_id,
         )
     )[0]
     check(
@@ -367,14 +400,21 @@ async def main(database_uri: str) -> None:
     row7 = await fetchrow(
         pool, "SELECT pinned FROM memories WHERE memory_id = %s", result.memory_id
     )
-    check(pin.pinned is True and row7[0] is True, "set_pin(true) reflected in DB and result")
+    check(
+        pin.pinned is True and row7[0] is True,
+        "set_pin(true) reflected in DB and result",
+    )
     pinned_at_insert = await service.ingest_observation(
         observe_event(agent_id=agent_id, pinned=True)
     )
     row8 = await fetchrow(
-        pool, "SELECT pinned FROM memories WHERE memory_id = %s", pinned_at_insert.memory_id
+        pool,
+        "SELECT pinned FROM memories WHERE memory_id = %s",
+        pinned_at_insert.memory_id,
     )
-    check(row8[0] is True and pinned_at_insert.pinned is True, "pinned-at-insert honored")
+    check(
+        row8[0] is True and pinned_at_insert.pinned is True, "pinned-at-insert honored"
+    )
 
     # ------------------------------------------------------------------ #
     print("\n[2] One seam, thin route (route JSON == service IngestResult)")
@@ -396,7 +436,9 @@ async def main(database_uri: str) -> None:
     capturing = CapturingService(service)
     api_module.app.state.service = capturing
     transport = httpx.ASGITransport(app=api_module.app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://walker") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://walker"
+    ) as client:
         payload = json.loads(observe_event(agent_id=agent_id).model_dump_json())
         response = await client.post("/v1/events/observe", json=payload)
     check(response.status_code == 200, "route returned 200")
@@ -412,7 +454,10 @@ async def main(database_uri: str) -> None:
     scene = await service.scene_boundary(
         SceneBoundaryEvent(agent_id=agent_id, client_timestamp=NOW, scene_type="tavern")
     )
-    check(scene.accepted is True and scene.total_ms >= 0, "scene-boundary accepted + timed")
+    check(
+        scene.accepted is True and scene.total_ms >= 0,
+        "scene-boundary accepted + timed",
+    )
 
     await pool.close()
     print(f"\nALL CHECKS PASSED ({len(PASSED)} assertions)")

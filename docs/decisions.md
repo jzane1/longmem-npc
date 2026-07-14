@@ -139,6 +139,10 @@ entity hit / novel entity — novel entities grow the table). VADER-class lexico
 coreference misses accepted. Coreference via fastcoref or coreferee. Reflection-time component trim
 silently invalidates caches. A spam gate on novel-entity growth is deferred.
 
+*(Superseded in part 2026-07-13 by the write-path build rulings below: escalation grew from the
+three triggers sketched here to five; coreference settled on fastcoref; affect settled on VADER +
+Warriner 2013 VAD.)*
+
 ## Authorial-correction ruling — 2026-07-12
 
 **Replace model adopted.** Authorial correction writes a corrected head row
