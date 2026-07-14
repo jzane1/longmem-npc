@@ -6,8 +6,8 @@ audit + dated ruling in `decisions.md`, superseding-in-part *Schema now, mechani
 floors stand verified: the migration-01 schema and write path v1 (ingest service + thin FastAPI
 route + real/fake providers + NLP pass, per `write-path.md`). **One open decision owed before the
 demo ships:** the escalation hard-stop failure path is a build-phase stance and must be re-ruled
-for production (see the 2026-07-13 write-path build entry in `decisions.md`). Next: spec the read
-path (`docs\read-path.md`), scoped knowing reconstruction follows it in the queue.
+for production (see the 2026-07-13 write-path build entry in `decisions.md`). The read path is
+**specced** (`read-path.md`, 2026-07-14 — scope rulings dated in `decisions.md`). Next: build it.
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -149,11 +149,31 @@ and the structured behavior output survive the interview. Research publication c
   re-audit: **no contradictions**; two residual annotations for the scene-boundary consumer split
   (`write-path.md`, `architecture.md` §6) fixed and grep-verified. Docs only — no code, no floors
   changed.
+- **2026-07-14** — **Read-path v1 build target specced** (`read-path.md`). Consolidates
+  architecture §4.2 + §6 (and the artifact queue's retrieval scoring function) into a build spec
+  over the frozen migration-01 schema (no new migration). Surface was pre-fixed by the re-slating
+  ruling (retrieval-only; the Sonnet dialogue call rides with the CLI harness); Jack ruled two
+  scope forks at spec time (dated entry in `decisions.md`): query input = **text + reserved
+  context** (`query_text` embedded as-is; location/entities/event_time accepted-not-consumed —
+  slots for the post-August encoding-context term; server-side composition rejected as
+  double-counting + a hidden hardcoded template), and v1 serving = **verbatim-only**
+  (`read_mode = verbatim` on every item; decay math lands now as the recency score component so
+  Set B asserts through scores; theta/cache/`reconstructed` land with reconstruction, which swaps
+  the serving stage only — retrieval and scoring untouched, pre-warm hooks this seam). Remaining
+  physical shapes tagged `[SETTLE-AT-BUILD]` for the build (wire shape, relevance mapping +
+  over-fetch, recency knobs, importance_norm method, k default, `as_of` override,
+  `weight_overrides` shape, empty-store behavior, embedding-failure fallback). Doc-auditor run:
+  one wording contradiction — the reserved-slot mirror overstated (three of four context stamps);
+  Jack ruled **affect deliberately not reserved** (query-side shape undesigned; it arrives with
+  the encoding-context term), exclusion now stated in the spec — plus three residuals fixed
+  (architecture §6 spec-pending marker, Set B score-surface note, empty-store settle-tag);
+  grep-verified.
 
 ## Immediate queue
 
 1. Read path: dialogue-init top-k with IDs + scores (+ the retrieval scoring function from the
-   artifact queue; `read_mode`/`pinned` in payloads). Spec first (`docs\read-path.md`), then build.
+   artifact queue; `read_mode`/`pinned` in payloads). **Specced 2026-07-14 (`read-path.md`) —
+   build next**; remaining physical shapes settle at build.
 2. CLI harness (vertical slice complete — includes the single Sonnet dialogue call + action
    directive + reputation delta/snapshot per architecture §9; no gate, no caching, no
    reconstruction in the slice) + synthetic load driver alongside.
@@ -181,7 +201,8 @@ day: **Migration 01 foundational schema**; connect the Postgres MCP + floor-veri
   dialogue turn (CLI harness), identity recompile → reconstruction, prompt-head rebuild →
   post-August.
 - Retrieval scoring function: relevance × recency(decay class) × importance_norm; pin exemption;
-  normalization; slots for the future context term and per-call split-brain overrides.
+  normalization; slots for the future context term and per-call split-brain overrides. —
+  **Consolidated into `read-path.md` 2026-07-14** (shapes settle at build).
 - Reconstruction call spec: operator-structured prompt with gist as fixed constraint; determinism;
   batching shape. **Feeds immediate-queue item 3 — pre-demo since the 2026-07-14 re-slating.**
 - Reflection spec end-to-end (mechanism explicitly post-August — ruled 2026-07-14).

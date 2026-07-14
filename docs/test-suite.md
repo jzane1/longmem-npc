@@ -29,7 +29,9 @@ Forked into **structural pairs by correction verb**, keyed on `write_cause` — 
 
 Exercise injected `valid_at` timestamps (time travel) to prove **recency decay and bi-temporal
 invalidation are structurally distinct mechanisms**: decay hides detail at read time without
-touching rows; invalidation stamps rows without touching decay.
+touching rows; invalidation stamps rows without touching decay. *(Per the 2026-07-14 read-path
+serving ruling, the pre-reconstruction assertable surface is the recency score component — decay
+moves scores, not rows; detail-hiding assertions land with reconstruction.)*
 
 ## Set C — identity-conditioned reconstruction (~7–9 scenarios)
 

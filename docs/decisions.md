@@ -376,3 +376,44 @@ reconstruction → authorial correction → gate → suite session → Unity/dem
 loses its reconstruction items and gains purge and prompt caching explicitly; the demo
 choreography's 60-day drift plot is a planned beat, no longer contingent; `architecture.md` §2 and
 §7 deferral markers updated. Docs only — no code changed with this ruling.
+
+## Read-path spec scope rulings — 2026-07-14
+
+Authoring `read-path.md` (the dialogue-init retrieval v1 build target) required two scope rulings.
+The surface itself was already fixed by the re-slating ruling above: **retrieval-only** — one
+retrieval service seam with a thin pass-through FastAPI route, mirroring the write-path surface
+ruling; the Sonnet dialogue call rides with the CLI harness (immediate-queue item 2). Jack ruled:
+
+1. **Query input = text + reserved context.** `query_text` is required and embedded **as-is** as
+   the relevance probe — the integrator authors it (opening utterance or scene blurb).
+   `location_name` / `entities[]` / `event_time` are accepted and shape-validated but **not
+   consumed and not echoed** in v1 — reserved slots for the post-August encoding-context term,
+   mirroring three of the four write-side context stamps (the phase_tag/event_id
+   accept-now-consume-later precedent). **Affect is deliberately not reserved** (ruled same day,
+   on a doc-auditor finding that the slot mirror was overstated): a query-side affect field's
+   shape — and whose affect it would carry — is undesigned; it gets its shape with the
+   encoding-context term rather than as a guessed slot, and the spec states the exclusion
+   explicitly. **Rejected:** server-side composition of context into the
+   probe — it would bake context into the relevance term and double-count it once the real
+   encoding-context term ships (a separate weighted term is the committed design), and the
+   composition template would be a hidden hardcoded authorial artifact colliding with
+   nothing-hardcoded. The demo makes context matter by writing it into `query_text` explicitly —
+   same effect, visible in the debug view.
+2. **v1 serving = verbatim-only.** Retrieval (candidates + scoring) is specced as a separate stage
+   from serving (text assembly + read-mode stamping). v1 serves the live `memory_details` head
+   verbatim with `read_mode = "verbatim"` on every item — honest self-description; the three-state
+   boundary collapses to one state because no reconstructor exists yet. The decay math is built
+   now and surfaces as the **recency score component**, so Set B asserts decay-vs-invalidation
+   distinctness through scores. The theta check, cache reads, and `reconstructed` read_mode land
+   with reconstruction (immediate-queue item 3), which **swaps the serving stage only** —
+   retrieval and scoring are untouched by that swap, and reconstruction's pre-warm hooks this same
+   dialogue-init seam.
+
+The spec consolidates the retrieval scoring function from the artifact queue
+(relevance × recency(decay class) × importance_norm; pin exemption → recency = 1.0; reserved slots
+for the context term and per-call `weight_overrides`) and tags the remaining physical shapes
+`[SETTLE-AT-BUILD]` (wire shape, distance→similarity mapping + over-fetch, recency knobs +
+shared-`tau_effective` confirmation, importance_norm method, k default, `as_of` override,
+`weight_overrides` shape, empty/short-store behavior, query-embedding-failure fallback — suggested
+fail-quiet recency × importance ranking with a `degraded` flag, the read analog of
+never-lose-a-write). These are ruled at the read path's build, not now.

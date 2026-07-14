@@ -149,9 +149,9 @@ write-time facts from day one.
 **Dialogue initialization:** top-k retrieval. Endpoints return **memory IDs and scores alongside
 prose** — this is load-bearing; it is what makes the test suite assertable.
 
-**Retrieval scoring** (spec pending): `relevance × recency(decay class) × importance_norm`; pin
-exemption; normalization; reserved slots for a future encoding-context term and per-call overrides
-under the split-brain topology.
+**Retrieval scoring** (specced in `read-path.md`, 2026-07-14; physical shapes settle at build):
+`relevance × recency(decay class) × importance_norm`; pin exemption; normalization; reserved slots
+for a future encoding-context term and per-call overrides under the split-brain topology.
 
 **Mid-dialogue gate (non-LLM hybrid):**
 - **Novelty check** — embed the utterance; measure distance against the loaded set; far from all →
