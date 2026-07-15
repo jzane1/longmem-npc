@@ -214,7 +214,7 @@ class RetrievedMemory(BaseModel):
     memory_id: UUID
     detail_id: UUID  # the served live head (Set A's corrected-head surface)
     content: str  # the live head's text, verbatim (v1 serving ruling)
-    read_mode: Literal["verbatim"]  # widens when reconstruction lands (item 3)
+    read_mode: Literal["verbatim"]  # widens when reconstruction lands (item 1)
     pinned: bool
     score: float  # relevance x recency x importance_norm
     relevance: float | None  # null on the degraded (no-vector) path

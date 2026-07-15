@@ -70,7 +70,7 @@ Retrieval (candidates + scoring) is a separate stage from serving (text assembly
 stamping). **v1 serving:** the live `memory_details` head's `content`, verbatim;
 `read_mode = "verbatim"` on every item; `pinned` mirrored from the row. The architecture's
 three-state read-mode boundary (§6) collapses to one state in v1 because no reconstructor exists —
-honest self-description, never a claimed mechanism. Item 3 swaps serving only: theta check
+honest self-description, never a claimed mechanism. Item 1 swaps serving only: theta check
 (reusing the decay math below), cache read keyed `(memory_id, identity_version)`, batched
 reconstruction on miss, `read_mode = "reconstructed"` past threshold.
 

@@ -64,7 +64,7 @@ app = FastAPI(title="longmem-npc API", version="1", lifespan=_lifespan)
 @app.post("/v1/dialogue/init", response_model=RetrievalResult)
 async def dialogue_init(request: DialogueInitRequest) -> RetrievalResult:
     """Dialogue-init retrieval (read-path.md wire shape, ruled 2026-07-14).
-    Reconstruction's pre-warm hooks this same endpoint at item 3."""
+    Reconstruction's pre-warm hooks this same endpoint at item 1."""
     try:
         return await app.state.retrieval.retrieve_dialogue_init(request)
     except UnknownAgentError as exc:

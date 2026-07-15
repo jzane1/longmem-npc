@@ -94,12 +94,13 @@ Returned by `ingest_observation`, surfaced verbatim in the CLI debug view and as
 
 ### `scene-boundary`
 
-The explicit, client-sent scene edge (architecture §6). Its three consumers — prompt-head rebuild,
-identity-document recompile, reputation snapshot — are **all deferred** *(slated 2026-07-14:
-reputation snapshot → the dialogue turn; identity-document recompile → reconstruction — both
-pre-demo; prompt-head rebuild → post-August; see `decisions.md`)*. **v1 accepts the event and
-instruments it (timing), and does nothing else; it writes no schema.** The contract exists now so the
-demo choreography and the eventual mechanisms hook a stable, tested event.
+The explicit, client-sent scene edge (architecture §6). Its three consumers were slated 2026-07-14:
+**reputation snapshot → the dialogue turn (landed 2026-07-15 with the CLI harness — caller-side, in
+the session-runner, which re-reads `agents.reputation` at each boundary; this handler itself still
+writes nothing)**; identity-document recompile → reconstruction (pre-demo); prompt-head rebuild →
+post-August (see `decisions.md`). **The handler accepts the event and instruments it (timing), and
+does nothing else; it writes no schema.** The contract exists now so the demo choreography and the
+eventual mechanisms hook a stable, tested event.
 
 ### `pin` / `unpin`
 

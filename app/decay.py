@@ -4,7 +4,7 @@
     recency       = exp(-age / tau_effective)        # age clamped at >= 0
 
 Consumers: the read path's recency score component (app\\retrieval.py) now;
-the reconstruction theta check (immediate-queue item 3) imports these same
+the reconstruction theta check (immediate-queue item 1) imports these same
 functions when it lands — ruled with the read-path build (2026-07-14): the
 recency term and detail decay share tau_effective exactly. Architecture's
 decayed detail strength is this same exponential (decay = 1 - recency).

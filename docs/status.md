@@ -1,6 +1,6 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-07-15
+**Last updated:** 2026-07-16
 **Phase:** **the vertical slice is complete** — *event in → memory stored → dialogue out* runs end
 to end as a console. Four floors stand verified: the migration-01 schema, write path v1
 (`write-path.md`), read path v1 (`read-path.md`), and **CLI harness v1** (`cli-harness.md` — built
@@ -218,11 +218,13 @@ and the structured behavior output survive the interview. Research publication c
   immediate-queue item 2, not 3), the latter also renumbered in `read-path.md`'s two reconstruction
   references at Jack's request.
 - **2026-07-15** — **CLI harness v1 built, verified, and committed — the vertical slice is
-  complete.** Jack ruled the two genuine settle-forks at plan approval (action-vocabulary source =
-  **per-call field → `agents.config` fallback**, neither → directives drop soft with reason, no
-  hardcoded default vocabulary; cost units = **tokens unconditionally, USD only via optional
-  `LONGMEM_PRICE_*` env vars** — pricing never hardcoded); the remaining seven shapes were approved
-  with the plan (dated "CLI-harness build rulings" entry in `decisions.md` records all nine).
+  complete.** Jack ruled two forks via explicit questions at plan approval (action-vocabulary
+  source = **per-call field → `agents.config` fallback**, neither → directives drop soft with
+  reason, no hardcoded default vocabulary; cost units = **tokens unconditionally, USD only via
+  optional `LONGMEM_PRICE_*` env vars** — pricing never hardcoded, a plan-raised choice implicit in
+  the spec's instrumentation contract); the spec's remaining nine settle-tags were approved with
+  the plan (dated "CLI-harness build rulings" entry in `decisions.md`; count annotation added by
+  the 2026-07-16 audit).
   New: `app\dialogue.py` (the `run_dialogue_turn` seam: retrieval → labeled-block prompt assembly →
   single dialogue call → vocabulary validation → atomic clamped in-place `agents.reputation`
   UPDATE), `app\session.py` (session-runner core owning frozen-snapshot scene state — the
@@ -243,10 +245,31 @@ and the structured behavior output survive the interview. Research publication c
   the REPL reconfigures non-tty stdin to `utf-8-sig`. Docs propagated: BUILT banner + inline ruling
   annotations in `cli-harness.md`, architecture §6/§9/§11 built markers, queue renumbered
   (reconstruction → item 1) with refs updated in `read-path.md`/`cli-harness.md` — including
-  read-path refs already stale from the prior renumber. **Known nit left in place:** two stale
-  code comments (`app\retrieval.py`, `app\schemas.py`) still cite reconstruction as "item 3"
-  (pre-dating this task); comment-only, flagged rather than touched to keep the read-path floor
-  untouched.
+  read-path refs already stale from the prior renumber. **Known nit left in place:** stale code
+  comments citing reconstruction as "item 3" — the 2026-07-16 audit found **four** such files
+  (`app\api.py`, `app\decay.py`, `app\retrieval.py`, `app\schemas.py`), not the two named here
+  originally; comment-only, left untouched at build time to keep the floors byte-identical.
+  *(Fixed 2026-07-16 by audit ruling; walkers re-run — see that entry.)*
+- **2026-07-16** — **Full-project audit + remediation (at Jack's request).** Three lanes: a
+  doc-auditor full-tree sweep, a code-vs-rulings review, and operational/toolchain checks.
+  **Code verdict: clean** — the only write surfaces are the atomic observe insert and the two
+  ruled runtime-scalar UPDATEs; the auditor's independent spot-checks (schema SQL vs.
+  migration-01.md, config knobs vs. rulings, the reputation-apply SQL shape, the dialogue seam
+  vs. its rulings) all passed. **Operations: clean** — container healthy, migrate no-arg a no-op,
+  `longmem` pristine, all `requirements.txt` pins match installed versions, ruff hook live,
+  suite-gate hook correctly dormant until the pytest suite lands. **Docs: six findings, all in
+  the 2026-07-15 wrap-up prose; Jack ruled on all of them** (dated "Full-project audit rulings"
+  entry in `decisions.md`): five mechanical fixes applied and grep-verified (the missed "Item 3"
+  renumber ref in `read-path.md`; the `write-path.md` scene-boundary landing annotation; the
+  settle-count correction annotated onto the 2026-07-15 decisions entry; the CLAUDE.md
+  "agent-row" → "runtime scalars" rewording; this log's nit sentence corrected to four files);
+  the **override-on-degraded-path interpretation CONFIRMED as built** (flag closed, no code
+  change); and the four stale "item 3" code comments **fixed** with all three walkers re-run on
+  fresh scratch (35/35, 34/34, 36/36 — floors intact, comment-only diffs). Observations carried
+  without ruling: `httpx` unpinned but used directly by two walkers; `max_tokens=1024` hardcoded
+  in the three real providers (write-path-era pattern). Also this session: a CLI-harness usage
+  guide was written up for Jack (operator prerequisites incl. the no-agent-provisioning-surface
+  gap, the turn pipeline, meta-commands, reputation semantics, fake/real modes, load driver).
 
 ## Immediate queue
 

@@ -531,6 +531,13 @@ reconstruction in the slice).
 
 ## CLI-harness build rulings — 2026-07-15
 
+*[Count correction, 2026-07-16 audit: the spec carried **ten** settle-tags (the nine-item list plus
+the `reputation_snapshot`-plumbing tag inline in the request contract), and "cost units" was a
+plan-raised choice implicit in the instrumentation contract, not a spec tag — so the tallies below
+("nine shapes", "two genuine forks" among them) miscount; the itemized rulings themselves are the
+authoritative, complete record: one spec tag ruled via explicit question (action-vocabulary
+source), nine spec tags approved with the plan, plus the cost-units question.]*
+
 The harness build (spec: `cli-harness.md`) settled the nine `[SETTLE-AT-BUILD]` shapes. Jack ruled
 the two genuine forks via explicit questions at plan approval; the remaining shapes were approved
 with the plan. Floor-verified the same day (structural walker `tests\verify_cli_harness.py`,
@@ -605,7 +612,8 @@ Approved-with-plan shapes, as built:
 **Build-surfaced interpretation (noted, not separately asked):** a client
 `reputation_delta_override`, being client-authoritative and independent of the model call, **still
 applies on the degraded (never-blank) path** — the ladder's "zero reputation delta" describes the
-no-override default. Flagged to Jack in the build report.
+no-override default. Flagged to Jack in the build report. *(Confirmed by Jack 2026-07-16 — see the
+audit-rulings entry below.)*
 
 **Environment learnings:** (1) Windows decodes piped stdin with the ANSI codepage, so a PowerShell
 here-string pipe delivers its UTF-8 BOM as mojibake — the REPL reconfigures non-tty stdin to
@@ -613,3 +621,35 @@ here-string pipe delivers its UTF-8 BOM as mojibake — the REPL reconfigures no
 `FakeDialogueProvider` default so pre-harness `Providers(...)` constructions (the write/read
 walkers) stand unchanged. (3) `RealDialogueProvider` streams (the anthropic SDK `messages.stream`)
 so first-token latency is measurable; the fake reports 0.0.
+
+## Full-project audit rulings — 2026-07-16
+
+A three-lane audit (doc-auditor full-tree sweep + code-vs-rulings review + operational checks) ran
+the day after the CLI-harness build. Code and operations came back clean; the doc sweep found six
+findings, all in the 2026-07-15 wrap-up prose. Jack ruled:
+
+1. **Mechanical doc fixes applied (five findings).** The missed reconstruction renumber ref in
+   `read-path.md` §Serving boundary ("Item 3" → "Item 1"); the `write-path.md` scene-boundary
+   consumer note annotated with the 2026-07-15 landing (caller-side in the session-runner; the
+   handler itself still writes nothing); the settle-shape count correction annotated onto the
+   2026-07-15 entry above (the register's annotation convention — no ruling was rewritten); the
+   CLAUDE.md invariant carve-out rewording ("the two runtime scalars" — `memories.pinned` is a
+   memory-row flag, not an agent-row scalar); and the status.md known-nit sentence corrected to
+   name all four stale-comment files.
+
+2. **Override-on-degraded-path CONFIRMED.** The 2026-07-15 build-surfaced interpretation stands as
+   built: a client `reputation_delta_override` is client-authoritative and applies even when the
+   dialogue call fails (the never-blank path); the degradation ladder's "zero reputation delta"
+   describes the no-override default. The flag is closed; no code change.
+
+3. **Stale queue-number code comments fixed, floors re-verified.** The four comments citing
+   reconstruction as "item 3" (`app\api.py`, `app\decay.py`, `app\retrieval.py`, `app\schemas.py`)
+   were corrected to item 1 — comment-only changes to floor-verified files, so all three structural
+   walkers were re-run on fresh scratch databases: 35/35, 34/34, 36/36, `db\migrate.py` no-arg
+   still a clean no-op, scratch dropped.
+
+Audit observations recorded without a ruling (carry as-is): `httpx` is imported directly by two
+walkers but rides transitively (unpinned in `requirements.txt`); `max_tokens=1024` is hardcoded in
+the three real providers (a write-path-era pattern — arguably provider implementation detail, not
+integrator config); the suite-gate Stop hook stays dormant by design until `test_*.py` files land
+with the pytest suite (immediate-queue item 4).

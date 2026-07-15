@@ -12,7 +12,7 @@ Pipeline per dialogue-init request:
 
 Retrieval (candidates + scoring) and serving (text assembly + read-mode
 stamping) are deliberately separate stages: reconstruction (immediate-queue
-item 3) swaps the SERVING stage only — theta check, cache keyed
+item 1) swaps the SERVING stage only — theta check, cache keyed
 (memory_id, identity_version), read_mode = "reconstructed" — and its
 pre-warm hooks this same seam. Retrieval and scoring stay untouched by that
 swap.
