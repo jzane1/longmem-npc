@@ -211,7 +211,11 @@ and the structured behavior output survive the interview. Research publication c
   split-brain, not this slice). Remaining physical shapes tagged `[SETTLE-AT-BUILD]` for the build
   (`LONGMEM_MODEL_DIALOGUE` name, structured-output schema, reputation apply shape, action-vocabulary
   source, prompt-assembly block, never-blank fallback, CLI meta-command surface, load-driver shape,
-  wire-model form). Docs only — no code, no floors changed. Doc-auditor sweep pending.
+  wire-model form). Docs only — no code, no floors changed. Doc-auditor sweep: **no contradictions**;
+  two fixes propagated + grep-verified — the "first in-place UPDATE" wording (the `set_pinned` pin
+  toggle is precedent for a runtime-scalar UPDATE) and a stale queue number (reconstruction feeds
+  immediate-queue item 2, not 3), the latter also renumbered in `read-path.md`'s two reconstruction
+  references at Jack's request.
 
 ## Immediate queue
 

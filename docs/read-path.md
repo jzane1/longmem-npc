@@ -15,7 +15,7 @@ it are in [decisions.md](decisions.md); the schema it reads is frozen in
 > rulings" entry in `decisions.md`): query input = **text + reserved context**; v1 serving =
 > **verbatim-only**. The surface was already fixed by the 2026-07-14 re-slating ruling:
 > retrieval-only — the Sonnet dialogue call rides with the CLI harness. Reconstruction
-> (immediate-queue item 3) lands next **on this seam**; the serving boundary below is drawn so it
+> (immediate-queue item 2) lands next **on this seam**; the serving boundary below is drawn so it
 > attaches without rework.
 
 ## Principles this build honors
@@ -43,7 +43,7 @@ it are in [decisions.md](decisions.md); the schema it reads is frozen in
 ## Scope boundary — do NOT build
 
 The mid-dialogue gate (and its degradation ladder); prompt caching; **reconstruction serving —
-theta check, cache reads/writes, pre-warm, `reconstructed` read_mode** (immediate-queue item 3,
+theta check, cache reads/writes, pre-warm, `reconstructed` read_mode** (immediate-queue item 2,
 next on this seam); the dialogue/Sonnet call, action directive, reputation (CLI-harness target);
 correction endpoints; purge; reflection; the encoding-context scoring term (its request fields are
 **reserved only**); per-call weight overrides (**slot reserved only**); and **any new DB schema or
