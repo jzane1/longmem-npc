@@ -14,9 +14,9 @@ it are in [decisions.md](decisions.md); the schema it reads is frozen in
 > schema stayed frozen.** Two scope forks had been ruled at spec time (dated "Read-path spec scope
 > rulings" entry in `decisions.md`): query input = **text + reserved context**; v1 serving =
 > **verbatim-only**. The surface was already fixed by the 2026-07-14 re-slating ruling:
-> retrieval-only — the Sonnet dialogue call rides with the CLI harness. Reconstruction
-> (immediate-queue item 2) lands next **on this seam**; the serving boundary below is drawn so it
-> attaches without rework.
+> retrieval-only — the Sonnet dialogue call rides with the CLI harness (built 2026-07-15).
+> Reconstruction (immediate-queue item 1) lands next **on this seam**; the serving boundary below
+> is drawn so it attaches without rework.
 
 ## Principles this build honors
 
@@ -43,8 +43,9 @@ it are in [decisions.md](decisions.md); the schema it reads is frozen in
 ## Scope boundary — do NOT build
 
 The mid-dialogue gate (and its degradation ladder); prompt caching; **reconstruction serving —
-theta check, cache reads/writes, pre-warm, `reconstructed` read_mode** (immediate-queue item 2,
-next on this seam); the dialogue/Sonnet call, action directive, reputation (CLI-harness target);
+theta check, cache reads/writes, pre-warm, `reconstructed` read_mode** (immediate-queue item 1,
+next on this seam); the dialogue/Sonnet call, action directive, reputation (CLI-harness target,
+built 2026-07-15);
 correction endpoints; purge; reflection; the encoding-context scoring term (its request fields are
 **reserved only**); per-call weight overrides (**slot reserved only**); and **any new DB schema or
 migration**. If adjacent work looks necessary, **stop and report** rather than expand scope.
@@ -60,7 +61,7 @@ retrieve_dialogue_init(request: DialogueInitRequest) -> RetrievalResult
 - The **CLI harness** calls it in-process; the **FastAPI route** is a thin wrapper whose JSON
   response is exactly the serialized `RetrievalResult` (route-is-pass-through, as proven for the
   write path). Timing + token accounting recorded once, at the service seam.
-- **This is where reconstruction attaches** (architecture §7: pre-warm at dialogue init): item 3
+- **This is where reconstruction attaches** (architecture §7: pre-warm at dialogue init): item 1
   wraps the *serving* stage below; retrieval and scoring are untouched by that swap.
 
 ### Serving boundary *(ruled 2026-07-14: verbatim-only v1)*
@@ -112,7 +113,7 @@ Result-level:
   the Set B separation, assertable in payloads.
 - Rows with **NULL embeddings** (the write path's ruled degradation) are unreachable by the vector
   probe — a documented consequence. They remain reachable via the degraded fallback below, and
-  later via the gate's entity/GIN path (item 5).
+  later via the gate's entity/GIN path (item 3).
 
 ## Retrieval scoring
 
@@ -135,7 +136,7 @@ computed at read time, returned per item with all components.
   `decay_classes` config map; rows flagged `decay_class_unknown` use the default class (same rule
   as write). `[SETTLE-AT-BUILD]` — **ruled 2026-07-14:** knob `decay_k_importance`, default 1.0;
   shared `tau_effective` **confirmed** — one formula, one implementation (`app\decay.py`, which
-  the theta check imports at item 3); age clamps at ≥ 0; a label resolving to neither the map nor
+  the theta check imports at item 1); age clamps at ≥ 0; a label resolving to neither the map nor
   a default class takes the `tau_fallback_seconds` knob (default 604800) — a read never fails on
   a resolvable row.
 - **importance_norm** — normalized at read from stored raw. `[SETTLE-AT-BUILD]` method —
@@ -145,7 +146,7 @@ computed at read time, returned per item with all components.
   would move *other* items' scores, breaking the Set B principle above; raw is already
   contractually 0..1 from the write call.
 - **Pin exemption** — pinned rows take `recency = 1.0` (pin = decay exemption, architecture §8;
-  pin's second meaning, reconstruction exclusion, binds at item 3).
+  pin's second meaning, reconstruction exclusion, binds at item 1).
 - **Normalization** — `[SETTLE-AT-BUILD]` — **ruled 2026-07-14 as suggested:** each component in
   [0,1] so the product is in [0,1]; no further rescaling. Ties in the final ordering break on
   `memory_id`, so repeated identical calls are byte-identical.
@@ -168,8 +169,8 @@ Retrieval is **non-LLM** — no new model role, no new env var. The one model ca
 embedding**, which reuses the write path's embedding provider pair as-is: real
 `text-embedding-3-small` at the locked 1536, and the **deterministic fake** (so the structural
 suite runs offline, keyless, with stable scores). The probe embeds with the same model+dimension
-that embedded the observations. (The gate, also non-LLM, arrives at item 5; reconstruction's model
-role binds at item 3.)
+that embedded the observations. (The gate, also non-LLM, arrives at item 3; reconstruction's model
+role binds at item 1.)
 
 ## `[SETTLE-AT-BUILD]` — physical shapes, ruled at build (stop and report, never silently choose)
 
@@ -177,7 +178,7 @@ role binds at item 3.)
 `decisions.md`; annotated inline above):
 
 - **Wire shape** — ruled as suggested: `POST /v1/dialogue/init` (reconstruction's pre-warm hooks
-  here at item 3), Pydantic models in `app\schemas.py`, route pass-through, unknown agent → 404.
+  here at item 1), Pydantic models in `app\schemas.py`, route pass-through, unknown agent → 404.
 - **Relevance mapping + SQL shape** — ruled as suggested: `clamp(1 − cosine_distance, 0, 1)`;
   over-fetch `retrieval_overfetch_factor` (4.0).
 - **Recency knobs** — ruled: `decay_k_importance` (1.0); shared `tau_effective` confirmed

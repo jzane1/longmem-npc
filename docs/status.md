@@ -1,17 +1,17 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-07-14
-**Phase:** scope re-slated by ruling — **the reconstruction mechanism is now pre-demo** (2026-07-14
-audit + dated ruling in `decisions.md`, superseding-in-part *Schema now, mechanism later*). Three
-floors stand verified: the migration-01 schema, write path v1 (ingest service + thin FastAPI route
-+ real/fake providers + NLP pass, per `write-path.md`), and **read path v1** (dialogue-init
-retrieval service + shared decay math + thin route, per `read-path.md` — built & floor-verified
-2026-07-14, all settle-shapes ruled in the dated `decisions.md` entry). **One open decision owed
+**Last updated:** 2026-07-15
+**Phase:** **the vertical slice is complete** — *event in → memory stored → dialogue out* runs end
+to end as a console. Four floors stand verified: the migration-01 schema, write path v1
+(`write-path.md`), read path v1 (`read-path.md`), and **CLI harness v1** (`cli-harness.md` — built
+& floor-verified 2026-07-15: the `run_dialogue_turn` seam with the single Sonnet-class dialogue
+call, structured directive + in-place reputation apply, an interactive REPL and the synthetic load
+driver on a shared session-runner core; all nine settle-shapes ruled in the dated `decisions.md`
+entry). Reconstruction remains pre-demo per the 2026-07-14 re-slating. **One open decision owed
 before the demo ships:** the escalation hard-stop failure path is a build-phase stance and must be
-re-ruled for production (see the 2026-07-13 write-path build entry in `decisions.md`). Next: **build
-the CLI harness** — its v1 build target is now specced (`cli-harness.md`, 2026-07-14; two scope forks
-ruled — reputation persisted in-place, drive surface = REPL over a shared session-runner core), the
-vertical slice's remaining piece.
+re-ruled for production (see the 2026-07-13 write-path build entry in `decisions.md`). Next:
+**spec reconstruction** (immediate-queue item 1) — it attaches to the read path's serving stage;
+the theta check imports `app\decay.py`.
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -44,6 +44,7 @@ and the structured behavior output survive the interview. Research publication c
 | Migration 01 foundational schema — 9 tables, 7 CHECKs, HNSW cosine + GIN + one-live-head + FK indexes (`db\migrations\001_foundation.sql`, applied by `db\migrate.py`) | floor-verifier **pass** on live `longmem`: every done-when re-run (idempotent second run, CHECK rejection, server UUID defaults, smoke fixture) + `vector 0.8.5` enabled; DB left pristine (only `schema_migrations`) | 2026-07-13 |
 | Write path v1 — ingest service seam (`app\ingest.py`) + thin FastAPI route (`app\api.py`, served via `python -m app.serve`) + real/deterministic-fake providers (`app\providers.py`) + NLP pass (`app\nlp.py`: spaCy lg + fastcoref + VADER + Warriner VAD) + atomic insert (`app\db.py`) | floor-verifier **pass** against the migration-01 floor: structural walker `tests\verify_write_path.py` re-run independently (35 assertions covering all 14 done-when criteria) on scratch `longmem_test`; `db\migrate.py` no-arg still a clean no-op on `longmem`; product `longmem` confirmed pristine via postgres MCP; independent spot-check of live head, span offsets, and degradation rows | 2026-07-13 |
 | Read path v1 — retrieval service seam (`app\retrieval.py`) + shared decay math (`app\decay.py`) + thin `POST /v1/dialogue/init` route (`app\api.py`) + read-only candidate SQL (`app\db.py`) + wire models (`app\schemas.py`) + five knobs (`app\config.py`) | floor-verifier **pass** against the migration-01 + write-path floors: structural walker `tests\verify_read_path.py` re-run independently (34 assertions, done-when 1–11) on scratch `longmem_test`; `tests\verify_write_path.py` re-run (35 assertions — shared files touched, floor intact); `db\migrate.py` no-arg still a clean no-op on `longmem`; `longmem` confirmed pristine; independent read-only SQL spot-checks (live head, NULL-embedding row, one-live-head index); plus a live `python -m app.serve` route session with byte-identical repeated reads | 2026-07-14 |
+| CLI harness v1 — dialogue-turn seam (`app\dialogue.py`: retrieval → prompt assembly → single dialogue call → directive validation → atomic in-place reputation apply) + shared session-runner core (`app\session.py`) + REPL (`python -m app.cli`, `app\cli.py`) + synthetic load driver (`python -m app.load_driver`, `app\load_driver.py`) + dialogue provider triad (`app\providers.py`) + turn wire models (`app\schemas.py`) + reputation SQL (`app\db.py`) + dialogue role/reputation/pricing config (`app\config.py`) | floor-verifier **pass** against the migration-01 + write-path + read-path floors: structural walker `tests\verify_cli_harness.py` re-run independently (36 assertions, every done-when criterion) on scratch `longmem_test`; both prior walkers re-run clean (35/35, 34/34 — shared files touched, floors intact); `db\migrate.py` no-arg still a clean no-op on `longmem` (schema frozen, `001` the only migration); `longmem` confirmed pristine **via the postgres MCP — the verifier's `mcp__postgres__*` tools worked this dispatch, resolving the 2026-07-14 flag**; an independent standalone load-driver run (offline, keyless); plus a live piped REPL session (observe → dialogue turns with debug view → scene-boundary snapshot refresh) | 2026-07-15 |
 
 ## Open questions needing Jack's ruling
 
@@ -216,29 +217,56 @@ and the structured behavior output survive the interview. Research publication c
   toggle is precedent for a runtime-scalar UPDATE) and a stale queue number (reconstruction feeds
   immediate-queue item 2, not 3), the latter also renumbered in `read-path.md`'s two reconstruction
   references at Jack's request.
+- **2026-07-15** — **CLI harness v1 built, verified, and committed — the vertical slice is
+  complete.** Jack ruled the two genuine settle-forks at plan approval (action-vocabulary source =
+  **per-call field → `agents.config` fallback**, neither → directives drop soft with reason, no
+  hardcoded default vocabulary; cost units = **tokens unconditionally, USD only via optional
+  `LONGMEM_PRICE_*` env vars** — pricing never hardcoded); the remaining seven shapes were approved
+  with the plan (dated "CLI-harness build rulings" entry in `decisions.md` records all nine).
+  New: `app\dialogue.py` (the `run_dialogue_turn` seam: retrieval → labeled-block prompt assembly →
+  single dialogue call → vocabulary validation → atomic clamped in-place `agents.reputation`
+  UPDATE), `app\session.py` (session-runner core owning frozen-snapshot scene state — the
+  scene-boundary reputation-snapshot consumer landed), `app\cli.py` (REPL,
+  `python -m app.cli --agent <uuid> [--debug]`), `app\load_driver.py` (deterministic seeded
+  generator or JSON script; emits §11's latency p50/p95 + itemized per-100-turn cost table),
+  `tests\verify_cli_harness.py` (36-assertion structural walker), the dialogue provider triad
+  (streaming real + deterministic fake + failure-injection fakes), turn wire models, reputation
+  SQL, and the dialogue-role/reputation/pricing config. The CLAUDE.md invariant clarification for
+  agent-row runtime scalars landed with the UPDATE, as ruled. **Build-surfaced interpretation
+  flagged for Jack:** a client `reputation_delta_override` still applies on the never-blank
+  degraded path (client-authoritative; the ladder's zero delta is the no-override default).
+  Verification ran on scratch `longmem_test` (created/migrated/dropped around the walkers); both
+  prior walkers re-run clean (35/35, 34/34); live piped REPL session + standalone load-driver run;
+  floor-verifier **pass** — and its `mcp__postgres__*` tools **worked this dispatch** (the
+  2026-07-14 MCP-allowlist flag resolved). Environment learnings in `decisions.md`: Windows decodes
+  piped stdin with the ANSI codepage (PowerShell here-string pipes deliver a mojibake UTF-8 BOM) —
+  the REPL reconfigures non-tty stdin to `utf-8-sig`. Docs propagated: BUILT banner + inline ruling
+  annotations in `cli-harness.md`, architecture §6/§9/§11 built markers, queue renumbered
+  (reconstruction → item 1) with refs updated in `read-path.md`/`cli-harness.md` — including
+  read-path refs already stale from the prior renumber. **Known nit left in place:** two stale
+  code comments (`app\retrieval.py`, `app\schemas.py`) still cite reconstruction as "item 3"
+  (pre-dating this task); comment-only, flagged rather than touched to keep the read-path floor
+  untouched.
 
 ## Immediate queue
 
-1. CLI harness (vertical slice complete — includes the single Sonnet dialogue call + action
-   directive + reputation delta/snapshot per architecture §9; no gate, no caching, no
-   reconstruction in the slice) + synthetic load driver alongside. **v1 build target specced
-   2026-07-14 (`cli-harness.md`); build pending** — reputation persists in-place, drive surface =
-   REPL over a shared session-runner core the load driver reuses.
-2. **Reconstruction (re-slated pre-demo 2026-07-14):** spec (reconstruction call + seed-only
+1. **Reconstruction (re-slated pre-demo 2026-07-14):** spec (reconstruction call + seed-only
    identity-document rendering + cache + drift budget + write-back + serving shape) → build →
    verification. Attaches to the read path's serving stage; the theta check imports
    `app\decay.py`.
-3. Authorial-correction endpoint (small target; the correction-override demo beat).
-4. Mid-dialogue gate + threshold values, efficacy definitions, per-signal fire logging.
-5. Test-suite scoped session (Sets A-authorial, B, C + degradation cases now mostly runnable).
-6. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
+2. Authorial-correction endpoint (small target; the correction-override demo beat).
+3. Mid-dialogue gate + threshold values, efficacy definitions, per-signal fire logging.
+4. Test-suite scoped session (Sets A-authorial, B, C + degradation cases now mostly runnable).
+5. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
    choreography incl. the 60-day drift beat.
-7. Before the demo ships: re-rule the escalation failure path (see open questions) and pick a
-   real-provider smoke moment (one live observe with keys) ahead of demo choreography.
+6. Before the demo ships: re-rule the escalation failure path (see open questions) and pick a
+   real-provider smoke moment (one live observe + one live dialogue turn with keys) ahead of demo
+   choreography.
 
-*(Done 2026-07-14: **Read path v1** — see the verified-floors table and session log. Done
-2026-07-13: **Write path v1**. Earlier same day: **Migration 01 foundational schema**; connect the
-Postgres MCP + floor-verifier MCP access.)*
+*(Done 2026-07-15: **CLI harness v1 + synthetic load driver** — the vertical slice is complete;
+see the verified-floors table and session log. Done 2026-07-14: **Read path v1**. Done 2026-07-13:
+**Write path v1**; earlier same day: **Migration 01 foundational schema**; connect the Postgres
+MCP + floor-verifier MCP access.)*
 
 ## Open artifact queue (writing tasks against settled decisions — not decisions)
 
@@ -247,14 +275,14 @@ Postgres MCP + floor-verifier MCP access.)*
   accepted-not-enforced). Still to spec/build: the diegetic-correction event (references a target
   memory_id; mechanism post-August) and purge (post-August, before the public flip — ruled
   2026-07-14). Scene-boundary's consumers were slated 2026-07-14: reputation snapshot → the
-  dialogue turn (CLI harness), identity recompile → reconstruction, prompt-head rebuild →
-  post-August.
+  dialogue turn (**landed 2026-07-15** — the session-runner re-reads `agents.reputation` at each
+  boundary), identity recompile → reconstruction, prompt-head rebuild → post-August.
 - Retrieval scoring function: relevance × recency(decay class) × importance_norm; pin exemption;
   normalization; slots for the future context term and per-call split-brain overrides. —
   **Consolidated into `read-path.md` 2026-07-14 and now BUILT** (shapes ruled at build; dated
   `decisions.md` entry).
 - Reconstruction call spec: operator-structured prompt with gist as fixed constraint; determinism;
-  batching shape. **Feeds immediate-queue item 2 — pre-demo since the 2026-07-14 re-slating.**
+  batching shape. **Feeds immediate-queue item 1 — pre-demo since the 2026-07-14 re-slating.**
 - Reflection spec end-to-end (mechanism explicitly post-August — ruled 2026-07-14).
 - Gate threshold values + efficacy definitions wired to instrumentation.
 - Unity client C# API surface: send event, open dialogue, directive callback, reputation read,

@@ -173,8 +173,9 @@ a marked recollection block; the head is **rebuilt at scene boundaries**, where 
 anyway. The **scene boundary is a load-bearing, explicit client-sent API event** with three
 consumers: prompt-head rebuild, identity-document recompile, reputation snapshot. Scene edges settle
 prefix, identity version, and reputation in one heartbeat. *(Consumer slating ruled 2026-07-14:
-reputation snapshot lands with the dialogue turn; identity recompile with reconstruction — both
-pre-demo; prompt-head rebuild / prompt caching is post-August.)*
+reputation snapshot lands with the dialogue turn — **landed 2026-07-15**, the session-runner
+re-reads `agents.reputation` at each boundary; identity recompile with reconstruction — pre-demo;
+prompt-head rebuild / prompt caching is post-August.)*
 
 **Read-mode boundary (self-describing, not just documented):** every returned memory carries
 `read_mode` (`verbatim | reconstructed`) and `pinned`, in payloads and the debug view. Three states:
@@ -241,7 +242,10 @@ correction verb, not pin); unpinning resumes the chain from the frozen head.
 
 ## 9. Behavior output & turn topology
 
-**August ship:** a single Sonnet-class call emitting prose + structured output.
+**August ship:** a single Sonnet-class call emitting prose + structured output *(built &
+floor-verified 2026-07-15, `cli-harness.md`; shapes ruled in the dated `decisions.md` entry —
+one `run_dialogue_turn` seam in `app\dialogue.py`, REPL + load driver on a shared session-runner
+core)*.
 
 **Committed target topology (post-August): multi-call split-brain.** A behavior call (Haiku-class,
 with its own retrieval weights) chooses the action; the dialogue call then sees that action **as
@@ -254,7 +258,9 @@ unknown or unparseable directives → log, ignore, the turn still succeeds.
 
 **Reputation:** a scalar on the NPC row. The Haiku call emits a delta by default; a client override
 wins; per-NPC sensitivity scalar; hard clamp on a defined scale. Injected into the prompt prefix
-from a **scene-start snapshot**.
+from a **scene-start snapshot**. *(Built 2026-07-15 in the single-call slice: the Sonnet call emits
+the delta, applied in-place to `agents.reputation` by an atomic clamped UPDATE; the snapshot is
+caller-frozen scene state — the "Haiku call" wording is the post-August split-brain behavior call.)*
 
 ## 10. Reflection & parameter bundles (mechanism deferred)
 
@@ -281,7 +287,9 @@ invalidation doubles as compiler-cache eviction.
   entity." Log which signal fired per gate event.
 - **Cost:** itemized per 100-turn session.
 - **Synthetic load driver:** Python, scripted sessions at volume; a first-class artifact co-built
-  with the CLI harness. **No distribution exists without it.**
+  with the CLI harness. **No distribution exists without it.** *(Built 2026-07-15,
+  `app\load_driver.py`: reuses the session-runner core; emits the latency p50/p95 decomposition —
+  no gate term yet — and the itemized per-100-turn token/USD table.)*
 
 ## 12. Integrator surface requirements
 

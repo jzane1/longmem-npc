@@ -1,10 +1,13 @@
 """providers.py — model provider interfaces: real implementations + deterministic fakes.
 
 Two write-path roles (write-path.md §Model provider interfaces) plus the
-escalation call ruled into v1 (2026-07-13):
+escalation call ruled into v1 (2026-07-13), plus the dialogue role (the
+CLI-harness build, 2026-07-15):
   - the single Haiku write call (render + importance + typology-when-absent),
   - the LLM-escalation gist call (hard cases, biased loose),
-  - the embedding call (text-embedding-3-small @ 1536, locked).
+  - the embedding call (text-embedding-3-small @ 1536, locked),
+  - the single Sonnet-class dialogue call (prose + action directive +
+    reputation delta in one structured output; cli-harness.md).
 
 Every fake is deterministic: same input -> byte-identical output, offline and
 keyless, so the structural suite never asserts on prose and CI needs no keys.
@@ -22,6 +25,7 @@ from __future__ import annotations
 import hashlib
 import json
 import struct
+import time
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -93,6 +97,28 @@ class EmbedResult:
     tokens: int
 
 
+@dataclass(frozen=True)
+class DialogueCallResult:
+    """Parsed structured output of the single dialogue call.
+
+    Tolerant parse (cli-harness.md degradation ladder): prose is required — a
+    response with no parseable prose raises MalformedOutputError; a malformed
+    directive or delta degrades field-wise (None + the reason captured) and
+    the call still counts as succeeded. Vocabulary validation of a well-formed
+    directive happens at the seam, not here.
+    """
+
+    prose: str
+    directive_type: str | None
+    directive_params: dict
+    directive_error: str | None  # shape-level parse issue; the seam drops it
+    reputation_delta: float | None  # None = missing/non-numeric; seam zeroes it
+    delta_error: str | None
+    input_tokens: int
+    output_tokens: int
+    first_token_ms: float  # 0.0 on the fake; measured on the streaming real call
+
+
 # ---------------------------------------------------------------------------
 # Interfaces
 # ---------------------------------------------------------------------------
@@ -122,6 +148,16 @@ class EscalationProvider(Protocol):
 
 class EmbeddingProvider(Protocol):
     def embed(self, texts: list[str]) -> EmbedResult: ...
+
+
+class DialogueProvider(Protocol):
+    """`system_prompt` is fully assembled at the seam (app\\dialogue.py owns
+    the block shape); `vocabulary` rides separately so the deterministic fake
+    can draw its fixed directive from it."""
+
+    def generate(
+        self, *, system_prompt: str, utterance: str, vocabulary: list[str]
+    ) -> DialogueCallResult: ...
 
 
 # ---------------------------------------------------------------------------
@@ -202,6 +238,29 @@ class FakeEmbeddingProvider:
         return EmbedResult(vectors=vectors, tokens=tokens)
 
 
+class FakeDialogueProvider:
+    """Deterministic dialogue: stable prose echo, the vocabulary's first
+    directive, hash-derived delta in [-1, 1) — byte-identical structured
+    output for identical turns (cli-harness.md done-when)."""
+
+    def generate(
+        self, *, system_prompt: str, utterance: str, vocabulary: list[str]
+    ) -> DialogueCallResult:
+        prose = f"[fake dialogue] {utterance}"
+        delta = round(_stable_unit_float(utterance, "reputation") * 2 - 1, 4)
+        return DialogueCallResult(
+            prose=prose,
+            directive_type=vocabulary[0] if vocabulary else None,
+            directive_params={},
+            directive_error=None,
+            reputation_delta=delta,
+            delta_error=None,
+            input_tokens=len(system_prompt.split()) + len(utterance.split()),
+            output_tokens=len(prose.split()),
+            first_token_ms=0.0,
+        )
+
+
 # --- failure-injection fakes (degradation ladder tests) --------------------
 
 
@@ -237,6 +296,22 @@ class FailingEscalationProvider:
     def extract_gist(self, **_kwargs) -> EscalationResult:
         self.calls += 1
         raise ProviderCallError(f"injected escalation failure (call {self.calls})")
+
+
+class FailingDialogueProvider:
+    """Dialogue-call failure: never-blank — the turn returns the fallback line."""
+
+    def generate(self, **_kwargs) -> DialogueCallResult:
+        raise ProviderCallError("injected dialogue-call failure")
+
+
+class MalformedDialogueProvider:
+    """Call 'succeeds' but nothing parses (no prose): fallback line, spend accounted."""
+
+    def generate(self, **_kwargs) -> DialogueCallResult:
+        raise MalformedOutputError(
+            "injected malformed dialogue output", input_tokens=7, output_tokens=3
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -429,6 +504,102 @@ class RealEscalationProvider:
         )
 
 
+class RealDialogueProvider:
+    """Anthropic Sonnet-class single dialogue call (cli-harness.md). Streams so
+    first-token latency is measurable; usage comes from the final message.
+
+    Structured-output contract (build ruling 2026-07-15, JSON-in-text per the
+    write/escalation precedent): ONLY a JSON object
+    {"prose": str, "directive": {"type": str, "params": object} | null,
+     "reputation_delta": float}. The instructions telling the model this live
+    in the seam-assembled system prompt; this class enforces the parse side.
+    """
+
+    def __init__(self, settings: Settings):
+        import anthropic
+
+        self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        self._model = settings.model_dialogue
+
+    def generate(
+        self, *, system_prompt: str, utterance: str, vocabulary: list[str]
+    ) -> DialogueCallResult:
+        t0 = time.perf_counter()
+        first_token_ms = 0.0
+        chunks: list[str] = []
+        try:
+            with self._client.messages.stream(
+                model=self._model,
+                max_tokens=1024,
+                system=system_prompt,
+                messages=[{"role": "user", "content": utterance}],
+            ) as stream:
+                for text in stream.text_stream:
+                    if not chunks:
+                        first_token_ms = round((time.perf_counter() - t0) * 1000.0, 2)
+                    chunks.append(text)
+                final = stream.get_final_message()
+        except Exception as exc:
+            raise ProviderCallError(f"dialogue call failed: {exc}") from exc
+        input_tokens = final.usage.input_tokens
+        output_tokens = final.usage.output_tokens
+        try:
+            payload = json.loads("".join(chunks))
+            prose = payload["prose"]
+            if not isinstance(prose, str) or not prose:
+                raise ValueError("prose missing, empty, or not a string")
+        except (
+            KeyError,
+            ValueError,
+            TypeError,
+            json.JSONDecodeError,
+        ) as exc:
+            raise MalformedOutputError(
+                f"dialogue output unparseable: {exc}",
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+            ) from exc
+
+        # Field-wise salvage below the required prose (degradation ladder).
+        directive_type: str | None = None
+        directive_params: dict = {}
+        directive_error: str | None = None
+        directive = payload.get("directive")
+        if directive is not None:
+            params = (
+                directive.get("params", {}) if isinstance(directive, dict) else None
+            )
+            if (
+                isinstance(directive, dict)
+                and isinstance(directive.get("type"), str)
+                and isinstance(params, dict)
+            ):
+                directive_type = directive["type"]
+                directive_params = params
+            else:
+                directive_error = f"malformed directive shape: {directive!r}"
+
+        delta: float | None = None
+        delta_error: str | None = None
+        raw_delta = payload.get("reputation_delta")
+        if isinstance(raw_delta, (int, float)) and not isinstance(raw_delta, bool):
+            delta = float(raw_delta)
+        else:
+            delta_error = f"reputation_delta missing or non-numeric: {raw_delta!r}"
+
+        return DialogueCallResult(
+            prose=prose,
+            directive_type=directive_type,
+            directive_params=directive_params,
+            directive_error=directive_error,
+            reputation_delta=delta,
+            delta_error=delta_error,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            first_token_ms=first_token_ms,
+        )
+
+
 class RealEmbeddingProvider:
     """OpenAI text-embedding-3-small @ 1536 (locked)."""
 
@@ -455,21 +626,27 @@ class RealEmbeddingProvider:
 
 @dataclass(frozen=True)
 class Providers:
+    # `dialogue` defaults to the fake so pre-harness constructions (the
+    # write/read structural walkers) stand unchanged; build_providers always
+    # sets it explicitly.
     write: WriteProvider
     escalation: EscalationProvider
     embedding: EmbeddingProvider
+    dialogue: DialogueProvider = field(default_factory=FakeDialogueProvider)
 
 
 def build_providers(settings: Settings) -> Providers:
-    """Provider selection by config; the ingest service is identical under either."""
+    """Provider selection by config; the services are identical under either."""
     if settings.provider_mode == "real":
         return Providers(
             write=RealWriteProvider(settings),
             escalation=RealEscalationProvider(settings),
             embedding=RealEmbeddingProvider(settings),
+            dialogue=RealDialogueProvider(settings),
         )
     return Providers(
         write=FakeWriteProvider(),
         escalation=FakeEscalationProvider(),
         embedding=FakeEmbeddingProvider(),
+        dialogue=FakeDialogueProvider(),
     )

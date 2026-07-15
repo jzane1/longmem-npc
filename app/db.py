@@ -4,8 +4,10 @@ psycopg v3 with AsyncConnectionPool (stack constant; no ORM, no query
 builder). The observe insert is ONE transaction: memories row + `original`
 memory_details head + memory_gist_spans + any new identity_components land
 together or not at all (write-path.md §pipeline step d). Nothing here ever
-UPDATEs stored content or DELETEs rows; `set_pin` flips the runtime `pinned`
-flag only.
+UPDATEs stored content or DELETEs rows; the only in-place writes are the two
+agent-row runtime scalars — `set_pinned` (`memories.pinned`, write-path v1)
+and `apply_reputation_delta` (`agents.reputation`, CLI-harness build ruling
+2026-07-15) — both outside the memory-content non-destructive invariant.
 
 Read-path candidate queries (read-path.md, 2026-07-14) are read-only: live
 memories (`memories.invalid_at IS NULL`) joined to the unique live detail
@@ -284,3 +286,75 @@ async def set_pinned(pool: AsyncConnectionPool, memory_id: UUID, pinned: bool) -
             "UPDATE memories SET pinned = %s WHERE memory_id = %s", (pinned, memory_id)
         )
         return cur.rowcount == 1
+
+
+@dataclass(frozen=True)
+class DialogueAgentState:
+    """The agent facts the dialogue turn consumes (cli-harness.md): seed
+    identity prose for the prompt prefix, the reputation runtime scalars, and
+    config for knob resolution. Numeric columns arrive as float, not Decimal."""
+
+    agent_id: UUID
+    seed_identity: str | None
+    reputation: float | None  # NULL = never set; neutral is a config knob
+    reputation_sensitivity: float | None  # NULL -> config default
+    config: dict
+
+
+async def fetch_dialogue_agent_state(
+    pool: AsyncConnectionPool, agent_id: UUID
+) -> DialogueAgentState | None:
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT agent_id, seed_identity, reputation, reputation_sensitivity, "
+            "config FROM agents WHERE agent_id = %s",
+            (agent_id,),
+        )
+        row = await cur.fetchone()
+    if row is None:
+        return None
+    return DialogueAgentState(
+        agent_id=row[0],
+        seed_identity=row[1],
+        reputation=float(row[2]) if row[2] is not None else None,
+        reputation_sensitivity=float(row[3]) if row[3] is not None else None,
+        config=row[4] or {},
+    )
+
+
+async def apply_reputation_delta(
+    pool: AsyncConnectionPool,
+    agent_id: UUID,
+    *,
+    addend: float,
+    neutral: float,
+    scale_min: float,
+    scale_max: float,
+) -> tuple[float, float] | None:
+    """Apply one turn's reputation change in a single atomic statement
+    (cli-harness build ruling 2026-07-15):
+
+        reputation = clamp(COALESCE(reputation, neutral) + addend, min, max)
+
+    `addend` is sensitivity x delta, computed by the seam. An in-place UPDATE
+    of an agent-row runtime scalar — deliberately outside the memory-content
+    non-destructive invariant (same class as `set_pinned`). Returns
+    (prev_effective, after) as floats, or None when the agent is unknown.
+    The clamp lives in SQL so the value can never leave the scale, even under
+    concurrent turns.
+    """
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "UPDATE agents a "
+            "SET reputation = GREATEST(%s::numeric, LEAST(%s::numeric, "
+            "COALESCE(a.reputation, %s::numeric) + %s::numeric)) "
+            "FROM (SELECT agent_id, reputation FROM agents "
+            "      WHERE agent_id = %s FOR UPDATE) old "
+            "WHERE a.agent_id = old.agent_id "
+            "RETURNING COALESCE(old.reputation, %s::numeric), a.reputation",
+            (scale_min, scale_max, neutral, addend, agent_id, neutral),
+        )
+        row = await cur.fetchone()
+    if row is None:
+        return None
+    return float(row[0]), float(row[1])

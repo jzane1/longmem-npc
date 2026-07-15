@@ -528,3 +528,88 @@ the turn payloads are Pydantic models or dataclasses). These are ruled at the ha
 now. The dialogue call is a new model role behind a provider interface with a real implementation + a
 deterministic fake, following the write-path triad; every retrieved memory is served **verbatim** (no
 reconstruction in the slice).
+
+## CLI-harness build rulings — 2026-07-15
+
+The harness build (spec: `cli-harness.md`) settled the nine `[SETTLE-AT-BUILD]` shapes. Jack ruled
+the two genuine forks via explicit questions at plan approval; the remaining shapes were approved
+with the plan. Floor-verified the same day (structural walker `tests\verify_cli_harness.py`,
+36 assertions; both prior walkers re-run clean; `longmem` pristine via the postgres MCP — **the
+floor-verifier's `mcp__postgres__*` tools worked this dispatch**, resolving the 2026-07-14 flag for
+this dispatch).
+
+1. **Action-vocabulary source = per-call field → `agents.config` fallback (ruled).** A per-call
+   `action_vocabulary` on `DialogueTurnRequest` wins when supplied; else
+   `agents.config["action_vocabulary"]`; when neither exists, every emitted directive is dropped
+   (`directive_dropped`, reason `"no vocabulary configured"`) and the turn succeeds. **No hardcoded
+   default vocabulary** (nothing integrator-configurable is hardcoded). Vocabulary shape: a JSON
+   array of directive `type` strings; `params` rides as a free object, unvalidated (architecture §9:
+   "free type + params"). **Rejected:** config-only (no per-call variation without a config write)
+   and per-call-required (boilerplate in every caller; a missing field becomes a hard error).
+
+2. **Per-turn cost units = tokens always; USD only when priced via env (ruled).** Cost fields carry
+   token counts unconditionally. USD populates only when the optional `LONGMEM_PRICE_*` env vars are
+   set (USD per Mtok: `DIALOGUE_IN/OUT`, `WRITE_IN/OUT`, `ESCALATION_IN/OUT`, `EMBEDDING`); otherwise
+   USD fields are null and the load-driver table reads "(unpriced)". **No model pricing is ever
+   hardcoded.** **Rejected:** hardcoded price defaults (volatile vendor data in code; pricing is not
+   per-agent config) and tokens-only (loses the demo's per-100-turn dollar figure).
+
+Approved-with-plan shapes, as built:
+
+- **Env var** — `LONGMEM_MODEL_DIALOGUE`, alongside the four existing roles in `app\config.py`;
+  required in real mode; `Settings.model_dialogue`.
+- **Structured output** — JSON-in-text per the write/escalation precedent: ONLY
+  `{"prose": str, "directive": {"type": str, "params": object} | null, "reputation_delta": float}`.
+  Parse policy: prose is required — no parseable prose → `MalformedOutputError` (token spend still
+  accounted) → the seam serves the fallback line, `degraded = true`. Below prose the parse is
+  field-wise (the ladder's salvage row): a malformed directive drops with `directive_dropped` +
+  reason; a missing/non-numeric delta zeroes with `reputation_delta_source = "zeroed"`. Vocabulary
+  validation of a well-formed directive happens at the seam, not the provider.
+- **Reputation apply** — one atomic SQL statement (`app\db.py apply_reputation_delta`):
+  `reputation = GREATEST(min, LEAST(max, COALESCE(reputation, neutral) + sensitivity × delta))`
+  with `FOR UPDATE` old-value capture, `RETURNING (prev, after)` — the clamp lives in SQL so the
+  scalar can never leave the scale even under concurrent turns. New `SERVICE_DEFAULTS` keys
+  (per-agent overridable, the `agent_knob` pattern): `reputation_scale_min = -1.0`,
+  `reputation_scale_max = 1.0`, `reputation_neutral = 0.0`, `reputation_sensitivity_default = 1.0`;
+  the `agents.reputation_sensitivity` column wins over the knob when non-NULL. The result carries
+  `reputation_delta_source` (`model | override | zeroed`) so override-wins and the degradation paths
+  are structurally assertable.
+- **Prompt assembly** — labeled blocks in spec order: `[identity]` (seed prose; omitted when NULL)
+  → `[reputation]` (frozen snapshot + scale bounds) → `[memories]` (rank order, one line per item,
+  memory_id carried) → `[output]` (the JSON contract + the turn's vocabulary; a no-vocabulary turn
+  instructs `directive: null`). User message = the raw utterance. Identical inputs assemble
+  byte-identical prompts; exposed as `assemble_system_prompt` so the walker asserts block order and
+  byte-stability without a model call.
+- **Never-blank fallback** — `DIALOGUE_FALLBACK_LINE = "..."` (a neutral beat), module constant in
+  `app\dialogue.py`, overridable per agent via `agents.config["dialogue_fallback_line"]` (the
+  `TYPOLOGY_FALLBACK` precedent).
+- **Snapshot plumbing** — `reputation_snapshot` is a **required request field**, not a session
+  handle: scene state lives in the caller (`app\session.py` freezes it; refreshes only at
+  `scene()`), making "frozen within a scene" a seam-contract property the walker asserts directly.
+- **CLI surface** — `python -m app.cli --agent <uuid> [--debug]` (`app\cli.py`, written to read as
+  documentation). Meta-commands: `:observe`, `:scene [type]`, `:pin`/`:unpin <memory_id>`,
+  `:as-of <iso8601|clear>`, `:debug [on|off]`, `:help`, `:quit`; anything else is an utterance.
+  Debug rendering is a pure function (`render_debug`) over the payload so the suite can assert it.
+- **Load driver** — `python -m app.load_driver --sessions N --turns M [--script p.json] [--seed S]
+  [--agent <uuid>] [--database-uri <uri>] [--json out.json]` (`app\load_driver.py`), reusing
+  `SessionRunner`. Script = JSON list of sessions, each a list of
+  `{"kind": "observe" | "utterance" | "scene", ...}` events; omitted, a seeded deterministic
+  generator supplies the mix (the generator passes its own vocabulary — callers own vocabulary).
+  Emits latency p50/p95 (retrieval SQL, query embed, first token, dialogue total, turn total — no
+  gate term) + the itemized per-100-turn token/USD table. Without `--agent` it creates a driver
+  agent in the target DB.
+- **Wire models** — Pydantic in `app\schemas.py` (`DialogueTurnRequest` / `ActionDirective` /
+  `DialogueTurnResult` / `DialogueTurnInstrumentation`, the latter nesting
+  `RetrievalInstrumentation`), mirroring the write/read payloads for the eventual Unity route.
+
+**Build-surfaced interpretation (noted, not separately asked):** a client
+`reputation_delta_override`, being client-authoritative and independent of the model call, **still
+applies on the degraded (never-blank) path** — the ladder's "zero reputation delta" describes the
+no-override default. Flagged to Jack in the build report.
+
+**Environment learnings:** (1) Windows decodes piped stdin with the ANSI codepage, so a PowerShell
+here-string pipe delivers its UTF-8 BOM as mojibake — the REPL reconfigures non-tty stdin to
+`utf-8-sig` (interactive consoles untouched). (2) `Providers.dialogue` carries a
+`FakeDialogueProvider` default so pre-harness `Providers(...)` constructions (the write/read
+walkers) stand unchanged. (3) `RealDialogueProvider` streams (the anthropic SDK `messages.stream`)
+so first-token latency is measurable; the fake reports 0.0.

@@ -1,0 +1,249 @@
+"""cli.py — the interactive console harness: the product surface of the
+vertical slice (event in -> memory stored -> dialogue out), readable top to
+bottom as documentation of the turn loop.
+
+    PowerShell:  python -m app.cli --agent <uuid> [--debug]
+
+Plain input is a player utterance: it drives dialogue-init retrieval, the
+single Sonnet-class dialogue call, and the in-place reputation apply — one
+`SessionRunner.utterance()` call on the shared session-runner core
+(app\\session.py); the synthetic load driver drives the very same core.
+
+Meta-commands (everything else is an utterance):
+
+    :observe <text>    store an observation through the write seam
+                       (the first :observe loads the NLP models — one-time cost)
+    :scene [type]      scene boundary: emits the event, then re-reads the
+                       frozen reputation snapshot for the next scene
+    :pin <memory_id>   pin a memory (decay exemption)     :unpin undoes it
+    :as-of <iso8601>   drive the session at an injected world time
+                       (retrieval age math + observe timestamps);  :as-of clear
+    :debug [on|off]    toggle the full turn debug view (IDs + scores, parsed
+                       structured output, reputation math, tokens + latency)
+    :help              this text                          :quit  exit
+
+Windows event-loop constraint: everything runs inside one
+asyncio.run(..., loop_factory=SelectorEventLoop) — psycopg's async pool
+cannot run on the default ProactorEventLoop (see app\\serve.py).
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import sys
+from datetime import datetime, timezone
+from uuid import UUID
+
+from app.ingest import (
+    EscalationHardStopError,
+    UnknownAgentError,
+    UnknownMemoryError,
+)
+from app.schemas import DialogueTurnResult, IngestResult
+from app.session import SessionRunner
+
+HELP = __doc__.split("Meta-commands", 1)[1]
+
+
+# ---------------------------------------------------------------------------
+# Rendering — pure functions over the structured payloads, so the structural
+# walker can assert the debug view carries IDs, scores, and counts.
+# ---------------------------------------------------------------------------
+
+
+def render_turn(result: DialogueTurnResult) -> str:
+    """The normal (non-debug) view: the line, the action, the soft flags."""
+    lines = [f"npc> {result.content}"]
+    if result.directive is not None:
+        lines.append(f"  [directive] {result.directive.type} {result.directive.params}")
+    if result.directive_dropped:
+        lines.append(f"  [directive dropped] {result.directive_dropped_reason}")
+    if result.instrumentation.degraded:
+        lines.append(f"  [degraded] {result.instrumentation.degraded_reason}")
+    return "\n".join(lines)
+
+
+def render_debug(result: DialogueTurnResult) -> str:
+    """The full turn debug view (status.md requirement): retrieved memory IDs
+    with score components, the parsed structured output, the reputation math,
+    and the token + latency accounting — all straight off the payload."""
+    ins = result.instrumentation
+    ret = ins.retrieval
+    lines = ["-- retrieved memories (IDs + score components) --"]
+    if not result.items:
+        lines.append("  (none)")
+    for item in result.items:
+        rel = f"{item.relevance:.4f}" if item.relevance is not None else "null"
+        lines.append(
+            f"  {item.memory_id}  score={item.score:.4f}  rel={rel}  "
+            f"rec={item.recency:.4f}  imp={item.importance_norm:.4f}"
+            f"{'  [pinned]' if item.pinned else ''}"
+        )
+    lines.append("-- structured output --")
+    lines.append(f"  prose:     {result.content}")
+    if result.directive is not None:
+        lines.append(f"  directive: {result.directive.type} {result.directive.params}")
+    elif result.directive_dropped:
+        lines.append(f"  directive: DROPPED ({result.directive_dropped_reason})")
+    else:
+        lines.append("  directive: none")
+    lines.append(
+        f"  delta:     {result.reputation_delta} ({result.reputation_delta_source})"
+    )
+    lines.append("-- reputation --")
+    lines.append(
+        f"  snapshot={result.reputation_snapshot}  prev={result.reputation_prev}  "
+        f"sensitivity={result.reputation_sensitivity}  after={result.reputation_after}"
+    )
+    lines.append("-- timing / tokens --")
+    lines.append(
+        f"  retrieval: embed={ret.embed_ms}ms sql={ret.sql_ms}ms "
+        f"score={ret.score_ms}ms total={ret.total_ms}ms "
+        f"candidates={ret.candidate_count} k={ret.k_effective}"
+        f"{'  [degraded: ' + str(ret.degraded_reason) + ']' if ret.degraded else ''}"
+    )
+    lines.append(
+        f"  dialogue:  first_token={ins.sonnet_first_token_ms}ms "
+        f"total={ins.sonnet_ms}ms  tokens in={ins.sonnet_input_tokens} "
+        f"out={ins.sonnet_output_tokens}"
+        + (f"  cost=${ins.cost_usd}" if ins.cost_usd is not None else "")
+    )
+    lines.append(f"  apply={ins.apply_ms}ms  turn_total={ins.total_ms}ms")
+    if ins.degraded:
+        lines.append(f"  [turn degraded] {ins.degraded_reason}")
+    return "\n".join(lines)
+
+
+def render_observe(result: IngestResult) -> str:
+    """Write-seam receipt: IDs + computed facts, never prose assertions."""
+    flags = [
+        name
+        for name, on in (
+            ("scoring_failed", result.scoring_failed),
+            ("embedding_failed", result.embedding_failed),
+            ("decay_class_unknown", result.decay_class_unknown),
+            ("escalated", result.instrumentation.escalated),
+            ("pinned", result.pinned),
+        )
+        if on
+    ]
+    return (
+        f"stored {result.memory_id}  importance={result.importance_raw}  "
+        f"typology={result.typology}({result.typology_source})  "
+        f"decay_class={result.decay_class}"
+        + (f"  [{', '.join(flags)}]" if flags else "")
+    )
+
+
+# ---------------------------------------------------------------------------
+# The REPL loop
+# ---------------------------------------------------------------------------
+
+
+def _parse_as_of(text: str) -> datetime:
+    """ISO-8601; a naive timestamp is taken as UTC (stated, not silent)."""
+    value = datetime.fromisoformat(text)
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value
+
+
+async def repl(agent_id: UUID, debug: bool) -> None:
+    runner = await SessionRunner.create(agent_id)
+    runner.debug = debug
+    nlp_warm = False
+    print(
+        f"longmem-npc CLI — agent {agent_id}  "
+        f"(reputation snapshot {runner.reputation_snapshot}; :help for commands)"
+    )
+    try:
+        while True:
+            try:
+                line = (await asyncio.to_thread(input, "you> ")).strip()
+            except (EOFError, KeyboardInterrupt):
+                break
+            if not line:
+                continue
+            try:
+                # -- meta-commands ------------------------------------------
+                if line in (":quit", ":q"):
+                    break
+                elif line == ":help":
+                    print(HELP)
+                elif line.startswith(":observe"):
+                    text = line[len(":observe") :].strip()
+                    if not text:
+                        print("usage: :observe <text>")
+                        continue
+                    if not nlp_warm:
+                        print("(loading NLP pipelines — first observe only)")
+                        nlp_warm = True
+                    print(render_observe(await runner.observe(text)))
+                elif line.startswith(":scene"):
+                    scene_type = line[len(":scene") :].strip() or None
+                    result = await runner.scene(scene_type)
+                    print(
+                        f"scene boundary accepted ({result.total_ms}ms); "
+                        f"reputation snapshot -> {runner.reputation_snapshot}"
+                    )
+                elif line.startswith((":pin", ":unpin")):
+                    command, _, raw_id = line.partition(" ")
+                    result = await runner.pin(
+                        UUID(raw_id.strip()), pinned=(command == ":pin")
+                    )
+                    print(f"{result.memory_id} pinned={result.pinned}")
+                elif line.startswith(":as-of"):
+                    raw = line[len(":as-of") :].strip()
+                    if raw in ("", "clear"):
+                        runner.as_of = None
+                        print("as-of cleared (live world time)")
+                    else:
+                        runner.as_of = _parse_as_of(raw)
+                        print(f"session time set to {runner.as_of.isoformat()}")
+                elif line.startswith(":debug"):
+                    raw = line[len(":debug") :].strip()
+                    runner.debug = raw == "on" if raw else not runner.debug
+                    print(f"debug {'on' if runner.debug else 'off'}")
+                elif line.startswith(":"):
+                    print(f"unknown command {line.split()[0]!r} — :help lists them")
+                # -- everything else is a player utterance ------------------
+                else:
+                    result = await runner.utterance(line)
+                    print(render_turn(result))
+                    if runner.debug:
+                        print(render_debug(result))
+            except (ValueError, UnknownMemoryError) as exc:
+                print(f"error: {exc}")
+            except EscalationHardStopError as exc:
+                # Build-phase fail-loud stance (re-rule before the demo):
+                # nothing was inserted; the observe may be resent safely.
+                print(f"write hard-stopped: {exc}")
+    finally:
+        await runner.close()
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="longmem-npc interactive console harness"
+    )
+    parser.add_argument("--agent", required=True, type=UUID, help="agent UUID")
+    parser.add_argument(
+        "--debug", action="store_true", help="render the full turn debug view"
+    )
+    args = parser.parse_args()
+    if not sys.stdin.isatty():
+        # Piped scripts arrive as UTF-8, typically with a BOM (PowerShell
+        # here-strings); utf-8-sig decodes them correctly and strips it.
+        # Interactive consoles are untouched.
+        sys.stdin.reconfigure(encoding="utf-8-sig")
+    try:
+        asyncio.run(
+            repl(args.agent, args.debug), loop_factory=asyncio.SelectorEventLoop
+        )
+    except UnknownAgentError as exc:
+        raise SystemExit(f"ERROR: {exc}")
+
+
+if __name__ == "__main__":
+    main()

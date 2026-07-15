@@ -8,7 +8,8 @@ Model roles (architecture §3): every role has its own env var. The v1 write
 call serves render + importance + typology in ONE Haiku call, so at startup
 in real mode the three role vars must name the same model — divergence is a
 loud config error, never a silent pick (ruled with the write-path plan,
-2026-07-13).
+2026-07-13). The dialogue role (LONGMEM_MODEL_DIALOGUE, cli-harness build
+2026-07-15) is the vertical slice's single Sonnet-class call.
 
 Service-level defaults below are integrator-overridable per agent via
 `agents.config` keys of the same name (nothing integrator-configurable is
@@ -38,7 +39,21 @@ ENV_MODEL_IMPORTANCE = "LONGMEM_MODEL_IMPORTANCE"
 ENV_MODEL_RENDER = "LONGMEM_MODEL_RENDER"
 ENV_MODEL_TYPOLOGY = "LONGMEM_MODEL_TYPOLOGY"
 ENV_MODEL_ESCALATION = "LONGMEM_MODEL_ESCALATION"
+ENV_MODEL_DIALOGUE = "LONGMEM_MODEL_DIALOGUE"
 ENV_PROVIDER_MODE = "LONGMEM_PROVIDER_MODE"
+
+# Optional per-Mtok USD prices (CLI-harness build ruling, 2026-07-15): cost
+# fields carry token counts unconditionally; USD appears only when these are
+# set. No model pricing is ever hardcoded. Maps env var -> Settings.prices key.
+PRICE_ENV_KEYS: dict[str, str] = {
+    "LONGMEM_PRICE_DIALOGUE_IN": "dialogue_in",
+    "LONGMEM_PRICE_DIALOGUE_OUT": "dialogue_out",
+    "LONGMEM_PRICE_WRITE_IN": "write_in",
+    "LONGMEM_PRICE_WRITE_OUT": "write_out",
+    "LONGMEM_PRICE_ESCALATION_IN": "escalation_in",
+    "LONGMEM_PRICE_ESCALATION_OUT": "escalation_out",
+    "LONGMEM_PRICE_EMBEDDING": "embedding",
+}
 
 # Service-level defaults, each overridable per agent via the same key in
 # agents.config (write-path plan rulings, 2026-07-13).
@@ -76,6 +91,15 @@ SERVICE_DEFAULTS: dict[str, float] = {
     # default class resolves in agents.config — a read never fails on a
     # resolvable row.
     "tau_fallback_seconds": 604800.0,
+    # --- dialogue turn (cli-harness.md; build rulings 2026-07-15) -----------
+    # Reputation scale + apply defaults. The agents.reputation /
+    # reputation_sensitivity columns carry no DEFAULT by migration-01 ruling;
+    # these service defaults (per-agent overridable, like every key here)
+    # supply the neutral point and clamp bounds the apply formula needs.
+    "reputation_scale_min": -1.0,
+    "reputation_scale_max": 1.0,
+    "reputation_neutral": 0.0,
+    "reputation_sensitivity_default": 1.0,
 }
 
 
@@ -94,14 +118,19 @@ def load_env(path: Path = ENV_PATH) -> dict[str, str]:
             continue
         key, _, value = line.partition("=")
         values[key.strip()] = value.strip().strip('"').strip("'")
-    overridable = set(values) | {
-        "DATABASE_URI",
-        ENV_PROVIDER_MODE,
-        ENV_MODEL_IMPORTANCE,
-        ENV_MODEL_RENDER,
-        ENV_MODEL_TYPOLOGY,
-        ENV_MODEL_ESCALATION,
-    }
+    overridable = (
+        set(values)
+        | {
+            "DATABASE_URI",
+            ENV_PROVIDER_MODE,
+            ENV_MODEL_IMPORTANCE,
+            ENV_MODEL_RENDER,
+            ENV_MODEL_TYPOLOGY,
+            ENV_MODEL_ESCALATION,
+            ENV_MODEL_DIALOGUE,
+        }
+        | set(PRICE_ENV_KEYS)
+    )
     for key in overridable:
         if key in os.environ:
             values[key] = os.environ[key]
@@ -116,9 +145,12 @@ class Settings:
     provider_mode: str = "fake"  # "real" | "fake"; fake is the offline default
     model_write: str = ""  # the single write-call model (render+importance+typology)
     model_escalation: str = ""
+    model_dialogue: str = ""  # the single-call dialogue role (cli-harness.md)
     anthropic_api_key: str = field(default="", repr=False)
     openai_api_key: str = field(default="", repr=False)
     defaults: dict[str, float] = field(default_factory=lambda: dict(SERVICE_DEFAULTS))
+    # Optional USD-per-Mtok prices (PRICE_ENV_KEYS); empty = cost in tokens only.
+    prices: dict[str, float] = field(default_factory=dict)
 
 
 class ConfigError(RuntimeError):
@@ -142,6 +174,7 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
 
     model_write = ""
     model_escalation = ""
+    model_dialogue = ""
     anthropic_key = ""
     openai_key = ""
     if mode == "real":
@@ -149,6 +182,7 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         render = env.get(ENV_MODEL_RENDER, "")
         typology = env.get(ENV_MODEL_TYPOLOGY, "")
         escalation = env.get(ENV_MODEL_ESCALATION, "")
+        dialogue = env.get(ENV_MODEL_DIALOGUE, "")
         missing = [
             name
             for name, value in (
@@ -156,6 +190,7 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
                 (ENV_MODEL_RENDER, render),
                 (ENV_MODEL_TYPOLOGY, typology),
                 (ENV_MODEL_ESCALATION, escalation),
+                (ENV_MODEL_DIALOGUE, dialogue),
             )
             if not value
         ]
@@ -173,6 +208,7 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
             )
         model_write = importance
         model_escalation = escalation
+        model_dialogue = dialogue
         anthropic_key = env.get("ANTHROPIC_API_KEY", "")
         openai_key = env.get("OPENAI_API_KEY", "")
         if not anthropic_key:
@@ -180,13 +216,25 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         if not openai_key:
             raise ConfigError("real mode requires OPENAI_API_KEY in .env.")
 
+    prices: dict[str, float] = {}
+    for env_key, price_key in PRICE_ENV_KEYS.items():
+        raw = env.get(env_key, "")
+        if not raw:
+            continue
+        try:
+            prices[price_key] = float(raw)
+        except ValueError as exc:
+            raise ConfigError(f"{env_key} must be a number, got {raw!r}.") from exc
+
     return Settings(
         database_uri=database_uri,
         provider_mode=mode,
         model_write=model_write,
         model_escalation=model_escalation,
+        model_dialogue=model_dialogue,
         anthropic_api_key=anthropic_key,
         openai_api_key=openai_key,
+        prices=prices,
     )
 
 

@@ -27,7 +27,10 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
 
 ## Invariants — never violate, regardless of how a task is worded
 - Non-destructive bi-temporal storage: supersede by setting invalid_at. Never UPDATE stored
-  content in place. Never DELETE rows — the purge endpoint is the sole exception.
+  content in place. Never DELETE rows — the purge endpoint is the sole exception. This governs
+  memory content (memories / memory_details and their chains); the two agent-row runtime scalars
+  — memories.pinned (pin toggle) and agents.reputation (the dialogue turn's clamped delta apply,
+  ruled 2026-07-15) — are deliberately updated in place and sit outside it.
 - Recency decay and bi-temporal invalidation are distinct mechanisms. Never conflate them.
 - Read endpoints always return memory IDs and scores alongside prose. The test suite dies
   without this.

@@ -251,3 +251,97 @@ class RetrievalResult(BaseModel):
 
     items: list[RetrievedMemory]  # ranked, <= k
     instrumentation: RetrievalInstrumentation
+
+
+# ---------------------------------------------------------------------------
+# Dialogue turn — the CLI-harness seam (docs\cli-harness.md, build rulings
+# 2026-07-15). No HTTP route consumes these in v1 — the REPL and the load
+# driver call the seam in-process; Pydantic by ruling, mirroring the
+# write/read payloads (the Unity route will reuse them).
+# ---------------------------------------------------------------------------
+
+
+class ActionDirective(BaseModel):
+    """One emitted action: free `type` from the integrator-supplied vocabulary
+    plus a free params object (architecture §9). Written as observed world
+    fact so the contract survives the split-brain migration unchanged."""
+
+    type: str
+    params: dict = Field(default_factory=dict)
+
+
+class DialogueTurnRequest(BaseModel):
+    """One dialogue turn (cli-harness.md request contract).
+
+    Scene state lives in the caller: `reputation_snapshot` is the scene-start
+    value the caller froze at the last scene boundary — a required explicit
+    field (build ruling 2026-07-15) so "snapshot frozen within a scene" is a
+    property of the seam contract. `action_vocabulary` per-call wins over
+    `agents.config["action_vocabulary"]`; with neither configured, every
+    emitted directive is dropped (never a hardcoded default vocabulary).
+    `k` / `as_of` pass through to retrieval unreinterpreted; `debug` is a
+    caller-side rendering hint, inert to the seam's computation.
+    """
+
+    agent_id: UUID
+    utterance: str = Field(min_length=1)
+    reputation_snapshot: float
+    reputation_delta_override: float | None = None  # client override wins (§9)
+    action_vocabulary: list[str] | None = None
+    k: int | None = Field(default=None, ge=1)
+    as_of: datetime | None = None
+    debug: bool = False
+
+    @field_validator("as_of")
+    @classmethod
+    def _tz_aware(cls, value: datetime | None) -> datetime | None:
+        if value is not None and value.tzinfo is None:
+            raise ValueError("timestamp must be timezone-aware")
+        return value
+
+
+class DialogueTurnInstrumentation(BaseModel):
+    """Per-turn timing + token accounting, recorded once at the seam.
+
+    Feeds architecture §11's latency histogram (no gate term in the slice)
+    and the per-100-turn cost table. Token counts are unconditional;
+    `cost_usd` is populated only when LONGMEM_PRICE_* env vars are set
+    (build ruling 2026-07-15 — no hardcoded model pricing), covering the
+    dialogue call plus the priced share of the query embedding.
+    """
+
+    retrieval: RetrievalInstrumentation
+    sonnet_ms: float
+    sonnet_first_token_ms: float
+    apply_ms: float  # the reputation UPDATE
+    total_ms: float
+    sonnet_input_tokens: int
+    sonnet_output_tokens: int
+    cost_usd: float | None = None
+    degraded: bool = False  # the never-blank path was taken
+    degraded_reason: str | None = None
+
+
+class DialogueTurnResult(BaseModel):
+    """Structured return of `run_dialogue_turn` — surfaced verbatim in the
+    CLI debug view; the suite asserts on this structure, never on prose.
+
+    `content` is the only unassertable field. `reputation_after` equals the
+    persisted `agents.reputation` scalar; `reputation_delta` is the delta
+    actually applied (pre-sensitivity), with `reputation_delta_source`
+    making override-wins and the zeroed degradation paths assertable.
+    """
+
+    agent_id: UUID
+    content: str
+    directive: ActionDirective | None
+    directive_dropped: bool = False
+    directive_dropped_reason: str | None = None
+    reputation_snapshot: float  # what the prompt actually saw
+    reputation_prev: float  # row value the apply started from
+    reputation_delta: float
+    reputation_delta_source: Literal["model", "override", "zeroed"]
+    reputation_sensitivity: float
+    reputation_after: float
+    items: list[RetrievedMemory]  # retrieval echo: IDs + scores invariant
+    instrumentation: DialogueTurnInstrumentation

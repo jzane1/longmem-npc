@@ -8,16 +8,19 @@ load driver); the rulings behind it are in [decisions.md](decisions.md); the sch
 the one scalar it writes are frozen in [migration-01.md](migration-01.md). This doc points, it does
 not re-derive.
 
-> **Status: SPECCED 2026-07-14 — build pending.** Two scope forks were ruled at spec time (dated
-> "CLI-harness spec scope rulings" entry in `decisions.md`): the reputation delta is **persisted
-> in-place** to the agent-row scalar, and the drive surface is an **interactive REPL over a shared
-> session-runner core** that the synthetic load driver reuses. Remaining physical shapes are tagged
-> `[SETTLE-AT-BUILD]` for the build (stop and report, never silently choose). **No new DB migration
-> — the migration-01 schema stays frozen;** reputation uses the existing `agents.reputation` /
-> `reputation_sensitivity` scalar columns. **Single-call reconciliation:** §9's "August ship: a
-> single Sonnet-class call" governs the slice — one call emits prose + action directive + reputation
-> delta together; §9's "the Haiku call emits a delta" describes the *post-August split-brain*
-> behavior call, not this slice. Do not wire a second Haiku behavior call into the vertical slice.
+> **Status: BUILT & floor-verified 2026-07-15.** Every `[SETTLE-AT-BUILD]` item below was ruled at
+> build time (dated "CLI-harness build rulings" entry in `decisions.md`; the two genuine forks —
+> action-vocabulary source and cost units — were ruled via explicit questions at plan approval,
+> the rest approved with the plan); the rulings are annotated inline. **The build added no new DB
+> migration — the migration-01 schema stayed frozen;** reputation rides the existing
+> `agents.reputation` / `reputation_sensitivity` scalar columns. Two scope forks had been ruled at
+> spec time (dated "CLI-harness spec scope rulings" entry in `decisions.md`): the reputation delta
+> is **persisted in-place** to the agent-row scalar, and the drive surface is an **interactive REPL
+> over a shared session-runner core** (`app\session.py`) that the synthetic load driver reuses.
+> **Single-call reconciliation:** §9's "August ship: a single Sonnet-class call" governs the slice —
+> one call emits prose + action directive + reputation delta together; §9's "the Haiku call emits a
+> delta" describes the *post-August split-brain* behavior call, not this slice. Do not wire a second
+> Haiku behavior call into the vertical slice.
 
 ## Principles this build honors
 
@@ -52,9 +55,9 @@ not re-derive.
 
 ## Scope boundary — do NOT build
 
-The mid-dialogue gate and its degradation ladder (immediate-queue item 4); prompt caching /
+The mid-dialogue gate and its degradation ladder (immediate-queue item 3); prompt caching /
 prompt-head rebuild (post-August); **reconstruction serving — theta check, cache reads/writes,
-pre-warm, `reconstructed` read_mode** (immediate-queue item 2, next on the retrieval seam) — every
+pre-warm, `reconstructed` read_mode** (immediate-queue item 1, next on the retrieval seam) — every
 retrieved memory is served **verbatim**, as the read path already ships; the split-brain behavior
 call and per-call weight overrides (post-August); reflection; correction endpoints; purge;
 identity-document recompile (rides with reconstruction) — the slice's identity document is
@@ -105,9 +108,11 @@ Returned by `run_dialogue_turn`, surfaced verbatim in the CLI debug view and ass
   (IDs + scores invariant).
 - **Instrumentation** — retrieval per-stage timings (from the read seam) + dialogue-call timing
   (`sonnet_ms`, first-token latency, total) + token accounting (`sonnet_input_tokens`,
-  `sonnet_output_tokens`) + the per-turn cost. Feeds architecture §11's latency histogram (first
-  token, total; **no gate term** in the slice) and the per-100-turn cost table; `degraded` flag
-  (+ reason) on the never-blank path.
+  `sonnet_output_tokens`) + the per-turn cost — **cost units ruled 2026-07-15 (explicit question):
+  tokens unconditionally; USD (`cost_usd`) only when the optional `LONGMEM_PRICE_*` env vars are
+  set, else null — model pricing is never hardcoded.** Feeds architecture §11's latency histogram
+  (first token, total; **no gate term** in the slice) and the per-100-turn cost table; `degraded`
+  flag (+ reason) on the never-blank path.
 
 ## Request contract — `DialogueTurnRequest`
 
@@ -115,9 +120,9 @@ Returned by `run_dialogue_turn`, surfaced verbatim in the CLI debug view and ass
 |---|---|
 | `agent_id` | target NPC (FK → agents). |
 | `utterance` | **required** — the player line; drives retrieval (passed to `retrieve_dialogue_init` as `query_text`, embedded as-is) **and** is the dialogue prompt's turn input. |
-| `reputation_snapshot` | the scene-start reputation value the caller froze at the last scene boundary; injected into the prompt prefix. Caller-owned scene state (see the seam note). `[SETTLE-AT-BUILD]` exact plumbing (request field vs. session-state handle). |
+| `reputation_snapshot` | the scene-start reputation value the caller froze at the last scene boundary; injected into the prompt prefix. Caller-owned scene state (see the seam note). `[SETTLE-AT-BUILD]` exact plumbing — **ruled 2026-07-15: a required request field** (not a session-state handle), so "frozen within a scene" is a seam-contract property the walker asserts directly. |
 | `reputation_delta_override` | optional client-supplied delta; **a client override wins** over the model's emitted delta (§9). |
-| `action_vocabulary` | the integrator's action-directive vocabulary for this turn. `[SETTLE-AT-BUILD]` source (per-agent `agents.config` vs. `SERVICE_DEFAULTS` vs. per-call field). |
+| `action_vocabulary` | the integrator's action-directive vocabulary for this turn. `[SETTLE-AT-BUILD]` source — **ruled 2026-07-15 (explicit question): per-call field wins → `agents.config["action_vocabulary"]` fallback; neither configured → every emitted directive drops (`"no vocabulary configured"`), the turn succeeds.** No hardcoded default vocabulary. Shape: JSON array of `type` strings; `params` free. |
 | `k` / `as_of` | pass-through to `retrieve_dialogue_init` (retrieval knob + time-travel surface); the harness does not reinterpret them. |
 | `debug` | optional; when set, the caller renders the full `DialogueTurnResult` debug view (IDs, scores, parsed output, token + latency counts). |
 
@@ -155,7 +160,11 @@ The prompt prefix assembles, in order: the **seed identity document** (seed pros
 identity-document recompile rides with reconstruction, which needs `identity_version`; reflection
 stays deferred) + the **reputation snapshot** + the **retrieved memories** (verbatim head content,
 carrying their IDs) ; the body is the **player utterance**. The exact block shape and ordering are
-`[SETTLE-AT-BUILD]`.
+`[SETTLE-AT-BUILD]` — **ruled 2026-07-15:** labeled blocks in spec order — `[identity]` (omitted
+when seed is NULL) → `[reputation]` (snapshot + scale bounds) → `[memories]` (rank order, one
+`- (memory_id) content` line each) → `[output]` (the JSON contract + the turn's vocabulary; a
+no-vocabulary turn instructs `directive: null`); user message = the raw utterance. Identical inputs
+assemble byte-identical prompts (`assemble_system_prompt`, assertable without a model call).
 
 ## Action directive
 
@@ -163,13 +172,14 @@ Per-turn, from an **integrator-supplied vocabulary** (free `type` + `params`). T
 is validated against the vocabulary; an unknown or unparseable directive is **logged, ignored, and
 the turn still succeeds** with `directive_dropped` set. The contract is written to **survive the
 split-brain migration unchanged** (architecture §9) — the post-August behavior call emits the same
-`{type, params}` shape as observed world fact. Vocabulary source is `[SETTLE-AT-BUILD]`.
+`{type, params}` shape as observed world fact. Vocabulary source is `[SETTLE-AT-BUILD]` —
+**ruled 2026-07-15: per-call → `agents.config` fallback (see the request contract row).**
 
 ## Degradation ladder (dialogue turn)
 
 | Condition | Behavior |
 |---|---|
-| dialogue (Sonnet) call fails | **never-blank-a-dialogue**: `[SETTLE-AT-BUILD]` fallback — a safe neutral line, empty directive, zero reputation delta, `degraded = true` + reason; the turn still returns (fail-quiet, the behavior analog of never-lose-a-write). |
+| dialogue (Sonnet) call fails | **never-blank-a-dialogue**: `[SETTLE-AT-BUILD]` fallback — **ruled 2026-07-15:** `DIALOGUE_FALLBACK_LINE = "..."` (a neutral beat), overridable per agent via `agents.config["dialogue_fallback_line"]` (the `TYPOLOGY_FALLBACK` precedent) — empty directive, zero reputation delta, `degraded = true` + reason; the turn still returns (fail-quiet, the behavior analog of never-lose-a-write). *Build note: a client `reputation_delta_override`, being client-authoritative, still applies on this path; the zero delta describes the no-override default.* |
 | malformed structured output | log; use the prose if present, drop the directive (`directive_dropped`), zero the delta; the turn succeeds. |
 | unknown / unparseable action directive | log, ignore, the turn succeeds; `directive_dropped` set (§9). |
 | retrieval degraded (query-embedding down) | inherited from the read path's fail-quiet ladder — the turn proceeds on the degraded candidate set; the retrieval `degraded` flag rides through into the turn instrumentation. |
@@ -184,7 +194,13 @@ session-runner core (not a divergent second path). It emits the §11 aggregates:
 histogram** (p50/p95, decomposed into retrieval SQL, first token, total — **no gate term** in the
 slice) and the **itemized per-100-turn cost table**. It runs on the **deterministic fake providers**
 by default (offline, keyless, at volume); the real providers back a keyed smoke moment ahead of demo
-choreography. Script format, scale knobs, and the exact aggregate output are `[SETTLE-AT-BUILD]`.
+choreography. Script format, scale knobs, and the exact aggregate output are `[SETTLE-AT-BUILD]` —
+**ruled 2026-07-15:** `python -m app.load_driver --sessions N --turns M [--script p.json] [--seed S]
+[--agent <uuid>] [--database-uri <uri>] [--json out.json]`; script = JSON list of sessions, each a
+list of `{"kind": "observe" | "utterance" | "scene", ...}` events, with a seeded deterministic
+built-in generator when omitted; aggregates = latency p50/p95 (retrieval SQL, query embed, first
+token, dialogue total, turn total) + the itemized per-100-turn token table, USD per the pricing
+ruling. Without `--agent` it creates a driver agent in the target DB.
 
 ## Model provider interfaces
 
@@ -198,29 +214,37 @@ always accounted). Registered on the `Providers` bundle and selected by `LONGMEM
 new role env var sits alongside the four existing roles in `app\config.py` with a `Settings` field
 and the existing real-mode key requirement. The dialogue service is identical under either provider.
 
-## `[SETTLE-AT-BUILD]` — physical shapes (stop and report, never silently choose)
+## `[SETTLE-AT-BUILD]` — physical shapes, ruled at build (stop and report, never silently choose)
 
-Report each with the build plan and record the choice in `decisions.md`:
+**All ruled 2026-07-15 with the build plan** (dated "CLI-harness build rulings" entry in
+`decisions.md`; the two genuine forks were ruled via explicit questions; annotated inline above):
 
-- **`LONGMEM_MODEL_DIALOGUE` env-var name** — following the `LONGMEM_MODEL_*` convention (the
-  dialogue role's var string is not yet on record).
-- **Dialogue structured-output schema** — the field names/shape for prose + action directive
-  `{type, params}` + `reputation_delta`, and the parse/validation (what counts as malformed).
-- **Reputation apply shape** — the clamp formula's `scale_min`/`scale_max`, the neutral point, the
-  `reputation_sensitivity` default, and which `agents.config` / `SERVICE_DEFAULTS` keys carry them.
-- **Action-directive vocabulary source** — per-agent `agents.config` vs. a service default vs. a
-  per-call request field.
-- **Prompt-assembly block shape** — the exact ordering and formatting of seed identity + snapshot +
-  memories + utterance.
-- **Never-blank fallback line** — the safe neutral response served when the dialogue call fails.
-- **CLI surface** — the meta-command set (`:observe` / `:scene` / `:pin` / `:as-of` / `:debug`), the
-  session-state model, the entry point (`python -m app.cli`, `[SETTLE-AT-BUILD]` module name), and
-  the `--debug` rendering.
-- **Load-driver shape** — script format, scale knobs, module path, and the exact cost/latency
-  aggregate output.
-- **Wire models** — whether `DialogueTurnRequest` / `DialogueTurnResult` are Pydantic models in
-  `app\schemas.py` (mirroring the write/read payloads) or plain dataclasses (no HTTP route needs
-  them this build).
+- **`LONGMEM_MODEL_DIALOGUE` env-var name** — **ruled as suggested:** exactly that string, alongside
+  the four existing roles in `app\config.py`; required in real mode; `Settings.model_dialogue`.
+- **Dialogue structured-output schema** — **ruled:** JSON-in-text per the write/escalation
+  precedent — ONLY `{"prose": str, "directive": {"type", "params"} | null, "reputation_delta":
+  float}`. Malformed = no parseable prose (→ fallback line, `degraded`, spend accounted); below
+  prose the parse salvages field-wise (directive drops with reason; delta zeroes,
+  `reputation_delta_source = "zeroed"`). Vocabulary validation happens at the seam.
+- **Reputation apply shape** — **ruled:** one atomic SQL statement (clamp in SQL, `FOR UPDATE`
+  old-value capture, `RETURNING (prev, after)`); `SERVICE_DEFAULTS` keys `reputation_scale_min`
+  (−1.0) / `reputation_scale_max` (1.0) / `reputation_neutral` (0.0) /
+  `reputation_sensitivity_default` (1.0), per-agent overridable; the `agents.reputation_sensitivity`
+  column wins over the knob when non-NULL.
+- **Action-directive vocabulary source** — **ruled (explicit question): per-call request field →
+  `agents.config` fallback; neither → drop with reason** (see the request-contract row).
+- **Prompt-assembly block shape** — **ruled:** labeled blocks in spec order (see §Prompt assembly).
+- **Never-blank fallback line** — **ruled:** `DIALOGUE_FALLBACK_LINE = "..."`, per-agent
+  `agents.config["dialogue_fallback_line"]` override (see the degradation ladder).
+- **CLI surface** — **ruled:** entry `python -m app.cli --agent <uuid> [--debug]` (`app\cli.py`);
+  meta-commands `:observe` / `:scene [type]` / `:pin` / `:unpin` / `:as-of <iso8601|clear>` /
+  `:debug [on|off]` / `:help` / `:quit`, anything else an utterance; session state (frozen
+  snapshot, `as_of`, debug flag) lives in the session-runner; `--debug` renders via the pure
+  `render_debug` function the walker asserts on.
+- **Load-driver shape** — **ruled:** `app\load_driver.py` (see §Synthetic load driver).
+- **Wire models** — **ruled: Pydantic in `app\schemas.py`**, mirroring the write/read payloads
+  (the eventual Unity route reuses them); `DialogueTurnInstrumentation` nests
+  `RetrievalInstrumentation`.
 
 ## Done when
 
