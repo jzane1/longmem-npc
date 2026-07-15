@@ -470,3 +470,61 @@ Approved with the plan, cross-cutting: component normalization as suggested (eac
 [0,1], product in [0,1], no further rescaling), and a determinism shape — final ordering
 `(−score, memory_id)` so ties are stable and within-scene byte-identity holds across identical
 calls.
+
+## CLI-harness spec scope rulings — 2026-07-14
+
+Authoring `cli-harness.md` (the CLI harness & synthetic load driver v1 build target — the remaining
+piece of the vertical slice, *retrieved memories → dialogue out*, consolidating architecture §9 + §11
+over the frozen schema) required two scope rulings. The surface was already fixed by prior rulings:
+the harness composes the two built seams (ingest, retrieval) in-process and adds the single Sonnet
+call; the reputation-snapshot scene-boundary consumer lands here per the 2026-07-14 re-slating. Jack
+ruled:
+
+1. **Reputation delta = persist in-place.** The single Sonnet call emits a per-turn
+   `reputation_delta`; the harness applies
+   `clamp(reputation_prev + reputation_sensitivity × delta, scale_min, scale_max)` and **UPDATEs
+   `agents.reputation` in place** (a client-supplied delta override wins over the model's delta, per
+   §9). The scene-start snapshot is read at the scene boundary and frozen into the prompt prefix for
+   that scene; mid-scene deltas accumulate on the row but the injected snapshot does not change until
+   the next boundary (freezing is a property of the seam contract — scene state lives in the caller,
+   which passes the snapshot in and refreshes it only at a boundary). **Invariant note:** this is an
+   in-place **UPDATE** of an agent-row *runtime scalar* — the same class of operation as the existing
+   pin-flag toggle (`set_pinned` flips `memories.pinned` in place, shipped write-path v1), and
+   likewise **outside** the memory-content non-destructive invariant (which governs `memories` /
+   `memory_details` content; never DELETE except purge). Reputation is runtime state, not stored
+   memory content (architecture §9: "a scalar on the NPC row"; the migration-01 schema gave it a
+   single mutable column with no default, not a version chain). The `CLAUDE.md` invariant clarification for
+   the reputation scalar rides with the *build* (when the UPDATE lands), not the spec. **Rejected:**
+   compute-and-return-only (mirroring write-v1's accept-and-instrument scene-boundary) — it would
+   leave the reputation-drift demo beat inoperative and the scene-start snapshot static; and
+   non-destructive reputation history — it needs new schema this spec forbids (the frozen migration-01
+   schema stands). The scale neutral/min/max and the sensitivity default remain integrator config
+   (`agents.config` / `SERVICE_DEFAULTS`), never hardcoded.
+
+2. **Drive surface = interactive REPL over a shared session-runner core.** The CLI is a
+   human-drivable console (typed utterances + meta-commands) with a `--debug` view exposing retrieved
+   memory IDs + scores, the parsed structured output (prose / action directive / reputation delta),
+   and token + latency counts — the product surface whose "main file reads as documentation"
+   (`status.md`). A **session-runner core beneath it is reused by the synthetic load driver**, which
+   drives scripted sessions at volume through the same seams to emit §11's latency histogram and
+   per-100-turn cost table. **Rejected:** scripted-transcript-replay-only (no hand-drivable product
+   surface for the demo) and interactive-REPL-only with a separate load-driver script (the two paths
+   would drift apart — architecture §11 makes the driver first-class, "no distribution exists without
+   it").
+
+**Reconciliation baked into the spec (a doc tension, not a new fork).** §9 reads both "August ship: a
+single Sonnet-class call" and "the Haiku call emits a delta by default." The 2026-07-14 re-slating
+governs the slice: the reputation snapshot injection lands with "architecture §9's August
+**single-call** ship," so the **one Sonnet call** carries prose + action directive + reputation delta
+together; the "Haiku call" wording describes the *post-August split-brain* behavior call. The spec
+states this explicitly so no one wires a second Haiku behavior call into the vertical slice.
+
+The spec tags the remaining physical shapes `[SETTLE-AT-BUILD]` (the `LONGMEM_MODEL_DIALOGUE` env-var
+name; the dialogue structured-output schema + parse/validation; the reputation apply shape — scale
+bounds/neutral/sensitivity defaults + config keys; the action-directive vocabulary source; the
+prompt-assembly block shape; the never-blank fallback line; the CLI meta-command surface + entry
+point + `--debug` rendering; the load-driver script format + scale knobs + aggregate output; whether
+the turn payloads are Pydantic models or dataclasses). These are ruled at the harness's build, not
+now. The dialogue call is a new model role behind a provider interface with a real implementation + a
+deterministic fake, following the write-path triad; every retrieved memory is served **verbatim** (no
+reconstruction in the slice).

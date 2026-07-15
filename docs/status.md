@@ -8,8 +8,10 @@ floors stand verified: the migration-01 schema, write path v1 (ingest service + 
 retrieval service + shared decay math + thin route, per `read-path.md` — built & floor-verified
 2026-07-14, all settle-shapes ruled in the dated `decisions.md` entry). **One open decision owed
 before the demo ships:** the escalation hard-stop failure path is a build-phase stance and must be
-re-ruled for production (see the 2026-07-13 write-path build entry in `decisions.md`). Next: the
-CLI harness — the vertical slice's remaining piece.
+re-ruled for production (see the 2026-07-13 write-path build entry in `decisions.md`). Next: **build
+the CLI harness** — its v1 build target is now specced (`cli-harness.md`, 2026-07-14; two scope forks
+ruled — reputation persisted in-place, drive surface = REPL over a shared session-runner core), the
+vertical slice's remaining piece.
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -192,12 +194,32 @@ and the structured behavior output survive the interview. Research publication c
   read-only `docker exec psql` checks) — the 2026-07-13 allowlist fix did not hold for this
   dispatch; revisit before the next verification. Docs propagated: BUILT banner + inline ruling
   annotations in `read-path.md`, architecture §6 built marker, dated `decisions.md` entry.
+- **2026-07-14** — **CLI-harness v1 build target specced** (`cli-harness.md`). Consolidates
+  architecture §9 (behavior output & turn topology) + §11 (instrumentation & load driver) into a
+  build spec over the frozen migration-01 schema (no new migration). The surface was pre-fixed: the
+  harness composes the two built seams (ingest, retrieval) in-process via one `run_dialogue_turn`
+  seam + the single Sonnet call; no HTTP route (that rides with Unity). Jack ruled two scope forks
+  at spec time (dated entry in `decisions.md`): **reputation delta = persist in-place** (UPDATE
+  `agents.reputation` with clamp + sensitivity, client override wins; scene-start snapshot frozen in
+  the prompt prefix until the next boundary — an in-place UPDATE of an agent-row runtime scalar, the
+  same class as the existing pin-flag toggle (`set_pinned`) and likewise outside the memory-content
+  non-destructive invariant;
+  compute-and-return-only and non-destructive-history both rejected), and **drive surface = an
+  interactive REPL over a shared session-runner core** the synthetic load driver reuses (scripted-
+  only and divergent-paths rejected). The single-Sonnet reconciliation is baked in (one call carries
+  prose + action directive + reputation delta; §9's "Haiku call emits a delta" is the post-August
+  split-brain, not this slice). Remaining physical shapes tagged `[SETTLE-AT-BUILD]` for the build
+  (`LONGMEM_MODEL_DIALOGUE` name, structured-output schema, reputation apply shape, action-vocabulary
+  source, prompt-assembly block, never-blank fallback, CLI meta-command surface, load-driver shape,
+  wire-model form). Docs only — no code, no floors changed. Doc-auditor sweep pending.
 
 ## Immediate queue
 
 1. CLI harness (vertical slice complete — includes the single Sonnet dialogue call + action
    directive + reputation delta/snapshot per architecture §9; no gate, no caching, no
-   reconstruction in the slice) + synthetic load driver alongside.
+   reconstruction in the slice) + synthetic load driver alongside. **v1 build target specced
+   2026-07-14 (`cli-harness.md`); build pending** — reputation persists in-place, drive surface =
+   REPL over a shared session-runner core the load driver reuses.
 2. **Reconstruction (re-slated pre-demo 2026-07-14):** spec (reconstruction call + seed-only
    identity-document rendering + cache + drift budget + write-back + serving shape) → build →
    verification. Attaches to the read path's serving stage; the theta check imports
@@ -228,7 +250,7 @@ Postgres MCP + floor-verifier MCP access.)*
   **Consolidated into `read-path.md` 2026-07-14 and now BUILT** (shapes ruled at build; dated
   `decisions.md` entry).
 - Reconstruction call spec: operator-structured prompt with gist as fixed constraint; determinism;
-  batching shape. **Feeds immediate-queue item 3 — pre-demo since the 2026-07-14 re-slating.**
+  batching shape. **Feeds immediate-queue item 2 — pre-demo since the 2026-07-14 re-slating.**
 - Reflection spec end-to-end (mechanism explicitly post-August — ruled 2026-07-14).
 - Gate threshold values + efficacy definitions wired to instrumentation.
 - Unity client C# API surface: send event, open dialogue, directive callback, reputation read,
