@@ -37,8 +37,10 @@ moves scores, not rows; detail-hiding assertions land with reconstruction.)*
 
 - Gist span rows are immutable.
 - A write-back inserts a new head and supersedes the prior row **under the same memory_id**.
-- Identity-version bump ⇒ cache miss; stable identity ⇒ cache hit.
-- Same `(memory_id, identity_version)` returns **byte-identical text**.
+- Identity-version bump ⇒ cache miss; stable identity **+ same decay band** ⇒ cache hit *(ruled
+  2026-07-17: the cache key's version component composes `identity_version` with the scene-frozen
+  thinning band — `reconstruction.md`)*.
+- Same `(memory_id, composed cache key)` returns **byte-identical text**.
 - Pinned memories never grow reconstruction chain rows and always read verbatim.
 - Correction verbs evict caches, and cascade or preserve the chain per the two-verb ruling.
 - The drift bound is enforced (over-threshold candidate write is refused; prior head kept).

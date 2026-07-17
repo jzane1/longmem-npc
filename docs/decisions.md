@@ -348,7 +348,9 @@ contingent ("when reconstruction ships"). Jack ruled:
 
 1. **The reconstruction mechanism ships before the August demo.** In scope: identity-conditioned
    reconstruction as the mandatory read path past theta; the write-back version chain
-   (`write_cause = reconstruction`); the `(memory_id × identity_version)` cache; the drift budget
+   (`write_cause = reconstruction`); the `(memory_id × identity_version)` cache *[key refined at
+   spec time — see the 2026-07-17 entry: the version component composes `identity_version` with a
+   scene-frozen decay band]*; the drift budget
    with re-anchoring; batched serving with pre-warm and the block-with-"reconstructing"-signal
    miss path; a reconstruction model role (`LONGMEM_MODEL_RECONSTRUCTION`) behind a provider
    interface with a real implementation + a deterministic fake; the Set C suite scenarios.
@@ -653,3 +655,65 @@ walkers but rides transitively (unpinned in `requirements.txt`); `max_tokens=102
 the three real providers (a write-path-era pattern — arguably provider implementation detail, not
 integrator config); the suite-gate Stop hook stays dormant by design until `test_*.py` files land
 with the pytest suite (immediate-queue item 4).
+
+## Reconstruction spec scope rulings — 2026-07-17
+
+Authoring `reconstruction.md` (the reconstruction v1 build target — immediate-queue item 1,
+pre-demo since the 2026-07-14 re-slating; consolidates architecture §7 + §4.2/§4.3/§6 over the
+frozen migration-01 schema, attaching to the read path's reserved serving stage) required three
+scope rulings. Jack ruled via explicit questions:
+
+1. **Reconstructor input = the prior head is included.** The reconstruction call sees the full
+   gist spans (fixed constraint, verbatim from `observation_text`) + the time-thinned original
+   detail slice + **the current live head as "how you currently tell it,"** conditioned on the
+   rendered identity document. Rationale: retellings compound (the Talk-of-the-Town
+   repetition-breeds-commitment precedent that motivated write-back; the Bartlett drift dynamic),
+   and the drift budget gets real work — without the prior telling in the prompt, candidates stay
+   near the anchor and the refuse-write threshold rarely binds. **Rejected:** original-only (the
+   literal §7 reading — each reconstruction independent of the last, tellings recorded but never
+   compounding) and prior-head-as-the-detail-source (gist/detail offsets exist only for
+   `observation_text`; reconstructed text has no span structure to thin against §4.2's
+   definition).
+
+2. **Pre-demo drift driver = a decay band composed into the cache key.** Spec-surfaced tension:
+   the identity document is seed-prose-only pre-demo, so `identity_version` is static and the
+   ruled `(memory_id × identity_version)` cache would reconstruct each memory exactly **once** —
+   the 60-day drift plot beat would be a single step, then flat until reflection ships
+   post-August. Ruled: the cache key's version component **composes `identity_version` with a
+   quantized thinning band** (the decayed detail strength, bucketed by an integrator quantum knob)
+   — no schema change, the column is text. Deeper decay crosses a band edge → new key →
+   re-reconstruction on thinner detail → a progressive drift trajectory under a static identity.
+   The band is **frozen per scene** (caller-frozen scene state, with theta and the thinning level
+   computed at the same scene basis) so within-scene byte-identity holds by construction, and the
+   band **both keys the cache and sets the thinning level** so same-key ⇒ byte-identical text
+   holds across scenes. Consequence: Set C's "stable identity ⇒ cache hit" refines to "stable
+   identity **+ same band** ⇒ cache hit" (`test-suite.md` updated). **Rejected:**
+   accept-single-step (faithful to the key as written, but the demo's drift beat loses its
+   trajectory) and retell-per-scene (evict/bypass at scene edges — contradicts Set C's
+   stable-identity⇒hit as written and multiplies reconstruction call volume).
+
+3. **Identity-document plumbing = hybrid, reputation-style.** The scene-boundary handler
+   recompiles **server-side** (render seed prose verbatim → content hash → upsert
+   `identity_documents`) and **returns `identity_version`** in its response; the caller freezes it
+   as scene state and passes it on each read request — exactly the ruled `reputation_snapshot`
+   contract, making "frozen within a scene" a seam-contract property. Lazy bootstrap when no
+   boundary has fired (a bare read ensures a current document and flags it); a request naming an
+   unknown version is a loud contract error. This is the scene-boundary handler's **first real
+   server-side consumer** (the 2026-07-14 slating's identity-recompile landing). **Rejected:**
+   fully server-side (retrieval reads the latest document row per call — the effective version
+   can shift mid-scene, making stability an implementation accident) and fully caller-side (every
+   future client, Unity included, would reimplement rendering + hashing, and the server would no
+   longer own the version its cache is keyed on).
+
+The spec restates the settled mechanics by pointer (batched pre-warm serving,
+block-with-signal deferred to the gate, the eviction invariant, the derivable drift anchor +
+re-anchoring rules, `LONGMEM_MODEL_RECONSTRUCTION` behind the provider triad) and adds two derived
+design lines: **serve only persisted text** (a model response that failed to persist is never
+served — unpersisted text breaks within-scene stability on the next read) and **the dialogue-init
+route becomes a writing endpoint** (write-back on read is §7's design; read-path v1's read-only
+SQL was a scope fact of verbatim-only serving, not a principle). Remaining physical shapes are
+tagged `[SETTLE-AT-BUILD]` (theta knob, band quantum + key composition, thinning function, prompt
++ batched output schema, retry policy, drift metric + threshold default, write-back `valid_at`,
+refusal caching, scene-state request fields, scene-boundary response shape, hash algorithm /
+NULL-seed / unknown-version shapes, wire-model + instrumentation deltas, walker shape). These are
+ruled at reconstruction's build, not now. Docs only — no code, no floors changed.

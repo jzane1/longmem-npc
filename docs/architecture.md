@@ -126,7 +126,9 @@ the sole mechanism that removes a durable fact.
    reflection time, silently invalidating reconstruction caches.
 2. **Rendered identity document** — seed prose plus current identity-relevant reflections, rendered
    into the exact prompt block. `identity_version` = a content hash of the rendered document.
-   Recompiled at scene edges.
+   Recompiled at scene edges *(plumbing ruled 2026-07-17: the scene-boundary handler recompiles
+   server-side and returns `identity_version`; the caller freezes it as scene state and passes it
+   per read request — the reputation-snapshot contract)*.
 
 ## 5. Write path
 
@@ -174,7 +176,8 @@ anyway. The **scene boundary is a load-bearing, explicit client-sent API event**
 consumers: prompt-head rebuild, identity-document recompile, reputation snapshot. Scene edges settle
 prefix, identity version, and reputation in one heartbeat. *(Consumer slating ruled 2026-07-14:
 reputation snapshot lands with the dialogue turn — **landed 2026-07-15**, the session-runner
-re-reads `agents.reputation` at each boundary; identity recompile with reconstruction — pre-demo;
+re-reads `agents.reputation` at each boundary; identity recompile with reconstruction — pre-demo,
+**specced 2026-07-17** (`reconstruction.md`: server-side recompile returning `identity_version`);
 prompt-head rebuild / prompt caching is post-August.)*
 
 **Read-mode boundary (self-describing, not just documented):** every returned memory carries
@@ -184,12 +187,15 @@ unpinned past the threshold → reconstructed. A fourth enum value, `reconstruct
 only if an async fallback is ever adopted. **Docs purity claim:** no raw access through the
 character read path, except integrator-designated pins; ground truth lives in the debug view.
 
-## 7. Reconstruction (pre-demo scope, ruled 2026-07-14; schema, caches, and pin behavior already live)
+## 7. Reconstruction (pre-demo scope, ruled 2026-07-14; specced `reconstruction.md` 2026-07-17; schema, caches, and pin behavior already live)
 
 Identity-conditioned reconstruction is the **mandatory read path** for unpinned memories past a
 threshold theta, where **theta reuses the decay math** (reconstruct when decayed detail strength
-falls below theta). The reconstructor sees the **full gist span as a fixed constraint** plus the
-time-thinned detail slice, conditioned on the rendered identity document.
+falls below theta; text-affecting decay evaluations bind to a scene-frozen basis so read-mode
+never flips mid-scene). The reconstructor sees the **full gist span as a fixed constraint** plus
+the time-thinned detail slice **plus the current live head — "how you currently tell it" (ruled
+2026-07-17: retellings compound; without the prior telling the drift budget rarely binds)** —
+conditioned on the rendered identity document.
 
 **Write-back with a version chain:** one permanent `memory_id` forever; each retelling inserts a new
 detail row and stamps the prior one superseded — **versioned confabulation over an immutable
@@ -203,7 +209,11 @@ latency ever forces async, the swap must be explicit state (a `reconstruction_pe
 never silent text mutation, because of the **within-scene text-stability invariant**: absent a
 diegetic event on that memory, repeated reads within one scene return byte-identical text.
 
-**Cache:** keyed `(memory_id × identity_version)`. **Cache-eviction invariant (generalized):** cache
+**Cache:** keyed `(memory_id × identity_version)`, where the version component **composes
+`identity_version` with a quantized, scene-frozen decay band** (ruled 2026-07-17; the band both
+keys the cache and sets the thinning level, so same key ⇒ byte-identical text, and deeper decay
+re-reconstructs on thinner detail — the pre-demo drift driver while the identity document is
+seed-only static). **Cache-eviction invariant (generalized):** cache
 writes happen only in the reconstruction path; **any other writer to a chain — correction, diegetic
 write, purge — must evict all cache rows for that memory_id.**
 

@@ -105,7 +105,9 @@ Set A test pair, `test-suite.md`, asserts a correction record is present).
 
 ### reconstruction_cache
 - `memory_id` FK → memories.
-- `identity_version` text — content hash of the rendered identity document.
+- `identity_version` text — content hash of the rendered identity document. *(Ruled 2026-07-17,
+  `reconstruction.md`: at reconstruction this column stores the composed reconstruction key —
+  `identity_version` ⊕ the scene-frozen decay band; column type and PK unchanged.)*
 - `rendered_text` text NOT NULL.
 - `created_at`.
 - PK `(memory_id, identity_version)`.

@@ -1,17 +1,18 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-07-16
+**Last updated:** 2026-07-17
 **Phase:** **the vertical slice is complete** — *event in → memory stored → dialogue out* runs end
 to end as a console. Four floors stand verified: the migration-01 schema, write path v1
 (`write-path.md`), read path v1 (`read-path.md`), and **CLI harness v1** (`cli-harness.md` — built
 & floor-verified 2026-07-15: the `run_dialogue_turn` seam with the single Sonnet-class dialogue
 call, structured directive + in-place reputation apply, an interactive REPL and the synthetic load
-driver on a shared session-runner core; all nine settle-shapes ruled in the dated `decisions.md`
-entry). Reconstruction remains pre-demo per the 2026-07-14 re-slating. **One open decision owed
+driver on a shared session-runner core; all settle-shapes ruled in the dated `decisions.md`
+entry — count corrected by the 2026-07-16 audit). Reconstruction remains pre-demo per the 2026-07-14 re-slating. **One open decision owed
 before the demo ships:** the escalation hard-stop failure path is a build-phase stance and must be
 re-ruled for production (see the 2026-07-13 write-path build entry in `decisions.md`). Next:
-**spec reconstruction** (immediate-queue item 1) — it attaches to the read path's serving stage;
-the theta check imports `app\decay.py`.
+**build reconstruction v1** (`reconstruction.md`, specced 2026-07-17 — three scope forks ruled:
+prior-head input, decay-band cache key, hybrid identity plumbing) — it swaps the read path's
+serving stage only; the theta check imports `app\decay.py`.
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -270,13 +271,42 @@ and the structured behavior output survive the interview. Research publication c
   in the three real providers (write-path-era pattern). Also this session: a CLI-harness usage
   guide was written up for Jack (operator prerequisites incl. the no-agent-provisioning-surface
   gap, the turn pipeline, meta-commands, reputation semantics, fake/real modes, load driver).
+- **2026-07-17** — **Reconstruction v1 build target specced** (`reconstruction.md`). Consolidates
+  architecture §7 (+ §4.2/§4.3/§6) and the 2026-07-14 re-slating scope into a build spec over the
+  frozen migration-01 schema (no new migration — `reconstruction_cache`, `identity_documents`, and
+  the `write_cause` enum are already live); it swaps the read path's reserved serving stage only.
+  Jack ruled three scope forks at spec time (dated "Reconstruction spec scope rulings" entry in
+  `decisions.md`): reconstructor input **includes the current live head** ("how you currently tell
+  it" — retellings compound, the drift budget gets real work); the cache key's version component
+  **composes `identity_version` with a quantized, scene-frozen decay band** (the pre-demo drift
+  driver — spec-surfaced tension: a seed-only identity is static, so the plain key would
+  reconstruct each memory exactly once and flatten the 60-day beat; the band both keys the cache
+  and sets the thinning level); and identity-document plumbing is **hybrid, reputation-style**
+  (scene-boundary handler recompiles server-side and returns `identity_version`; the caller
+  freezes it as scene state and passes it per request — the handler's first real server-side
+  consumer). Two derived design lines stated in the spec: **serve only persisted text** and **the
+  dialogue-init route becomes a writing endpoint**. Remaining physical shapes tagged
+  `[SETTLE-AT-BUILD]` for the build (theta knob, band quantum + key composition, thinning
+  function, prompt + batched output schema, retry policy, drift metric + threshold, write-back
+  `valid_at`,
+  refusal caching, scene-state request fields, scene-boundary response shape, hash/NULL-seed/
+  unknown-version shapes, wire deltas, walker shape). Propagated: architecture §7 input/cache/
+  marker + §4.3/§6 plumbing notes; `test-suite.md` Set C cache-hit clause refined to "stable
+  identity + same band." Doc-auditor sweep: one contradiction (the `migration-01.md` cache-column
+  line still read pure-content-hash — annotated with the ruling) + five propagation residuals
+  fixed and grep-verified (`read-path.md` serving-boundary key note, the register's annotation
+  convention on the 2026-07-14 re-slating entry, `write-path.md` scene-boundary specced marker,
+  this log's settle-tag list + the phase header's stale "nine" count). **Known nit left in
+  place:** `app\retrieval.py`'s module comment still sketches the plain
+  `(memory_id, identity_version)` cache key — comment-only in a floor-verified file, and the
+  reconstruction build rewrites that comment when it swaps the serving stage; left untouched to
+  keep this session docs-only. Docs only — no code, no floors changed.
 
 ## Immediate queue
 
-1. **Reconstruction (re-slated pre-demo 2026-07-14):** spec (reconstruction call + seed-only
-   identity-document rendering + cache + drift budget + write-back + serving shape) → build →
-   verification. Attaches to the read path's serving stage; the theta check imports
-   `app\decay.py`.
+1. **Reconstruction (re-slated pre-demo 2026-07-14): specced 2026-07-17 (`reconstruction.md`) —
+   build → verification remain.** Swaps the read path's serving stage only; the theta check
+   imports `app\decay.py`; settle-tags rule at build.
 2. Authorial-correction endpoint (small target; the correction-override demo beat).
 3. Mid-dialogue gate + threshold values, efficacy definitions, per-signal fire logging.
 4. Test-suite scoped session (Sets A-authorial, B, C + degradation cases now mostly runnable).
@@ -305,7 +335,8 @@ MCP + floor-verifier MCP access.)*
   **Consolidated into `read-path.md` 2026-07-14 and now BUILT** (shapes ruled at build; dated
   `decisions.md` entry).
 - Reconstruction call spec: operator-structured prompt with gist as fixed constraint; determinism;
-  batching shape. **Feeds immediate-queue item 1 — pre-demo since the 2026-07-14 re-slating.**
+  batching shape. — **Consolidated into `reconstruction.md` 2026-07-17** (immediate-queue item 1;
+  prompt/output schema shapes settle at build).
 - Reflection spec end-to-end (mechanism explicitly post-August — ruled 2026-07-14).
 - Gate threshold values + efficacy definitions wired to instrumentation.
 - Unity client C# API surface: send event, open dialogue, directive callback, reputation read,

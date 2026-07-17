@@ -71,7 +71,9 @@ stamping). **v1 serving:** the live `memory_details` head's `content`, verbatim;
 `read_mode = "verbatim"` on every item; `pinned` mirrored from the row. The architecture's
 three-state read-mode boundary (§6) collapses to one state in v1 because no reconstructor exists —
 honest self-description, never a claimed mechanism. Item 1 swaps serving only: theta check
-(reusing the decay math below), cache read keyed `(memory_id, identity_version)`, batched
+(reusing the decay math below), cache read keyed `(memory_id, identity_version)` *(refined
+2026-07-17: the key's version component composes `identity_version` with the scene-frozen decay
+band — `reconstruction.md`)*, batched
 reconstruction on miss, `read_mode = "reconstructed"` past threshold.
 
 ## Request contract — `DialogueInitRequest`
