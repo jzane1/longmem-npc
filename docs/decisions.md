@@ -771,7 +771,8 @@ embed tokens, `cache_hits/misses`, `write_backs`, `drift_refusals`,
 reconstruction latency + cost rows (drift-check embeds ride the embedding price); walker
 `tests\verify_reconstruction.py` on the scratch pattern.
 
-**Build-surfaced shapes (flagged for Jack's confirmation, built as follows):**
+**Build-surfaced shapes (flagged for Jack's confirmation, built as follows):** *[All confirmed
+as built/written 2026-07-17 — see "Reconstruction flagged-shapes confirmations" below.]*
 
 - **Prior walkers pin `reconstruction_theta = 0.0` in their fixture agent configs** (one config
   key + comment each; assertion bodies untouched — verified by the floor-verifier against git).
@@ -799,3 +800,42 @@ swapped to `/longmem` → "Up to date, 0 pending"). `.env` was not modified; whe
 back at `longmem` or create the sandbox DB is Jack's call. *[Resolved same day: Jack pointed the
 URI back at `longmem`; no-arg `db\migrate.py` re-verified as a clean no-op — see the status.md
 wrap-up entry.]*
+
+## Reconstruction flagged-shapes confirmations — 2026-07-17
+
+A dedicated confirmation session: Jack walked the three open reconstruction flags (the two
+build-surfaced shapes plus the floor-verifier observation from the 2026-07-17 build-rulings
+entry) and ruled on each. All three **confirmed as built/written — no code, no spec, no walker
+changes.** The escalation hard-stop failure-path re-rule is now the sole open question.
+
+1. **Prior-walker theta pin — CONFIRMED as built.** `tests\verify_read_path.py` and
+   `tests\verify_cli_harness.py` keep `reconstruction_theta = 0.0` in their fixture agent
+   configs. Ruled after a correction of understanding, recorded because the register keeps the
+   why: Jack initially read the pin as "reconstruction is dormant in v1" and provisionally ruled
+   rewrite-the-walkers + activate-the-knob; on review, reconstruction is **already
+   production-active** (default `reconstruction_theta = 0.5` in `app\config.py`, per-agent
+   overridable; the 0.0 pin exists only in the two older walkers' fixture NPCs), proven live at
+   the 2026-07-17 verification (REPL drift beat with a real write-back and cache hit), and
+   reconstruction owns its own dedicated 41-assertion walker. With that corrected, confirmed as
+   built: staged-verification layer isolation — each walker guards one layer so a failure has a
+   single cause, and the pinned pair doubles as proof the serving swap is transparent when
+   knob-disabled. **Rejected:** rewriting the old walkers to run under default theta (duplicates
+   `tests\verify_reconstruction.py`'s coverage, touches floor-verified assertion bodies, re-opens
+   the read-path and CLI-harness floors, and blurs failure attribution).
+2. **Blind-check refusals not cached — CONFIRMED as built.** A drift-check **embedding failure**
+   (a blind check — no distance computable) refuses the write-back fail-closed but does NOT
+   cache the served prior text (`app\reconstruction.py`), so a transient embedding outage never
+   permanently pins a key — the next read retries. True over-threshold refusals cache, as ruled
+   at build. **Rejected:** uniform refusal caching (an outage would pin the served text under
+   that key until the identity version or decay band moved).
+3. **Pin-after-reconstruction read_mode — CONFIRMED, keep as written.** Ruled after a requested
+   review of pin mechanics (pins are integrator-designated only, via the observe event's flag or
+   `PUT /v1/memories/{id}/pin`; §8: pin freezes the *current* head — restoration is a correction
+   verb, not pin). A memory reconstructed in an earlier scene and pinned afterward serves its
+   `reconstruction`-cause head as `read_mode = "verbatim"` — §6's "pinned → verbatim, always"
+   holds as written: "verbatim" is the serving-stage claim (served exactly as stored, stage not
+   applied, frozen from here on), and `pinned` rides alongside `read_mode` in every payload, so
+   consumers retain ground truth. Floor-verifier observation closed; no spec amendment.
+   **Rejected:** relabeling pinned drifted heads via `_head_mode` (a §6 amendment plus a
+   serving-stage change re-opening the reconstruction floor, for a label carrying no information
+   the `pinned` flag doesn't already carry).

@@ -54,13 +54,9 @@ and the structured behavior output survive the interview. Research publication c
 - **Escalation failure path for production (owed before the demo publishes).** The v1 write path
   hard-stops a write when the gist-escalation call fails twice (fail-loud, build-phase tuning
   stance, ruled 2026-07-13). The production/demo behavior — hard-stop vs. some soft degradation —
-  must be re-ruled before the demo ships. Not blocking current work.
-- **Two build-surfaced reconstruction shapes flagged for confirmation (built as recorded in the
-  2026-07-17 build-rulings entry):** the prior read-side walkers pin `reconstruction_theta = 0`
-  in fixture configs (v1 contract asserted with the stage knob-disabled), and blind-check
-  (drift-embed-failure) refusals are not cached. Plus one floor-verifier observation:
-  pin-after-reconstruction serves the `reconstruction`-cause head as `verbatim` — spec-compliant
-  ("pinned → verbatim, always"), noted for awareness.
+  must be re-ruled before the demo ships. Not blocking current work. **Now the sole open
+  question** — the reconstruction flagged shapes were all confirmed 2026-07-17 (see the
+  "Reconstruction flagged-shapes confirmations" entry in `decisions.md`).
 
 ## Session log
 
@@ -342,6 +338,17 @@ and the structured behavior output survive the interview. Research publication c
   schema-frozen criterion reads exactly as recorded for every prior floor again. The two
   build-surfaced reconstruction shapes (prior walkers' `reconstruction_theta = 0` pin;
   blind-check refusals not cached) remain flagged for confirmation in open questions.
+- **2026-07-17** — **Flagged-shapes confirmation session (docs only).** Jack walked the three
+  open reconstruction flags and confirmed all three as built/written (dated "Reconstruction
+  flagged-shapes confirmations" entry in `decisions.md`): the prior walkers' fixture-only
+  `reconstruction_theta = 0` pin (confirmed after correcting a misread — reconstruction is
+  **production-active** at default theta 0.5 and has its own 41-assertion walker; the pin exists
+  only in the two older walkers' fake NPCs, preserving single-cause layer isolation); blind-check
+  refusals staying uncached (a transient embedding outage never pins a key); and
+  pin-after-reconstruction `read_mode = "verbatim"` kept as written ("verbatim" is the
+  serving-stage claim; `pinned` rides in every payload — observation closed, no spec amendment).
+  No code, no floors touched. **The escalation hard-stop failure-path re-rule is now the sole
+  open question.**
 
 ## Immediate queue
 
