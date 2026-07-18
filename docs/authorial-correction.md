@@ -1,0 +1,194 @@
+# Authorial correction — v1 build target
+
+Sixth build target, on top of migration 01, write path v1, read path v1, CLI harness v1, and
+reconstruction v1. This specs **the authorial-correction endpoint** — the operator's
+fix-wrong-data verb (**replace model, ruled 2026-07-12**) and the correction-override demo beat.
+It inherits reconstruction's two stated obligations (evict all cache rows for the memory_id; the
+corrected head re-anchors the drift budget) and rules the reconstructor-input consequence the
+inheritance surfaced. Design truth is [architecture.md](architecture.md) §8 (+ §7 cache/anchor
+obligations); the rulings behind it are in [decisions.md](decisions.md); the schema it writes is
+recorded in [migration-01.md](migration-01.md) — the `write_cause` chain enum
+(`authorial_correction` a member since day one), `reconstruction_cache`, and the one-live-head
+index are already live, so **no migration is needed as a fact of this target** (if the build
+surfaces a schema need, stop and report — migration 002 is available under the 2026-07-17
+scope-limiter reframing). This doc points, it does not re-derive.
+
+Four scope forks were ruled at spec time (dated "Authorial-correction spec scope rulings" entry
+in `decisions.md`) — **the first spec authored under the 2026-07-17 scope-limiter reframing**:
+
+1. **Scope = chain content now; fact-level correction slated as its own target** (immediate-queue
+   item 2, ruled by explicit question). This target corrects the telling chain. The honest gap it
+   leaves — retrieval still ranks a corrected memory by the original observation's embedding, and
+   gist spans still index the original text — is closed by the slated fact-correction target
+   (versioned memories-row facts, corrected embedding; migration-002-class design with its own
+   spec pass), not silently accepted.
+2. **The reconstructor's fixed constraint follows the drift anchor.** On a chain whose derivable
+   anchor is an `authorial_correction` head, the corrected head — not the stale gist spans —
+   is the fixed constraint. One notion of ground truth per chain: the constraint and the drift
+   anchor derive from the same `write_cause` rule. *(This ruling reversed the pre-reframing
+   recommendation, which had leaned on "re-opens the reconstruction floor" as a deterrent.)*
+3. **Surface = memory-scoped operator verb** (mirroring pin), not an `/v1/events/*` event —
+   `/v1/events/*` stays diegetic (the future diegetic-correction event keeps a clean namespace).
+4. **Immediate mid-scene effect.** Wrong data stops serving the moment the operator fixes it; the
+   within-scene stability invariant's wording gains authorial correction as the second sanctioned
+   text-change cause (amended in CLAUDE.md, architecture §7, and `test-suite.md` Set C).
+
+## Principles this build honors
+
+- **Non-destructive supersession.** The correction **inserts** a corrected head
+  (`write_cause = authorial_correction`) and supersedes the prior head by setting `invalid_at` —
+  ordinary supersession under the permanent `memory_id`. Never UPDATE content, never DELETE chain
+  rows. Prior tellings stay queryable under `as_of`.
+- **No model calls.** The corrected head is the operator's text, stored **byte-verbatim**. A
+  render pass would alter the fix, and any composition template would be a hidden hardcoded
+  authorial artifact (the query-composition rejection's reasoning). This endpoint is pure
+  storage discipline.
+- **Verb discrimination by `write_cause` alone** (ruled 2026-07-12): no marker on prior rows, and
+  **no `corrections`-table row** — that table is diegetic-only by CHECK
+  (`rationalization | update_with_resentment`).
+- **The eviction invariant** (standing, `reconstruction.md`): this writer evicts **all**
+  `reconstruction_cache` rows for the memory_id, in the same transaction (application code, not
+  triggers).
+- **Re-anchoring is automatic.** The drift anchor is derivable, no pointer — the corrected head
+  is selected by the existing anchor SQL the moment it commits (proven at the db layer by
+  `tests\verify_reconstruction.py` [8]).
+- **Correction outranks pin; the corrected head inherits it** (§8 final ruling). Pin lives on the
+  memories row, so inheritance is structural; a pinned corrected memory serves the corrected head
+  verbatim on the next read.
+- **Fail-loud operator surface.** Gameplay reads degrade quietly; operator tooling does not — the
+  operator must know a fix failed to land. No soft paths in this endpoint.
+- **Honest self-description, IDs in payloads, instrument at the seam** — unchanged contracts; the
+  result carries IDs and instrumentation like every other seam.
+
+## Scope boundary — do NOT build
+
+**Fact-level correction** — slated as immediate-queue item 2, its own spec + build (a sequencing
+note, not a rejection: it needs a fact-versioning design the memories row doesn't have, and that
+design deserves its own fork surface). **The diegetic correction event + dissonance path**
+(sequenced post-August; the `corrections` table stays write-less until then). **Purge.** **The
+mid-dialogue gate** (immediate-queue item 3). If adjacent work looks necessary, stop and report —
+with the correct option and its real cost stated, per the reframed contract.
+
+## Surface (where this attaches)
+
+A thin route delegating to an `IngestService` method (the `set_pin` pattern —
+`app\api.py` route, `app\ingest.py` seam, SQL in `app\db.py`):
+
+- **Route:** memory-scoped operator verb. `[SETTLE-AT-BUILD]` exact path/verb — suggested
+  `POST /v1/memories/{memory_id}/correction`.
+- **Request:** the corrected content (required, non-empty — `[SETTLE-AT-BUILD]` validation
+  shape) + the correction's world time. `[SETTLE-AT-BUILD]` `valid_at` policy — suggested: a
+  required tz-aware field, like the observe event (bi-temporal rule: `valid_at` is client-sent
+  world time; the operator states when the corrected fact takes effect).
+- **Response:** `[SETTLE-AT-BUILD]` exact wire shape — suggested `CorrectionResult` with
+  `memory_id`, `detail_id` (the corrected head), `superseded_detail_id`, `evicted_cache_rows`,
+  and instrumentation (`correction_ms`). IDs-in-payloads, as everywhere.
+- **CLI:** a `:correct` meta-command on the REPL so the correction-override demo beat is drivable
+  pre-Unity; debug view shows the result fields. `[SETTLE-AT-BUILD]` exact syntax — suggested
+  `:correct <memory_id> <corrected text…>`.
+- **Errors, loud:** unknown `memory_id` → 404; invalid content → 422; a lost concurrency race →
+  `[SETTLE-AT-BUILD]` — suggested 409 (see below). Transaction failure → 5xx, nothing partial
+  (single transaction).
+
+## Mechanism — one transaction
+
+The reconstruction write-back is the precedent (`write_back_reconstruction`, `app\db.py`): one
+transaction, supersede-guarded.
+
+1. **Supersede the live head:** `invalid_at = t_c` on the current head, guarded by
+   `invalid_at IS NULL` + rowcount (the optimistic-concurrency pattern; the one-live-head index
+   is the structural backstop). `[SETTLE-AT-BUILD]` loser behavior — suggested: a concurrent
+   writer having superseded first is a 409 to the operator (they should re-read and re-issue
+   against the new head — silent retry would correct a telling they never saw).
+2. **Insert the corrected head:** `write_cause = 'authorial_correction'`,
+   `valid_at = t_c` — prior `invalid_at` = new `valid_at`, the coherent-chain-timeline precedent,
+   so `as_of` time travel before/after t_c serves the right telling.
+3. **Evict all cache rows** for the memory_id — the inherited invariant, same transaction.
+
+No `corrections` row. No `memories`-row writes of any kind (fact correction is item 2).
+
+## The reconstruction delta: constraint follows the anchor
+
+Ruled at spec time (fork 2). Prompt assembly (`assemble_reconstruction_prompt`,
+`app\reconstruction.py`) becomes **anchor-cause-aware**:
+
+- **Original-anchored chains: unchanged.** Gist spans stay the fixed constraint; thinned detail
+  and the current live head ride as today.
+- **Authorial-corrected chains** (anchor `write_cause = authorial_correction`): the **corrected
+  anchor text is the fixed constraint**. `[SETTLE-AT-BUILD]` exact corrected-chain input shape —
+  suggested: constraint block = the anchor content; the current live head still included ("how
+  you currently tell it" — retellings compound above the correction too); the observation-derived
+  gist/detail blocks **omitted** (they may contain exactly the data the operator corrected away —
+  re-injecting it so the drift budget can refuse it burns a call to fail; the decay band still
+  keys the cache and the trajectory, it just no longer selects a thinning slice for these
+  chains).
+- **`update_with_resentment`-anchored chains:** decided with the dissonance path (sequenced
+  post-August); until then no mechanism writes that cause.
+- The drift budget itself is unchanged — candidates embed against the corrected anchor, as
+  already built.
+
+**This re-opens the reconstruction floor** — a prompt-assembly change plus walker updates, then
+`tests\verify_reconstruction.py` re-runs and the floor-verifier re-passes. That is the step, in
+full; it is not a design cost.
+
+## Immediate effect & the amended invariant
+
+Eviction + supersession mean the very next read — same scene included — misses the cache and
+serves the corrected chain: pre-theta or pinned → the corrected head verbatim; past theta → a
+fresh reconstruction constrained by the corrected anchor. The within-scene stability invariant
+now reads: *absent a diegetic event **or an authorial correction** on a memory, repeated reads
+within one scene return byte-identical text* (amended 2026-07-17 in CLAUDE.md and architecture
+§7; `test-suite.md` Set C matches). The invariant protects the character from non-diegetic
+flicker; an operator override of wrong data is not flicker.
+
+## Instrumentation (rides the seam)
+
+`correction_ms` + `evicted_cache_rows` in the result; the REPL `:correct` output and debug view
+surface them. No token accounting — this endpoint makes no model calls. `[SETTLE-AT-BUILD]`
+exact field names with the wire shape.
+
+## `[SETTLE-AT-BUILD]` — physical shapes (stop and report, never silently choose)
+
+- Route path/verb; request/response wire models and field names.
+- `valid_at` policy (required vs defaulted; suggested required, tz-aware).
+- Empty/invalid-content validation shape.
+- Concurrency loser behavior (suggested 409, no silent retry).
+- Corrected-chain prompt input shape (suggested: anchor constraint + live head, gist/detail
+  omitted).
+- CLI `:correct` syntax + debug rendering.
+- Error-code mapping (404 / 422 / 409 / 5xx).
+- Walker name + shape — suggested `tests\verify_authorial_correction.py`, scratch-DB pattern.
+
+## Done when
+
+- **Replace-model chain shape.** A correction on a drifted chain: prior head superseded
+  (`invalid_at = t_c`), exactly one live head, `write_cause = authorial_correction`, content
+  **byte-identical to the operator's input**; `observation_text` and gist rows untouched.
+- **Eviction.** All `reconstruction_cache` rows for the memory_id are gone, atomically with the
+  chain write.
+- **No `corrections` row** was written.
+- **Re-anchoring.** `fetch_reconstruction_sources` resolves the anchor to the corrected head.
+- **Constraint follows the anchor, assertably.** The pure assembly function shows the corrected
+  anchor as the fixed constraint on a corrected chain (and gist unchanged as the constraint on
+  an original-anchored chain) — no model call.
+- **Post-correction serving.** Pre-theta / pinned → corrected head verbatim, `read_mode` honest;
+  past theta → reconstructs under the corrected constraint, drift-checked against the corrected
+  anchor, write-back lands (fake providers).
+- **Immediate mid-scene effect.** Within one scene: read → correct → read serves the corrected
+  content (the amended invariant's sanctioned change).
+- **Pin inheritance.** Correcting a pinned memory proceeds; the corrected head serves verbatim;
+  no reconstruction row ever grows on it.
+- **Time travel coherent.** `as_of` before t_c serves the prior telling; at/after t_c the
+  corrected chain.
+- **Concurrency guarded.** A stale supersede (rowcount ≠ 1) changes nothing and reports per the
+  settled loser shape.
+- **Errors loud.** Unknown memory 404; invalid content 422; route is a pass-through of the seam
+  result (ASGITransport JSON-equality, the house pattern).
+- **CLI drivable.** A piped REPL session performs the correction-override beat: read → `:correct`
+  → read, with debug fields visible.
+- **Floors intact, one re-opened deliberately.** `tests\verify_reconstruction.py` re-runs clean
+  against the anchor-cause-aware assembly (its own assertions updated as part of this target);
+  the other three walkers re-run clean untouched; `db\migrate.py` no-arg still a clean no-op
+  (no migration was needed).
+- Every touched `[SETTLE-AT-BUILD]` was reported and confirmed before being built, and recorded
+  in `decisions.md`.

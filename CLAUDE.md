@@ -40,7 +40,8 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
 - Read endpoints always return memory IDs and scores alongside prose. The test suite dies
   without this.
 - Nothing integrator-configurable is ever hardcoded: vocabularies, thresholds, model roles, knobs.
-- Within a scene, absent a diegetic event on a memory, repeated reads return byte-identical text.
+- Within a scene, absent a diegetic event or an authorial correction on a memory, repeated reads
+  return byte-identical text (correction added by the 2026-07-17 authorial-correction ruling).
 
 ## Working discipline
 - IMPORTANT: Build only what the task names. If adjacent work seems necessary, stop and report

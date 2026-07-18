@@ -11,9 +11,10 @@ scene-boundary identity recompile; all settle-shapes ruled in the dated `decisio
 (build-phase stance, 2026-07-13). *(The `.env` DATABASE_URI deviation found during the
 reconstruction build was resolved the same day — Jack pointed it back at `longmem`; no-arg
 `db\migrate.py` verified a clean no-op again.)*
-Next: **the authorial-correction endpoint** (immediate-queue item 1) — small target, the
-correction-override demo beat; it inherits reconstruction's cache-eviction and re-anchoring
-obligations.
+Next: **build the authorial-correction endpoint** (immediate-queue item 1; **specced 2026-07-17**,
+`authorial-correction.md` — four scope forks ruled, incl. constraint-follows-anchor and immediate
+mid-scene effect; the first spec authored under the same-day scope-limiter reframing). A
+**fact-level correction target** was slated as item 2 by explicit ruling.
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -366,19 +367,46 @@ and the structured behavior output survive the interview. Research publication c
   objection, VAD dominance in jsonb, location description column) are now *eligible* for
   re-opening, each its own future ruling. **The authorial-correction spec resumes next — its
   four open forks re-presented fairly priced under the new framing.**
+- **2026-07-17** — **Authorial-correction v1 build target specced** (`authorial-correction.md`)
+  — the first spec session under the scope-limiter reframing (paused mid-forks by that ruling;
+  resumed with all four forks re-presented fairly priced). Jack ruled four scope forks (dated
+  "Authorial-correction spec scope rulings" entry in `decisions.md`): scope = **chain content
+  now + a slated fact-level correction target** (ruled into the immediate queue as item 2,
+  ahead of the gate — versioned memories-row facts + corrected embedding, migration-002-class,
+  own spec session); the reconstructor's **fixed constraint follows the drift anchor** on
+  corrected chains (the recommendation that flipped once floor re-verification was priced as a
+  step — deliberately re-opens the reconstruction floor at build); surface = **memory-scoped
+  operator verb** (the pin pattern; `/v1/events/*` stays diegetic-only) + a REPL `:correct`
+  meta-command; **immediate mid-scene effect**, with the within-scene invariant's wording
+  amended (CLAUDE.md, architecture §7, `test-suite.md` Set C — authorial correction is now the
+  second sanctioned text-change cause). Endpoint design lines: no model calls (operator text
+  byte-verbatim), no `corrections` row (diegetic-only by CHECK), one supersede-guarded
+  transaction with cache eviction, fail-loud operator surface. No migration needed as a fact of
+  this target. Remaining physical shapes tagged `[SETTLE-AT-BUILD]`. Queue renumbered (gate →
+  3, suite → 4) with stale refs updated in `read-path.md`, `cli-harness.md`,
+  `reconstruction.md`. Doc-auditor sweep: **no contradictions**; two residuals fixed and
+  grep-verified — `reconstruction.md` gained the house-style constraint-follows-anchor
+  annotations (scope boundary, reconstructor-input item 1, cache-contract band line — the last
+  hedged as a `[SETTLE-AT-BUILD]` suggestion, not a ruling), and the register's 2026-07-12
+  within-scene-invariant statement gained its amendment note per the annotation convention.
+  Docs only — no code, no floors changed.
 
 ## Immediate queue
 
-1. Authorial-correction endpoint (small target; the correction-override demo beat; inherits
-   reconstruction's cache-eviction + re-anchoring obligations, both stated in
-   `reconstruction.md`).
-2. Mid-dialogue gate + threshold values, efficacy definitions, per-signal fire logging (the
+1. Authorial-correction endpoint — **specced 2026-07-17** (`authorial-correction.md`); build
+   next. The correction-override demo beat; evict-on-write + re-anchoring inherited from
+   `reconstruction.md`; the constraint-follows-anchor delta deliberately re-opens the
+   reconstruction floor at build.
+2. Fact-level correction target (slated by explicit ruling 2026-07-17): versioned memories-row
+   facts + corrected embedding so retrieval follows the fix — migration-002-class design, its
+   own spec session.
+3. Mid-dialogue gate + threshold values, efficacy definitions, per-signal fire logging (the
    block-with-"reconstructing"-signal miss path binds here).
-3. Test-suite scoped session (Sets A-authorial, B, C + degradation cases now runnable).
-4. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
+4. Test-suite scoped session (Sets A-authorial, B, C + degradation cases now runnable).
+5. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
    choreography incl. the 60-day drift beat (its mechanics — `:as-of` jumps + scene boundaries +
    band crossings — are live in the REPL).
-5. Before the demo ships: re-rule the escalation failure path (see open questions) and pick a
+6. Before the demo ships: re-rule the escalation failure path (see open questions) and pick a
    real-provider smoke moment (one live observe + one live dialogue turn + one live
    reconstruction with keys) ahead of demo choreography.
 

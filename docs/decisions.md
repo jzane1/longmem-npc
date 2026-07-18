@@ -116,7 +116,9 @@ pin; unpinning resumes from the frozen head.
    novelty-only; both out → gate closed, serve the loaded set, fail-quiet. Which-signal-fired is
    logged per event; the entity gate's lookup table *is* the identity components table.
 4. **Within-scene text-stability invariant.** Absent a diegetic event on that memory, repeated reads
-   within one scene return byte-identical text. Constrains any future async fallback.
+   within one scene return byte-identical text. Constrains any future async fallback. *(Amended
+   2026-07-17: authorial correction added as the second sanctioned text-change cause — see the
+   "Authorial-correction spec scope rulings" entry.)*
 5. **`typology_source` is a distinct field from provenance** (`lived | injected`).
 6. **Write-time facts vs runtime state.** Facts populate day one; runtime state rides with its
    mechanism. The `write_cause` enum
@@ -885,3 +887,59 @@ Kept deliberately: "the August deadline never drives a decision" (+ `status.md`'
 framing), staged verification and the verifier/auditor agents, the invariants block, and
 `tests\CLAUDE.md`'s structural-only discipline — the reframe makes these enforceable rather
 than replacing them.
+
+## Authorial-correction spec scope rulings — 2026-07-17
+
+Authoring `authorial-correction.md` (the authorial-correction endpoint build target —
+immediate-queue item 1, slated pre-demo by the 2026-07-14 re-slating) required four scope
+rulings. **The first spec session run under the same-day scope-limiter reframing:** the forks
+were presented twice — the pre-reframing presentation was paused by Jack (it became the trigger
+for that ruling); the re-presentation priced the larger options fairly, and one recommendation
+flipped as a direct result.
+
+1. **Scope = chain content now; fact-level correction slated as its own target (explicit
+   questions, two rulings).** This target writes the corrected telling head only. The honest
+   gap it leaves — retrieval still ranks a corrected memory by the original observation's
+   embedding, and gist spans still index the original text — is closed by a slated
+   **fact-level correction target** (versioned memories-row facts + corrected embedding so
+   retrieval follows the fix; migration-002-class design with its own spec pass). Slating
+   position ruled by a second explicit question: **immediate queue, item 2, ahead of the
+   gate** — closing the operator's wrong-data story outranks demo-queue focus. **Rejected:**
+   full fact correction inside this target (the fact-versioning mechanism deserves its own
+   design pass, not a rider); chain-only with no slated follow-up (leaves the
+   retrieval-on-wrong-semantics gap unowned).
+2. **The reconstructor's fixed constraint follows the drift anchor (the flipped
+   recommendation).** On a chain whose derivable anchor is an `authorial_correction` head, the
+   corrected head — not the stale observation gist — is the fixed constraint: one notion of
+   ground truth per chain, with constraint and drift anchor deriving from the same
+   `write_cause` rule. Original-anchored chains are unchanged; the `update_with_resentment`
+   mapping is decided with the dissonance path. Deliberately re-opens the reconstruction floor
+   at build (anchor-cause-aware `assemble_reconstruction_prompt` + walker updates +
+   re-verification) — priced as the step it is. **Rejected:** drift-budget-defends
+   (reconstruction untouched): the constraint and the anchor would disagree about ground truth,
+   and every gist-contradicting reconstruction would burn a model call just to be refused. *(The
+   pre-reframing recommendation had been drift-budget-defends, leaning on "re-opens the floor"
+   as a deterrent — recorded here as the reframing entry intends.)*
+3. **Surface = memory-scoped operator verb** (the `set_pin` pattern; suggested
+   `POST /v1/memories/{memory_id}/correction`, exact shape `[SETTLE-AT-BUILD]`), plus a REPL
+   `:correct` meta-command so the correction-override demo beat is drivable pre-Unity.
+   `/v1/events/*` stays diegetic-only. **Rejected:** an `/v1/events/correction` event — it
+   blurs operator tooling into the in-world namespace, and the future diegetic-correction event
+   would sit beside a differently-shaped sibling.
+4. **Immediate mid-scene effect + invariant amendment.** Eviction + supersession serve the
+   corrected chain on the very next read, mid-scene included. The within-scene stability
+   invariant's wording gains authorial correction as the **second sanctioned text-change
+   cause** (amended in CLAUDE.md, architecture §7, and `test-suite.md` Set C). **Rejected:**
+   defer-to-scene-boundary — fairly priced post-reframing (a migration could house the pending
+   state) and rejected on the merits: it keeps wrong data serving longer to protect the
+   character from a change the operator explicitly chose.
+
+Consequences propagated: `authorial-correction.md` written (design lines: no model calls —
+operator text byte-verbatim; no `corrections` row — diegetic-only by CHECK; one
+supersede-guarded transaction with cache eviction; fail-loud operator surface; remaining
+physical shapes `[SETTLE-AT-BUILD]`); the invariant wording amended in CLAUDE.md + architecture
+§7 + `test-suite.md` Set C; architecture §7's reconstructor-input line and §8's authorial
+bullet annotated; Set A's authorial pair gains the constraint-follows-anchor and
+mid-scene-immediacy assertions; the immediate queue renumbered (fact correction → 2, gate → 3,
+suite → 4, Unity → 5, pre-ship gates → 6) with stale gate/suite refs updated in `read-path.md`,
+`cli-harness.md`, `reconstruction.md`. Docs only — no code, no floors changed.

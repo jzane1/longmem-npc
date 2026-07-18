@@ -60,14 +60,16 @@ scene-frozen decay band** (the pre-demo drift driver); and identity-document plu
 
 ## Scope boundary — do NOT build
 
-The mid-dialogue gate (immediate-queue item 2) — in this slice **every retrieval is dialogue init**,
+The mid-dialogue gate (immediate-queue item 3) — in this slice **every retrieval is dialogue init**,
 so all cache misses resolve inside the pre-warm; the **block-with-"reconstructing"-signal mid-scene
 miss path binds to the gate**, and the signal's wire shape is deliberately **not settled here**.
 The authorial-correction endpoint (item 1) — its obligations toward this layer (evict all cache
 rows for the memory_id; the corrected head re-anchors the drift budget) are stated here and built
-there. The diegetic/dissonance path, reflection (the identity document stays **seed-prose-only**),
+there. *(A third consequence was ruled 2026-07-17 at that target's spec: on
+`authorial_correction`-anchored chains the fixed constraint follows the anchor — an assembly
+change that deliberately re-opens this floor at that build; `authorial-correction.md`.)* The diegetic/dissonance path, reflection (the identity document stays **seed-prose-only**),
 purge, prompt caching, and split-brain per-call weights (post-August). The pytest suite (Set C
-rides item 3; this build ships the structural walker `tests\verify_reconstruction.py`). And **any
+rides item 4; this build ships the structural walker `tests\verify_reconstruction.py`). And **any
 new DB schema or migration** — `reconstruction_cache` and `identity_documents` exist; the
 composed cache key lives in the existing text column. If adjacent work looks necessary, **stop and
 report** rather than expand scope.
@@ -146,7 +148,9 @@ prior telling is included):
 
 1. **Gist spans — fixed constraint.** The full span text, verbatim from `observation_text`
    (`memory_gist_spans` offsets). Never thinned, never dropped; the output must remain consistent
-   with it.
+   with it. *(On `authorial_correction`-anchored chains the corrected head replaces the gist
+   constraint — ruled 2026-07-17, lands with the authorial-correction build;
+   `authorial-correction.md`.)*
 2. **Time-thinned original detail.** The non-gist remainder of `observation_text`, thinned
    deterministically to the band's level (below) — §4.2: decay controls how much detail the
    reconstructor is shown.
@@ -171,7 +175,9 @@ format and quantum knob — suggested `{identity_version}|b{index}` with
 
 - **The band both keys the cache and sets the thinning level.** Same stored key ⇒ same thinning
   input ⇒ (with the write-back below) **byte-identical served text** — the coherence that makes
-  Set C's byte-identity row hold across scenes, not just within one.
+  Set C's byte-identity row hold across scenes, not just within one. *(Corrected-chain input
+  shape is `[SETTLE-AT-BUILD]` in `authorial-correction.md` — suggested there: on those chains
+  the band keys the cache without selecting a thinning slice.)*
 - **Identity bump ⇒ miss. Same identity + same band ⇒ hit** (Set C, as refined by this ruling).
   Deeper decay crosses a band edge ⇒ new key ⇒ re-reconstruction on thinner detail ⇒ the
   **progressive pre-demo drift trajectory** despite the static seed-only identity — the 60-day
@@ -230,7 +236,7 @@ input/output token counts (feeding the per-100-turn cost table), batch size, `ca
 `cache_misses`, `write_backs`, `drift_refusals`, lazy-bootstrap flag. Per-item: `read_mode` is
 already in the payload; the debug view (`render_debug`) grows the reconstruction counters. The
 load driver's aggregate table gains the reconstruction terms (`[SETTLE-AT-BUILD]` shape). No gate
-term — the gate is item 2.
+term — the gate is item 3.
 
 ## `[SETTLE-AT-BUILD]` — physical shapes, ruled at build (stop and report, never silently choose)
 

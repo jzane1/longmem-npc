@@ -197,7 +197,9 @@ falls below theta; text-affecting decay evaluations bind to a scene-frozen basis
 never flips mid-scene). The reconstructor sees the **full gist span as a fixed constraint** plus
 the time-thinned detail slice **plus the current live head — "how you currently tell it" (ruled
 2026-07-17: retellings compound; without the prior telling the drift budget rarely binds)** —
-conditioned on the rendered identity document.
+conditioned on the rendered identity document. *(On a chain whose drift anchor is an
+`authorial_correction` head, the fixed constraint follows the anchor — the corrected head
+replaces the stale gist constraint; ruled 2026-07-17, specced in `authorial-correction.md`.)*
 
 **Write-back with a version chain:** one permanent `memory_id` forever; each retelling inserts a new
 detail row and stamps the prior one superseded — **versioned confabulation over an immutable
@@ -209,7 +211,8 @@ pre-warm at dialogue init; on a mid-scene miss, **block and expose a "reconstruc
 (latency becomes characterization). Async serve-verbatim-then-cache is **not** the design — if
 latency ever forces async, the swap must be explicit state (a `reconstruction_pending` read mode),
 never silent text mutation, because of the **within-scene text-stability invariant**: absent a
-diegetic event on that memory, repeated reads within one scene return byte-identical text.
+diegetic event **or an authorial correction** (the second sanctioned text-change cause, ruled
+2026-07-17) on that memory, repeated reads within one scene return byte-identical text.
 
 **Cache:** keyed `(memory_id × identity_version)`, where the version component **composes
 `identity_version` with a quantized, scene-frozen decay band** (ruled 2026-07-17; the band both
@@ -240,7 +243,11 @@ Habituation guards for the future context term: **both a cap and a decay**, as i
   drifted chain with a corrected head row, `write_cause = authorial_correction`. The memory stays
   retrievable under the same memory_id, now serving corrected content, and the corrected head
   becomes the drift anchor. Prior rows are invalidated by ordinary supersession; the verbs are
-  discriminated by the new head's `write_cause`, not by any marker on prior rows.
+  discriminated by the new head's `write_cause`, not by any marker on prior rows. Takes effect
+  immediately, mid-scene included, and the corrected head becomes the reconstructor's fixed
+  constraint for that chain (both ruled 2026-07-17). *(Specced 2026-07-17,
+  `authorial-correction.md` — chain content only; fact-level correction is its own slated
+  target, immediate-queue item 2.)*
 - **Diegetic** (in-world confrontation; an API event referencing a target `memory_id`): preserves
   the chain and routes through the dissonance path; the new head row is typed `rationalization` or
   `update_with_resentment`, and a correction record is present.

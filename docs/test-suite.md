@@ -20,7 +20,9 @@ Forked into **structural pairs by correction verb**, keyed on `write_cause` — 
 - **Authorial pair (replace model, ruled 2026-07-12):** prior head superseded (`invalid_at` set);
   exactly one new head row typed `authorial_correction`; cache rows for the memory_id evicted; the
   memory ID **present** in retrieval candidates, serving the corrected head; the drift anchor now
-  resolves to that head.
+  resolves to that head; post-correction reconstruction takes the corrected head as its **fixed
+  constraint** (pure prompt-assembly assertion — ruled 2026-07-17); a mid-scene correction changes
+  served text immediately (the amended invariant's sanctioned cause); no `corrections` row.
 - **Diegetic pair:** chain intact; new head row typed `rationalization` or
   `update_with_resentment`; correction record present; cache evicted. *(Lands when the dissonance
   mechanism ships.)*
@@ -44,8 +46,8 @@ moves scores, not rows; detail-hiding assertions land with reconstruction.)*
 - Pinned memories never grow reconstruction chain rows and always read verbatim.
 - Correction verbs evict caches, and cascade or preserve the chain per the two-verb ruling.
 - The drift bound is enforced (over-threshold candidate write is refused; prior head kept).
-- Within-scene text stability: absent a diegetic event on that memory, repeated reads within one
-  scene are byte-identical.
+- Within-scene text stability: absent a diegetic event or an authorial correction on that memory
+  (amended 2026-07-17), repeated reads within one scene are byte-identical.
 
 ## Degradation cases
 
