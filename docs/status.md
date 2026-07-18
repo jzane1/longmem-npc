@@ -7,10 +7,10 @@ retelling out* runs end to end. Five floors stand verified: the migration-01 sch
 **reconstruction v1** (`reconstruction.md` — built & floor-verified 2026-07-17: the serving swap
 with theta on the scene-frozen basis, the decay-band cache, drift-budgeted write-back, and the
 scene-boundary identity recompile; all settle-shapes ruled in the dated `decisions.md` entry).
-**Two open decisions owed:** the escalation hard-stop failure path re-rule (before the demo
-ships; 2026-07-13), and the **`.env` DATABASE_URI pointer** — it now names a nonexistent
-`longmem_sandbox` database (operator-side edit after 2026-07-16; `longmem` itself is intact and
-pristine; no-arg `db\migrate.py` fails to connect until it's resolved — see open questions).
+**One open decision owed before the demo ships:** the escalation hard-stop failure path re-rule
+(build-phase stance, 2026-07-13). *(The `.env` DATABASE_URI deviation found during the
+reconstruction build was resolved the same day — Jack pointed it back at `longmem`; no-arg
+`db\migrate.py` verified a clean no-op again.)*
 Next: **the authorial-correction endpoint** (immediate-queue item 1) — small target, the
 correction-override demo beat; it inherits reconstruction's cache-eviction and re-anchoring
 obligations.
@@ -55,13 +55,6 @@ and the structured behavior output survive the interview. Research publication c
   hard-stops a write when the gist-escalation call fails twice (fail-loud, build-phase tuning
   stance, ruled 2026-07-13). The production/demo behavior — hard-stop vs. some soft degradation —
   must be re-ruled before the demo ships. Not blocking current work.
-- **`.env` DATABASE_URI points at a nonexistent `longmem_sandbox` database (found 2026-07-17
-  during reconstruction verification).** An operator-side `.env` edit after the 2026-07-16 audit;
-  the server holds only `longmem` (intact, pristine) and `postgres`. Consequence: no-arg
-  `db\migrate.py` (and any tool reading the URI as-is) fails to connect; this build verified the
-  schema-frozen criterion via `--database-uri` with the path swapped to `/longmem`, and `.env`
-  was not modified. Jack's call: point the URI back at `longmem`, or create `longmem_sandbox`
-  (and say which DB is the product target going forward).
 - **Two build-surfaced reconstruction shapes flagged for confirmation (built as recorded in the
   2026-07-17 build-rulings entry):** the prior read-side walkers pin `reconstruction_theta = 0`
   in fixture configs (v1 contract asserted with the stage knob-disabled), and blind-check
@@ -343,7 +336,12 @@ and the structured behavior output survive the interview. Research publication c
   **pass** with working postgres MCP tools and independent code spot-checks. **Environment
   deviation found and flagged (not fixed):** `.env`'s DATABASE_URI names a nonexistent
   `longmem_sandbox` DB — no-arg migrate can't connect; the no-op criterion was verified against
-  `/longmem` explicitly (see open questions).
+  `/longmem` explicitly. *(Resolved the same day — see the wrap-up entry below.)*
+- **2026-07-17** — **Wrap-up: the `.env` deviation is closed.** Jack restored `DATABASE_URI` to
+  `longmem`; no-arg `db\migrate.py` re-verified as a clean no-op ("Up to date, 0 pending") — the
+  schema-frozen criterion reads exactly as recorded for every prior floor again. The two
+  build-surfaced reconstruction shapes (prior walkers' `reconstruction_theta = 0` pin;
+  blind-check refusals not cached) remain flagged for confirmation in open questions.
 
 ## Immediate queue
 
@@ -356,9 +354,9 @@ and the structured behavior output survive the interview. Research publication c
 4. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
    choreography incl. the 60-day drift beat (its mechanics — `:as-of` jumps + scene boundaries +
    band crossings — are live in the REPL).
-5. Before the demo ships: re-rule the escalation failure path, resolve the `.env` sandbox pointer
-   (see open questions), and pick a real-provider smoke moment (one live observe + one live
-   dialogue turn + one live reconstruction with keys) ahead of demo choreography.
+5. Before the demo ships: re-rule the escalation failure path (see open questions) and pick a
+   real-provider smoke moment (one live observe + one live dialogue turn + one live
+   reconstruction with keys) ahead of demo choreography.
 
 *(Done 2026-07-17: **Reconstruction v1** — the thesis mechanism is live; see the verified-floors
 table and session log. Done 2026-07-15: **CLI harness v1 + synthetic load driver** — the vertical

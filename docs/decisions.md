@@ -796,4 +796,6 @@ reconstruction latency + cost rows (drift-check embeds ride the embedding price)
 time after the 2026-07-16 audit. Consequence: `python db\migrate.py` **no-arg** fails to connect;
 the schema-frozen criterion was verified the equivalent way (`--database-uri` with the path
 swapped to `/longmem` → "Up to date, 0 pending"). `.env` was not modified; whether to point it
-back at `longmem` or create the sandbox DB is Jack's call.
+back at `longmem` or create the sandbox DB is Jack's call. *[Resolved same day: Jack pointed the
+URI back at `longmem`; no-arg `db\migrate.py` re-verified as a clean no-op — see the status.md
+wrap-up entry.]*
