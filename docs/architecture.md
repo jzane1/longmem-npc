@@ -39,8 +39,9 @@ memory can drift and be defended, while the ground-truth record underneath never
   importance is arguably correct. If dynamic salience ever enters, it enters as a separate runtime
   term.
 - **Schema now, mechanism later.** Schema, caches, and pin behavior are live from day one even where
-  the consuming mechanism lands later. Re-slated 2026-07-14: reconstruction ships **pre-demo**;
-  dissonance and reflection land after the August demo.
+  the consuming mechanism lands later. Sequencing of the mechanisms themselves lives in
+  `status.md`'s queues — and sequencing orders work, it never vetoes a design option (reframed
+  2026-07-17; the 2026-07-14 reconstruction re-slating is the pull-forward template).
 - **Integrator-defined vocabulary everywhere.** Observation phase tags, diagnosticity goal, action
   vocabulary, context-match weights, scene-type vocabulary, model roles, rigidity, reputation
   sensitivity, decay knobs, drift threshold, habituation cap/decay — none is ever hardcoded.
@@ -273,7 +274,7 @@ from a **scene-start snapshot**. *(Built 2026-07-15 in the single-call slice: th
 the delta, applied in-place to `agents.reputation` by an atomic clamped UPDATE; the snapshot is
 caller-frozen scene state — the "Haiku call" wording is the post-August split-brain behavior call.)*
 
-## 10. Reflection & parameter bundles (mechanism deferred)
+## 10. Reflection & parameter bundles (mechanism sequenced later — see `status.md`)
 
 Reflection is an **endpoint** (the verb) — no scheduler. The store exposes **reflection pressure as
 a readable gauge** and the integrator pulls the trigger. Sampling: episodes weighted by

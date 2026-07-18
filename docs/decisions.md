@@ -839,3 +839,49 @@ changes.** The escalation hard-stop failure-path re-rule is now the sole open qu
    **Rejected:** relabeling pinned drifted heads via `_head_mode` (a §6 amendment plus a
    serving-stage change re-opening the reconstruction floor, for a label carrying no information
    the `pinned` flag doesn't already carry).
+
+## Scope-limiter reframing — 2026-07-17
+
+Ruled by Jack after he flagged a standing bias in brainstorm/spec sessions: rules written as
+verification discipline had hardened into design pressure — correct-but-larger options arrived
+pre-labeled "blocked", "deferred", or "would re-open a floor". Surfaced live in the
+authorial-correction spec session (paused mid-forks; its four scope forks are owed a fair
+re-presentation under this ruling). A full sweep of every instruction surface (CLAUDE.md,
+docs\, tests\CLAUDE.md, .claude\ commands and agents) found four limiter families. Four standing
+changes, applied to the living rule surfaces (CLAUDE.md, status.md, architecture.md §2/§10,
+.claude\commands\build-task.md); built specs, prior register entries, and session logs stand as
+history:
+
+1. **The schema freeze is retired as a standing rule.** The schema evolves by numbered
+   migration: when the correct design needs a column, table, or index, the target adds
+   migration `NNN` via the `db\migrate.py` ledger (built for exactly this since 2026-07-13),
+   updates the schema docs, and the floor re-verifies (migrate idempotency + walkers). "No new
+   migration" may appear in a spec only as a per-target scope fact Jack explicitly ruled — never
+   as an inherited default. (The freeze was never tooling; it was a per-target scope fact in
+   `write-path.md` that three later specs inherited as law.) What stays locked on its own
+   grounds: the 1536 embedding dimension and the non-destructive invariants. The freeze's
+   recorded casualties — the idempotency/dedup column, the scene-boundary schema home, the
+   reputation-history schema objection, VAD dominance in jsonb, the location-description
+   column — become *eligible* for re-opening; each is its own future ruling when a target
+   touches it, and none is re-opened by this entry.
+2. **Sequencing, not veto.** `status.md`'s "Post-August ledger" is renamed **"Sequenced-later
+   ledger (pull-forward eligible)"** with the standing rule: any sequenced item may be pulled
+   into the immediate queue by a dated ruling when a current target shows it is architecturally
+   load-bearing — the 2026-07-14 reconstruction re-slating is the template. Sequencing orders
+   work; it never rules an option out of a design discussion. The "revisit only if demo latency
+   demands" phrasing (prompt caching) is struck for "revisit when a target needs it or demo
+   latency demands" — the old wording forbade revisiting for correctness reasons. The dated
+   deferral rulings themselves stand; this entry changes what they mean going forward.
+3. **Floors are re-openable.** Re-running walkers + the floor-verifier is the normal cost of a
+   design improvement, never an argument against one; options must state re-verification as the
+   step it is, not as a design cost. (Staged verification itself is untouched — it is what makes
+   this rule safe.)
+4. **Reports carry the correct option.** The stop-and-report contract (CLAUDE.md working
+   discipline; `/build-task` Phase 2) now requires the architecturally correct option to appear
+   in every report even when it exceeds the task's scope, with its real cost stated — "bigger
+   than this task" is a sequencing note, never a rejection reason.
+
+Kept deliberately: "the August deadline never drives a decision" (+ `status.md`'s deadline
+framing), staged verification and the verifier/auditor agents, the invariants block, and
+`tests\CLAUDE.md`'s structural-only discipline — the reframe makes these enforceable rather
+than replacing them.

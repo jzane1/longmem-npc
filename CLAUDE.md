@@ -21,6 +21,11 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
 ## Stack constants — do not substitute
 - FastAPI; psycopg v3 with AsyncConnectionPool; hand-written SQL. No ORM, no query builder.
 - UUID primary keys minted server-side. Embedding dimension 1536, locked.
+- The schema evolves by numbered migration (ruled 2026-07-17). When the correct design needs a
+  column, table, or index, the target adds migration NNN via the db\migrate.py ledger, updates
+  the schema docs, and the floor re-verifies (migrate idempotency + walkers). "No new migration"
+  may appear in a spec only as a per-target scope fact Jack explicitly ruled — never as an
+  inherited default.
 - Every model role (importance, render, typology, escalation, reconstruction, reputation,
   reflection, dialogue) has its own env var. The retrieval gate is non-LLM — there is no gate model.
 - Python formatting: ruff, enforced mechanically by a PostToolUse hook. Don't hand-format.
@@ -42,9 +47,15 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
   instead of expanding scope.
 - Stop and report on: ambiguity, a failed verification, any [SETTLE-AT-BUILD] tag, any conflict
   between the task and docs/. Never resolve an architectural fork yourself — surface it.
-  Decisions are Jack's.
+  Decisions are Jack's. The report must include the architecturally correct option even when it
+  exceeds the task's scope, with its real cost stated — "bigger than this task" is a sequencing
+  note, never a rejection reason (ruled 2026-07-17).
 - Staged verification: verify each layer against the known-good layer beneath it before building
   on top. Renamed or ported code is re-verified before it counts as a floor.
+- Floors are re-openable (ruled 2026-07-17). The walkers and floor-verifier exist to make
+  revision safe and cheap — re-running them is the normal cost of a design improvement, never an
+  argument against one. When presenting options, state re-verification as the step it is, not as
+  a design cost.
 - The August deadline never drives a decision. Flag deadline pressure; never act on it without
   Jack's explicit confirmation.
 - Instrument at the seam: when building a layer, add its timing and token accounting in the

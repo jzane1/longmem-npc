@@ -28,7 +28,10 @@ content of the plan; Jack's approval of it exits plan mode into Phase 2.
 - Follow the approved plan. Build only what the task names.
 - Stop and report — never guess — on: ambiguity in the task or spec, any [SETTLE-AT-BUILD] tag,
   any conflict between the task and docs\, any failed check. A report = the problem, the options
-  with tradeoffs, then wait.
+  with tradeoffs, then wait. The options must include the architecturally correct one even when
+  it exceeds this task's scope, with its real cost stated — "bigger than this task" is a
+  sequencing note, never a rejection reason; re-verifying an existing floor is a step, not a
+  design cost (ruled 2026-07-17).
 - If the same check fails twice for the same cause, stop and report rather than iterating
   blindly.
 

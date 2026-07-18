@@ -349,6 +349,23 @@ and the structured behavior output survive the interview. Research publication c
   serving-stage claim; `pinned` rides in every payload — observation closed, no spec amendment).
   No code, no floors touched. **The escalation hard-stop failure-path re-rule is now the sole
   open question.**
+- **2026-07-17** — **Scope-limiter reframing (rules + docs; ruled by Jack).** The
+  authorial-correction spec session was paused when Jack flagged a standing bias: rules written
+  as verification discipline had hardened into design pressure — correct-but-larger options
+  arrived pre-labeled "blocked", "deferred", or "would re-open a floor". A full sweep of every
+  instruction surface (CLAUDE.md, docs\, tests\CLAUDE.md, .claude\) found four limiter families;
+  Jack ruled the reframe (dated "Scope-limiter reframing" entry in `decisions.md`). Changes:
+  CLAUDE.md gains the schema-evolves-by-migration rule, the floors-are-re-openable line, and the
+  full-options report contract; this file's "Post-August ledger" renamed **"Sequenced-later
+  ledger (pull-forward eligible)"** with the standing pull-forward rule, and "revisit only if
+  demo latency demands" struck; architecture §2/§10 sequencing clauses became pointers to the
+  queues; `/build-task` Phase 2's report contract amended. Kept deliberately: the
+  deadline-never-drives rule, staged verification, the invariants, structural-only tests. Built
+  specs, old register entries, and session logs stand as history. The freeze's recorded
+  casualties (idempotency/dedup column, scene-boundary schema home, reputation history's schema
+  objection, VAD dominance in jsonb, location description column) are now *eligible* for
+  re-opening, each its own future ruling. **The authorial-correction spec resumes next — its
+  four open forks re-presented fairly priced under the new framing.**
 
 ## Immediate queue
 
@@ -397,12 +414,19 @@ access.)*
   pre-demo).
 - README destructive-compression counter-example pick.
 
-## Post-August ledger
+## Sequenced-later ledger (pull-forward eligible)
 
-Reflection pipeline mechanism (explicitly post-August — hedge resolved 2026-07-14; the pre-demo
+*Sequencing orders work; it never rules an option out of a design discussion. Any item here may
+be pulled into the immediate queue by a dated ruling when a current target shows it is
+architecturally load-bearing — the 2026-07-14 reconstruction re-slating is the template.
+(Reframed from "Post-August ledger" by the 2026-07-17 "Scope-limiter reframing" ruling in
+`decisions.md`.)*
+
+Reflection pipeline mechanism (sequenced post-August — hedge resolved 2026-07-14; the pre-demo
 identity document is seed-prose-only); dissonance path + the diegetic suite pair; the purge
 endpoint (before the public flip — ruled 2026-07-14); prompt caching / prompt-head rebuild
-(revisit only if demo latency demands — ruled 2026-07-14); encoding-context read term +
+(revisit when a target needs it or demo latency demands — reframed 2026-07-17 from the ruled
+"only if demo latency demands" wording); encoding-context read term +
 habituation; split-brain topology with per-call weights and re-run cost/latency instrumentation;
 reflection → parameter compiler; Unity Package Manager packaging; docs final + public flip
 (Apache-2.0). *(Reconstruction — mechanism, drift budget, Set C scenarios — moved off this ledger
