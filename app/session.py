@@ -14,6 +14,13 @@ the injected snapshot does not change until `scene()` re-reads it. The
 scene-boundary reputation-snapshot consumer (deferred in write-v1) lands
 here, per the 2026-07-14 re-slating.
 
+Since the reconstruction build (2026-07-17) the frozen scene state also
+carries `identity_version` (returned by the scene-boundary handler's
+server-side recompile — the hybrid plumbing ruling) and `scene_started_at`
+(the boundary's world time — the basis for every text-affecting decay
+evaluation, so read-mode and served text cannot flip mid-scene). Both pass
+through every turn, exactly like the reputation snapshot.
+
 `as_of` is the session's time-travel surface: when set, it rides retrieval's
 age computation AND becomes the client_timestamp of `observe()` events, so a
 whole session can be driven at an injected world time (tests\\CLAUDE.md).
@@ -31,7 +38,7 @@ from uuid import UUID
 
 from psycopg_pool import AsyncConnectionPool
 
-from app import db
+from app import db, identity
 from app.config import Settings, agent_knob, load_settings
 from app.db import build_pool
 from app.dialogue import DialogueService
@@ -72,6 +79,8 @@ class SessionRunner:
         self.agent_id = agent_id
         self.phase_tag = phase_tag  # passthrough label on observe events
         self.reputation_snapshot: float = 0.0  # set by _refresh_snapshot
+        self.identity_version: str | None = None  # frozen at scene boundaries
+        self.scene_started_at: datetime | None = None  # the scene basis
         self.as_of: datetime | None = None  # session time-travel override
         self.debug: bool = False  # rendering hint; inert to the seams
 
@@ -112,15 +121,24 @@ class SessionRunner:
             agent_id=agent_id,
             phase_tag=phase_tag,
         )
-        await runner._refresh_snapshot()  # loud UnknownAgentError at startup
+        # Session start is an implicit scene start: freeze the snapshot, the
+        # identity version (ensured directly, the _refresh_snapshot precedent
+        # — no boundary event is emitted), and the scene basis.
+        state = await runner._refresh_snapshot()  # loud UnknownAgentError
+        version, _rendered, _created = await identity.ensure_identity_document(
+            pool, agent_id, state.seed_identity
+        )
+        runner.identity_version = version
+        runner.scene_started_at = runner._now()
         return runner
 
     def _now(self) -> datetime:
         return self.as_of if self.as_of is not None else datetime.now(timezone.utc)
 
-    async def _refresh_snapshot(self) -> float:
+    async def _refresh_snapshot(self) -> db.DialogueAgentState:
         """Read the reputation scalar into the frozen snapshot (NULL row value
-        -> the agent's neutral point; nothing hardcoded)."""
+        -> the agent's neutral point; nothing hardcoded). Returns the fetched
+        agent state so callers can reuse it without a second read."""
         state = await db.fetch_dialogue_agent_state(self._pool, self.agent_id)
         if state is None:
             raise UnknownAgentError(f"unknown agent_id {self.agent_id}")
@@ -129,7 +147,7 @@ class SessionRunner:
             if state.reputation is not None
             else agent_knob(state.config, "reputation_neutral", self._settings)
         )
-        return self.reputation_snapshot
+        return state
 
     async def utterance(
         self,
@@ -139,7 +157,7 @@ class SessionRunner:
         action_vocabulary: list[str] | None = None,
         k: int | None = None,
     ) -> DialogueTurnResult:
-        """One dialogue turn through the seam, under the frozen snapshot."""
+        """One dialogue turn through the seam, under the frozen scene state."""
         return await self._dialogue.run_dialogue_turn(
             DialogueTurnRequest(
                 agent_id=self.agent_id,
@@ -149,6 +167,8 @@ class SessionRunner:
                 action_vocabulary=action_vocabulary,
                 k=k,
                 as_of=self.as_of,
+                identity_version=self.identity_version,
+                scene_started_at=self.scene_started_at,
                 debug=self.debug,
             )
         )
@@ -166,9 +186,11 @@ class SessionRunner:
         )
 
     async def scene(self, scene_type: str | None = None) -> SceneResult:
-        """Scene boundary: emit the event (accept + instrument), then refresh
-        the frozen snapshot — the next scene's prompt sees the accumulated
-        reputation; within the ending scene it never moved."""
+        """Scene boundary: emit the event (whose handler recompiles the
+        identity document server-side and returns its version), then refresh
+        every piece of frozen scene state — the next scene sees the
+        accumulated reputation, the current identity version, and a new
+        basis; within the ending scene none of them moved."""
         result = await self._ingest.scene_boundary(
             SceneBoundaryEvent(
                 agent_id=self.agent_id,
@@ -177,6 +199,8 @@ class SessionRunner:
             )
         )
         await self._refresh_snapshot()
+        self.identity_version = result.identity_version
+        self.scene_started_at = self._now()
         return result
 
     async def pin(self, memory_id: UUID, pinned: bool) -> PinResult:

@@ -176,8 +176,9 @@ anyway. The **scene boundary is a load-bearing, explicit client-sent API event**
 consumers: prompt-head rebuild, identity-document recompile, reputation snapshot. Scene edges settle
 prefix, identity version, and reputation in one heartbeat. *(Consumer slating ruled 2026-07-14:
 reputation snapshot lands with the dialogue turn — **landed 2026-07-15**, the session-runner
-re-reads `agents.reputation` at each boundary; identity recompile with reconstruction — pre-demo,
-**specced 2026-07-17** (`reconstruction.md`: server-side recompile returning `identity_version`);
+re-reads `agents.reputation` at each boundary; identity recompile with reconstruction —
+**landed 2026-07-17**, the boundary handler recompiles server-side and returns
+`identity_version`, which the session-runner freezes as scene state (`reconstruction.md`);
 prompt-head rebuild / prompt caching is post-August.)*
 
 **Read-mode boundary (self-describing, not just documented):** every returned memory carries
@@ -187,7 +188,7 @@ unpinned past the threshold → reconstructed. A fourth enum value, `reconstruct
 only if an async fallback is ever adopted. **Docs purity claim:** no raw access through the
 character read path, except integrator-designated pins; ground truth lives in the debug view.
 
-## 7. Reconstruction (pre-demo scope, ruled 2026-07-14; specced `reconstruction.md` 2026-07-17; schema, caches, and pin behavior already live)
+## 7. Reconstruction (pre-demo scope, ruled 2026-07-14; **built & floor-verified 2026-07-17**, `reconstruction.md`)
 
 Identity-conditioned reconstruction is the **mandatory read path** for unpinned memories past a
 threshold theta, where **theta reuses the decay math** (reconstruct when decayed detail strength

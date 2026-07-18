@@ -29,7 +29,7 @@ from uuid import UUID
 
 from psycopg_pool import AsyncConnectionPool
 
-from app import db, nlp
+from app import db, identity, nlp
 from app.config import Settings, agent_knob
 from app.db import InsertPlan, SpanPlan
 from app.providers import (
@@ -403,15 +403,25 @@ class IngestService:
     # ------------------------------------------------------------------ #
 
     async def scene_boundary(self, event: SceneBoundaryEvent) -> SceneResult:
+        """Scene edge. Since the reconstruction build (2026-07-17) this
+        handler carries its first server-side consumer: the identity-document
+        recompile (render seed prose -> content hash -> upsert), returning
+        identity_version for the caller to freeze as scene state (the hybrid
+        plumbing ruling; the reputation snapshot stays caller-side in the
+        session-runner, and the prompt-head rebuild remains post-August)."""
         t_total = time.perf_counter()
         agent = await db.fetch_agent(self._pool, event.agent_id)
         if agent is None:
             raise UnknownAgentError(f"unknown agent_id {event.agent_id}")
-        # v1 writes no schema; the three consumers are deferred (write-path.md).
+        version, _rendered, created = await identity.ensure_identity_document(
+            self._pool, event.agent_id, agent["seed_identity"]
+        )
         return SceneResult(
             agent_id=event.agent_id,
             accepted=True,
             total_ms=_ms(time.perf_counter() - t_total),
+            identity_version=version,
+            identity_document_new=created,
         )
 
     # ------------------------------------------------------------------ #

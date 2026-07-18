@@ -3,11 +3,12 @@
     tau_effective = tau_base(decay_class) * (1 + k_importance * importance_raw)
     recency       = exp(-age / tau_effective)        # age clamped at >= 0
 
-Consumers: the read path's recency score component (app\\retrieval.py) now;
-the reconstruction theta check (immediate-queue item 1) imports these same
-functions when it lands — ruled with the read-path build (2026-07-14): the
-recency term and detail decay share tau_effective exactly. Architecture's
-decayed detail strength is this same exponential (decay = 1 - recency).
+Consumers: the read path's recency score component (app\\retrieval.py) and
+the reconstruction theta/band evaluation (app\\reconstruction.py, landed
+2026-07-17) — ruled with the read-path build (2026-07-14): the recency term
+and detail decay share tau_effective exactly. Architecture's decayed detail
+strength is this same exponential (decay = 1 - recency); reconstruction
+evaluates it at the scene-frozen basis, scoring at the per-call as_of.
 
 Invariant note (CLAUDE.md): recency decay and bi-temporal invalidation are
 distinct mechanisms. Everything in this module moves scores only — candidacy

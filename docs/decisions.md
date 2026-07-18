@@ -717,3 +717,83 @@ tagged `[SETTLE-AT-BUILD]` (theta knob, band quantum + key composition, thinning
 refusal caching, scene-state request fields, scene-boundary response shape, hash algorithm /
 NULL-seed / unknown-version shapes, wire-model + instrumentation deltas, walker shape). These are
 ruled at reconstruction's build, not now. Docs only — no code, no floors changed.
+
+## Reconstruction build rulings — 2026-07-17
+
+Reconstruction v1 built and floor-verifier-passed the same day (structural walker
+`tests\verify_reconstruction.py`, 41 assertions; all three prior walkers re-run clean on fresh
+scratch — 35/35, 34/34, 36/36; `longmem` confirmed pristine via the postgres MCP, whose tools
+worked this dispatch). Jack ruled the two genuine forks via explicit questions at plan approval;
+the spec's remaining settle-shapes were approved with the plan.
+
+1. **Fake-mode drift = locality-sensitive fake embedding (ruled, explicit question).**
+   `FakeEmbeddingProvider` was rewritten from shake_256 hash vectors to **lowercased character
+   trigrams hashed into the 1536 buckets, L2-normalized** — still deterministic, offline, keyless,
+   but similar texts now get similar vectors, so fake-mode retrieval relevance and reconstruction
+   drift distances are meaningful. Build-surfaced fork: the hash fake made ANY two texts nearly
+   orthogonal (~1.0 cosine distance), so every fake-mode reconstruction would have been refused at
+   any sane threshold — offline dev, the load driver, and the walker happy path would never
+   exercise write-back at default knobs. **Rejected:** keep-orthogonal (drift observable only in
+   real mode) and a provider-mode-conditional drift check (violates the cli-harness principle that
+   the service is identical under either provider). Empirically: an echo-style retelling lands
+   ~0.04 from its anchor; unrelated text ~1.0.
+2. **`drift_budget_threshold` default = 0.35 (ruled, explicit question).** Cosine distance,
+   per-agent overridable (`agents.config`, the `agent_knob` pattern; migration 01 slotted the
+   drift threshold there from day one). Paraphrase-level retellings (~0.05–0.25 on real
+   embeddings) pass; candidates that left the event's semantic neighborhood refuse. **Rejected:**
+   0.25 (crystallizes early — flattens the 60-day beat) and 0.5 (the budget becomes a backstop
+   only).
+
+Approved-with-plan shapes, as built: knobs `reconstruction_theta` **0.5** /
+`reconstruction_band_quantum` **0.25** (band = `floor((1−strength)/quantum)` capped at the last
+band; thinning level = the band's midpoint strength; composed key `{identity_version}|b{index}`
+in the cache's existing text column); deterministic dependency-free thinning
+(sentence-split on `(?<=[.!?])\s+`, per-segment prefix retention `ceil(level × n)`, min 1 — no
+spaCy on the read path); batched JSON-in-text call (system = optional `[identity]` block +
+`[task]`; user = a JSON list of `{memory_id, gist, detail, current_telling}` sorted by memory_id;
+response = ONLY a JSON object memory_id → retelling; per-item salvage; pure
+`assemble_reconstruction_prompt`); single attempt, fail-quiet; drift check embeds candidate +
+anchor **at check time** in one batched embed call (chain rows have no embedding column;
+`memories.embedding` embeds the observation, not the render); write-back supersedes and inserts
+**at the scene basis** (prior head `invalid_at` = new head `valid_at` = basis — a coherent chain
+timeline under `as_of` time travel, and the precedent the authorial endpoint inherits); refusal
+caches the served prior text under the current key; scene-state request fields
+`identity_version` + `scene_started_at` (both optional; absent → basis falls back to
+`as_of_effective` and the identity document lazy-bootstraps, flagged); unknown version →
+`UnknownIdentityVersionError` → **422** at the route; `SceneResult` gains `identity_version` +
+`identity_document_new` (additive defaults); sha256 full hex; NULL seed renders the empty string
+(hashed) with the identity block omitted; `RealReconstructionProvider` max_tokens
+`min(1024 × batch, 8192)` (batch-safe variant of the provider-internal 1024 pattern);
+`read_mode` literal widens to `verbatim | reconstructed` (`reconstruction_pending` stays
+unadopted); instrumentation deltas all defaulted (`reconstruction_ms` / input / output /
+embed tokens, `cache_hits/misses`, `write_backs`, `drift_refusals`,
+`identity_version_effective`, `identity_bootstrapped`); load-driver aggregates gain the
+reconstruction latency + cost rows (drift-check embeds ride the embedding price); walker
+`tests\verify_reconstruction.py` on the scratch pattern.
+
+**Build-surfaced shapes (flagged for Jack's confirmation, built as follows):**
+
+- **Prior walkers pin `reconstruction_theta = 0.0` in their fixture agent configs** (one config
+  key + comment each; assertion bodies untouched — verified by the floor-verifier against git).
+  Their fixtures age past the default theta, so without the pin the swap would change what they
+  serve; theta = 0 knob-disables the stage per agent, so they still assert the v1 serving
+  contract byte-for-byte — which doubles as proof the swap is transparent when disabled. The
+  swapped behavior is the new walker's floor.
+- **Blind-check refusals are not cached:** a drift-check **embedding failure** refuses the
+  write-back (fail-closed) but does NOT cache the served prior text — a transient embedding
+  outage never permanently pins a key. True over-threshold refusals do cache, as ruled.
+- **Cache-hit `detail_id` corner (documented):** after backwards time travel a cached telling can
+  predate the current live head; the cache row is still served (same key ⇒ byte-identical text),
+  `detail_id` identifies the live chain head, `content` the key's telling.
+- **Pin-after-reconstruction read_mode (floor-verifier observation, spec-compliant):** a memory
+  reconstructed in an earlier scene and pinned afterward serves its `reconstruction`-cause head
+  as `read_mode = "verbatim"` — the spec's "pinned → verbatim, always" wins as written; noted as
+  the one spot where read-mode names the pin rule rather than the served row's cause.
+
+**Environment deviation found during verification (operational, not a ruling — needs Jack):**
+`.env`'s `DATABASE_URI` now names a database `longmem_sandbox` that does not exist on the server
+(the server has `longmem`, intact and pristine, and `postgres` only) — an operator-side edit some
+time after the 2026-07-16 audit. Consequence: `python db\migrate.py` **no-arg** fails to connect;
+the schema-frozen criterion was verified the equivalent way (`--database-uri` with the path
+swapped to `/longmem` → "Up to date, 0 pending"). `.env` was not modified; whether to point it
+back at `longmem` or create the sandbox DB is Jack's call.

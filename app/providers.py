@@ -2,15 +2,21 @@
 
 Two write-path roles (write-path.md §Model provider interfaces) plus the
 escalation call ruled into v1 (2026-07-13), plus the dialogue role (the
-CLI-harness build, 2026-07-15):
+CLI-harness build, 2026-07-15), plus the reconstruction role (the
+reconstruction build, 2026-07-17):
   - the single Haiku write call (render + importance + typology-when-absent),
   - the LLM-escalation gist call (hard cases, biased loose),
   - the embedding call (text-embedding-3-small @ 1536, locked),
   - the single Sonnet-class dialogue call (prose + action directive +
-    reputation delta in one structured output; cli-harness.md).
+    reputation delta in one structured output; cli-harness.md),
+  - the batched Haiku-class reconstruction call (all cache misses of one
+    retrieval in one structured call; reconstruction.md).
 
 Every fake is deterministic: same input -> byte-identical output, offline and
 keyless, so the structural suite never asserts on prose and CI needs no keys.
+The fake embedding is LOCALITY-SENSITIVE (ruled 2026-07-17): similar texts
+get similar vectors, so fake-mode retrieval relevance and reconstruction
+drift distances are meaningful, not hash noise.
 Failure-injection fakes live here too — the degradation ladder is tested per
 model call (architecture §2).
 
@@ -24,7 +30,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-import struct
+import math
 import time
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -119,6 +125,31 @@ class DialogueCallResult:
     first_token_ms: float  # 0.0 on the fake; measured on the streaming real call
 
 
+@dataclass(frozen=True)
+class ReconstructionItem:
+    """One cache-missed memory prepared for the batched retelling call
+    (reconstruction.md call contract): the fixed gist, the band-thinned
+    original detail, and the current live telling. memory_id is the UUID
+    string — the JSON key of the batched output contract."""
+
+    memory_id: str
+    gist: str
+    thinned_detail: str
+    current_telling: str
+
+
+@dataclass(frozen=True)
+class ReconstructionCallResult:
+    """Parsed batched output: memory_id -> retelling. Per-item salvage
+    (reconstruction.md ladder): an entry that is missing, empty, or not a
+    string simply has no key here, and that item alone degrades at the seam;
+    the call still counts as succeeded and its spend is accounted."""
+
+    retellings: dict[str, str]
+    input_tokens: int
+    output_tokens: int
+
+
 # ---------------------------------------------------------------------------
 # Interfaces
 # ---------------------------------------------------------------------------
@@ -158,6 +189,21 @@ class DialogueProvider(Protocol):
     def generate(
         self, *, system_prompt: str, utterance: str, vocabulary: list[str]
     ) -> DialogueCallResult: ...
+
+
+class ReconstructionProvider(Protocol):
+    """`system_prompt` and `user_content` are fully assembled at the seam
+    (app\\reconstruction.py's pure assembly owns the block shape, the dialogue
+    precedent); `items` rides separately so the deterministic fake can derive
+    stable retellings from the structured inputs."""
+
+    def reconstruct(
+        self,
+        *,
+        system_prompt: str,
+        user_content: str,
+        items: list[ReconstructionItem],
+    ) -> ReconstructionCallResult: ...
 
 
 # ---------------------------------------------------------------------------
@@ -225,15 +271,30 @@ class FakeEscalationProvider:
 
 
 class FakeEmbeddingProvider:
-    """Stable pseudo-embedding: shake_256(text) -> 1536 floats in [-1, 1]."""
+    """Locality-sensitive deterministic pseudo-embedding (ruled 2026-07-17,
+    superseding the original shake_256 hash vectors): lowercased character
+    trigrams hashed into the 1536 buckets, counted, L2-normalized. Similar
+    texts get similar vectors, so fake-mode retrieval relevance and the
+    reconstruction drift check are meaningful — the hash fake made any two
+    texts nearly orthogonal, which would have refused every fake-mode
+    write-back at any sane drift threshold."""
 
     def embed(self, texts: list[str]) -> EmbedResult:
         vectors: list[list[float]] = []
         tokens = 0
         for text in texts:
-            raw = hashlib.shake_256(text.encode()).digest(EMBEDDING_DIM * 4)
-            ints = struct.unpack(f">{EMBEDDING_DIM}I", raw)
-            vectors.append([(i / 2**31) - 1.0 for i in ints])
+            counts = [0.0] * EMBEDDING_DIM
+            lowered = text.lower()
+            grams = (
+                [lowered[i : i + 3] for i in range(len(lowered) - 2)]
+                if len(lowered) >= 3
+                else [lowered]
+            )
+            for gram in grams:
+                digest = hashlib.sha256(gram.encode()).digest()
+                counts[int.from_bytes(digest[:4], "big") % EMBEDDING_DIM] += 1.0
+            norm = math.sqrt(sum(c * c for c in counts)) or 1.0
+            vectors.append([c / norm for c in counts])
             tokens += len(text.split())
         return EmbedResult(vectors=vectors, tokens=tokens)
 
@@ -258,6 +319,40 @@ class FakeDialogueProvider:
             input_tokens=len(system_prompt.split()) + len(utterance.split()),
             output_tokens=len(prose.split()),
             first_token_ms=0.0,
+        )
+
+
+class FakeReconstructionProvider:
+    """Deterministic retelling: the current telling plus a short marker hashed
+    from every input (identity document via the system prompt, gist, thinned
+    detail, telling) — so an identity bump or a band crossing changes the
+    output, byte-identical inputs reproduce it, and the echo shape keeps the
+    candidate NEAR the anchor under the trigram fake embedding (the happy
+    path passes the default drift budget; compounding markers slowly spend
+    it, which is the drift dynamic in miniature)."""
+
+    def reconstruct(
+        self,
+        *,
+        system_prompt: str,
+        user_content: str,
+        items: list[ReconstructionItem],
+    ) -> ReconstructionCallResult:
+        retellings: dict[str, str] = {}
+        input_tokens = len(system_prompt.split()) + len(user_content.split())
+        output_tokens = 0
+        for item in items:
+            marker = hashlib.sha256(
+                f"{system_prompt}|{item.gist}|{item.thinned_detail}"
+                f"|{item.current_telling}".encode()
+            ).hexdigest()[:8]
+            text = f"{item.current_telling} [retold {marker}]"
+            retellings[item.memory_id] = text
+            output_tokens += len(text.split())
+        return ReconstructionCallResult(
+            retellings=retellings,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
         )
 
 
@@ -311,6 +406,44 @@ class MalformedDialogueProvider:
     def generate(self, **_kwargs) -> DialogueCallResult:
         raise MalformedOutputError(
             "injected malformed dialogue output", input_tokens=7, output_tokens=3
+        )
+
+
+class FailingReconstructionProvider:
+    """Reconstruction-call failure: fail-quiet — the affected items serve
+    their live heads with honest read_mode; nothing is written."""
+
+    def reconstruct(self, **_kwargs) -> ReconstructionCallResult:
+        raise ProviderCallError("injected reconstruction-call failure")
+
+
+class MalformedReconstructionProvider:
+    """Call 'succeeds' but the batched output is unparseable: every item
+    degrades, token spend accounted."""
+
+    def reconstruct(self, **_kwargs) -> ReconstructionCallResult:
+        raise MalformedOutputError(
+            "injected malformed reconstruction output", input_tokens=7, output_tokens=3
+        )
+
+
+class DriftingReconstructionProvider:
+    """Emits a retelling with no trigram overlap with any English fixture —
+    cosine distance from the anchor ~1.0 under the fake embedding, so the
+    drift budget must refuse the write-back at the default threshold."""
+
+    def reconstruct(
+        self,
+        *,
+        system_prompt: str,
+        user_content: str,
+        items: list[ReconstructionItem],
+    ) -> ReconstructionCallResult:
+        text = "xyzzq plughz " * 12
+        return ReconstructionCallResult(
+            retellings={item.memory_id: text.strip() for item in items},
+            input_tokens=len(system_prompt.split()) + len(user_content.split()),
+            output_tokens=len(text.split()) * len(items),
         )
 
 
@@ -600,6 +733,63 @@ class RealDialogueProvider:
         )
 
 
+class RealReconstructionProvider:
+    """Anthropic Haiku-class batched retelling call (reconstruction.md).
+
+    Output contract (build ruling 2026-07-17, JSON-in-text per the
+    write/escalation/dialogue precedent): ONLY a JSON object mapping each
+    memory_id to its retelling string. The instructions live in the
+    seam-assembled system prompt; this class enforces the parse side with
+    per-item salvage (a non-string entry drops; the object-level shape must
+    parse). max_tokens scales with the batch (1024 per item, capped at 8192 —
+    a fixed 1024 would truncate large batches)."""
+
+    def __init__(self, settings: Settings):
+        import anthropic
+
+        self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        self._model = settings.model_reconstruction
+
+    def reconstruct(
+        self,
+        *,
+        system_prompt: str,
+        user_content: str,
+        items: list[ReconstructionItem],
+    ) -> ReconstructionCallResult:
+        try:
+            response = self._client.messages.create(
+                model=self._model,
+                max_tokens=min(1024 * max(len(items), 1), 8192),
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_content}],
+            )
+        except Exception as exc:
+            raise ProviderCallError(f"reconstruction call failed: {exc}") from exc
+        input_tokens = response.usage.input_tokens
+        output_tokens = response.usage.output_tokens
+        try:
+            payload = json.loads(response.content[0].text)
+            if not isinstance(payload, dict):
+                raise ValueError("batched output is not a JSON object")
+        except (ValueError, TypeError, json.JSONDecodeError, IndexError) as exc:
+            raise MalformedOutputError(
+                f"reconstruction output unparseable: {exc}",
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+            ) from exc
+        retellings = {
+            str(key): value
+            for key, value in payload.items()
+            if isinstance(value, str) and value
+        }
+        return ReconstructionCallResult(
+            retellings=retellings,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+
+
 class RealEmbeddingProvider:
     """OpenAI text-embedding-3-small @ 1536 (locked)."""
 
@@ -626,13 +816,16 @@ class RealEmbeddingProvider:
 
 @dataclass(frozen=True)
 class Providers:
-    # `dialogue` defaults to the fake so pre-harness constructions (the
-    # write/read structural walkers) stand unchanged; build_providers always
-    # sets it explicitly.
+    # `dialogue` and `reconstruction` default to their fakes so pre-existing
+    # constructions (the earlier structural walkers) stand unchanged;
+    # build_providers always sets them explicitly.
     write: WriteProvider
     escalation: EscalationProvider
     embedding: EmbeddingProvider
     dialogue: DialogueProvider = field(default_factory=FakeDialogueProvider)
+    reconstruction: ReconstructionProvider = field(
+        default_factory=FakeReconstructionProvider
+    )
 
 
 def build_providers(settings: Settings) -> Providers:
@@ -643,10 +836,12 @@ def build_providers(settings: Settings) -> Providers:
             escalation=RealEscalationProvider(settings),
             embedding=RealEmbeddingProvider(settings),
             dialogue=RealDialogueProvider(settings),
+            reconstruction=RealReconstructionProvider(settings),
         )
     return Providers(
         write=FakeWriteProvider(),
         escalation=FakeEscalationProvider(),
         embedding=FakeEmbeddingProvider(),
         dialogue=FakeDialogueProvider(),
+        reconstruction=FakeReconstructionProvider(),
     )

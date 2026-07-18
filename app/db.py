@@ -14,6 +14,15 @@ memories (`memories.invalid_at IS NULL`) joined to the unique live detail
 head (`memory_details.invalid_at IS NULL`; uniqueness guaranteed by the
 one-live-head index). Invalidation excludes rows here, in SQL — decay never
 does (the two mechanisms stay distinct).
+
+Reconstruction (reconstruction.md, built 2026-07-17) writes through
+`write_back_reconstruction`: ONE transaction that supersedes the prior head
+(sets invalid_at — ordinary non-destructive supersession, never an UPDATE of
+content), inserts the new `reconstruction` head, and inserts the cache row —
+the serve-only-persisted-text rule rides on this atomicity. The cache tables'
+only writers live in the reconstruction path (the eviction invariant's
+precondition); `upsert_identity_document` is insert-if-absent (versions are
+content-addressed and immutable once written).
 """
 
 from __future__ import annotations
@@ -43,13 +52,19 @@ def build_pool(database_uri: str) -> AsyncConnectionPool:
 async def fetch_agent(pool: AsyncConnectionPool, agent_id: UUID) -> dict | None:
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
-            "SELECT agent_id, diagnosticity_goal, config FROM agents WHERE agent_id = %s",
+            "SELECT agent_id, diagnosticity_goal, config, seed_identity "
+            "FROM agents WHERE agent_id = %s",
             (agent_id,),
         )
         row = await cur.fetchone()
     if row is None:
         return None
-    return {"agent_id": row[0], "diagnosticity_goal": row[1], "config": row[2] or {}}
+    return {
+        "agent_id": row[0],
+        "diagnosticity_goal": row[1],
+        "config": row[2] or {},
+        "seed_identity": row[3],
+    }
 
 
 async def fetch_live_components(
@@ -225,7 +240,9 @@ async def insert_observation(
 
 @dataclass(frozen=True)
 class CandidateRow:
-    """One live memory joined to its live detail head, as retrieval reads it."""
+    """One live memory joined to its live detail head, as retrieval reads it.
+    `write_cause` (added at the reconstruction build) feeds read-mode honesty:
+    a served head that is itself a reconstruction row reads as such."""
 
     memory_id: UUID
     detail_id: UUID
@@ -234,12 +251,13 @@ class CandidateRow:
     pinned: bool
     decay_class: str | None
     valid_at: datetime
+    write_cause: str
     distance: float | None = None  # cosine distance; None on the degraded path
 
 
 _CANDIDATE_COLUMNS = (
     "m.memory_id, d.detail_id, d.content, m.importance_raw, m.pinned, "
-    "m.decay_class, m.valid_at"
+    "m.decay_class, m.valid_at, d.write_cause"
 )
 _CANDIDATE_FROM = (
     "FROM memories m JOIN memory_details d "
@@ -358,3 +376,171 @@ async def apply_reputation_delta(
     if row is None:
         return None
     return float(row[0]), float(row[1])
+
+
+# ---------------------------------------------------------------------------
+# Reconstruction (reconstruction.md, built 2026-07-17): identity documents,
+# the (memory_id x composed-key) cache, retelling sources, and the write-back.
+# ---------------------------------------------------------------------------
+
+
+async def upsert_identity_document(
+    pool: AsyncConnectionPool, agent_id: UUID, rendered_text: str, identity_version: str
+) -> bool:
+    """Insert-if-absent (versions are content-addressed and immutable once
+    written). Returns True when this call created the row."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "INSERT INTO identity_documents (agent_id, rendered_text, "
+            "identity_version) VALUES (%s, %s, %s) "
+            "ON CONFLICT (agent_id, identity_version) DO NOTHING",
+            (agent_id, rendered_text, identity_version),
+        )
+        return cur.rowcount == 1
+
+
+async def fetch_identity_document(
+    pool: AsyncConnectionPool, agent_id: UUID, identity_version: str
+) -> str | None:
+    """rendered_text for a caller-passed version; None = unknown version
+    (a loud contract error at the seam, never a silent fallback)."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT rendered_text FROM identity_documents "
+            "WHERE agent_id = %s AND identity_version = %s",
+            (agent_id, identity_version),
+        )
+        row = await cur.fetchone()
+    return row[0] if row is not None else None
+
+
+async def fetch_cache_rows(
+    pool: AsyncConnectionPool, pairs: list[tuple[UUID, str]]
+) -> dict[tuple[UUID, str], str]:
+    """Batched cache lookup: {(memory_id, composed_key): rendered_text}. The
+    stored identity_version column carries the composed reconstruction key
+    (identity_version + decay band — spec ruling 2026-07-17)."""
+    if not pairs:
+        return {}
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT c.memory_id, c.identity_version, c.rendered_text "
+            "FROM reconstruction_cache c "
+            "JOIN unnest(%s::uuid[], %s::text[]) AS t(memory_id, identity_version) "
+            "ON c.memory_id = t.memory_id "
+            "AND c.identity_version = t.identity_version",
+            ([m for m, _ in pairs], [k for _, k in pairs]),
+        )
+        rows = await cur.fetchall()
+    return {(row[0], row[1]): row[2] for row in rows}
+
+
+async def insert_cache_row(
+    pool: AsyncConnectionPool, memory_id: UUID, composed_key: str, rendered_text: str
+) -> None:
+    """Refusal caching (spec ruling 2026-07-17): the served prior-head text is
+    cached under the current key so subsequent same-key reads are stable and
+    call-free. No chain write rides with this one."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "INSERT INTO reconstruction_cache (memory_id, identity_version, "
+            "rendered_text) VALUES (%s, %s, %s) "
+            "ON CONFLICT (memory_id, identity_version) DO NOTHING",
+            (memory_id, composed_key, rendered_text),
+        )
+
+
+@dataclass(frozen=True)
+class ReconstructionSource:
+    """Per-memory retelling inputs: the immutable observation text, ordered
+    gist span offsets, and the drift anchor's content (the latest chain row
+    whose write_cause is in the anchor set — derivable, no pointer)."""
+
+    observation_text: str
+    spans: list[tuple[int, int]]
+    anchor_content: str
+
+
+async def fetch_reconstruction_sources(
+    pool: AsyncConnectionPool, memory_ids: list[UUID]
+) -> dict[UUID, ReconstructionSource]:
+    if not memory_ids:
+        return {}
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT memory_id, observation_text FROM memories "
+            "WHERE memory_id = ANY(%s)",
+            (memory_ids,),
+        )
+        texts = {row[0]: row[1] for row in await cur.fetchall()}
+        await cur.execute(
+            "SELECT memory_id, start_char, end_char FROM memory_gist_spans "
+            "WHERE memory_id = ANY(%s) ORDER BY memory_id, start_char, end_char",
+            (memory_ids,),
+        )
+        spans: dict[UUID, list[tuple[int, int]]] = {}
+        for row in await cur.fetchall():
+            spans.setdefault(row[0], []).append((row[1], row[2]))
+        # The drift anchor: latest chain row with an anchoring write_cause
+        # (original | authorial_correction | update_with_resentment);
+        # rationalization and reconstruction rows never re-anchor.
+        await cur.execute(
+            "SELECT DISTINCT ON (memory_id) memory_id, content "
+            "FROM memory_details WHERE memory_id = ANY(%s) "
+            "AND write_cause IN "
+            "('original', 'authorial_correction', 'update_with_resentment') "
+            "ORDER BY memory_id, created_at DESC",
+            (memory_ids,),
+        )
+        anchors = {row[0]: row[1] for row in await cur.fetchall()}
+    return {
+        memory_id: ReconstructionSource(
+            observation_text=texts[memory_id],
+            spans=spans.get(memory_id, []),
+            anchor_content=anchors[memory_id],
+        )
+        for memory_id in texts
+        if memory_id in anchors
+    }
+
+
+async def write_back_reconstruction(
+    pool: AsyncConnectionPool,
+    *,
+    memory_id: UUID,
+    prior_detail_id: UUID,
+    content: str,
+    basis: datetime,
+    composed_key: str,
+) -> UUID | None:
+    """The retelling write-back: ONE transaction — supersede the prior head at
+    the scene basis (world time; ordinary non-destructive supersession),
+    insert the new `reconstruction` head (valid_at = the same basis, so the
+    chain timeline is coherent under as_of time travel), and insert the cache
+    row. Serve-only-persisted-text rides on this atomicity. Returns the new
+    detail_id, or None when the prior head was already superseded (a
+    concurrent writer won; nothing is changed)."""
+    async with pool.connection() as conn:
+        async with conn.transaction():
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "UPDATE memory_details SET invalid_at = %s "
+                    "WHERE detail_id = %s AND invalid_at IS NULL",
+                    (basis, prior_detail_id),
+                )
+                if cur.rowcount != 1:
+                    return None
+                await cur.execute(
+                    "INSERT INTO memory_details (memory_id, content, write_cause, "
+                    "valid_at) VALUES (%s, %s, 'reconstruction', %s) "
+                    "RETURNING detail_id",
+                    (memory_id, content, basis),
+                )
+                detail_id = (await cur.fetchone())[0]
+                await cur.execute(
+                    "INSERT INTO reconstruction_cache (memory_id, identity_version, "
+                    "rendered_text) VALUES (%s, %s, %s) "
+                    "ON CONFLICT (memory_id, identity_version) DO NOTHING",
+                    (memory_id, composed_key, content),
+                )
+    return detail_id

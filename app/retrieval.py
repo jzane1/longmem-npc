@@ -8,21 +8,29 @@ module; neither duplicates the timing or token accounting recorded here
 Pipeline per dialogue-init request:
   resolve agent + knobs -> embed the query probe (as-is) -> vector over-fetch
   -> score (relevance x recency x importance_norm; pin exemption) -> top-k
-  -> serve verbatim.
+  -> SERVE via the reconstruction stage (app\\reconstruction.py, built
+  2026-07-17): theta partition at the scene-frozen basis, cache keyed
+  (memory_id, identity_version + decay band), batched retelling of the
+  misses with drift-budgeted write-back, read_mode = "reconstructed" past
+  theta — pinned and fresh rows serve their live heads verbatim.
 
 Retrieval (candidates + scoring) and serving (text assembly + read-mode
-stamping) are deliberately separate stages: reconstruction (immediate-queue
-item 1) swaps the SERVING stage only — theta check, cache keyed
-(memory_id, identity_version), read_mode = "reconstructed" — and its
-pre-warm hooks this same seam. Retrieval and scoring stay untouched by that
-swap.
+stamping) are deliberately separate stages: the reconstruction build swapped
+the SERVING stage only; retrieval and scoring are byte-for-byte the
+read-path v1 logic, and scores are unchanged by the swap. Since that build
+this seam WRITES on read (chain write-backs + cache rows) — architecture §7
+mandates write-back on the read path; read-v1's read-only SQL was a scope
+fact of verbatim-only serving, not a principle.
 
-Degradation ladder (read, ruled 2026-07-14):
+Degradation ladder (read, ruled 2026-07-14; reconstruction rows 2026-07-17):
   - query-embedding failure -> FAIL-QUIET fallback: rank ALL live candidates
     (NULL-embedding rows included) by recency x importance_norm; the item
     relevance component is null (none was computed); degraded = true +
     reason. The read analog of never-lose-a-write is never-blank-a-dialogue.
   - empty/short store -> 0..k items, never an error (a valid young-NPC state).
+  - reconstruction-stage failures (call, drift embed, persistence) degrade
+    soft per reconstruction.md's ladder: affected items serve their live
+    heads with honest read_mode; degraded = true + reason.
 """
 
 from __future__ import annotations
@@ -38,11 +46,11 @@ from app import db, decay
 from app.config import Settings, agent_knob
 from app.ingest import UnknownAgentError
 from app.providers import ProviderCallError, Providers
+from app.reconstruction import ReconstructionService
 from app.schemas import (
     DialogueInitRequest,
     RetrievalInstrumentation,
     RetrievalResult,
-    RetrievedMemory,
 )
 
 
@@ -63,6 +71,9 @@ class RetrievalService:
         self._pool = pool
         self._providers = providers
         self._settings = settings
+        # The serving stage (reconstruction.md): constructed here so neither
+        # caller (route, session-runner) changes its wiring.
+        self._reconstruction = ReconstructionService(pool, providers, settings)
 
     async def retrieve_dialogue_init(
         self, request: DialogueInitRequest
@@ -150,24 +161,19 @@ class RetrievalService:
         top = scored[:k]
         score_ms = _ms(time.perf_counter() - t0)
 
-        # --- serving: verbatim-only v1 (ruled 2026-07-14) --------------------
-        items = [
-            RetrievedMemory(
-                memory_id=row.memory_id,
-                detail_id=row.detail_id,
-                content=row.content,
-                read_mode="verbatim",
-                pinned=row.pinned,
-                score=score,
-                relevance=rel,
-                recency=rec,
-                importance_norm=imp,
-                importance_raw=raw,
-            )
-            for score, rel, rec, imp, raw, row in top
-        ]
+        # --- serving: the reconstruction stage (reconstruction.md, built
+        # 2026-07-17) — swapped in over verbatim-only v1; retrieval and
+        # scoring above are untouched.
+        outcome = await self._reconstruction.serve(
+            request=request,
+            config=config,
+            seed_identity=agent["seed_identity"],
+            scored_top=top,
+            as_of=as_of,
+        )
+        reasons = [r for r in (degraded_reason, outcome.degraded_reason) if r]
         return RetrievalResult(
-            items=items,
+            items=outcome.items,
             instrumentation=RetrievalInstrumentation(
                 embed_ms=embed_ms,
                 sql_ms=sql_ms,
@@ -176,8 +182,18 @@ class RetrievalService:
                 embedding_tokens=embed_tokens,
                 candidate_count=len(candidates),
                 k_effective=k,
-                degraded=degraded_reason is not None,
-                degraded_reason=degraded_reason,
+                degraded=bool(reasons),
+                degraded_reason="; ".join(reasons) if reasons else None,
                 as_of_effective=as_of,
+                reconstruction_ms=outcome.reconstruction_ms,
+                reconstruction_input_tokens=outcome.input_tokens,
+                reconstruction_output_tokens=outcome.output_tokens,
+                reconstruction_embed_tokens=outcome.embed_tokens,
+                cache_hits=outcome.cache_hits,
+                cache_misses=outcome.cache_misses,
+                write_backs=outcome.write_backs,
+                drift_refusals=outcome.drift_refusals,
+                identity_version_effective=outcome.identity_version,
+                identity_bootstrapped=outcome.identity_bootstrapped,
             ),
         )

@@ -61,6 +61,12 @@ NOW = datetime(2026, 7, 14, 12, 0, 0, tzinfo=timezone.utc)
 AGENT_CONFIG = {
     "decay_classes": {"episodic": 86400, "semantic": 604800},
     "decay_class_default": "episodic",
+    # Reconstruction (built 2026-07-17) swapped the serving stage this walker
+    # verifies in its v1 form. theta = 0 knob-disables the stage per agent
+    # (strength is always > 0), so these fixtures still assert the read-path
+    # v1 contract byte-for-byte — proving the swap is transparent when
+    # disabled. The swapped behavior is verify_reconstruction.py's floor.
+    "reconstruction_theta": 0.0,
 }
 
 # Seed corpus: text -> injected valid_at age. TWIN_* share one text so their

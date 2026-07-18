@@ -64,6 +64,11 @@ AGENT_CONFIG = {
     "decay_class_default": "episodic",
     "action_vocabulary": VOCAB,
     "dialogue_fallback_line": FALLBACK_LINE,
+    # theta = 0 knob-disables the reconstruction serving stage (built
+    # 2026-07-17) so this walker keeps asserting the CLI-harness v1 contract
+    # over verbatim serving; the swapped behavior is verify_reconstruction.py's
+    # floor (same rationale as verify_read_path.py's pin).
+    "reconstruction_theta": 0.0,
 }
 
 T_FORGE = "Mara sharpened my blade at the forge while John watched."

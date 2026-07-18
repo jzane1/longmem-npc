@@ -55,10 +55,11 @@ not re-derive.
 
 ## Scope boundary — do NOT build
 
-The mid-dialogue gate and its degradation ladder (immediate-queue item 3); prompt caching /
+The mid-dialogue gate and its degradation ladder (immediate-queue item 2); prompt caching /
 prompt-head rebuild (post-August); **reconstruction serving — theta check, cache reads/writes,
-pre-warm, `reconstructed` read_mode** (immediate-queue item 1, next on the retrieval seam) — every
-retrieved memory is served **verbatim**, as the read path already ships; the split-brain behavior
+pre-warm, `reconstructed` read_mode** (landed on the retrieval seam 2026-07-17,
+`reconstruction.md`) — in this slice every
+retrieved memory was served **verbatim**, as the read path then shipped; the split-brain behavior
 call and per-call weight overrides (post-August); reflection; correction endpoints; purge;
 identity-document recompile (rides with reconstruction) — the slice's identity document is
 **seed-prose-only**; a dialogue-turn **HTTP route** (rides with the Unity client surface — the

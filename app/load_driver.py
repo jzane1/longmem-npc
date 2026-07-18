@@ -189,6 +189,9 @@ def _aggregate(
     series = {
         "retrieval_sql": [t.instrumentation.retrieval.sql_ms for t in turns],
         "query_embed": [t.instrumentation.retrieval.embed_ms for t in turns],
+        "reconstruction": [
+            t.instrumentation.retrieval.reconstruction_ms for t in turns
+        ],
         "first_token": [t.instrumentation.sonnet_first_token_ms for t in turns],
         "dialogue_total": [t.instrumentation.sonnet_ms for t in turns],
         "turn_total": [t.instrumentation.total_ms for t in turns],
@@ -216,8 +219,17 @@ def _aggregate(
     write_out = sum(o.instrumentation.haiku_output_tokens for o in observes)
     esc_in = sum(o.instrumentation.escalation_input_tokens for o in observes)
     esc_out = sum(o.instrumentation.escalation_output_tokens for o in observes)
-    embed_tokens = sum(o.instrumentation.embedding_tokens for o in observes) + sum(
-        t.instrumentation.retrieval.embedding_tokens for t in turns
+    recon_in = sum(
+        t.instrumentation.retrieval.reconstruction_input_tokens for t in turns
+    )
+    recon_out = sum(
+        t.instrumentation.retrieval.reconstruction_output_tokens for t in turns
+    )
+    embed_tokens = (
+        sum(o.instrumentation.embedding_tokens for o in observes)
+        + sum(t.instrumentation.retrieval.embedding_tokens for t in turns)
+        # Drift-check embeddings ride the same embedding role/price.
+        + sum(t.instrumentation.retrieval.reconstruction_embed_tokens for t in turns)
     )
     embed_usd = (
         round(embed_tokens * prices["embedding"] / 1e6, 6)
@@ -244,13 +256,20 @@ def _aggregate(
                 esc_in, esc_out, "escalation_in", "escalation_out"
             ),
         },
+        "reconstruction": {
+            "input_tokens_per_100_turns": per_100(recon_in),
+            "output_tokens_per_100_turns": per_100(recon_out),
+            "usd_per_100_turns": usd(
+                recon_in, recon_out, "reconstruction_in", "reconstruction_out"
+            ),
+        },
         "embedding": {
             "tokens_per_100_turns": per_100(embed_tokens),
             "usd_per_100_turns": embed_usd,
         },
     }
     # Scale the USD table to per-100-turns too, when priced at all.
-    for row in ("dialogue", "write", "escalation"):
+    for row in ("dialogue", "write", "escalation", "reconstruction"):
         if cost[row]["usd_per_100_turns"] is not None:
             cost[row]["usd_per_100_turns"] = round(
                 cost[row]["usd_per_100_turns"] * 100.0 / n_turns, 6
@@ -266,6 +285,11 @@ def _aggregate(
         "latency_ms": latency,
         "per_100_turns": cost,
         "degraded_turns": sum(1 for t in turns if t.instrumentation.degraded),
+        "write_backs": sum(t.instrumentation.retrieval.write_backs for t in turns),
+        "drift_refusals": sum(
+            t.instrumentation.retrieval.drift_refusals for t in turns
+        ),
+        "cache_hits": sum(t.instrumentation.retrieval.cache_hits for t in turns),
     }
 
 
@@ -273,6 +297,11 @@ def _print_report(report: dict) -> None:
     print(
         f"\nagent {report['agent_id']} — {report['turns']} turns, "
         f"{report['observes']} observes, {report['degraded_turns']} degraded"
+    )
+    print(
+        f"reconstruction: {report['write_backs']} write-backs, "
+        f"{report['cache_hits']} cache hits, "
+        f"{report['drift_refusals']} drift refusals"
     )
     print("\nlatency (ms)                p50        p95")
     for name, row in report["latency_ms"].items():

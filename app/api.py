@@ -28,6 +28,7 @@ from app.ingest import (
 )
 from app.nlp import warm_pipelines
 from app.providers import build_providers
+from app.reconstruction import UnknownIdentityVersionError
 from app.retrieval import RetrievalService
 from app.schemas import (
     DialogueInitRequest,
@@ -63,12 +64,17 @@ app = FastAPI(title="longmem-npc API", version="1", lifespan=_lifespan)
 
 @app.post("/v1/dialogue/init", response_model=RetrievalResult)
 async def dialogue_init(request: DialogueInitRequest) -> RetrievalResult:
-    """Dialogue-init retrieval (read-path.md wire shape, ruled 2026-07-14).
-    Reconstruction's pre-warm hooks this same endpoint at item 1."""
+    """Dialogue-init retrieval (read-path.md wire shape, ruled 2026-07-14) —
+    since the reconstruction build (2026-07-17) this endpoint also serves the
+    pre-warm: past-theta items reconstruct (write-back + cache) before the
+    response returns. An unknown caller-passed identity_version is a broken
+    contract, not a flaky model -> 422 (the unknown-agent 404 precedent)."""
     try:
         return await app.state.retrieval.retrieve_dialogue_init(request)
     except UnknownAgentError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except UnknownIdentityVersionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @app.post("/v1/events/observe", response_model=IngestResult)

@@ -9,7 +9,9 @@ call serves render + importance + typology in ONE Haiku call, so at startup
 in real mode the three role vars must name the same model — divergence is a
 loud config error, never a silent pick (ruled with the write-path plan,
 2026-07-13). The dialogue role (LONGMEM_MODEL_DIALOGUE, cli-harness build
-2026-07-15) is the vertical slice's single Sonnet-class call.
+2026-07-15) is the vertical slice's single Sonnet-class call. The
+reconstruction role (LONGMEM_MODEL_RECONSTRUCTION, reconstruction build
+2026-07-17) is the Haiku-class batched retelling call (reconstruction.md).
 
 Service-level defaults below are integrator-overridable per agent via
 `agents.config` keys of the same name (nothing integrator-configurable is
@@ -40,6 +42,7 @@ ENV_MODEL_RENDER = "LONGMEM_MODEL_RENDER"
 ENV_MODEL_TYPOLOGY = "LONGMEM_MODEL_TYPOLOGY"
 ENV_MODEL_ESCALATION = "LONGMEM_MODEL_ESCALATION"
 ENV_MODEL_DIALOGUE = "LONGMEM_MODEL_DIALOGUE"
+ENV_MODEL_RECONSTRUCTION = "LONGMEM_MODEL_RECONSTRUCTION"
 ENV_PROVIDER_MODE = "LONGMEM_PROVIDER_MODE"
 
 # Optional per-Mtok USD prices (CLI-harness build ruling, 2026-07-15): cost
@@ -52,6 +55,8 @@ PRICE_ENV_KEYS: dict[str, str] = {
     "LONGMEM_PRICE_WRITE_OUT": "write_out",
     "LONGMEM_PRICE_ESCALATION_IN": "escalation_in",
     "LONGMEM_PRICE_ESCALATION_OUT": "escalation_out",
+    "LONGMEM_PRICE_RECONSTRUCTION_IN": "reconstruction_in",
+    "LONGMEM_PRICE_RECONSTRUCTION_OUT": "reconstruction_out",
     "LONGMEM_PRICE_EMBEDDING": "embedding",
 }
 
@@ -100,6 +105,17 @@ SERVICE_DEFAULTS: dict[str, float] = {
     "reputation_scale_max": 1.0,
     "reputation_neutral": 0.0,
     "reputation_sensitivity_default": 1.0,
+    # --- reconstruction (reconstruction.md; build rulings 2026-07-17) -------
+    # Reconstruct when decayed detail strength (= decay.recency at the
+    # scene-frozen basis) falls below theta. Pinned rows are exempt.
+    "reconstruction_theta": 0.5,
+    # Band quantum: band_index = floor((1 - strength) / quantum). The band
+    # composes the cache key with identity_version AND sets the thinning
+    # level (the band's midpoint strength), so same key => same input.
+    "reconstruction_band_quantum": 0.25,
+    # Drift budget: refuse a reconstruction write-back whose embedding's
+    # cosine distance from the anchor exceeds this (ruled 2026-07-17).
+    "drift_budget_threshold": 0.35,
 }
 
 
@@ -128,6 +144,7 @@ def load_env(path: Path = ENV_PATH) -> dict[str, str]:
             ENV_MODEL_TYPOLOGY,
             ENV_MODEL_ESCALATION,
             ENV_MODEL_DIALOGUE,
+            ENV_MODEL_RECONSTRUCTION,
         }
         | set(PRICE_ENV_KEYS)
     )
@@ -146,6 +163,7 @@ class Settings:
     model_write: str = ""  # the single write-call model (render+importance+typology)
     model_escalation: str = ""
     model_dialogue: str = ""  # the single-call dialogue role (cli-harness.md)
+    model_reconstruction: str = ""  # the batched retelling role (reconstruction.md)
     anthropic_api_key: str = field(default="", repr=False)
     openai_api_key: str = field(default="", repr=False)
     defaults: dict[str, float] = field(default_factory=lambda: dict(SERVICE_DEFAULTS))
@@ -175,6 +193,7 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
     model_write = ""
     model_escalation = ""
     model_dialogue = ""
+    model_reconstruction = ""
     anthropic_key = ""
     openai_key = ""
     if mode == "real":
@@ -183,6 +202,7 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         typology = env.get(ENV_MODEL_TYPOLOGY, "")
         escalation = env.get(ENV_MODEL_ESCALATION, "")
         dialogue = env.get(ENV_MODEL_DIALOGUE, "")
+        reconstruction = env.get(ENV_MODEL_RECONSTRUCTION, "")
         missing = [
             name
             for name, value in (
@@ -191,6 +211,7 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
                 (ENV_MODEL_TYPOLOGY, typology),
                 (ENV_MODEL_ESCALATION, escalation),
                 (ENV_MODEL_DIALOGUE, dialogue),
+                (ENV_MODEL_RECONSTRUCTION, reconstruction),
             )
             if not value
         ]
@@ -209,6 +230,7 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         model_write = importance
         model_escalation = escalation
         model_dialogue = dialogue
+        model_reconstruction = reconstruction
         anthropic_key = env.get("ANTHROPIC_API_KEY", "")
         openai_key = env.get("OPENAI_API_KEY", "")
         if not anthropic_key:
@@ -232,6 +254,7 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         model_write=model_write,
         model_escalation=model_escalation,
         model_dialogue=model_dialogue,
+        model_reconstruction=model_reconstruction,
         anthropic_api_key=anthropic_key,
         openai_api_key=openai_key,
         prices=prices,

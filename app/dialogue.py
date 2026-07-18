@@ -191,13 +191,17 @@ class DialogueService:
             vocabulary = [str(v) for v in configured] if configured else []
             vocabulary_configured = configured is not None
 
-        # --- retrieval: the built read seam, passed through unreinterpreted --
+        # --- retrieval: the built read seam, passed through unreinterpreted
+        # (incl. the caller-frozen scene state — reconstruction build
+        # 2026-07-17; past-theta items reconstruct inside this call).
         retrieval = await self._retrieval.retrieve_dialogue_init(
             DialogueInitRequest(
                 agent_id=request.agent_id,
                 query_text=request.utterance,
                 k=request.k,
                 as_of=request.as_of,
+                identity_version=request.identity_version,
+                scene_started_at=request.scene_started_at,
             )
         )
 

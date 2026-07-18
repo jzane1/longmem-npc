@@ -145,11 +145,18 @@ class IngestResult(BaseModel):
 
 
 class SceneResult(BaseModel):
-    """Accept + instrument only (v1): no schema is written."""
+    """Scene boundary result. Since the reconstruction build (2026-07-17) the
+    handler recompiles the identity document server-side and returns its
+    version — the boundary's first server-side consumer; the caller freezes
+    `identity_version` as scene state (the reputation-snapshot contract).
+    `identity_document_new` is True when this version's row was inserted (an
+    unchanged seed re-hashes to the existing version)."""
 
     agent_id: UUID
     accepted: bool
     total_ms: float
+    identity_version: str | None = None
+    identity_document_new: bool = False
 
 
 class PinResult(BaseModel):
@@ -198,8 +205,16 @@ class DialogueInitRequest(BaseModel):
     event_time: datetime | None = None  # RESERVED — inert in v1
     weight_overrides: WeightOverrides | None = None  # RESERVED — inert in v1
     as_of: datetime | None = None  # defaults to server now (UTC)
+    # Caller-frozen scene state (reconstruction build 2026-07-17): the
+    # identity version returned by the last scene boundary, and the boundary's
+    # world time — the basis for every text-affecting decay evaluation (theta,
+    # band, thinning), so read-mode and served text cannot flip mid-scene.
+    # Absent -> the basis falls back to as_of_effective and the identity
+    # document lazy-bootstraps; an unknown version is a loud contract error.
+    identity_version: str | None = None
+    scene_started_at: datetime | None = None
 
-    @field_validator("event_time", "as_of")
+    @field_validator("event_time", "as_of", "scene_started_at")
     @classmethod
     def _tz_aware(cls, value: datetime | None) -> datetime | None:
         if value is not None and value.tzinfo is None:
@@ -212,9 +227,11 @@ class RetrievedMemory(BaseModel):
     suite asserts on this structure, never on prose)."""
 
     memory_id: UUID
-    detail_id: UUID  # the served live head (Set A's corrected-head surface)
-    content: str  # the live head's text, verbatim (v1 serving ruling)
-    read_mode: Literal["verbatim"]  # widens when reconstruction lands (item 1)
+    detail_id: UUID  # the served detail row (Set A's corrected-head surface)
+    content: str  # the served text: live head, or the reconstruction cache row
+    read_mode: Literal["verbatim", "reconstructed"]  # three-state boundary,
+    # real since the reconstruction build (2026-07-17); honest to what was
+    # actually served — a failed reconstruction serves the head and says so.
     pinned: bool
     score: float  # relevance x recency x importance_norm
     relevance: float | None  # null on the degraded (no-vector) path
@@ -242,6 +259,19 @@ class RetrievalInstrumentation(BaseModel):
     degraded: bool = False
     degraded_reason: str | None = None
     as_of_effective: datetime
+    # Reconstruction serving stage (reconstruction.md, built 2026-07-17).
+    # All defaulted: pre-swap constructions and payload shapes stand. Failures
+    # in the serving stage reuse degraded/degraded_reason above.
+    reconstruction_ms: float = 0.0
+    reconstruction_input_tokens: int = 0
+    reconstruction_output_tokens: int = 0
+    reconstruction_embed_tokens: int = 0  # drift-check embeddings
+    cache_hits: int = 0
+    cache_misses: int = 0
+    write_backs: int = 0
+    drift_refusals: int = 0
+    identity_version_effective: str | None = None
+    identity_bootstrapped: bool = False  # no version passed; ensured lazily
 
 
 class RetrievalResult(BaseModel):
@@ -290,9 +320,13 @@ class DialogueTurnRequest(BaseModel):
     action_vocabulary: list[str] | None = None
     k: int | None = Field(default=None, ge=1)
     as_of: datetime | None = None
+    # Caller-frozen scene state, passed through to retrieval unreinterpreted
+    # (reconstruction build 2026-07-17; the reputation_snapshot precedent).
+    identity_version: str | None = None
+    scene_started_at: datetime | None = None
     debug: bool = False
 
-    @field_validator("as_of")
+    @field_validator("as_of", "scene_started_at")
     @classmethod
     def _tz_aware(cls, value: datetime | None) -> datetime | None:
         if value is not None and value.tzinfo is None:

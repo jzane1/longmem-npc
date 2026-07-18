@@ -13,8 +13,10 @@ Meta-commands (everything else is an utterance):
 
     :observe <text>    store an observation through the write seam
                        (the first :observe loads the NLP models — one-time cost)
-    :scene [type]      scene boundary: emits the event, then re-reads the
-                       frozen reputation snapshot for the next scene
+    :scene [type]      scene boundary: emits the event (the handler recompiles
+                       the identity document and returns its version), then
+                       re-freezes the scene state — reputation snapshot,
+                       identity version, and the scene basis time
     :pin <memory_id>   pin a memory (decay exemption)     :unpin undoes it
     :as-of <iso8601>   drive the session at an injected world time
                        (retrieval age math + observe timestamps);  :as-of clear
@@ -77,7 +79,8 @@ def render_debug(result: DialogueTurnResult) -> str:
         rel = f"{item.relevance:.4f}" if item.relevance is not None else "null"
         lines.append(
             f"  {item.memory_id}  score={item.score:.4f}  rel={rel}  "
-            f"rec={item.recency:.4f}  imp={item.importance_norm:.4f}"
+            f"rec={item.recency:.4f}  imp={item.importance_norm:.4f}  "
+            f"mode={item.read_mode}"
             f"{'  [pinned]' if item.pinned else ''}"
         )
     lines.append("-- structured output --")
@@ -102,6 +105,15 @@ def render_debug(result: DialogueTurnResult) -> str:
         f"score={ret.score_ms}ms total={ret.total_ms}ms "
         f"candidates={ret.candidate_count} k={ret.k_effective}"
         f"{'  [degraded: ' + str(ret.degraded_reason) + ']' if ret.degraded else ''}"
+    )
+    lines.append(
+        f"  recon:     hits={ret.cache_hits} misses={ret.cache_misses} "
+        f"write_backs={ret.write_backs} refusals={ret.drift_refusals} "
+        f"total={ret.reconstruction_ms}ms  tokens "
+        f"in={ret.reconstruction_input_tokens} "
+        f"out={ret.reconstruction_output_tokens} "
+        f"drift_embed={ret.reconstruction_embed_tokens}"
+        f"{'  [bootstrapped]' if ret.identity_bootstrapped else ''}"
     )
     lines.append(
         f"  dialogue:  first_token={ins.sonnet_first_token_ms}ms "
@@ -183,9 +195,16 @@ async def repl(agent_id: UUID, debug: bool) -> None:
                 elif line.startswith(":scene"):
                     scene_type = line[len(":scene") :].strip() or None
                     result = await runner.scene(scene_type)
+                    version = (
+                        f"{result.identity_version[:12]}…"
+                        if result.identity_version
+                        else "none"
+                    )
                     print(
                         f"scene boundary accepted ({result.total_ms}ms); "
-                        f"reputation snapshot -> {runner.reputation_snapshot}"
+                        f"reputation snapshot -> {runner.reputation_snapshot}; "
+                        f"identity {version}"
+                        f"{' (new document)' if result.identity_document_new else ''}"
                     )
                 elif line.startswith((":pin", ":unpin")):
                     command, _, raw_id = line.partition(" ")

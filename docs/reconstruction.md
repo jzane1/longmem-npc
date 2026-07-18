@@ -18,6 +18,19 @@ scene-frozen decay band** (the pre-demo drift driver); and identity-document plu
 **hybrid, reputation-style** (server recompiles at the scene boundary and returns
 `identity_version`; the caller freezes it as scene state and passes it per request).
 
+> **Status: BUILT & floor-verified 2026-07-17.** Every `[SETTLE-AT-BUILD]` item below was ruled at
+> build time (dated "Reconstruction build rulings" entry in `decisions.md`; the two genuine forks
+> — the **locality-sensitive fake embedding** rewrite the drift budget surfaced, and the
+> **`drift_budget_threshold` default 0.35** — were ruled via explicit questions at plan approval,
+> the rest approved with the plan); the rulings are annotated inline. **The build added no new DB
+> migration — the migration-01 schema stayed frozen** (`reconstruction_cache` and
+> `identity_documents` were already live; the composed key rides the existing text column). The
+> serving swap landed in `app\reconstruction.py` + `app\retrieval.py`; identity plumbing in
+> `app\identity.py` + the scene-boundary handler + the session-runner; walker
+> `tests\verify_reconstruction.py` (41 assertions). The two prior read-side walkers pin
+> `reconstruction_theta = 0` in their fixture configs so they keep asserting the v1 serving
+> contract with this stage knob-disabled (build-surfaced shape, flagged in the register).
+
 ## Principles this build honors
 
 - **Non-destructive write-back.** A retelling **inserts** a new `memory_details` head
@@ -47,14 +60,14 @@ scene-frozen decay band** (the pre-demo drift driver); and identity-document plu
 
 ## Scope boundary — do NOT build
 
-The mid-dialogue gate (immediate-queue item 3) — in this slice **every retrieval is dialogue init**,
+The mid-dialogue gate (immediate-queue item 2) — in this slice **every retrieval is dialogue init**,
 so all cache misses resolve inside the pre-warm; the **block-with-"reconstructing"-signal mid-scene
 miss path binds to the gate**, and the signal's wire shape is deliberately **not settled here**.
-The authorial-correction endpoint (item 2) — its obligations toward this layer (evict all cache
+The authorial-correction endpoint (item 1) — its obligations toward this layer (evict all cache
 rows for the memory_id; the corrected head re-anchors the drift budget) are stated here and built
 there. The diegetic/dissonance path, reflection (the identity document stays **seed-prose-only**),
 purge, prompt caching, and split-brain per-call weights (post-August). The pytest suite (Set C
-rides item 4; this build ships the structural walker `tests\verify_reconstruction.py`). And **any
+rides item 3; this build ships the structural walker `tests\verify_reconstruction.py`). And **any
 new DB schema or migration** — `reconstruction_cache` and `identity_documents` exist; the
 composed cache key lives in the existing text column. If adjacent work looks necessary, **stop and
 report** rather than expand scope.
@@ -165,7 +178,7 @@ format and quantum knob — suggested `{identity_version}|b{index}` with
   beat's mechanism.
 - **Eviction invariant (standing, generalized):** cache writes happen only in the reconstruction
   path; **any other writer to a chain — correction, diegetic write, purge — evicts all cache rows
-  for that memory_id** (application code, not triggers). The authorial endpoint (item 2) inherits
+  for that memory_id** (application code, not triggers). The authorial endpoint (item 1) inherits
   this obligation.
 
 ## Write-back & drift budget
@@ -217,32 +230,47 @@ input/output token counts (feeding the per-100-turn cost table), batch size, `ca
 `cache_misses`, `write_backs`, `drift_refusals`, lazy-bootstrap flag. Per-item: `read_mode` is
 already in the payload; the debug view (`render_debug`) grows the reconstruction counters. The
 load driver's aggregate table gains the reconstruction terms (`[SETTLE-AT-BUILD]` shape). No gate
-term — the gate is item 3.
+term — the gate is item 2.
 
 ## `[SETTLE-AT-BUILD]` — physical shapes, ruled at build (stop and report, never silently choose)
 
-- **Theta knob** — name/default; suggested `reconstruction_theta`, default 0.5 (strength below
+**All ruled 2026-07-17 with the build plan** (dated "Reconstruction build rulings" entry in
+`decisions.md`; the two genuine forks were ruled via explicit questions):
+
+- **Theta knob** — **ruled as suggested:** `reconstruction_theta`, default 0.5 (strength below
   theta reconstructs), service default + per-agent override.
-- **Band quantum + key composition** — suggested `reconstruction_band_quantum` 0.25;
-  `{identity_version}|b{index}`; thinning level = the band's midpoint strength.
-- **Thinning function** — deterministic + monotone in the band; suggested sentence-granular
-  prefix retention per contiguous non-gist segment, proportion = the band's level.
-- **Reconstruction prompt block shape + batched output schema** — suggested JSON-in-text keyed by
-  memory_id; per-item salvage; pure-function assembly.
-- **Retry policy** — suggested single attempt, fail-quiet.
-- **Drift metric + knob default** — suggested cosine distance; `drift_budget_threshold` default
-  proposed at build with the fake-provider calibration.
-- **Write-back `valid_at`** — suggested the scene reference time.
-- **Refusal caching** — suggested cache the served prior text under the current key.
-- **Scene-state request fields** — suggested `identity_version` + `scene_started_at` on
-  `DialogueInitRequest`, pass-through on `DialogueTurnRequest`; the session-runner freezes both
-  at `:scene`.
-- **Scene-boundary response shape** — suggested adds `identity_version` (+ a recompiled flag).
-- **Hash algorithm / NULL-seed document / unknown-version error shape** — suggested sha256 hex;
-  empty render + omitted prompt block; loud 4xx-equivalent at the route.
-- **Wire-model + instrumentation deltas** — `read_mode` literal widens to `reconstructed`
-  (`reconstruction_pending` stays **unadopted** — async is not the design); new result fields.
-- **Walker shape** — `tests\verify_reconstruction.py`, scratch-DB pattern per the prior walkers.
+- **Band quantum + key composition** — **ruled as suggested:** `reconstruction_band_quantum`
+  0.25; `{identity_version}|b{index}`; thinning level = the band's midpoint strength; band index
+  capped at the last band.
+- **Thinning function** — **ruled as suggested:** deterministic + monotone — sentence-granular
+  prefix retention per contiguous non-gist segment (`(?<=[.!?])\s+`, retain `ceil(level × n)`,
+  min 1), proportion = the band's level. No spaCy on the read path.
+- **Reconstruction prompt block shape + batched output schema** — **ruled as suggested:**
+  JSON-in-text keyed by memory_id (items sorted by memory_id for byte-stability); per-item
+  salvage; pure-function assembly (`assemble_reconstruction_prompt`).
+- **Retry policy** — **ruled as suggested:** single attempt, fail-quiet.
+- **Drift metric + knob default** — **ruled (explicit questions):** cosine distance;
+  `drift_budget_threshold` default **0.35**; and the calibration surfaced a genuine fork —
+  **`FakeEmbeddingProvider` rewritten locality-sensitive** (trigram-bucket, L2-normalized), since
+  the hash fake made any two texts ~orthogonal and would have refused every fake-mode write-back.
+- **Write-back `valid_at`** — **ruled as suggested:** the scene basis; the superseded head's
+  `invalid_at` is the same basis (coherent chain timeline under time travel).
+- **Refusal caching** — **ruled as suggested**, with a build-surfaced carve-out: a drift-check
+  **embedding failure** (blind check) refuses but does NOT cache, so a transient outage never
+  permanently pins a key.
+- **Scene-state request fields** — **ruled as suggested:** `identity_version` +
+  `scene_started_at` on `DialogueInitRequest`, pass-through on `DialogueTurnRequest`; the
+  session-runner freezes both at `:scene` (and at `create()`, an implicit scene start).
+- **Scene-boundary response shape** — **ruled:** adds `identity_version` +
+  `identity_document_new` (additive defaults).
+- **Hash algorithm / NULL-seed document / unknown-version error shape** — **ruled:** sha256 full
+  hex; empty render + omitted prompt block; `UnknownIdentityVersionError` → **422** at the route.
+- **Wire-model + instrumentation deltas** — **ruled as listed:** `read_mode` literal widens to
+  `reconstructed` (`reconstruction_pending` stays **unadopted** — async is not the design);
+  result fields all defaulted, incl. `identity_version_effective` + `identity_bootstrapped`.
+- **Walker shape** — **ruled:** `tests\verify_reconstruction.py`, 41 assertions, scratch-DB
+  pattern per the prior walkers — which pin `reconstruction_theta = 0` in their fixture configs
+  (build-surfaced shape; see the register entry).
 
 ## Done when
 
