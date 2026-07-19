@@ -131,6 +131,19 @@ the sole mechanism that removes a durable fact.
    server-side and returns `identity_version`; the caller freezes it as scene state and passes it
    per read request — the reputation-snapshot contract)*.
 
+### 4.4 The fact-version chain *(specced 2026-07-18 — `fact-level-correction.md`; migration 002)*
+
+The memories row's **semantic basis** — the text retrieval ranks by, and its embedding — gains
+the same bi-temporal machinery the telling has: a child chain under the stable `memory_id`
+(supersede by `invalid_at`, one live head, `write_cause` discrimination), created by migration
+002 with an `original` row backfilled per existing memory. The authorial-correction verb is
+**fact-following** (one combined verb, ruled 2026-07-18): the operator's corrected text becomes
+both the telling head and the embedded fact basis in one transaction, so retrieval follows the
+fix. Only the embedding follows the correction (ruled 2026-07-18); importance, typology, decay
+class, entities, and affect stand as write-time facts about the *event*. Accepted asymmetry: a
+corrected memory's embedding basis is the operator's corrected text rather than
+observation-class text — the same ground-truth rule as constraint-follows-anchor.
+
 ## 5. Write path
 
 Client event → NLP span/affect pass → **single Haiku call** (prose render + importance scoring;
@@ -157,7 +170,10 @@ dated `decisions.md` entry): `relevance × recency(decay class) × importance_no
 normalization; reserved slots for a future encoding-context term and per-call overrides under the
 split-brain topology. importance_norm is clamp + floor (ruled over min-max so invalidation can
 never move other items' scores); the decay math lives once, in `app\decay.py`, shared later by
-the reconstruction theta check.
+the reconstruction theta check. *(Fact-level correction specced 2026-07-18,
+`fact-level-correction.md`: once migration 002 lands, the relevance probe reads the **live
+fact-version head's** embedding — scoring inputs otherwise unchanged; scores move only through
+relevance.)*
 
 **Mid-dialogue gate (non-LLM hybrid):**
 - **Novelty check** — embed the utterance; measure distance against the loaded set; far from all →
@@ -248,7 +264,8 @@ Habituation guards for the future context term: **both a cap and a decay**, as i
   immediately, mid-scene included, and the corrected head becomes the reconstructor's fixed
   constraint for that chain (both ruled 2026-07-17). *(Specced 2026-07-17, **built &
   floor-verified 2026-07-18**, `authorial-correction.md` — chain content only; fact-level
-  correction is its own slated target, immediate-queue item 1 since the 2026-07-18 build.)*
+  correction **specced 2026-07-18**, `fact-level-correction.md`: at its build this verb becomes
+  fact-following — the corrected text is also the embedded fact basis, migration 002.)*
 - **Diegetic** (in-world confrontation; an API event referencing a target `memory_id`): preserves
   the chain and routes through the dissonance path; the new head row is typed `rationalization` or
   `update_with_resentment`, and a correction record is present.
@@ -319,7 +336,8 @@ retention policy? Can a player's memories be deleted?
 
 - **Retention:** a tested **purge endpoint/script, no scheduler** — the tool provides the delete
   verb, the schedule is the integrator's policy (this is the GDPR surface). Purge completeness
-  stated honestly: the endpoint deletes the original, its chain, and its caches; reflections
+  stated honestly: the endpoint deletes the original, its chains (telling **and fact versions** —
+  the latter specced 2026-07-18, `fact-level-correction.md`), and its caches; reflections
   previously derived from purged episodes are aggregate work-product, and the docs say so.
 - Docs must draw the **verbatim/reconstructive read-mode boundary** (self-describing payloads carry
   it too), state per-field degradation for optional context fields, state the gate degradation

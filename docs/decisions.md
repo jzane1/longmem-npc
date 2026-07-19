@@ -935,9 +935,10 @@ flipped as a direct result.
    character from a change the operator explicitly chose.
 
 Consequences propagated: `authorial-correction.md` written (design lines: no model calls —
-operator text byte-verbatim; no `corrections` row — diegetic-only by CHECK; one
-supersede-guarded transaction with cache eviction; fail-loud operator surface; remaining
-physical shapes `[SETTLE-AT-BUILD]`); the invariant wording amended in CLAUDE.md + architecture
+operator text byte-verbatim *[superseded in part 2026-07-18: at the fact-level build the verb
+gains one embed call — see the fact-level entry below]*; no `corrections` row — diegetic-only
+by CHECK; one supersede-guarded transaction with cache eviction; fail-loud operator surface;
+remaining physical shapes `[SETTLE-AT-BUILD]`); the invariant wording amended in CLAUDE.md + architecture
 §7 + `test-suite.md` Set C; architecture §7's reconstructor-input line and §8's authorial
 bullet annotated; Set A's authorial pair gains the constraint-follows-anchor and
 mid-scene-immediacy assertions; the immediate queue renumbered (fact correction → 2, gate → 3,
@@ -971,7 +972,9 @@ Approved-with-plan shapes, as built: route `POST /v1/memories/{memory_id}/correc
 each call mints a chain row); `CorrectionRequest { content min_length 1, client_timestamp
 required tz-aware (the ObserveEvent naming) → t_c, expected_detail_id optional }` /
 `CorrectionResult { memory_id, detail_id, superseded_detail_id, evicted_cache_rows, total_ms }`
-(the PinResult naming; no token fields — no model calls); whitespace-only content invalid
+(the PinResult naming; no token fields — no model calls *[superseded in part 2026-07-18: the
+fact-level build widens `CorrectionResult` and adds the one embed call — see the fact-level
+entry below]*); whitespace-only content invalid
 (pydantic `min_length` + a stripped check in the seam → 422); **concurrency = the spec's 409
 suggestion refined to an opt-in compare-and-swap** — the supersede targets the live head by
 predicate (race-safe under row locking; the one-live-head index the backstop), and a supplied
@@ -989,3 +992,69 @@ original-anchored chains byte-identical to the prior stage; `ReconstructionSourc
 Environment learning (recorded for the next session): the repo `.env` now runs
 `LONGMEM_PROVIDER_MODE=real`, so piped-REPL smokes must set
 `$env:LONGMEM_PROVIDER_MODE = "fake"` alongside the scratch `DATABASE_URI` override.
+
+## Fact-level correction spec scope rulings — 2026-07-18
+
+Authoring `fact-level-correction.md` (the fact-level correction target — immediate-queue item 1,
+slated by fork 1 of the 2026-07-17 authorial-correction rulings) required four scope rulings.
+Presented twice at Jack's request: the technical presentation, then a plain-prose
+re-introduction of all four (mechanism, issue, options); ruled on the re-presentation, each on
+the recommended option. Premise corrections were surfaced during pricing and verified in code
+before presenting: `entities` is **write-only today** (the read-request slot is RESERVED-inert;
+its first consumer is the gate's GIN path, queue item 2); **gist re-derivation on corrected
+chains would have zero consumers** (the corrected-anchor prompt branch ignores
+`observation_text` and spans); **purge is a docs-only contract** (no handler exists). The
+stored embedding's sole consumer is the `fetch_vector_candidates` probe — the direct target of
+"retrieval follows the fix."
+
+1. **Fact scope = embedding only.** The corrected text is re-embedded (one embedding-provider
+   call); importance, typology, decay class, entities, and affect stand as write-time facts
+   about the *event* — consistent with the deliberately-disregarded 2026-07-12 staleness
+   tension. Honest deferral recorded: a fact-corrected memory carries its original entities
+   until an additive fact-chain column rides with the gate target. **Rejected:** +mechanical
+   NLP pass (entities/affect feed nothing readable today; gist re-derivation consumer-less;
+   spaCy latency on the operator verb); +Haiku re-score (a second model call; importance moves
+   to the fact head, widening the candidate-SQL delta and re-opening read-path scoring
+   assertions); operator per-field overrides (no model calls, but the same candidate-SQL
+   widening for importance — re-openable later if operator authority over scalar facts is ever
+   wanted).
+2. **Version shape = a fact-version child table** (suggested `memory_fact_versions`; exact
+   names `[SETTLE-AT-BUILD]`): chain rows under the stable `memory_id` — basis text, embedding,
+   `write_cause`, bi-temporal stamps — with a one-live-head partial unique index and a partial
+   HNSW; the `memory_details` precedent applied to the semantic basis, the non-destructive
+   invariant untouched. Migration 002 creates + backfills one `original` row per existing
+   memory. Read-path and write-path floors re-open at build — re-verification steps.
+   **Rejected:** history table + in-place-updated live columns (candidate SQL and HNSW
+   untouched, but "never UPDATE stored content in place" would narrow — an invariant rewording
+   propagated through every rule doc, the weaker architecture); self-chaining the memories row
+   (`memory_id` is simultaneously PK and the stable FK target of four tables and every wire
+   payload — a new anchor ID for identical semantics).
+3. **Surface = one combined verb.** `POST /v1/memories/{memory_id}/correction` becomes
+   fact-following: the operator's corrected text is both the telling head (byte-verbatim, the
+   v1 contract) and the embedded fact basis, one transaction, CAS and eviction inherited.
+   Verified coupling drove this: a fact-only correction leaves an original-anchored chain whose
+   reconstructor keeps re-injecting the corrected-away data from stale gist spans. **Rejected:**
+   a separate fact verb (needs a second ground-truth rule keyed on fact-version state — two
+   truths per chain, against the 2026-07-17 one-ground-truth-per-chain ruling — and re-opens
+   the reconstruction floor); a scope field (inherits the same problem in facts-only mode,
+   triples the behavior matrix).
+4. **Embed failure = all-or-nothing, fail-loud.** Embed before the transaction opens (never
+   hold a transaction across a network call — the reconstruction precedent); on provider
+   failure nothing is written, loud 5xx-class error, operator retries. Honest price recorded:
+   during an embedding outage, telling corrections are blocked too — v1 needed no model.
+   **Rejected:** land-with-NULL-embedding (the memory vanishes from the vector probe — worse
+   than stale — and needs a nonexistent retry verb); land-with-stale-embedding (retrieval keeps
+   following the old semantics, the target's own problem statement).
+
+Consequences propagated: `fact-level-correction.md` written (design lines: one model call
+stated honestly — v1's "no model calls" purity superseded, not silently dropped; the existing
+embedding role, no new model role or env var; the fact chain's `write_cause` vocabulary reuses
+`original | authorial_correction`; **migration 002 is a fact of the target — the first spec for
+which that is true**; remaining physical shapes `[SETTLE-AT-BUILD]`). CLAUDE.md's
+non-destructive parenthetical grows the fact chain; architecture gains §4.4 + the §6 probe
+marker + the §8 fact-following annotation + §12 purge prose ("its chains — telling and fact
+versions"); `authorial-correction.md` annotated at five spots (fork 1 closed, no-model-calls
+superseded-in-part, scope boundary, mechanism, instrumentation); `migration-01.md` 002 pointers
+(embedding column, HNSW index, mechanics); `test-suite.md` Set A authorial pair grows the
+fact-chain assertions + a new all-or-nothing degradation case. Docs only — no code, no floors
+changed.

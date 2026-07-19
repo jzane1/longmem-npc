@@ -117,7 +117,10 @@ Result-level:
   the Set B separation, assertable in payloads.
 - Rows with **NULL embeddings** (the write path's ruled degradation) are unreachable by the vector
   probe — a documented consequence. They remain reachable via the degraded fallback below, and
-  later via the gate's entity/GIN path (item 2).
+  later via the gate's entity/GIN path (item 2). *(Fact-level correction specced 2026-07-18,
+  `fact-level-correction.md`: at migration 002 the probe joins the **live fact-version head**
+  and orders by its embedding — this floor deliberately re-opens at that build; scoring inputs
+  otherwise unchanged.)*
 
 ## Retrieval scoring
 

@@ -1,19 +1,21 @@
 # longmem-npc — Status
 
 **Last updated:** 2026-07-18
-**Phase:** **the correction-override beat is live** — the operator's fix-wrong-data verb runs end
-to end on top of the thesis mechanism. Six floors stand verified: the migration-01 schema, write
-path v1 (`write-path.md`), read path v1 (`read-path.md`), CLI harness v1 (`cli-harness.md`),
-reconstruction v1 (`reconstruction.md`), and **authorial-correction v1**
-(`authorial-correction.md` — built & floor-verified 2026-07-18: the replace-model operator verb
-in one supersede-guarded transaction with atomic cache eviction, the constraint-follows-anchor
-reconstruction delta — that floor deliberately re-opened and re-verified, walker 41 → 42 — and
-the REPL `:correct` surface; all settle-shapes ruled in the dated `decisions.md` entry, one via
-an explicit mid-build question). **One open decision owed before the demo ships:** the escalation
+**Phase:** **the fact-level correction target is specced** (`fact-level-correction.md`,
+2026-07-18) — the design session for "retrieval follows the fix" ran the same day the
+correction-override beat went live. Four scope forks ruled (dated `decisions.md` entry;
+presented technically, then re-introduced in plain prose at Jack's request, each ruled on the
+recommended option): **embedding-only** re-derivation, a **fact-version child table**
+(migration 002 — the first target for which a new migration is a spec fact), **one combined
+verb** (the correction endpoint becomes fact-following), and **all-or-nothing fail-loud** on
+embed failure. Six floors stand verified: the migration-01 schema, write path v1
+(`write-path.md`), read path v1 (`read-path.md`), CLI harness v1 (`cli-harness.md`),
+reconstruction v1 (`reconstruction.md`), and authorial-correction v1
+(`authorial-correction.md`). **One open decision owed before the demo ships:** the escalation
 hard-stop failure path re-rule (build-phase stance, 2026-07-13).
-Next: **spec the fact-level correction target** (immediate-queue item 1, slated by explicit
-ruling 2026-07-17): versioned memories-row facts + corrected embedding so retrieval follows the
-fix — migration-002-class design, its own spec session.
+Next: **build the fact-level correction target** (immediate-queue item 1): migration 002 +
+the fact-following verb + the retrieval-delta walkers, per the spec's `[SETTLE-AT-BUILD]`
+contract.
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -416,15 +418,45 @@ and the structured behavior output survive the interview. Research publication c
   and independent code spot-checks. Queue renumbered (fact-level correction → item 1, gate → 2,
   suite → 3) with stale refs updated in `read-path.md`, `cli-harness.md`, `reconstruction.md`,
   `authorial-correction.md`.
+- **2026-07-18** — **Fact-level correction v1 build target specced** (`fact-level-correction.md`)
+  — immediate-queue item 1's own spec session, as slated. Consolidates the 2026-07-17 slating
+  (versioned memories-row facts + corrected embedding so retrieval follows the fix) into a build
+  spec; **migration 002 is a fact of the target — the first spec for which that is true** (the
+  002 ledger seam designed 2026-07-13 finally gets its migration). Jack ruled four scope forks
+  (dated "Fact-level correction spec scope rulings" entry in `decisions.md`), presented twice —
+  technically, then re-introduced in plain prose at his request — and each ruled on the
+  recommended option: **fact scope = embedding only** (importance/typology/decay/entities/affect
+  stand as write-time event facts; the entities honest-deferral recorded — its first reader, the
+  gate's GIN path, is queue item 2); **version shape = a fact-version child table** (the
+  `memory_details` precedent applied to the semantic basis: one-live-head partial unique index +
+  partial HNSW, `original` rows backfilled; read-path + write-path floors re-open at build as
+  re-verification steps); **surface = one combined verb** (the correction endpoint becomes
+  fact-following — corrected text is both telling head and embedded fact basis; verified
+  coupling: a fact-only correction would leave reconstruction re-injecting corrected-away data
+  from original-anchored gist spans); **embed failure = all-or-nothing fail-loud** (embed before
+  the transaction; the honest price — an embedding outage blocks telling corrections too — was
+  stated and accepted). Premise corrections verified in code before presenting: entities is
+  write-only today; gist re-derivation on corrected chains has zero consumers; purge is a
+  docs-only contract. Design lines: one model call stated honestly (v1's "no model calls"
+  purity superseded, not silently dropped; the existing embedding role — no new model role or
+  env var); the reconstruction delta is **none** (the drift check embeds text fresh; the
+  corrected-anchor branch ignores spans) — `verify_reconstruction.py` re-running unmodified is
+  the build's proof. Remaining physical shapes `[SETTLE-AT-BUILD]`. Propagated: CLAUDE.md
+  invariant parenthetical (fact chain), architecture §4.4 (new) + §6 + §8 + §12,
+  `authorial-correction.md` five annotations, `migration-01.md` 002 pointers, `test-suite.md`
+  Set A fact assertions + the all-or-nothing degradation case. Docs only — no code, no floors
+  changed.
 
 ## Immediate queue
 
 1. Fact-level correction target (slated by explicit ruling 2026-07-17): versioned memories-row
    facts + corrected embedding so retrieval follows the fix — migration-002-class design, its
-   own spec session.
+   own spec session. **Specced 2026-07-18** (`fact-level-correction.md`; four scope forks ruled
+   in the dated `decisions.md` entry) — **build next**.
 2. Mid-dialogue gate + threshold values, efficacy definitions, per-signal fire logging (the
    block-with-"reconstructing"-signal miss path binds here).
-3. Test-suite scoped session (Sets A-authorial, B, C + degradation cases now runnable).
+3. Test-suite scoped session (Sets A-authorial, B, C + degradation cases now runnable; the
+   Set A fact-chain additions become runnable with item 1).
 4. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
    choreography incl. the 60-day drift beat and the correction-override beat (both live in the
    REPL: `:as-of` jumps + scene boundaries + band crossings; `:correct`).

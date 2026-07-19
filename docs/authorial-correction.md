@@ -21,7 +21,7 @@ in `decisions.md`) — **the first spec authored under the 2026-07-17 scope-limi
    leaves — retrieval still ranks a corrected memory by the original observation's embedding, and
    gist spans still index the original text — is closed by the slated fact-correction target
    (versioned memories-row facts, corrected embedding; migration-002-class design with its own
-   spec pass), not silently accepted.
+   spec pass), not silently accepted. *(Specced 2026-07-18 — `fact-level-correction.md`.)*
 2. **The reconstructor's fixed constraint follows the drift anchor.** On a chain whose derivable
    anchor is an `authorial_correction` head, the corrected head — not the stale gist spans —
    is the fixed constraint. One notion of ground truth per chain: the constraint and the drift
@@ -59,7 +59,10 @@ in `decisions.md`) — **the first spec authored under the 2026-07-17 scope-limi
 - **No model calls.** The corrected head is the operator's text, stored **byte-verbatim**. A
   render pass would alter the fix, and any composition template would be a hidden hardcoded
   authorial artifact (the query-composition rejection's reasoning). This endpoint is pure
-  storage discipline.
+  storage discipline. *(Superseded in part by the fact-level spec, 2026-07-18: at that build the
+  verb gains exactly one embed call — the corrected basis must be embedded so retrieval follows
+  the fix. The operator text itself stays byte-verbatim in both chains; no render pass, ever.
+  `fact-level-correction.md`.)*
 - **Verb discrimination by `write_cause` alone** (ruled 2026-07-12): no marker on prior rows, and
   **no `corrections`-table row** — that table is diegetic-only by CHECK
   (`rationalization | update_with_resentment`).
@@ -81,7 +84,9 @@ in `decisions.md`) — **the first spec authored under the 2026-07-17 scope-limi
 
 **Fact-level correction** — slated as its own spec + build, immediate-queue item 1 as of this
 build's completion (a sequencing note, not a rejection: it needs a fact-versioning design the
-memories row doesn't have, and that design deserves its own fork surface). **The diegetic
+memories row doesn't have, and that design deserves its own fork surface). *(That fork surface
+ran 2026-07-18 — specced in `fact-level-correction.md`; at its build the combined verb grows
+this endpoint.)* **The diegetic
 correction event + dissonance path** (sequenced post-August; the `corrections` table stays
 write-less until then). **Purge.** **The mid-dialogue gate** (immediate-queue item 2). If adjacent work looks necessary, stop and report —
 with the correct option and its real cost stated, per the reframed contract.
@@ -123,7 +128,9 @@ transaction, supersede-guarded.
 3. **Evict all cache rows** for the memory_id — the inherited invariant, same transaction.
 
 No `corrections` row. No `memories`-row writes of any kind (fact correction is item 1 of the
-queue as of this build's completion).
+queue as of this build's completion). *(Fact-level correction specced 2026-07-18: at its build
+this transaction grows the fact-chain supersede + insert — still no `memories`-row writes; the
+fact versions live on their own chain. `fact-level-correction.md`.)*
 
 ## The reconstruction delta: constraint follows the anchor
 
@@ -163,7 +170,9 @@ flicker; an operator override of wrong data is not flicker.
 
 `correction_ms` + `evicted_cache_rows` in the result; the REPL `:correct` output and debug view
 surface them. No token accounting — this endpoint makes no model calls. `[SETTLE-AT-BUILD]`
-exact field names with the wire shape.
+exact field names with the wire shape. *(The no-token line is superseded at the fact-level
+build, specced 2026-07-18: one embed call rides the verb and `CorrectionResult` widens —
+`fact-level-correction.md`.)*
 
 ## `[SETTLE-AT-BUILD]` — physical shapes, ruled at build (stop and report, never silently choose)
 
@@ -175,7 +184,9 @@ exact field names with the wire shape.
 - **Wire models** — **ruled:** `CorrectionRequest { content (min_length 1), client_timestamp
   (required, tz-aware — the ObserveEvent naming), expected_detail_id (optional, see CAS) }`;
   `CorrectionResult { memory_id, detail_id, superseded_detail_id, evicted_cache_rows, total_ms }`
-  (the PinResult naming; no token fields — no model calls).
+  (the PinResult naming; no token fields — no model calls). *(Superseded at the fact-level
+  build, specced 2026-07-18: `CorrectionResult` widens and one embed call rides the verb —
+  `fact-level-correction.md`.)*
 - **`valid_at` policy** — **ruled as suggested:** required tz-aware `client_timestamp` → t_c.
 - **Validation** — **ruled:** pydantic `min_length=1` + a stripped-non-empty check in the seam;
   whitespace-only content is invalid (422).

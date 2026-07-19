@@ -149,7 +149,9 @@ the location **name** + its embedding only; a longer description is embed-only (
 `memory_details` head (`write_cause = original`) + `memory_gist_spans` + any new
 `identity_components`. Validate `decay_class` against the agent `config` map; **unknown label →
 default class + `decay_class_unknown = true`** (never reject — mirrors `scoring_failed`). Commit,
-then return `IngestResult`.
+then return `IngestResult`. *(Fact-level correction specced 2026-07-18,
+`fact-level-correction.md`: at migration 002 this transaction also mints the `original`
+fact-version row — this floor deliberately re-opens at that build.)*
 
 ### The render seam *(confirmed as specced — ruled 2026-07-13)*
 

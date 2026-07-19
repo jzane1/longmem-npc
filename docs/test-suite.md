@@ -23,6 +23,14 @@ Forked into **structural pairs by correction verb**, keyed on `write_cause` — 
   resolves to that head; post-correction reconstruction takes the corrected head as its **fixed
   constraint** (pure prompt-assembly assertion — ruled 2026-07-17); a mid-scene correction changes
   served text immediately (the amended invariant's sanctioned cause); no `corrections` row.
+  **Fact chain (specced 2026-07-18, `fact-level-correction.md`):** prior fact head superseded;
+  one corrected fact head with `basis_text` byte-identical to the operator input and the
+  corrected embedding; the superseded fact row still carries the original embedding; **the
+  memory ranks by the corrected embedding** *(asserted at the db layer, where order is pure
+  distance — a service-level rank assertion would hang on hash-derived fake importance; see the
+  spec's done-when)* — assertable via the fake-mode distance-0 mechanic (the deterministic fake
+  embedding is a pure function of text, so probe text == stored basis ⇒ cosine distance 0; a
+  *fixture* property — production uses real embeddings).
 - **Diegetic pair:** chain intact; new head row typed `rationalization` or
   `update_with_resentment`; correction record present; cache evicted. *(Lands when the dissonance
   mechanism ships.)*
@@ -57,6 +65,9 @@ moves scores, not rows; detail-hiding assertions land with reconstruction.)*
   `decay_class_unknown = true` — never rejected (ruled 2026-07-13; mirrors `scoring_failed`).
 - Embedding-call failure → the write still lands with a NULL embedding; `embedding IS NULL` is the
   queryable signal and the payload carries `embedding_failed` (ruled 2026-07-13).
+- Embedding-call failure during an **authorial correction** → **all-or-nothing**: nothing written
+  on either chain, cache intact, loud error (ruled 2026-07-18 — the deliberate contrast with the
+  observe path's land-with-NULL degradation; `fact-level-correction.md`).
 - Escalation call fails twice → **HARD-STOP**, nothing inserted — structurally assertable as zero
   rows (build-phase stance ruled 2026-07-13; re-rule owed before the demo ships — see `status.md`).
 - Gate degradation ladder: embeddings down → entity-only lexical fetch; no entities → novelty-only;

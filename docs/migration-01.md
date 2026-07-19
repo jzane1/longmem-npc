@@ -44,7 +44,10 @@ One row per observation. **`observation_text` is immutable after insert.**
 - `memory_id` UUID PK, server default.
 - `agent_id` FK → agents.
 - `observation_text` text NOT NULL.
-- `embedding` vector(1536) — dimension locked.
+- `embedding` vector(1536) — dimension locked. *(Fact-level correction specced 2026-07-18,
+  `fact-level-correction.md`: at migration 002 the retrieval probe moves to the live
+  fact-version head; this column remains the write-time event fact under that spec's suggested
+  dual-write default — dual-write vs freeze is `[SETTLE-AT-BUILD]` there.)*
 - `importance_raw` real — stored raw; normalized at read.
 - `scoring_failed` boolean NOT NULL default false — set true when the importance-scoring model
   fails; the write still lands with neutral importance (never lose a write). See architecture §2.
@@ -145,7 +148,9 @@ The entity/topic index: gist matching + entity-gate tripwire.
 ## Indexes
 
 - **HNSW** on `memories.embedding`, `vector_cosine_ops`. *(Ruled 2026-07-13: cosine, for
-  text-embedding-3-small.)*
+  text-embedding-3-small. Fact-level correction specced 2026-07-18: the probe index moves to the
+  fact-version chain at migration 002; this index's fate — drop vs dormant — is
+  `[SETTLE-AT-BUILD]` in `fact-level-correction.md`.)*
 - **GIN** on `memories.entities`.
 - FK/lookup indexes: `memories(agent_id)`, `memory_details(memory_id)`,
   `memory_gist_spans(memory_id)`, `corrections(memory_id)`, `reflections(agent_id)`,
@@ -156,7 +161,8 @@ The entity/topic index: gist matching + entity-gate tripwire.
 - Numbered SQL file(s) under `db\migrations\` (e.g. `001_foundation.sql`) plus `db\migrate.py`, a
   minimal Python runner. *(Ruled 2026-07-13: Python runner with a `schema_migrations` bookkeeping
   table — the seam migration 02+ lands on; each migration's DDL and its ledger row commit in one
-  transaction, so a half-applied migration can never be logged complete.)*
+  transaction, so a half-applied migration can never be logged complete. Migration 002 — the
+  fact-version chain — specced 2026-07-18, `fact-level-correction.md`.)*
 - Docker: `pgvector/pgvector` for Postgres 16; connection string from `.env`.
 
 ## Done when
