@@ -199,7 +199,8 @@ the time-thinned detail slice **plus the current live head — "how you currentl
 2026-07-17: retellings compound; without the prior telling the drift budget rarely binds)** —
 conditioned on the rendered identity document. *(On a chain whose drift anchor is an
 `authorial_correction` head, the fixed constraint follows the anchor — the corrected head
-replaces the stale gist constraint; ruled 2026-07-17, specced in `authorial-correction.md`.)*
+replaces the stale gist constraint; ruled 2026-07-17, **built & floor-verified 2026-07-18**,
+`authorial-correction.md`.)*
 
 **Write-back with a version chain:** one permanent `memory_id` forever; each retelling inserts a new
 detail row and stamps the prior one superseded — **versioned confabulation over an immutable
@@ -245,9 +246,9 @@ Habituation guards for the future context term: **both a cap and a decay**, as i
   becomes the drift anchor. Prior rows are invalidated by ordinary supersession; the verbs are
   discriminated by the new head's `write_cause`, not by any marker on prior rows. Takes effect
   immediately, mid-scene included, and the corrected head becomes the reconstructor's fixed
-  constraint for that chain (both ruled 2026-07-17). *(Specced 2026-07-17,
-  `authorial-correction.md` — chain content only; fact-level correction is its own slated
-  target, immediate-queue item 2.)*
+  constraint for that chain (both ruled 2026-07-17). *(Specced 2026-07-17, **built &
+  floor-verified 2026-07-18**, `authorial-correction.md` — chain content only; fact-level
+  correction is its own slated target, immediate-queue item 1 since the 2026-07-18 build.)*
 - **Diegetic** (in-world confrontation; an API event referencing a target `memory_id`): preserves
   the chain and routes through the dissonance path; the new head row is typed `rationalization` or
   `update_with_resentment`, and a correction record is present.

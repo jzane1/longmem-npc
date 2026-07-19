@@ -60,16 +60,16 @@ scene-frozen decay band** (the pre-demo drift driver); and identity-document plu
 
 ## Scope boundary — do NOT build
 
-The mid-dialogue gate (immediate-queue item 3) — in this slice **every retrieval is dialogue init**,
+The mid-dialogue gate (immediate-queue item 2) — in this slice **every retrieval is dialogue init**,
 so all cache misses resolve inside the pre-warm; the **block-with-"reconstructing"-signal mid-scene
 miss path binds to the gate**, and the signal's wire shape is deliberately **not settled here**.
-The authorial-correction endpoint (item 1) — its obligations toward this layer (evict all cache
-rows for the memory_id; the corrected head re-anchors the drift budget) are stated here and built
-there. *(A third consequence was ruled 2026-07-17 at that target's spec: on
+The authorial-correction endpoint (**built 2026-07-18**) — its obligations toward this layer
+(evict all cache rows for the memory_id; the corrected head re-anchors the drift budget) are
+stated here and built there. *(A third consequence was ruled 2026-07-17 at that target's spec: on
 `authorial_correction`-anchored chains the fixed constraint follows the anchor — an assembly
 change that deliberately re-opens this floor at that build; `authorial-correction.md`.)* The diegetic/dissonance path, reflection (the identity document stays **seed-prose-only**),
 purge, prompt caching, and split-brain per-call weights (post-August). The pytest suite (Set C
-rides item 4; this build ships the structural walker `tests\verify_reconstruction.py`). And **any
+rides item 3; this build ships the structural walker `tests\verify_reconstruction.py`). And **any
 new DB schema or migration** — `reconstruction_cache` and `identity_documents` exist; the
 composed cache key lives in the existing text column. If adjacent work looks necessary, **stop and
 report** rather than expand scope.
@@ -184,8 +184,8 @@ format and quantum knob — suggested `{identity_version}|b{index}` with
   beat's mechanism.
 - **Eviction invariant (standing, generalized):** cache writes happen only in the reconstruction
   path; **any other writer to a chain — correction, diegetic write, purge — evicts all cache rows
-  for that memory_id** (application code, not triggers). The authorial endpoint (item 1) inherits
-  this obligation.
+  for that memory_id** (application code, not triggers). The authorial endpoint inherits
+  this obligation (built 2026-07-18).
 
 ## Write-back & drift budget
 
@@ -236,7 +236,7 @@ input/output token counts (feeding the per-100-turn cost table), batch size, `ca
 `cache_misses`, `write_backs`, `drift_refusals`, lazy-bootstrap flag. Per-item: `read_mode` is
 already in the payload; the debug view (`render_debug`) grows the reconstruction counters. The
 load driver's aggregate table gains the reconstruction terms (`[SETTLE-AT-BUILD]` shape). No gate
-term — the gate is item 3.
+term — the gate is item 2.
 
 ## `[SETTLE-AT-BUILD]` — physical shapes, ruled at build (stop and report, never silently choose)
 

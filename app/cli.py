@@ -18,6 +18,10 @@ Meta-commands (everything else is an utterance):
                        re-freezes the scene state — reputation snapshot,
                        identity version, and the scene basis time
     :pin <memory_id>   pin a memory (decay exemption)     :unpin undoes it
+    :correct <memory_id> <text>
+                       authorial correction: replace the live telling with
+                       the operator's text byte-verbatim (supersede + cache
+                       evict; takes effect immediately, mid-scene included)
     :as-of <iso8601>   drive the session at an injected world time
                        (retrieval age math + observe timestamps);  :as-of clear
     :debug [on|off]    toggle the full turn debug view (IDs + scores, parsed
@@ -212,6 +216,21 @@ async def repl(agent_id: UUID, debug: bool) -> None:
                         UUID(raw_id.strip()), pinned=(command == ":pin")
                     )
                     print(f"{result.memory_id} pinned={result.pinned}")
+                elif line.startswith(":correct"):
+                    rest = line[len(":correct") :].strip()
+                    raw_id, _, text = rest.partition(" ")
+                    text = text.strip()
+                    if not raw_id or not text:
+                        print("usage: :correct <memory_id> <corrected text>")
+                        continue
+                    correction = await runner.correct(UUID(raw_id), text)
+                    print(
+                        f"corrected {correction.memory_id}: head "
+                        f"{correction.superseded_detail_id} -> "
+                        f"{correction.detail_id}; "
+                        f"{correction.evicted_cache_rows} cache row(s) "
+                        f"evicted ({correction.total_ms}ms)"
+                    )
                 elif line.startswith(":as-of"):
                     raw = line[len(":as-of") :].strip()
                     if raw in ("", "clear"):

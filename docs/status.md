@@ -1,20 +1,19 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-07-17
-**Phase:** **the thesis mechanism is live** — *event in → memory stored → identity-conditioned
-retelling out* runs end to end. Five floors stand verified: the migration-01 schema, write path v1
-(`write-path.md`), read path v1 (`read-path.md`), CLI harness v1 (`cli-harness.md`), and
-**reconstruction v1** (`reconstruction.md` — built & floor-verified 2026-07-17: the serving swap
-with theta on the scene-frozen basis, the decay-band cache, drift-budgeted write-back, and the
-scene-boundary identity recompile; all settle-shapes ruled in the dated `decisions.md` entry).
-**One open decision owed before the demo ships:** the escalation hard-stop failure path re-rule
-(build-phase stance, 2026-07-13). *(The `.env` DATABASE_URI deviation found during the
-reconstruction build was resolved the same day — Jack pointed it back at `longmem`; no-arg
-`db\migrate.py` verified a clean no-op again.)*
-Next: **build the authorial-correction endpoint** (immediate-queue item 1; **specced 2026-07-17**,
-`authorial-correction.md` — four scope forks ruled, incl. constraint-follows-anchor and immediate
-mid-scene effect; the first spec authored under the same-day scope-limiter reframing). A
-**fact-level correction target** was slated as item 2 by explicit ruling.
+**Last updated:** 2026-07-18
+**Phase:** **the correction-override beat is live** — the operator's fix-wrong-data verb runs end
+to end on top of the thesis mechanism. Six floors stand verified: the migration-01 schema, write
+path v1 (`write-path.md`), read path v1 (`read-path.md`), CLI harness v1 (`cli-harness.md`),
+reconstruction v1 (`reconstruction.md`), and **authorial-correction v1**
+(`authorial-correction.md` — built & floor-verified 2026-07-18: the replace-model operator verb
+in one supersede-guarded transaction with atomic cache eviction, the constraint-follows-anchor
+reconstruction delta — that floor deliberately re-opened and re-verified, walker 41 → 42 — and
+the REPL `:correct` surface; all settle-shapes ruled in the dated `decisions.md` entry, one via
+an explicit mid-build question). **One open decision owed before the demo ships:** the escalation
+hard-stop failure path re-rule (build-phase stance, 2026-07-13).
+Next: **spec the fact-level correction target** (immediate-queue item 1, slated by explicit
+ruling 2026-07-17): versioned memories-row facts + corrected embedding so retrieval follows the
+fix — migration-002-class design, its own spec session.
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -48,6 +47,7 @@ and the structured behavior output survive the interview. Research publication c
 | Write path v1 — ingest service seam (`app\ingest.py`) + thin FastAPI route (`app\api.py`, served via `python -m app.serve`) + real/deterministic-fake providers (`app\providers.py`) + NLP pass (`app\nlp.py`: spaCy lg + fastcoref + VADER + Warriner VAD) + atomic insert (`app\db.py`) | floor-verifier **pass** against the migration-01 floor: structural walker `tests\verify_write_path.py` re-run independently (35 assertions covering all 14 done-when criteria) on scratch `longmem_test`; `db\migrate.py` no-arg still a clean no-op on `longmem`; product `longmem` confirmed pristine via postgres MCP; independent spot-check of live head, span offsets, and degradation rows | 2026-07-13 |
 | Read path v1 — retrieval service seam (`app\retrieval.py`) + shared decay math (`app\decay.py`) + thin `POST /v1/dialogue/init` route (`app\api.py`) + read-only candidate SQL (`app\db.py`) + wire models (`app\schemas.py`) + five knobs (`app\config.py`) | floor-verifier **pass** against the migration-01 + write-path floors: structural walker `tests\verify_read_path.py` re-run independently (34 assertions, done-when 1–11) on scratch `longmem_test`; `tests\verify_write_path.py` re-run (35 assertions — shared files touched, floor intact); `db\migrate.py` no-arg still a clean no-op on `longmem`; `longmem` confirmed pristine; independent read-only SQL spot-checks (live head, NULL-embedding row, one-live-head index); plus a live `python -m app.serve` route session with byte-identical repeated reads | 2026-07-14 |
 | CLI harness v1 — dialogue-turn seam (`app\dialogue.py`: retrieval → prompt assembly → single dialogue call → directive validation → atomic in-place reputation apply) + shared session-runner core (`app\session.py`) + REPL (`python -m app.cli`, `app\cli.py`) + synthetic load driver (`python -m app.load_driver`, `app\load_driver.py`) + dialogue provider triad (`app\providers.py`) + turn wire models (`app\schemas.py`) + reputation SQL (`app\db.py`) + dialogue role/reputation/pricing config (`app\config.py`) | floor-verifier **pass** against the migration-01 + write-path + read-path floors: structural walker `tests\verify_cli_harness.py` re-run independently (36 assertions, every done-when criterion) on scratch `longmem_test`; both prior walkers re-run clean (35/35, 34/34 — shared files touched, floors intact); `db\migrate.py` no-arg still a clean no-op on `longmem` (schema frozen, `001` the only migration); `longmem` confirmed pristine **via the postgres MCP — the verifier's `mcp__postgres__*` tools worked this dispatch, resolving the 2026-07-14 flag**; an independent standalone load-driver run (offline, keyless); plus a live piped REPL session (observe → dialogue turns with debug view → scene-boundary snapshot refresh) | 2026-07-15 |
+| Authorial-correction v1 — memory-scoped operator verb (`POST /v1/memories/{id}/correction` in `app\api.py` → `IngestService.correct` in `app\ingest.py` → one-transaction `apply_authorial_correction` in `app\db.py`: predicate supersede + optional `expected_detail_id` compare-and-swap + corrected `authorial_correction` head at t_c + cache eviction with count) + the constraint-follows-anchor reconstruction delta (`app\reconstruction.py` `build_reconstruction_item`, anchor-cause-aware; `db.ReconstructionSource.anchor_cause`) + wire models (`app\schemas.py`) + REPL surface (`app\session.py` `runner.correct`, `app\cli.py` `:correct`) | floor-verifier **pass** against all five prior floors (reconstruction deliberately re-opened by the constraint-follows-anchor ruling, re-verified): structural walker `tests\verify_authorial_correction.py` re-run independently (31 assertions, every done-when criterion incl. the re-ruled stored-coherence time-travel criterion) on fresh scratch `longmem_test`; all four prior walkers re-run clean (42/42 — grown +1 by the corrected-item assertion, addition only; 36/36; 34/34; 35/35); `db\migrate.py` no-arg a clean no-op on `longmem` (no migration needed, as specced); `longmem` confirmed pristine via the postgres MCP; independent code spot-checks (transaction + CAS rollback, eviction inside the transaction, byte-verbatim no-model path, retrieval/scoring untouched vs HEAD); plus a live piped REPL correction-override beat (read verbatim → `:correct` head swap → corrected read, one scene) | 2026-07-18 |
 | Reconstruction v1 — serving-stage engine (`app\reconstruction.py`: theta partition at the scene-frozen basis → decay-band cache → batched retelling call → drift-budgeted atomic write-back → serve-only-persisted-text) + serving swap (`app\retrieval.py`, retrieval/scoring untouched) + identity-document plumbing (`app\identity.py` + scene-boundary recompile in `app\ingest.py` + caller-frozen scene state in `app\session.py`) + reconstruction provider triad and the **locality-sensitive fake embedding** (`app\providers.py`) + reconstruction SQL (`app\db.py`) + wire/instrumentation deltas (`app\schemas.py`) + knobs/role/pricing (`app\config.py`) + debug/aggregate surfacing (`app\cli.py`, `app\load_driver.py`) + 422 mapping (`app\api.py`) | floor-verifier **pass** against all four prior floors: structural walker `tests\verify_reconstruction.py` re-run independently (41 assertions, every done-when criterion) on fresh scratch `longmem_test`; all three prior walkers re-run clean (35/35, 34/34, 36/36 — the read-side pair pin `reconstruction_theta = 0` in fixture configs, assertion bodies untouched, verified against git); schema frozen (`001` the only migration; migrate **`--database-uri` on `/longmem`** → "Up to date, 0 pending" — no-arg blocked by the `.env` sandbox pointer, flagged); `longmem` confirmed pristine **via the postgres MCP (tools worked this dispatch)**; independent code spot-checks (atomic write-back, derivable anchor, scene-basis binding, retrieval byte-identical to HEAD); plus a live piped REPL drift beat (verbatim → 46-day jump → reconstructed write-back → call-free cache hit) and a standalone load-driver run with the reconstruction latency/cost rows | 2026-07-17 |
 
 ## Open questions needing Jack's ruling
@@ -390,27 +390,51 @@ and the structured behavior output survive the interview. Research publication c
   hedged as a `[SETTLE-AT-BUILD]` suggestion, not a ruling), and the register's 2026-07-12
   within-scene-invariant statement gained its amendment note per the annotation convention.
   Docs only — no code, no floors changed.
+- **2026-07-18** — **Authorial-correction endpoint v1 built, verified, and committed — the
+  correction-override beat is live.** Jack ruled one criterion via an explicit question at a
+  mid-build stop-and-report: the spec's "time travel coherent" done-when **re-ruled to stored
+  bi-temporal coherence** — its original "as_of before t_c serves the prior telling" wording
+  over-claimed (`as_of` is an age-computation override by the 2026-07-14 read-path ruling; the
+  candidate SQL always joins the live head); the walker asserts windowed-SQL re-derivation
+  instead, and the alternative (as_of-windowed chain serving) was presented fairly priced and
+  not adopted. The spec's remaining settle-shapes were approved with the plan, including the
+  **compare-and-swap refinement** (optional `expected_detail_id`: stale → 409 with rollback;
+  omitted → correct the live head — the REPL default). New: `apply_authorial_correction`
+  (`app\db.py`, one transaction: predicate supersede + CAS + corrected head at t_c + cache
+  eviction; the module's first sanctioned DELETE — derived cache rows only),
+  `IngestService.correct` + `CorrectionConflictError` (`app\ingest.py`),
+  `POST /v1/memories/{id}/correction` with 404/409/422 (`app\api.py`),
+  `CorrectionRequest`/`CorrectionResult` (`app\schemas.py`), the anchor-cause-aware pure
+  `build_reconstruction_item` + `ReconstructionSource.anchor_cause` (the constraint-follows-
+  anchor delta — the reconstruction floor deliberately re-opened and re-verified, its walker
+  grown 41 → 42 by addition only), `runner.correct` + the REPL `:correct` meta-command, and
+  walker `tests\verify_authorial_correction.py` (31 assertions). Verification: all five walkers
+  on fresh scratch (31/31, 42/42, 36/36, 34/34, 35/35); a live piped REPL correction-override
+  beat (read verbatim → `:correct` head swap → corrected read, one scene; fake mode — note the
+  REPL smoke now needs `$env:LONGMEM_PROVIDER_MODE = "fake"` since `.env` runs real mode);
+  `db\migrate.py` no-arg a clean no-op; floor-verifier **pass** with working postgres MCP tools
+  and independent code spot-checks. Queue renumbered (fact-level correction → item 1, gate → 2,
+  suite → 3) with stale refs updated in `read-path.md`, `cli-harness.md`, `reconstruction.md`,
+  `authorial-correction.md`.
 
 ## Immediate queue
 
-1. Authorial-correction endpoint — **specced 2026-07-17** (`authorial-correction.md`); build
-   next. The correction-override demo beat; evict-on-write + re-anchoring inherited from
-   `reconstruction.md`; the constraint-follows-anchor delta deliberately re-opens the
-   reconstruction floor at build.
-2. Fact-level correction target (slated by explicit ruling 2026-07-17): versioned memories-row
+1. Fact-level correction target (slated by explicit ruling 2026-07-17): versioned memories-row
    facts + corrected embedding so retrieval follows the fix — migration-002-class design, its
    own spec session.
-3. Mid-dialogue gate + threshold values, efficacy definitions, per-signal fire logging (the
+2. Mid-dialogue gate + threshold values, efficacy definitions, per-signal fire logging (the
    block-with-"reconstructing"-signal miss path binds here).
-4. Test-suite scoped session (Sets A-authorial, B, C + degradation cases now runnable).
-5. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
-   choreography incl. the 60-day drift beat (its mechanics — `:as-of` jumps + scene boundaries +
-   band crossings — are live in the REPL).
-6. Before the demo ships: re-rule the escalation failure path (see open questions) and pick a
+3. Test-suite scoped session (Sets A-authorial, B, C + degradation cases now runnable).
+4. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
+   choreography incl. the 60-day drift beat and the correction-override beat (both live in the
+   REPL: `:as-of` jumps + scene boundaries + band crossings; `:correct`).
+5. Before the demo ships: re-rule the escalation failure path (see open questions) and pick a
    real-provider smoke moment (one live observe + one live dialogue turn + one live
    reconstruction with keys) ahead of demo choreography.
 
-*(Done 2026-07-17: **Reconstruction v1** — the thesis mechanism is live; see the verified-floors
+*(Done 2026-07-18: **Authorial-correction endpoint v1** — the correction-override beat is live;
+see the verified-floors table and session log. Done 2026-07-17: **Reconstruction v1** — the
+thesis mechanism is live; see the verified-floors
 table and session log. Done 2026-07-15: **CLI harness v1 + synthetic load driver** — the vertical
 slice completed. Done 2026-07-14: **Read path v1**. Done 2026-07-13: **Write path v1**; earlier
 same day: **Migration 01 foundational schema**; connect the Postgres MCP + floor-verifier MCP

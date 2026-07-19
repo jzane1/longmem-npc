@@ -43,6 +43,8 @@ from app.providers import (
 )
 from app.schemas import (
     AffectOut,
+    CorrectionRequest,
+    CorrectionResult,
     IngestResult,
     Instrumentation,
     ObserveEvent,
@@ -62,7 +64,13 @@ class UnknownAgentError(LookupError):
 
 
 class UnknownMemoryError(LookupError):
-    """set_pin references a memory_id with no memories row."""
+    """set_pin / correct references a memory_id with no memories row."""
+
+
+class CorrectionConflictError(RuntimeError):
+    """The correction's expected_detail_id no longer names the live head —
+    the operator's read is stale; nothing was changed (409, never a silent
+    retry against a telling the operator did not see)."""
 
 
 class EscalationHardStopError(RuntimeError):
@@ -436,5 +444,39 @@ class IngestService:
         return PinResult(
             memory_id=memory_id,
             pinned=pinned,
+            total_ms=_ms(time.perf_counter() - t_total),
+        )
+
+    # ------------------------------------------------------------------ #
+    # authorial correction — the operator's replace-model fix
+    # ------------------------------------------------------------------ #
+
+    async def correct(
+        self, memory_id: UUID, request: CorrectionRequest
+    ) -> CorrectionResult:
+        """Authorial correction (authorial-correction.md): the operator's
+        text byte-verbatim into one supersede-guarded transaction with cache
+        eviction. Fail-loud — the operator surface has no soft paths."""
+        t_total = time.perf_counter()
+        if not request.content.strip():
+            raise ValueError("corrected content must be non-empty")
+        outcome = await db.apply_authorial_correction(
+            self._pool,
+            memory_id=memory_id,
+            content=request.content,
+            valid_at=request.client_timestamp,
+            expected_detail_id=request.expected_detail_id,
+        )
+        if outcome == "unknown_memory":
+            raise UnknownMemoryError(f"unknown memory_id {memory_id}")
+        if outcome == "stale_head":
+            raise CorrectionConflictError(
+                f"live head moved for {memory_id}; re-read and re-issue"
+            )
+        return CorrectionResult(
+            memory_id=memory_id,
+            detail_id=outcome.detail_id,
+            superseded_detail_id=outcome.superseded_detail_id,
+            evicted_cache_rows=outcome.evicted_cache_rows,
             total_ms=_ms(time.perf_counter() - t_total),
         )

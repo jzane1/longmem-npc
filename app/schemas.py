@@ -85,6 +85,28 @@ class PinRequest(BaseModel):
     pinned: bool
 
 
+class CorrectionRequest(BaseModel):
+    """Body of POST /v1/memories/{memory_id}/correction — the operator's
+    replace-model fix (authorial-correction.md, build shapes ruled
+    2026-07-18). `content` is stored byte-verbatim as the corrected head — no
+    model call touches it. `client_timestamp` is the correction's world time
+    t_c (prior head invalid_at = corrected head valid_at — the coherent-
+    chain-timeline precedent). `expected_detail_id`, when supplied, makes the
+    supersede a compare-and-swap: 409 if the live head moved since the
+    operator read it (never a silent correction of an unseen telling)."""
+
+    content: str = Field(min_length=1)
+    client_timestamp: datetime
+    expected_detail_id: UUID | None = None
+
+    @field_validator("client_timestamp")
+    @classmethod
+    def _tz_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            raise ValueError("timestamp must be timezone-aware")
+        return value
+
+
 class AffectOut(BaseModel):
     """Stored affect facts (valence/arousal columns + jsonb detail)."""
 
@@ -164,6 +186,17 @@ class PinResult(BaseModel):
 
     memory_id: UUID
     pinned: bool
+    total_ms: float
+
+
+class CorrectionResult(BaseModel):
+    """Result of the authorial correction — IDs + instrumentation. No token
+    fields: the endpoint makes no model calls (authorial-correction.md)."""
+
+    memory_id: UUID
+    detail_id: UUID  # the corrected head
+    superseded_detail_id: UUID
+    evicted_cache_rows: int
     total_ms: float
 
 

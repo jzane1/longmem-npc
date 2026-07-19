@@ -4,10 +4,12 @@ psycopg v3 with AsyncConnectionPool (stack constant; no ORM, no query
 builder). The observe insert is ONE transaction: memories row + `original`
 memory_details head + memory_gist_spans + any new identity_components land
 together or not at all (write-path.md §pipeline step d). Nothing here ever
-UPDATEs stored content or DELETEs rows; the only in-place writes are the two
-agent-row runtime scalars — `set_pinned` (`memories.pinned`, write-path v1)
-and `apply_reputation_delta` (`agents.reputation`, CLI-harness build ruling
-2026-07-15) — both outside the memory-content non-destructive invariant.
+UPDATEs stored content; the only in-place writes are the two agent-row
+runtime scalars — `set_pinned` (`memories.pinned`, write-path v1) and
+`apply_reputation_delta` (`agents.reputation`, CLI-harness build ruling
+2026-07-15) — both outside the memory-content non-destructive invariant. The
+only DELETE is `apply_authorial_correction`'s cache eviction — derived rows,
+not memory content (the standing eviction invariant, authorial-correction.md).
 
 Read-path candidate queries (read-path.md, 2026-07-14) are read-only: live
 memories (`memories.invalid_at IS NULL`) joined to the unique live detail
@@ -21,7 +23,10 @@ Reconstruction (reconstruction.md, built 2026-07-17) writes through
 content), inserts the new `reconstruction` head, and inserts the cache row —
 the serve-only-persisted-text rule rides on this atomicity. The cache tables'
 only writers live in the reconstruction path (the eviction invariant's
-precondition); `upsert_identity_document` is insert-if-absent (versions are
+precondition); any other chain writer evicts — `apply_authorial_correction`
+(authorial-correction.md) supersedes the live head with the operator's text
+byte-verbatim and deletes every cache row for that memory in the same
+transaction. `upsert_identity_document` is insert-if-absent (versions are
 content-addressed and immutable once written).
 """
 
@@ -29,6 +34,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pgvector.psycopg import register_vector_async
@@ -453,12 +459,16 @@ async def insert_cache_row(
 @dataclass(frozen=True)
 class ReconstructionSource:
     """Per-memory retelling inputs: the immutable observation text, ordered
-    gist span offsets, and the drift anchor's content (the latest chain row
-    whose write_cause is in the anchor set — derivable, no pointer)."""
+    gist span offsets, and the drift anchor's content and cause (the latest
+    chain row whose write_cause is in the anchor set — derivable, no
+    pointer). The cause drives the constraint: on `authorial_correction`-
+    anchored chains the corrected head replaces the gist constraint (ruled
+    2026-07-17, authorial-correction.md)."""
 
     observation_text: str
     spans: list[tuple[int, int]]
     anchor_content: str
+    anchor_cause: str
 
 
 async def fetch_reconstruction_sources(
@@ -485,19 +495,20 @@ async def fetch_reconstruction_sources(
         # (original | authorial_correction | update_with_resentment);
         # rationalization and reconstruction rows never re-anchor.
         await cur.execute(
-            "SELECT DISTINCT ON (memory_id) memory_id, content "
+            "SELECT DISTINCT ON (memory_id) memory_id, content, write_cause "
             "FROM memory_details WHERE memory_id = ANY(%s) "
             "AND write_cause IN "
             "('original', 'authorial_correction', 'update_with_resentment') "
             "ORDER BY memory_id, created_at DESC",
             (memory_ids,),
         )
-        anchors = {row[0]: row[1] for row in await cur.fetchall()}
+        anchors = {row[0]: (row[1], row[2]) for row in await cur.fetchall()}
     return {
         memory_id: ReconstructionSource(
             observation_text=texts[memory_id],
             spans=spans.get(memory_id, []),
-            anchor_content=anchors[memory_id],
+            anchor_content=anchors[memory_id][0],
+            anchor_cause=anchors[memory_id][1],
         )
         for memory_id in texts
         if memory_id in anchors
@@ -544,3 +555,77 @@ async def write_back_reconstruction(
                     (memory_id, composed_key, content),
                 )
     return detail_id
+
+
+@dataclass(frozen=True)
+class CorrectionApplied:
+    """Row-level outcome of `apply_authorial_correction`."""
+
+    detail_id: UUID
+    superseded_detail_id: UUID
+    evicted_cache_rows: int
+
+
+class _StaleHeadError(Exception):
+    """Internal: aborts (rolls back) the correction transaction on a failed
+    compare-and-swap; surfaced to the caller as the "stale_head" outcome."""
+
+
+async def apply_authorial_correction(
+    pool: AsyncConnectionPool,
+    *,
+    memory_id: UUID,
+    content: str,
+    valid_at: datetime,
+    expected_detail_id: UUID | None = None,
+) -> CorrectionApplied | Literal["unknown_memory", "stale_head"]:
+    """The operator's replace-model correction (authorial-correction.md): ONE
+    transaction — supersede the live head at the correction's world time,
+    insert the corrected `authorial_correction` head (valid_at = the same
+    instant; the coherent-chain-timeline precedent), and evict every cache
+    row for the memory (the standing eviction invariant: any non-
+    reconstruction chain writer evicts). `content` is the operator's text
+    byte-verbatim — no model call rides here. With `expected_detail_id` the
+    supersede is a compare-and-swap: a head that moved since the operator
+    read it reports "stale_head" and changes nothing (never silently correct
+    a telling the operator did not see). "unknown_memory" = no live head,
+    which by the one-live-head construction means no such memory."""
+    try:
+        async with pool.connection() as conn:
+            async with conn.transaction():
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        "UPDATE memory_details SET invalid_at = %s "
+                        "WHERE memory_id = %s AND invalid_at IS NULL "
+                        "RETURNING detail_id",
+                        (valid_at, memory_id),
+                    )
+                    row = await cur.fetchone()
+                    if row is None:
+                        return "unknown_memory"
+                    superseded = row[0]
+                    if (
+                        expected_detail_id is not None
+                        and superseded != expected_detail_id
+                    ):
+                        raise _StaleHeadError
+                    await cur.execute(
+                        "INSERT INTO memory_details (memory_id, content, "
+                        "write_cause, valid_at) VALUES "
+                        "(%s, %s, 'authorial_correction', %s) "
+                        "RETURNING detail_id",
+                        (memory_id, content, valid_at),
+                    )
+                    detail_id = (await cur.fetchone())[0]
+                    await cur.execute(
+                        "DELETE FROM reconstruction_cache WHERE memory_id = %s",
+                        (memory_id,),
+                    )
+                    evicted = cur.rowcount
+    except _StaleHeadError:
+        return "stale_head"
+    return CorrectionApplied(
+        detail_id=detail_id,
+        superseded_detail_id=superseded,
+        evicted_cache_rows=evicted,
+    )

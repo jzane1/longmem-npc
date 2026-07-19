@@ -21,6 +21,7 @@ from fastapi import FastAPI, HTTPException
 from app.config import load_settings
 from app.db import build_pool
 from app.ingest import (
+    CorrectionConflictError,
     EscalationHardStopError,
     IngestService,
     UnknownAgentError,
@@ -31,6 +32,8 @@ from app.providers import build_providers
 from app.reconstruction import UnknownIdentityVersionError
 from app.retrieval import RetrievalService
 from app.schemas import (
+    CorrectionRequest,
+    CorrectionResult,
     DialogueInitRequest,
     IngestResult,
     ObserveEvent,
@@ -103,3 +106,18 @@ async def set_pin(memory_id: UUID, body: PinRequest) -> PinResult:
         return await app.state.service.set_pin(memory_id, body.pinned)
     except UnknownMemoryError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/v1/memories/{memory_id}/correction", response_model=CorrectionResult)
+async def correct_memory(memory_id: UUID, body: CorrectionRequest) -> CorrectionResult:
+    """Authorial correction (authorial-correction.md): memory-scoped operator
+    verb — /v1/events/* stays diegetic. Fail-loud: 404 unknown memory, 409
+    stale expected_detail_id, 422 invalid content; nothing partial."""
+    try:
+        return await app.state.service.correct(memory_id, body)
+    except UnknownMemoryError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except CorrectionConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc

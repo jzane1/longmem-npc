@@ -943,3 +943,49 @@ bullet annotated; Set A's authorial pair gains the constraint-follows-anchor and
 mid-scene-immediacy assertions; the immediate queue renumbered (fact correction → 2, gate → 3,
 suite → 4, Unity → 5, pre-ship gates → 6) with stale gate/suite refs updated in `read-path.md`,
 `cli-harness.md`, `reconstruction.md`. Docs only — no code, no floors changed.
+
+## Authorial-correction build rulings — 2026-07-18
+
+Authorial-correction v1 built and floor-verifier-passed the same day (structural walker
+`tests\verify_authorial_correction.py`, 31 assertions; all four prior walkers re-run clean on
+fresh scratch — 42/42 with the reconstruction walker grown by one corrected-item assertion
+(addition only), 36/36, 34/34, 35/35; `longmem` confirmed pristine via the postgres MCP). Jack
+ruled one criterion via an explicit question at a mid-build stop-and-report; the spec's
+remaining settle-shapes were approved with the plan.
+
+1. **Done-when "time travel coherent" re-ruled to stored bi-temporal coherence (explicit
+   question).** The spec's wording — "`as_of` before t_c serves the prior telling" —
+   over-claimed: the candidate SQL joins the live head unconditionally
+   (`d.invalid_at IS NULL`), and `as_of` is an **age-computation override** by the 2026-07-14
+   read-path ruling; invalidation excluding rows in SQL is what Set B's decay-vs-invalidation
+   separation asserts through. Ruled: the walker asserts the **stored** guarantee — chain
+   stamps coherent around t_c (superseded `invalid_at` = corrected `valid_at` = t_c) and a
+   windowed SQL query re-derives which telling was live at any instant, with no gap or overlap.
+   **Rejected (presented fairly priced, not adopted, not slated):** as_of-windowed chain
+   serving — the fuller bi-temporal read would rewrite the ruled `as_of` semantics, re-open the
+   read-path floor, and require re-thinking the reconstruction cache for superseded heads; no
+   ruling or demo beat asks for it (drift and correction-override both want current-state
+   serving). If ever wanted, it is its own spec-first target.
+
+Approved-with-plan shapes, as built: route `POST /v1/memories/{memory_id}/correction` (POST —
+each call mints a chain row); `CorrectionRequest { content min_length 1, client_timestamp
+required tz-aware (the ObserveEvent naming) → t_c, expected_detail_id optional }` /
+`CorrectionResult { memory_id, detail_id, superseded_detail_id, evicted_cache_rows, total_ms }`
+(the PinResult naming; no token fields — no model calls); whitespace-only content invalid
+(pydantic `min_length` + a stripped check in the seam → 422); **concurrency = the spec's 409
+suggestion refined to an opt-in compare-and-swap** — the supersede targets the live head by
+predicate (race-safe under row locking; the one-live-head index the backstop), and a supplied
+`expected_detail_id` that no longer names the live head → `CorrectionConflictError` → **409**
+with the transaction rolled back (never a silent correction of a telling the operator did not
+see), while an omitted CAS (the REPL default) corrects the current live head; corrected-chain
+prompt shape per the pure `build_reconstruction_item` (anchor cause `authorial_correction` →
+the corrected anchor text in the constraint slot, empty detail — nothing observation-derived
+re-injected — `current_telling` kept, `_SYSTEM_TASK` and the JSON shape unchanged;
+original-anchored chains byte-identical to the prior stage; `ReconstructionSource` gains
+`anchor_cause`); CLI `:correct <memory_id> <text…>` with t_c = the session's effective time
+(`as_of` under time travel); error mapping 404 / 409 / 422 / 5xx raw (fail-loud); walker
+`tests\verify_authorial_correction.py` on the scratch pattern.
+
+Environment learning (recorded for the next session): the repo `.env` now runs
+`LONGMEM_PROVIDER_MODE=real`, so piped-REPL smokes must set
+`$env:LONGMEM_PROVIDER_MODE = "fake"` alongside the scratch `DATABASE_URI` override.

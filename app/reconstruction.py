@@ -22,6 +22,12 @@ Design lines carried from the spec (built 2026-07-17):
     failure -> fail-closed on the write (refuse, serve head; NOT cached, so
     a transient embed outage never permanently pins a key); persistence
     failure -> serve the head, the next read retries the miss.
+  - CONSTRAINT FOLLOWS THE ANCHOR (authorial-correction build, ruled
+    2026-07-17): an `authorial_correction`-anchored chain retells from the
+    corrected head as the fixed constraint — no observation-derived gist or
+    detail is re-injected (it may contain exactly the data the operator
+    corrected away); the band still keys the cache. Original-anchored chains
+    are unchanged.
 
 Cache-hit corner (documented shape): after backwards time travel a cached
 telling can predate the current live head. The cache row is still served
@@ -145,6 +151,34 @@ def thin_detail(segments: list[str], level: float) -> str:
         retain = max(1, math.ceil(level * len(sentences)))
         kept.append(" ".join(sentences[:retain]))
     return "\n".join(kept)
+
+
+def build_reconstruction_item(
+    memory_id: str,
+    source: db.ReconstructionSource,
+    level: float,
+    current_telling: str,
+) -> ReconstructionItem:
+    """The per-memory call inputs, anchor-cause-aware (constraint follows
+    the anchor — ruled 2026-07-17, authorial-correction.md): on an
+    `authorial_correction`-anchored chain the corrected head IS the fixed
+    facts (the gist slot), with no observation-derived detail re-injected;
+    original-anchored chains build byte-identically to the pre-correction
+    stage. Pure — walker-assertable without a database or model call."""
+    if source.anchor_cause == "authorial_correction":
+        return ReconstructionItem(
+            memory_id=memory_id,
+            gist=source.anchor_content,
+            thinned_detail="",
+            current_telling=current_telling,
+        )
+    gist, segments = split_gist_detail(source.observation_text, source.spans)
+    return ReconstructionItem(
+        memory_id=memory_id,
+        gist=gist,
+        thinned_detail=thin_detail(segments, level),
+        current_telling=current_telling,
+    )
 
 
 def assemble_reconstruction_prompt(
@@ -334,18 +368,12 @@ class ReconstructionService:
                     )
             items: list[ReconstructionItem] = []
             for slot in sorted(call_slots, key=lambda s: str(s.row.memory_id)):
-                source = sources[slot.row.memory_id]
-                gist, segments = split_gist_detail(
-                    source.observation_text, source.spans
-                )
                 items.append(
-                    ReconstructionItem(
-                        memory_id=str(slot.row.memory_id),
-                        gist=gist,
-                        thinned_detail=thin_detail(
-                            segments, band_level(slot.band, quantum)
-                        ),
-                        current_telling=slot.row.content,
+                    build_reconstruction_item(
+                        str(slot.row.memory_id),
+                        sources[slot.row.memory_id],
+                        band_level(slot.band, quantum),
+                        slot.row.content,
                     )
                 )
             system_prompt, user_content = assemble_reconstruction_prompt(

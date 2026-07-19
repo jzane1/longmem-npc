@@ -47,6 +47,8 @@ from app.nlp import warm_pipelines
 from app.providers import Providers, build_providers
 from app.retrieval import RetrievalService
 from app.schemas import (
+    CorrectionRequest,
+    CorrectionResult,
     DialogueTurnRequest,
     DialogueTurnResult,
     IngestResult,
@@ -205,6 +207,16 @@ class SessionRunner:
 
     async def pin(self, memory_id: UUID, pinned: bool) -> PinResult:
         return await self._ingest.set_pin(memory_id, pinned)
+
+    async def correct(self, memory_id: UUID, content: str) -> CorrectionResult:
+        """Authorial correction at the session's effective time — the
+        operator states t_c, and under time travel that is the session's
+        as_of (authorial-correction.md; immediate effect, mid-scene
+        included)."""
+        return await self._ingest.correct(
+            memory_id,
+            CorrectionRequest(content=content, client_timestamp=self._now()),
+        )
 
     async def close(self) -> None:
         if self._owns_pool:

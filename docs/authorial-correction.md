@@ -33,6 +33,23 @@ in `decisions.md`) — **the first spec authored under the 2026-07-17 scope-limi
    within-scene stability invariant's wording gains authorial correction as the second sanctioned
    text-change cause (amended in CLAUDE.md, architecture §7, and `test-suite.md` Set C).
 
+> **Status: BUILT & floor-verified 2026-07-18.** Every `[SETTLE-AT-BUILD]` item below was ruled at
+> build time (dated "Authorial-correction build rulings" entry in `decisions.md`): one criterion
+> was **re-ruled via an explicit question at a mid-build stop-and-report** — the done-when
+> "time travel coherent" bullet became **stored bi-temporal coherence** (its original wording
+> over-claimed; see the annotation below) — and the rest were approved with the plan, including
+> the **compare-and-swap refinement** of the 409 suggestion (optional `expected_detail_id`).
+> **No migration was needed, as the spec stated** (`db\migrate.py` no-arg still a clean no-op).
+> The endpoint landed in `app\db.py` (`apply_authorial_correction`) + `app\ingest.py`
+> (`IngestService.correct`) + `app\api.py` + `app\schemas.py`; the reconstruction delta in
+> `app\reconstruction.py` (`build_reconstruction_item`, anchor-cause-aware — the deliberately
+> re-opened floor, re-verified with its walker grown 41 → 42 by addition only); the REPL surface
+> in `app\session.py` + `app\cli.py` (`:correct`); walker `tests\verify_authorial_correction.py`
+> (31 assertions). floor-verifier **pass** — all five walkers re-run independently on fresh
+> scratch, `longmem` confirmed pristine via the postgres MCP, independent code spot-checks
+> (transaction + CAS rollback shape, byte-verbatim no-model path, retrieval/scoring untouched),
+> plus a live piped REPL correction-override beat.
+
 ## Principles this build honors
 
 - **Non-destructive supersession.** The correction **inserts** a corrected head
@@ -62,11 +79,11 @@ in `decisions.md`) — **the first spec authored under the 2026-07-17 scope-limi
 
 ## Scope boundary — do NOT build
 
-**Fact-level correction** — slated as immediate-queue item 2, its own spec + build (a sequencing
-note, not a rejection: it needs a fact-versioning design the memories row doesn't have, and that
-design deserves its own fork surface). **The diegetic correction event + dissonance path**
-(sequenced post-August; the `corrections` table stays write-less until then). **Purge.** **The
-mid-dialogue gate** (immediate-queue item 3). If adjacent work looks necessary, stop and report —
+**Fact-level correction** — slated as its own spec + build, immediate-queue item 1 as of this
+build's completion (a sequencing note, not a rejection: it needs a fact-versioning design the
+memories row doesn't have, and that design deserves its own fork surface). **The diegetic
+correction event + dissonance path** (sequenced post-August; the `corrections` table stays
+write-less until then). **Purge.** **The mid-dialogue gate** (immediate-queue item 2). If adjacent work looks necessary, stop and report —
 with the correct option and its real cost stated, per the reframed contract.
 
 ## Surface (where this attaches)
@@ -105,7 +122,8 @@ transaction, supersede-guarded.
    so `as_of` time travel before/after t_c serves the right telling.
 3. **Evict all cache rows** for the memory_id — the inherited invariant, same transaction.
 
-No `corrections` row. No `memories`-row writes of any kind (fact correction is item 2).
+No `corrections` row. No `memories`-row writes of any kind (fact correction is item 1 of the
+queue as of this build's completion).
 
 ## The reconstruction delta: constraint follows the anchor
 
@@ -147,17 +165,37 @@ flicker; an operator override of wrong data is not flicker.
 surface them. No token accounting — this endpoint makes no model calls. `[SETTLE-AT-BUILD]`
 exact field names with the wire shape.
 
-## `[SETTLE-AT-BUILD]` — physical shapes (stop and report, never silently choose)
+## `[SETTLE-AT-BUILD]` — physical shapes, ruled at build (stop and report, never silently choose)
 
-- Route path/verb; request/response wire models and field names.
-- `valid_at` policy (required vs defaulted; suggested required, tz-aware).
-- Empty/invalid-content validation shape.
-- Concurrency loser behavior (suggested 409, no silent retry).
-- Corrected-chain prompt input shape (suggested: anchor constraint + live head, gist/detail
-  omitted).
-- CLI `:correct` syntax + debug rendering.
-- Error-code mapping (404 / 422 / 409 / 5xx).
-- Walker name + shape — suggested `tests\verify_authorial_correction.py`, scratch-DB pattern.
+**All ruled 2026-07-18 with the build plan** (dated "Authorial-correction build rulings" entry in
+`decisions.md`; the time-travel done-when was re-ruled via an explicit question):
+
+- **Route** — **ruled:** `POST /v1/memories/{memory_id}/correction` (POST — each call mints a
+  chain row; pin's PUT is a toggle).
+- **Wire models** — **ruled:** `CorrectionRequest { content (min_length 1), client_timestamp
+  (required, tz-aware — the ObserveEvent naming), expected_detail_id (optional, see CAS) }`;
+  `CorrectionResult { memory_id, detail_id, superseded_detail_id, evicted_cache_rows, total_ms }`
+  (the PinResult naming; no token fields — no model calls).
+- **`valid_at` policy** — **ruled as suggested:** required tz-aware `client_timestamp` → t_c.
+- **Validation** — **ruled:** pydantic `min_length=1` + a stripped-non-empty check in the seam;
+  whitespace-only content is invalid (422).
+- **Concurrency** — **ruled with a refinement of the spec's 409 suggestion:** the supersede
+  targets the live head by predicate (race-safe under row locking); an optional
+  `expected_detail_id` makes it a compare-and-swap — stale → **409**, transaction rolled back,
+  nothing changed (the ruled no-silent-correction behavior, opt-in); omitted (the REPL default)
+  → correct the current live head.
+- **Corrected-chain prompt input shape** — **ruled as suggested:** the pure
+  `build_reconstruction_item` branches on `anchor_cause` — corrected anchor text in the
+  constraint (gist) slot, empty detail, `current_telling` kept; `_SYSTEM_TASK` and the JSON
+  shape unchanged; original-anchored chains byte-identical to the prior stage.
+- **CLI** — **ruled as suggested:** `:correct <memory_id> <corrected text…>`; t_c = the
+  session's effective time (`as_of` under time travel); prints the head swap, eviction count,
+  and timing.
+- **Error mapping** — **ruled:** 404 unknown memory / 409 stale CAS / 422 invalid content /
+  5xx raw. Fail-loud, no soft paths.
+- **Walker** — **ruled:** `tests\verify_authorial_correction.py` (31 assertions, scratch
+  pattern); `tests\verify_reconstruction.py` grew one corrected-item assertion (41 → 42,
+  addition only).
 
 ## Done when
 
@@ -179,7 +217,12 @@ exact field names with the wire shape.
 - **Pin inheritance.** Correcting a pinned memory proceeds; the corrected head serves verbatim;
   no reconstruction row ever grows on it.
 - **Time travel coherent.** `as_of` before t_c serves the prior telling; at/after t_c the
-  corrected chain.
+  corrected chain. *(Re-ruled at build via explicit question, 2026-07-18: **stored bi-temporal
+  coherence** — the walker asserts a windowed SQL query re-derives the pre-correction telling,
+  with no gap or overlap at t_c. The original wording over-claimed: serving always follows the
+  live head, and `as_of` is an age-computation override per the 2026-07-14 read-path ruling.
+  The alternative — as_of-windowed chain serving — was presented fairly priced and not
+  adopted.)*
 - **Concurrency guarded.** A stale supersede (rowcount ≠ 1) changes nothing and reports per the
   settled loser shape.
 - **Errors loud.** Unknown memory 404; invalid content 422; route is a pass-through of the seam

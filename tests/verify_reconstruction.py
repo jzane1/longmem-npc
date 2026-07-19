@@ -54,6 +54,7 @@ from app.reconstruction import (
     UnknownIdentityVersionError,
     assemble_reconstruction_prompt,
     band_index,
+    build_reconstruction_item,
     compose_cache_key,
     merge_spans,
     split_gist_detail,
@@ -544,6 +545,14 @@ async def main(database_uri: str) -> None:
     check(
         sources[ids["old"]].anchor_content == corrected,
         "anchor resolves to the corrected head (derivable, no pointer)",
+    )
+    item8 = build_reconstruction_item(
+        str(ids["old"]), sources[ids["old"]], 0.5, corrected
+    )
+    check(
+        item8.gist == corrected and item8.thinned_detail == "",
+        "constraint follows the anchor: the corrected head is the fixed "
+        "constraint, no observation detail (authorial-correction build)",
     )
     r8 = await retrieval.retrieve_dialogue_init(request(agent_a, version2, basis2))
     m8 = by_id(r8)[ids["old"]]
