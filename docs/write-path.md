@@ -157,7 +157,10 @@ then return `IngestResult`. *(Fact-level correction built 2026-07-18,
 the build **ruled freeze** — the observation vector is written only there, never to
 `memories.embedding`. This floor was deliberately re-opened and re-verified, walker 35 → 38 —
 one modification ruled with the freeze: the embed-degradation signal assertion moved to the
-fact head.)*
+fact head.)* *(Gate spec 2026-07-19, freeze ruling — the same precedent applied to entities:
+at the gate build this transaction writes entities to the `original` fact head only;
+`memories.entities` frozen post-003, its GIN replaced by a partial GIN on live fact heads —
+`mid-dialogue-gate.md`.)*
 
 ### The render seam *(confirmed as specced — ruled 2026-07-13)*
 
@@ -173,7 +176,7 @@ On write-call failure the head falls back to the raw observation text — never 
 | importance-scoring model fails | write lands; neutral importance; `scoring_failed = true`. |
 | unknown `decay_class` label | write lands; default class; `decay_class_unknown = true`. |
 | malformed Haiku structured output | log, ignore, apply neutral/default; the write succeeds. |
-| embedding call fails | write lands; NULL embedding (`embedding IS NULL` is the queryable signal; payload mirror `embedding_failed`). *(Ruled 2026-07-13.)* |
+| embedding call fails | write lands; NULL embedding (`embedding IS NULL` is the queryable signal; payload mirror `embedding_failed`). *(Ruled 2026-07-13; signal home since the 2026-07-18 freeze: the live fact head — `memory_fact_versions.embedding IS NULL`.)* |
 | escalation call fails twice | **HARD-STOP** — retry once, then abort the write, nothing inserted (fail-loud; escalation precedes the insert, so a client resend is safe pre-idempotency). *(Build-phase stance ruled 2026-07-13 — **must be re-ruled before the demo ships**; open decision in `status.md`.)* |
 
 ## Model provider interfaces
@@ -208,7 +211,8 @@ The provider is selected by config; the ingest service is identical under either
 - **Embedding-failure degradation** — fail the write vs. null embedding + flag. *(Ruled 2026-07-13:
   the write lands with a NULL embedding; `embedding IS NULL` is the queryable signal, mirrored in
   the payload as `embedding_failed`. The memory stays reachable via the entity/GIN path; vector
-  backfill is future work.)*
+  backfill is future work.)* *(Gate spec 2026-07-19: the entity/GIN reachability moves to the
+  fact-head partial GIN at migration 003 — `mid-dialogue-gate.md`.)*
 - **Wire shape** — the `observe` request/response Pydantic models and the FastAPI route path/verb.
   *(Ruled 2026-07-13: `POST /v1/events/observe`, `POST /v1/events/scene-boundary`,
   `PUT /v1/memories/{memory_id}/pin`; models in `app\schemas.py`; the route is a pass-through.)*

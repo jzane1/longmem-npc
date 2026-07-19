@@ -89,7 +89,8 @@ ran 2026-07-18 — specced in `fact-level-correction.md`; at its build the combi
 this endpoint.)* **The diegetic
 correction event + dissonance path** (sequenced post-August; the `corrections` table stays
 write-less until then). **Purge.** **The mid-dialogue gate** (immediate-queue item 1 since the
-2026-07-18 fact-level build). If adjacent work looks necessary, stop and report —
+2026-07-18 fact-level build; specced 2026-07-19, `mid-dialogue-gate.md`). If adjacent work
+looks necessary, stop and report —
 with the correct option and its real cost stated, per the reframed contract.
 
 ## Surface (where this attaches)
@@ -183,7 +184,9 @@ build, specced 2026-07-18: one embed call rides the verb and `CorrectionResult` 
 - **Route** — **ruled:** `POST /v1/memories/{memory_id}/correction` (POST — each call mints a
   chain row; pin's PUT is a toggle).
 - **Wire models** — **ruled:** `CorrectionRequest { content (min_length 1), client_timestamp
-  (required, tz-aware — the ObserveEvent naming), expected_detail_id (optional, see CAS) }`;
+  (required, tz-aware — the ObserveEvent naming), expected_detail_id (optional, see CAS) }`
+  *(gate spec 2026-07-19, fork 3: gains an optional `entities` field at the gate build — NER +
+  operator merge populate the corrected fact head's entities; `mid-dialogue-gate.md`)*;
   `CorrectionResult { memory_id, detail_id, superseded_detail_id, evicted_cache_rows, total_ms }`
   (the PinResult naming; no token fields — no model calls). *(Superseded at the fact-level
   build, specced 2026-07-18: `CorrectionResult` widens and one embed call rides the verb —

@@ -90,7 +90,8 @@ table with per-event client override.
 
 **Context stamps: four optional fields, typed columns.** Location, entities, time, affect; per-field
 degradation stated; typed column per component (per-component read weights require it); location
-embedded via the same 1536 model.
+embedded via the same 1536 model. *(2026-07-19 gate-spec freeze: entities' home moves to the
+fact chain at migration 003, the GIN with it — `mid-dialogue-gate.md`.)*
 
 **Reputation: model-emitted delta.** Haiku emits a delta by default; client override wins; per-NPC
 sensitivity scalar; hard clamp on a defined scale; injected from a scene-start snapshot.
@@ -115,6 +116,8 @@ pin; unpinning resumes from the frozen head.
    entity-only lexical fetch off the GIN index ranked by recency × importance; no entities →
    novelty-only; both out → gate closed, serve the loaded set, fail-quiet. Which-signal-fired is
    logged per event; the entity gate's lookup table *is* the identity components table.
+   *(2026-07-19 gate-spec freeze ruling: migration 003 moves the entities GIN to the live fact
+   heads — the lexical fetch reads fact-head entities; `mid-dialogue-gate.md`.)*
 4. **Within-scene text-stability invariant.** Absent a diegetic event on that memory, repeated reads
    within one scene return byte-identical text. Constrains any future async fallback. *(Amended
    2026-07-17: authorial correction added as the second sanctioned text-change cause — see the
@@ -293,7 +296,8 @@ with the build plan.
    queryable degradation signal (frozen schema allows no flag column); mirrored in the payload as
    `IngestResult.embedding_failed` — a payload-only extension of the spec's field list, added so
    the degradation is assertable without a DB peek. Memory stays reachable via the entity/GIN
-   path; vector backfill is future work.
+   path; vector backfill is future work. *(2026-07-19 gate-spec freeze: that reachability moves
+   to the fact-head partial GIN at migration 003 — `mid-dialogue-gate.md`.)*
 3. **NLP stack: spaCy `en_core_web_lg` + fastcoref + VADER + Warriner 2013 VAD lexicon.**
    - **License gate outcome:** NRC-VAD **rejected** — non-commercial-research-only, incompatible
      with the planned Apache-2.0 flip. The pre-ruled fallback **Warriner et al. 2013** is CC-BY
@@ -1011,7 +1015,9 @@ stored embedding's sole consumer is the `fetch_vector_candidates` probe — the 
    call); importance, typology, decay class, entities, and affect stand as write-time facts
    about the *event* — consistent with the deliberately-disregarded 2026-07-12 staleness
    tension. Honest deferral recorded: a fact-corrected memory carries its original entities
-   until an additive fact-chain column rides with the gate target. **Rejected:** +mechanical
+   until an additive fact-chain column rides with the gate target. *(Closed 2026-07-19 —
+   migration 003 specced at the gate target, and the correction verb re-derives entities;
+   `mid-dialogue-gate.md`.)* **Rejected:** +mechanical
    NLP pass (entities/affect feed nothing readable today; gist re-derivation consumer-less;
    spaCy latency on the operator verb); +Haiku re-score (a second model call; importance moves
    to the fact head, widening the candidate-SQL delta and re-opening read-path scoring
@@ -1106,3 +1112,92 @@ rejected land-with-NULL option would have needed).
 Verification also included a live piped REPL beat on scratch (fake mode): the `:correct` line
 prints both head swaps, and the same chapel query's relevance moved 0.4686 → 0.5637 across the
 correction — retrieval following the fix, visible in the debug view.
+
+## Mid-dialogue gate spec scope rulings — 2026-07-19
+
+Authoring `mid-dialogue-gate.md` (the mid-dialogue gate — immediate-queue item 1 since the
+2026-07-18 fact-level build) required five scope rulings. Presentation mode, recorded per the
+house convention: forks 1, 2, 4, and 5 were re-presented in plain prose at Jack's request
+(fork 1 after distinguishing the loaded set from a per-turn top-k and detailing the
+server-side option; fork 2 after a refresher on the two-chain split — retellings compound on
+the telling chain while the fact chain is the ground-truth basis reconstructions never touch)
+and ruled on the re-presentation, each on the recommended option; fork 3 was ruled on the
+first presentation. **Fork 5's recommendation was reversed between presentations, recorded
+honestly** (see below). Premises verified in code before presenting: the loaded set has **no
+state home anywhere** (the session runner holds only scene-frozen scalars — no turn counter,
+no last-retrieval, no history); retrieval fires **unconditionally on every turn**
+(`app\dialogue.py`); `memories.entities` and its GIN index have **zero readers**; the
+read-request `entities` slot is RESERVED-inert and is not the gate's input.
+
+1. **Loaded-set home = caller-held scene state, reputation-style.** The session runner (Unity
+   client in production) keeps loaded memory IDs as scene state — reset at scene boundaries,
+   populated by the loader turn, appended on gate fetches — and passes them per request; the
+   server fetches those rows by ID each turn (one keyed SQL on live fact heads) for the
+   novelty basis, coverage check, and closed-gate serving. Absent fields ⇒ loader semantics ⇒
+   v1 byte-parity. Third use of the ruled caller-freezes-scene-state contract (reputation
+   snapshot 2026-07-15, `identity_version` 2026-07-17). **Rejected:** server-side scene state
+   (a scene-state table invents a persistent scene object + a per-turn write + lifecycle
+   questions in a no-DELETE store; an in-process cache breaks under the REPL-in-process +
+   route-over-HTTP dual-caller topology and dies on restart); per-turn approximation (runs
+   the probe to decide whether to run the probe; already-recalled entities re-fire on every
+   mention; contradicts architecture §6).
+2. **Migration 003 entities = FREEZE — the fact head is the sole entities home.** The 002
+   embedding precedent applied to entities: `memory_fact_versions.entities` added; observe
+   writes the fact head only; guarded backfill from `memories.entities` before the index;
+   partial GIN over live fact heads; `memories_entities_gin` dropped; `memories.entities`
+   frozen (the epoch split accepted, same as the embedding's). Decisive argument: the gate's
+   coverage check and degraded fetch *read* entities — one home makes "corrections move
+   entities" true everywhere they're read. **Sanctioned shape, explicitly:** the backfill is
+   an UPDATE of a brand-new never-populated column on existing fact rows — schema-evolution
+   backfill in the 002 spirit, not a content mutation. **Rejected:** dual-home (two homes
+   drift; the gate would read the home corrections cannot move — the exact debt 003 closes).
+3. **Correction entities = mechanical NLP pass + optional operator field.** The corrected
+   fact head's entities mirror observe's merge exactly: spaCy NER over the corrected text +
+   optional `CorrectionRequest.entities`, case-insensitive dedup; absent field ⇒ NER alone.
+   Non-LLM. The fact-level fork-1 rejection of an NLP re-pass rested on "entities feed
+   nothing readable today" — a premise this target ends; the price (the write path's NLP
+   stack enters the correction path) restated and accepted. **Rejected:** NER-only (drops the
+   client-supplied merge observe has); operator-field-only (fieldless corrections don't move
+   entities); copy-forward-only (the deferral's stated purpose would defer again).
+4. **Per-signal fire logs = instrumentation-only.** `signals_fired` rides the turn
+   instrumentation (the write path's `escalated_by` precedent) + load-driver per-100-turn
+   aggregates; the reserved novelty kill-switch decision reads run artifacts. Zero schema,
+   zero per-turn DB writes; a persisted `gate_events` table stays pull-forward eligible if
+   the kill-switch ruling later demands cross-session data. **Rejected:** persisted rows
+   riding 003 (a write per gate evaluation — base rates need non-fire rows; purge-contract
+   growth; more schema before any long-running real usage exists).
+5. **Reconstructing signal = post-hoc response fields + a pre-serve callback.** The reply
+   carries the pause info AND an optional in-process callback fires as a blocking mid-scene
+   serve begins — the REPL prints `(reconstructing…)` during the wait; the queued Unity hook
+   maps onto the same seam; no HTTP transport change. **Recommendation reversed at the
+   plain-prose pass, recorded honestly:** fields-only had been recommended (it keeps
+   `app\reconstruction.py` byte-untouched), but fields-only cannot show anything *during*
+   the pause — it cannot deliver §7's "latency becomes characterization" intent, the
+   signal's entire purpose. Price accepted: one defaulted parameter touches the serving
+   path; the reconstruction floor re-opens at build and re-verifies — a step, not a cost.
+   **Rejected:** fields-only (the during-the-wait effect is unreachable); SSE/streaming now
+   (a new transport class before Unity, its only consumer, exists).
+
+The **fruitless-retrieval damper** was deliberately not forked: its mechanism stays
+`[SETTLE-AT-BUILD]` with a full suggested default in the spec, **flagged promotable** for a
+ruling before the build if Jack wants it settled.
+
+Consequences propagated: `mid-dialogue-gate.md` written (design lines: non-LLM with the one
+embed reused as the probe — one embed per turn; the two identity structures kept distinct —
+tripwire = live `identity_components`, coverage = post-003 fact-head entities via the keyed
+fetch, degraded fetch = their partial GIN; the reserved read-request slots stay inert; loader
+turn ungated with absent-fields
+byte-parity; the loaded set append-only within a scene; caller-side reset — no fourth
+scene-boundary server consumer; **migration 003 is a fact of the target — the second spec for
+which that is true**; remaining physical shapes `[SETTLE-AT-BUILD]`). Architecture §6 specced
+marker + ladder GIN-home annotation, §5 freeze annotation, §4.4 entities-now-follows
+amendment note, §11 lands-with markers; audit ruling #3 GIN-home annotation + the 2026-07-18
+fact-level fork-1 deferral-closure annotation (this register); `fact-level-correction.md`
+closure annotations; `reconstruction.md` wire-shape-settled + no-gate-term annotations;
+`write-path.md` entities-freeze + GIN-reachability annotations (+ this register's
+context-stamps and write-path-ruling annotations); `read-path.md` + `cli-harness.md` specced
+pointers; `authorial-correction.md`
+`CorrectionRequest` optional-entities annotation; `migration-01.md` 003 pointers;
+`test-suite.md` Set D + ladder-row pointer; CLAUDE.md deliberately unchanged (the
+within-scene invariant needs no amendment — which memories surface was never under the
+byte-identity guarantee). Docs only — no code, no floors changed.

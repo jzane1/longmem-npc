@@ -63,6 +63,9 @@ scene-frozen decay band** (the pre-demo drift driver); and identity-document plu
 The mid-dialogue gate (immediate-queue item 1 since the 2026-07-18 fact-level build) — in this slice **every retrieval is dialogue init**,
 so all cache misses resolve inside the pre-warm; the **block-with-"reconstructing"-signal mid-scene
 miss path binds to the gate**, and the signal's wire shape is deliberately **not settled here**.
+*(Settled 2026-07-19 at the gate spec: post-hoc response fields + an in-process pre-serve
+callback — one defaulted parameter on the serving path, this floor re-opening at the gate
+build; `mid-dialogue-gate.md`.)*
 The authorial-correction endpoint (**built 2026-07-18**) — its obligations toward this layer
 (evict all cache rows for the memory_id; the corrected head re-anchors the drift budget) are
 stated here and built there. *(A third consequence was ruled 2026-07-17 at that target's spec: on
@@ -236,7 +239,8 @@ input/output token counts (feeding the per-100-turn cost table), batch size, `ca
 `cache_misses`, `write_backs`, `drift_refusals`, lazy-bootstrap flag. Per-item: `read_mode` is
 already in the payload; the debug view (`render_debug`) grows the reconstruction counters. The
 load driver's aggregate table gains the reconstruction terms (`[SETTLE-AT-BUILD]` shape). No gate
-term — the gate is item 1 (renumbered 2026-07-18).
+term — the gate is item 1 (renumbered 2026-07-18; specced 2026-07-19, `mid-dialogue-gate.md` —
+the term lands at its build).
 
 ## `[SETTLE-AT-BUILD]` — physical shapes, ruled at build (stop and report, never silently choose)
 

@@ -57,6 +57,32 @@ moves scores, not rows; detail-hiding assertions land with reconstruction.)*
 - Within-scene text stability: absent a diegetic event or an authorial correction on that memory
   (amended 2026-07-17), repeated reads within one scene are byte-identical.
 
+## Set D — mid-dialogue gate (~8–10 scenarios) *(specced 2026-07-19, `mid-dialogue-gate.md`)*
+
+- **Loader-parity:** a request without `loaded_memory_ids` behaves byte-identically to v1
+  (payload shape and SQL).
+- **Closed gate:** a covered, near-loaded utterance serves exactly the loaded IDs — zero probe
+  SQL, `signals_fired == []`, relevance non-null on every embedded item (a NULL-embedding
+  loaded row carries `relevance = null`), deterministic order.
+- **Novelty fire:** a far utterance fetches, appends only new IDs marked `gate_fetched`, logs
+  exactly `["novelty"]` *(the deterministic fake's locality is a fixture property — production
+  uses real embeddings)*.
+- **Tripwire fire + covered suppression:** an uncovered live-component mention fires
+  `["entity_tripwire"]` and the fetch contains the entity; the same mention covered by a loaded
+  item's fact-head entities does not fire.
+- **Both-signal logging:** far + uncovered logs both constants; every fire event carries
+  non-empty `signals_fired`.
+- **Append + byte-stability:** the loaded set is append-only within a scene; a gate-fetched
+  item's text is byte-stable from its first mid-scene serving onward (the invariant governs
+  served *text* — which memories surface was never under it).
+- **Damper + reset:** the ruled max of consecutive fruitless fetches suppresses novelty (the
+  tripwire stays live); a scene boundary resets streak and suppression.
+- **Efficacy booleans:** `novelty_outscored` / `entity_covered` populate per the ruled
+  comparators on fire events.
+- **Entities-follow-correction pair (migration 003):** a correction moves the fact head's
+  entities (NER + optional operator field, merged); windowed SQL re-derives entity liveness at
+  any instant; superseded fact rows keep their entities.
+
 ## Degradation cases
 
 - Importance-scoring model failure → the write still lands, with neutral importance and a
@@ -73,6 +99,7 @@ moves scores, not rows; detail-hiding assertions land with reconstruction.)*
 - Escalation call fails twice → **HARD-STOP**, nothing inserted — structurally assertable as zero
   rows (build-phase stance ruled 2026-07-13; re-rule owed before the demo ships — see `status.md`).
 - Gate degradation ladder: embeddings down → entity-only lexical fetch; no entities → novelty-only;
-  both out → gate closed, loaded set served, fail-quiet.
+  both out → gate closed, loaded set served, fail-quiet. *(Specced 2026-07-19: the lexical fetch
+  reads the post-003 fact-head entities GIN — `mid-dialogue-gate.md`.)*
 - Malformed model responses (unparseable structured output, unknown action directive) → log, ignore,
   turn succeeds.

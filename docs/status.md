@@ -1,20 +1,22 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-07-18
-**Phase:** **retrieval follows the fix** — fact-level correction v1 specced AND built &
-floor-verified 2026-07-18 (`fact-level-correction.md`), the same day the correction-override
-beat went live. **Migration 002 is applied** (`002_fact_versions.sql` — the fact-version chain
-under the stable `memory_id`; the ledger seam's first use; the floor criterion now reads
-"001 + 002 applied, 0 pending"). The build ruled **freeze** (observe writes the observation
-vector only to the `original` fact head; the embed-degradation signal moved there) and
-**dropped the old probe index**; the vector probe reads the live fact head, so an operator
-correction now moves recall — live in the REPL: the same query's relevance shifted
-0.4686 → 0.5637 across a `:correct`. Seven floors stand verified (see the table). **One open
+**Last updated:** 2026-07-19
+**Phase:** **the gate is specced** — mid-dialogue gate v1 build target specced 2026-07-19
+(`mid-dialogue-gate.md`), five scope forks ruled by Jack (dated entry in `decisions.md`):
+the **loaded set is caller-held scene state** (reputation-style — the third use of the ruled
+contract); **migration 003 entities = FREEZE to the fact head** (the 002 embedding precedent;
+old entities GIN dropped, partial GIN on live fact heads); **correction entities = NER +
+optional operator field** (mirrors observe's merge); **fire logs instrumentation-only** (the
+reserved kill-switch reads run artifacts); **reconstructing signal = post-hoc fields + a
+pre-serve callback** (the REPL can print "(reconstructing…)" *during* the pause — the
+recommendation reversal recorded honestly). **Migration 003 is a fact of the target** — the
+entities fact-chain column, closing the 2026-07-18 honest deferral. Seven floors stand
+verified (see the table); docs only this session — no code, no floors changed. **One open
 decision owed before the demo ships:** the escalation hard-stop failure path re-rule
-(build-phase stance, 2026-07-13).
-Next: **the mid-dialogue gate** (immediate-queue item 1 after the renumber): thresholds,
-efficacy definitions, per-signal fire logging — and the entities fact-chain column deferred to
-it by the 2026-07-18 embedding-only ruling.
+(build-phase stance, 2026-07-13); the **damper mechanism** is `[SETTLE-AT-BUILD]`-suggested
+and flagged promotable if Jack wants it ruled before the build.
+Next: **the gate build** — thresholds, efficacy wiring, per-signal fire logging, migration
+003, the loaded-set plumbing.
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -474,6 +476,35 @@ and the structured behavior output survive the interview. Research publication c
   same query's relevance moved 0.4686 → 0.5637 across a `:correct` — the fix moving recall,
   visible in the debug view. Queue renumbered (gate → 1 and it inherits the entities fact-chain
   column, suite → 2, Unity → 3, pre-ship gates → 4).
+- **2026-07-19** — **Mid-dialogue gate v1 build target specced** (`mid-dialogue-gate.md`) —
+  immediate-queue item 1's own spec session. Consolidates architecture §6 (gate + degradation
+  ladder + the prompt-caching boundary), §4.3 (the two identity structures), §7 (the mid-scene
+  block-with-signal miss path deferred here by `reconstruction.md`), §11 (efficacy definitions
+  + the reserved gate-check latency term), and the 2026-07-18 entities honest-deferral into a
+  build spec; **migration 003 is a fact of the target — the second spec for which that is
+  true**. Jack ruled five scope forks (dated "Mid-dialogue gate spec scope rulings" entry in
+  `decisions.md`; forks 1/2/4/5 re-presented in plain prose at his request and ruled on the
+  re-presentation): **loaded set = caller-held scene state** (reputation-style; absent fields ⇒
+  loader turn ⇒ v1 byte-parity); **migration 003 entities = FREEZE** (fact head the sole home;
+  guarded backfill; partial GIN on live heads; `memories_entities_gin` dropped;
+  `memories.entities` frozen — the coverage-check-consistency argument was decisive);
+  **correction entities = NLP pass + optional operator field** (observe's merge mirrored — the
+  fact-level NLP-re-pass rejection's premise ends with this target); **per-signal fire logs =
+  instrumentation-only** (`gate_events` stays pull-forward eligible); **reconstructing signal
+  = post-hoc fields + an in-process pre-serve callback** (fields-only was un-recommended
+  mid-session — it cannot show anything *during* the pause; the reconstruction floor re-opens
+  at build for one defaulted parameter, a step priced as a step). The fruitless damper stays
+  `[SETTLE-AT-BUILD]` with a full suggested mechanism, flagged promotable. Design lines: one
+  embed per turn (the novelty embedding IS the probe); tripwire = live `identity_components`
+  vs coverage = fact-head entities (keyed fetch) + degraded fetch = their partial GIN — never
+  conflated; the reserved
+  read-request slots stay inert; loaded set append-only within a scene; caller-side reset (no
+  fourth scene-boundary server consumer); CLAUDE.md deliberately unchanged (which memories
+  surface was never under the byte-identity guarantee). Propagated: architecture §4.4/§5/§6/§11
+  annotations, register annotations (audit ruling #3 GIN home; fact-level fork-1 deferral
+  closed), `fact-level-correction.md`, `reconstruction.md`, `read-path.md`, `cli-harness.md`,
+  `authorial-correction.md`, `migration-01.md` 003 pointers, `test-suite.md` **Set D** (new,
+  ~8–10 scenarios) + ladder-row pointer. Docs only — no code, no floors changed.
 
 ## Immediate queue
 
@@ -481,6 +512,8 @@ and the structured behavior output survive the interview. Research publication c
    block-with-"reconstructing"-signal miss path binds here; **the entities fact-chain column
    rides here** — the honest deferral of the 2026-07-18 embedding-only ruling, a
    migration-003-class additive column when the GIN path gets its first reader).
+   **Specced 2026-07-19** (`mid-dialogue-gate.md` — five scope forks ruled; migration 003 a
+   fact of the target; build next).
 2. Test-suite scoped session (Sets A-authorial incl. the fact-chain pair, B, C + degradation
    cases — all now runnable).
 3. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
@@ -519,7 +552,9 @@ access.)*
   batching shape. — **Consolidated into `reconstruction.md` 2026-07-17 and now BUILT** (built &
   floor-verified the same day; shapes ruled at build; dated `decisions.md` entry).
 - Reflection spec end-to-end (mechanism explicitly post-August — ruled 2026-07-14).
-- Gate threshold values + efficacy definitions wired to instrumentation.
+- Gate threshold values + efficacy definitions wired to instrumentation. — **Consolidated into
+  `mid-dialogue-gate.md` 2026-07-19** (threshold defaults suggested under `[SETTLE-AT-BUILD]`;
+  efficacy comparators + per-signal fire logging specced; instrumentation-only fire logs ruled).
 - Unity client C# API surface: send event, open dialogue, directive callback, reputation read,
   reconstructing-signal hook, scene-boundary emission.
 - Demo choreography: injected-timestamp time travel; decay + correction-override + gate-recollect

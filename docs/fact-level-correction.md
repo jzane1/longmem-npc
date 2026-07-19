@@ -25,7 +25,9 @@ plain-prose re-introduction — and ruled on the re-presentation):
    the *event* — consistent with the deliberately-disregarded 2026-07-12 staleness tension.
    Honest deferral recorded with the ruling: the entities column's first read consumer is the
    gate's GIN path (immediate-queue item 2, the next target); until an additive fact-chain column
-   rides there, a fact-corrected memory carries its original entities. **Rejected:** +mechanical
+   rides there, a fact-corrected memory carries its original entities. *(Closed 2026-07-19:
+   migration 003 rides the gate target, and the correction verb re-derives entities —
+   `mid-dialogue-gate.md`.)* **Rejected:** +mechanical
    NLP pass (entities/affect feed nothing readable today; gist re-derivation has zero consumers
    on corrected chains; spaCy latency on the operator verb); +Haiku re-score (a second model
    call; importance moves to the fact head, widening the candidate-SQL delta); operator per-field
@@ -112,7 +114,8 @@ plain-prose re-introduction — and ruled on the re-presentation):
 re-derivation**: gist spans on corrected chains have zero consumers (the corrected-anchor prompt
 branch ignores them), and the span rows remain immutable facts about the original observation.
 **The entities fact column + the gate's GIN path** — rides with the gate (immediate-queue
-item 2); the honest deferral is recorded in fork 1. **Purge** (its docs contract now names fact
+item 2); the honest deferral is recorded in fork 1. *(Specced 2026-07-19 — migration 003,
+`mid-dialogue-gate.md`; the gate is item 1 since the 2026-07-18 renumber.)* **Purge** (its docs contract now names fact
 versions — architecture §12). **Diegetic fact-writes** — unslated; any future in-world mechanism
 that moves *facts* rather than tellings needs its own ruling. **Re-embedding on an
 embedding-model migration** (the 1536 lock stands; a model-swap story is its own future target).

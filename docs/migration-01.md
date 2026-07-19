@@ -66,6 +66,8 @@ One row per observation. **`observation_text` is immutable after insert.**
 - Context stamps (all four nullable — optional API fields):
   - `location_embedding` vector(1536) and `location_name` text.
   - `entities` text[] — with a **GIN index** (serves the entity gate now, context boost later).
+    *(Gate spec 2026-07-19, freeze ruling: migration 003 moves the entities home + GIN to the
+    live fact heads; this column frozen post-003 — `mid-dialogue-gate.md`.)*
   - `event_time` timestamptz.
   - `affect_valence` real, `affect_arousal` real, `affect_detail` jsonb (all nullable) — from the
     VADER-class write pass. *(Ruled 2026-07-13: three columns — valence + arousal + jsonb detail.)*
@@ -152,7 +154,9 @@ The entity/topic index: gist matching + entity-gate tripwire.
   text-embedding-3-small. Fact-level correction built 2026-07-18: migration 002 **dropped this
   index** (ruled via explicit question — derived structure, zero readers) and the probe now
   runs on `memory_fact_versions`' partial HNSW — `fact-level-correction.md`.)*
-- **GIN** on `memories.entities`.
+- **GIN** on `memories.entities`. *(Dropped by migration 003 — gate-spec freeze ruling
+  2026-07-19; replaced by a partial GIN on `memory_fact_versions` live heads;
+  `mid-dialogue-gate.md`.)*
 - FK/lookup indexes: `memories(agent_id)`, `memory_details(memory_id)`,
   `memory_gist_spans(memory_id)`, `corrections(memory_id)`, `reflections(agent_id)`,
   `identity_components(agent_id)`.
@@ -163,7 +167,8 @@ The entity/topic index: gist matching + entity-gate tripwire.
   minimal Python runner. *(Ruled 2026-07-13: Python runner with a `schema_migrations` bookkeeping
   table — the seam migration 02+ lands on; each migration's DDL and its ledger row commit in one
   transaction, so a half-applied migration can never be logged complete. Migration 002 — the
-  fact-version chain — specced 2026-07-18, `fact-level-correction.md`.)*
+  fact-version chain — specced 2026-07-18, `fact-level-correction.md`; migration 003 — the
+  entities fact-chain column — specced 2026-07-19, `mid-dialogue-gate.md`.)*
 - Docker: `pgvector/pgvector` for Postgres 16; connection string from `.env`.
 
 ## Done when

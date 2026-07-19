@@ -42,7 +42,8 @@ it are in [decisions.md](decisions.md); the schema it reads is frozen in
 
 ## Scope boundary — do NOT build
 
-The mid-dialogue gate (and its degradation ladder); prompt caching; **reconstruction serving —
+The mid-dialogue gate (and its degradation ladder — specced 2026-07-19,
+`mid-dialogue-gate.md`); prompt caching; **reconstruction serving —
 theta check, cache reads/writes, pre-warm, `reconstructed` read_mode** (landed on this seam
 2026-07-17, `reconstruction.md`); the dialogue/Sonnet call, action directive, reputation
 (CLI-harness target, built 2026-07-15);
@@ -117,7 +118,9 @@ Result-level:
   the Set B separation, assertable in payloads.
 - Rows with **NULL embeddings** (the write path's ruled degradation) are unreachable by the vector
   probe — a documented consequence. They remain reachable via the degraded fallback below, and
-  later via the gate's entity/GIN path (item 1 since the 2026-07-18 renumber). *(Fact-level correction built 2026-07-18,
+  later via the gate's entity/GIN path (item 1 since the 2026-07-18 renumber; specced
+  2026-07-19 — the lexical fetch reads the post-003 fact-head entities GIN,
+  `mid-dialogue-gate.md`). *(Fact-level correction built 2026-07-18,
   `fact-level-correction.md`: the probe joins the **live fact-version head** and orders by its
   embedding — this floor was deliberately re-opened and re-verified, walker 34 → 36 by addition;
   scoring inputs otherwise unchanged.)*
@@ -167,7 +170,7 @@ computed at read time, returned per item with all components.
 | Condition | Behavior |
 |---|---|
 | query-embedding call fails | `[SETTLE-AT-BUILD]` — **ruled 2026-07-14 as suggested: fail-quiet fallback** — rank all live candidates (including NULL-embedding rows) by `recency × importance_norm`, return with `degraded = true` + reason; the per-item `relevance` component is null on this path (none was computed). Precedent: the gate ladder's embeddings-down rung ranks by recency × importance; the read analog of never-lose-a-write is **never-blank-a-dialogue**. |
-| stored row has NULL embedding | absent from vector candidates (documented consequence); reachable via the degraded path now and the gate's GIN path later. |
+| stored row has NULL embedding | absent from vector candidates (documented consequence); reachable via the degraded path now and the gate's GIN path later (specced 2026-07-19, `mid-dialogue-gate.md`). |
 | fewer than k live memories (or none) | `[SETTLE-AT-BUILD]` — **ruled 2026-07-14 as suggested:** return what exists (0..k items), not an error; an empty store is a valid young-NPC state. |
 
 ## Model provider interfaces
@@ -176,7 +179,8 @@ Retrieval is **non-LLM** — no new model role, no new env var. The one model ca
 embedding**, which reuses the write path's embedding provider pair as-is: real
 `text-embedding-3-small` at the locked 1536, and the **deterministic fake** (so the structural
 suite runs offline, keyless, with stable scores). The probe embeds with the same model+dimension
-that embedded the observations. (The gate, also non-LLM, arrives at item 1 — renumbered 2026-07-18; reconstruction's model
+that embedded the observations. (The gate, also non-LLM, arrives at item 1 — renumbered
+2026-07-18, specced 2026-07-19 (`mid-dialogue-gate.md`); reconstruction's model
 role, `LONGMEM_MODEL_RECONSTRUCTION`, landed 2026-07-17.)
 
 ## `[SETTLE-AT-BUILD]` — physical shapes, ruled at build (stop and report, never silently choose)

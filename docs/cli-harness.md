@@ -55,7 +55,8 @@ not re-derive.
 
 ## Scope boundary — do NOT build
 
-The mid-dialogue gate and its degradation ladder (immediate-queue item 1 since the 2026-07-18 fact-level build); prompt caching /
+The mid-dialogue gate and its degradation ladder (immediate-queue item 1 since the 2026-07-18
+fact-level build; specced 2026-07-19, `mid-dialogue-gate.md`); prompt caching /
 prompt-head rebuild (post-August); **reconstruction serving — theta check, cache reads/writes,
 pre-warm, `reconstructed` read_mode** (landed on the retrieval seam 2026-07-17,
 `reconstruction.md`) — in this slice every
@@ -112,7 +113,8 @@ Returned by `run_dialogue_turn`, surfaced verbatim in the CLI debug view and ass
   `sonnet_output_tokens`) + the per-turn cost — **cost units ruled 2026-07-15 (explicit question):
   tokens unconditionally; USD (`cost_usd`) only when the optional `LONGMEM_PRICE_*` env vars are
   set, else null — model pricing is never hardcoded.** Feeds architecture §11's latency histogram
-  (first token, total; **no gate term** in the slice) and the per-100-turn cost table; `degraded`
+  (first token, total; **no gate term** in the slice — it lands with the gate build, specced
+  2026-07-19) and the per-100-turn cost table; `degraded`
   flag (+ reason) on the never-blank path.
 
 ## Request contract — `DialogueTurnRequest`
@@ -193,7 +195,8 @@ without it"). Python; drives **scripted sessions at volume** — observe events,
 boundaries — through the same `run_dialogue_turn` and `ingest_observation` seams, reusing the
 session-runner core (not a divergent second path). It emits the §11 aggregates: the **latency
 histogram** (p50/p95, decomposed into retrieval SQL, first token, total — **no gate term** in the
-slice) and the **itemized per-100-turn cost table**. It runs on the **deterministic fake providers**
+slice; the gate term lands at its build, specced 2026-07-19) and the **itemized per-100-turn
+cost table**. It runs on the **deterministic fake providers**
 by default (offline, keyless, at volume); the real providers back a keyed smoke moment ahead of demo
 choreography. Script format, scale knobs, and the exact aggregate output are `[SETTLE-AT-BUILD]` —
 **ruled 2026-07-15:** `python -m app.load_driver --sessions N --turns M [--script p.json] [--seed S]
