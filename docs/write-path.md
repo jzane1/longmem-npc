@@ -144,14 +144,20 @@ apply neutral/default, the turn succeeds.
 **c. Embedding.** OpenAI `text-embedding-3-small` at **1536** (locked) for `observation_text` →
 `embedding`, and for the location name/description → `location_embedding`. The frozen schema stores
 the location **name** + its embedding only; a longer description is embed-only (no new column).
+*(Freeze ruling 2026-07-18, `fact-level-correction.md`: the observation vector's destination is
+now the `original` fact head on `memory_fact_versions` — `memories.embedding` is no longer
+written; `location_embedding` is unaffected.)*
 
 **d. Atomic insert (one transaction).** `memories` (all write-time facts) + the `original`
 `memory_details` head (`write_cause = original`) + `memory_gist_spans` + any new
 `identity_components`. Validate `decay_class` against the agent `config` map; **unknown label →
 default class + `decay_class_unknown = true`** (never reject — mirrors `scoring_failed`). Commit,
-then return `IngestResult`. *(Fact-level correction specced 2026-07-18,
-`fact-level-correction.md`: at migration 002 this transaction also mints the `original`
-fact-version row — this floor deliberately re-opens at that build.)*
+then return `IngestResult`. *(Fact-level correction built 2026-07-18,
+`fact-level-correction.md`: this transaction also mints the `original` fact-version row, and
+the build **ruled freeze** — the observation vector is written only there, never to
+`memories.embedding`. This floor was deliberately re-opened and re-verified, walker 35 → 38 —
+one modification ruled with the freeze: the embed-degradation signal assertion moved to the
+fact head.)*
 
 ### The render seam *(confirmed as specced — ruled 2026-07-13)*
 

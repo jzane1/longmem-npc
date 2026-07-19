@@ -22,6 +22,7 @@ from app.config import load_settings
 from app.db import build_pool
 from app.ingest import (
     CorrectionConflictError,
+    CorrectionEmbedFailedError,
     EscalationHardStopError,
     IngestService,
     UnknownAgentError,
@@ -110,14 +111,19 @@ async def set_pin(memory_id: UUID, body: PinRequest) -> PinResult:
 
 @app.post("/v1/memories/{memory_id}/correction", response_model=CorrectionResult)
 async def correct_memory(memory_id: UUID, body: CorrectionRequest) -> CorrectionResult:
-    """Authorial correction (authorial-correction.md): memory-scoped operator
-    verb — /v1/events/* stays diegetic. Fail-loud: 404 unknown memory, 409
-    stale expected_detail_id, 422 invalid content; nothing partial."""
+    """Authorial correction (authorial-correction.md; fact-following since
+    the fact-level build): memory-scoped operator verb — /v1/events/* stays
+    diegetic. Fail-loud: 404 unknown memory, 409 stale expected_detail_id,
+    422 invalid content, 502 embed failure with nothing written (the
+    all-or-nothing ruling, 2026-07-18 — the escalation-hard-stop precedent);
+    nothing partial."""
     try:
         return await app.state.service.correct(memory_id, body)
     except UnknownMemoryError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except CorrectionConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except CorrectionEmbedFailedError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

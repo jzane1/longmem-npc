@@ -1,21 +1,20 @@
 # longmem-npc — Status
 
 **Last updated:** 2026-07-18
-**Phase:** **the fact-level correction target is specced** (`fact-level-correction.md`,
-2026-07-18) — the design session for "retrieval follows the fix" ran the same day the
-correction-override beat went live. Four scope forks ruled (dated `decisions.md` entry;
-presented technically, then re-introduced in plain prose at Jack's request, each ruled on the
-recommended option): **embedding-only** re-derivation, a **fact-version child table**
-(migration 002 — the first target for which a new migration is a spec fact), **one combined
-verb** (the correction endpoint becomes fact-following), and **all-or-nothing fail-loud** on
-embed failure. Six floors stand verified: the migration-01 schema, write path v1
-(`write-path.md`), read path v1 (`read-path.md`), CLI harness v1 (`cli-harness.md`),
-reconstruction v1 (`reconstruction.md`), and authorial-correction v1
-(`authorial-correction.md`). **One open decision owed before the demo ships:** the escalation
-hard-stop failure path re-rule (build-phase stance, 2026-07-13).
-Next: **build the fact-level correction target** (immediate-queue item 1): migration 002 +
-the fact-following verb + the retrieval-delta walkers, per the spec's `[SETTLE-AT-BUILD]`
-contract.
+**Phase:** **retrieval follows the fix** — fact-level correction v1 specced AND built &
+floor-verified 2026-07-18 (`fact-level-correction.md`), the same day the correction-override
+beat went live. **Migration 002 is applied** (`002_fact_versions.sql` — the fact-version chain
+under the stable `memory_id`; the ledger seam's first use; the floor criterion now reads
+"001 + 002 applied, 0 pending"). The build ruled **freeze** (observe writes the observation
+vector only to the `original` fact head; the embed-degradation signal moved there) and
+**dropped the old probe index**; the vector probe reads the live fact head, so an operator
+correction now moves recall — live in the REPL: the same query's relevance shifted
+0.4686 → 0.5637 across a `:correct`. Seven floors stand verified (see the table). **One open
+decision owed before the demo ships:** the escalation hard-stop failure path re-rule
+(build-phase stance, 2026-07-13).
+Next: **the mid-dialogue gate** (immediate-queue item 1 after the renumber): thresholds,
+efficacy definitions, per-signal fire logging — and the entities fact-chain column deferred to
+it by the 2026-07-18 embedding-only ruling.
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -51,6 +50,7 @@ and the structured behavior output survive the interview. Research publication c
 | CLI harness v1 — dialogue-turn seam (`app\dialogue.py`: retrieval → prompt assembly → single dialogue call → directive validation → atomic in-place reputation apply) + shared session-runner core (`app\session.py`) + REPL (`python -m app.cli`, `app\cli.py`) + synthetic load driver (`python -m app.load_driver`, `app\load_driver.py`) + dialogue provider triad (`app\providers.py`) + turn wire models (`app\schemas.py`) + reputation SQL (`app\db.py`) + dialogue role/reputation/pricing config (`app\config.py`) | floor-verifier **pass** against the migration-01 + write-path + read-path floors: structural walker `tests\verify_cli_harness.py` re-run independently (36 assertions, every done-when criterion) on scratch `longmem_test`; both prior walkers re-run clean (35/35, 34/34 — shared files touched, floors intact); `db\migrate.py` no-arg still a clean no-op on `longmem` (schema frozen, `001` the only migration); `longmem` confirmed pristine **via the postgres MCP — the verifier's `mcp__postgres__*` tools worked this dispatch, resolving the 2026-07-14 flag**; an independent standalone load-driver run (offline, keyless); plus a live piped REPL session (observe → dialogue turns with debug view → scene-boundary snapshot refresh) | 2026-07-15 |
 | Authorial-correction v1 — memory-scoped operator verb (`POST /v1/memories/{id}/correction` in `app\api.py` → `IngestService.correct` in `app\ingest.py` → one-transaction `apply_authorial_correction` in `app\db.py`: predicate supersede + optional `expected_detail_id` compare-and-swap + corrected `authorial_correction` head at t_c + cache eviction with count) + the constraint-follows-anchor reconstruction delta (`app\reconstruction.py` `build_reconstruction_item`, anchor-cause-aware; `db.ReconstructionSource.anchor_cause`) + wire models (`app\schemas.py`) + REPL surface (`app\session.py` `runner.correct`, `app\cli.py` `:correct`) | floor-verifier **pass** against all five prior floors (reconstruction deliberately re-opened by the constraint-follows-anchor ruling, re-verified): structural walker `tests\verify_authorial_correction.py` re-run independently (31 assertions, every done-when criterion incl. the re-ruled stored-coherence time-travel criterion) on fresh scratch `longmem_test`; all four prior walkers re-run clean (42/42 — grown +1 by the corrected-item assertion, addition only; 36/36; 34/34; 35/35); `db\migrate.py` no-arg a clean no-op on `longmem` (no migration needed, as specced); `longmem` confirmed pristine via the postgres MCP; independent code spot-checks (transaction + CAS rollback, eviction inside the transaction, byte-verbatim no-model path, retrieval/scoring untouched vs HEAD); plus a live piped REPL correction-override beat (read verbatim → `:correct` head swap → corrected read, one scene) | 2026-07-18 |
 | Reconstruction v1 — serving-stage engine (`app\reconstruction.py`: theta partition at the scene-frozen basis → decay-band cache → batched retelling call → drift-budgeted atomic write-back → serve-only-persisted-text) + serving swap (`app\retrieval.py`, retrieval/scoring untouched) + identity-document plumbing (`app\identity.py` + scene-boundary recompile in `app\ingest.py` + caller-frozen scene state in `app\session.py`) + reconstruction provider triad and the **locality-sensitive fake embedding** (`app\providers.py`) + reconstruction SQL (`app\db.py`) + wire/instrumentation deltas (`app\schemas.py`) + knobs/role/pricing (`app\config.py`) + debug/aggregate surfacing (`app\cli.py`, `app\load_driver.py`) + 422 mapping (`app\api.py`) | floor-verifier **pass** against all four prior floors: structural walker `tests\verify_reconstruction.py` re-run independently (41 assertions, every done-when criterion) on fresh scratch `longmem_test`; all three prior walkers re-run clean (35/35, 34/34, 36/36 — the read-side pair pin `reconstruction_theta = 0` in fixture configs, assertion bodies untouched, verified against git); schema frozen (`001` the only migration; migrate **`--database-uri` on `/longmem`** → "Up to date, 0 pending" — no-arg blocked by the `.env` sandbox pointer, flagged); `longmem` confirmed pristine **via the postgres MCP (tools worked this dispatch)**; independent code spot-checks (atomic write-back, derivable anchor, scene-basis binding, retrieval byte-identical to HEAD); plus a live piped REPL drift beat (verbatim → 46-day jump → reconstructed write-back → call-free cache hit) and a standalone load-driver run with the reconstruction latency/cost rows | 2026-07-17 |
+| Fact-level correction v1 — **migration 002** (`db\migrations\002_fact_versions.sql`: `memory_fact_versions` fact chain + guarded backfill + one-live-head partial unique + **partial HNSW** over live heads + `memories_embedding_hnsw` **dropped**, ruled) + the fact-following verb (`app\db.py` `apply_authorial_correction` grown: fact supersede + insert in the same transaction; `app\ingest.py` embed-before-transaction + `CorrectionEmbedFailedError`; `app\api.py` 502) + the **freeze ruling** (`insert_observation` mints the `original` fact head — the sole vector home; `memories.embedding` no longer written; the embed-degradation signal moved to the live fact head) + the vector probe on the live fact head (`fetch_vector_candidates`) + wire deltas (`CorrectionResult` widened, `IngestResult.fact_version_id`) + REPL surfacing (`app\cli.py`) | floor-verifier **pass** against all six prior floors (read-path + write-path deliberately re-opened, re-verified): structural walker `tests\verify_fact_correction.py` re-run independently (32 assertions, every done-when criterion incl. db-layer distance-0 retrieval-follows-the-fix, the backfill guard via a legacy-shaped row, and all-or-nothing embed failure) on fresh scratch `longmem_test`; all five prior walkers re-run clean (38/38 — grown 35 → 38 incl. the one ruling-driven modification, the embed-signal query moved to the fact head; 36/36 read, 34 → 36 addition only; 33/33 authorial, 31 → 33 addition only; 42/42 reconstruction and 36/36 CLI harness **byte-untouched — the no-reconstruction-delta proof**, `app\retrieval.py`/`app\reconstruction.py` byte-identical to HEAD); migration 002 applied to `longmem`, no-arg migrate → **"Up to date: 2 applied, 0 pending"** (the criterion's new wording); `longmem` confirmed pristine via the postgres MCP (all product tables 0 rows, ledger = 001+002, old index absent, three fact indexes present); independent code spot-checks (one transaction with the embed outside it, CAS + broken-store rollbacks, sole DELETE still cache eviction, degraded path byte-identical); plus a live piped REPL beat: `:correct` prints both head swaps + embed timing, and the same query's relevance moved 0.4686 → 0.5637 across the correction | 2026-07-18 |
 
 ## Open questions needing Jack's ruling
 
@@ -446,25 +446,54 @@ and the structured behavior output survive the interview. Research publication c
   `authorial-correction.md` five annotations, `migration-01.md` 002 pointers, `test-suite.md`
   Set A fact assertions + the all-or-nothing degradation case. Docs only — no code, no floors
   changed.
+- **2026-07-18** — **Fact-level correction v1 built, verified, and committed — retrieval
+  follows the fix, and migration 002 is the ledger seam's first use.** Jack ruled two shapes
+  via explicit questions at plan approval (dated "Fact-level correction build rulings" entry in
+  `decisions.md`): **dual-write vs freeze = FREEZE** (against the dual-write recommendation —
+  observe no longer writes `memories.embedding`; the `original` fact head is the sole vector
+  home; the epoch split accepted; the queryable embed-degradation signal moved to the live fact
+  head, and the write-path walker's signal assertion moved with it — the build's one
+  non-additive walker change, ruling-driven) and **the old `memories_embedding_hnsw` dropped in
+  002**; the eight mechanical shapes were approved as proposed. New:
+  `db\migrations\002_fact_versions.sql` (fact chain + guarded backfill before the indexes +
+  one-live-head partial unique + partial HNSW + the index drop), the fact-following verb
+  (`apply_authorial_correction` grown — fact supersede + insert in the same transaction, embed
+  BEFORE it; `CorrectionEmbedFailedError` → 502, the escalation precedent), the freeze at
+  observe (`insert_observation` mints the fact head), the probe on the live fact head
+  (`fetch_vector_candidates`; degraded path deliberately unjoined), wire deltas
+  (`CorrectionResult` += fact IDs + embed_ms/embedding_tokens; `IngestResult` +=
+  fact_version_id), REPL surfacing (both head swaps + embed timing), and walker
+  `tests\verify_fact_correction.py` (32 assertions — incl. the db-layer distance-0
+  retrieval-follows-the-fix pair, the backfill guard proven against a legacy-shaped row, and
+  the correction-repairs-degraded-rows beat: correcting a NULL-fact-embedding memory re-embeds
+  it into vector reach). Verification: all six walkers on fresh scratch (32/32, 38/38, 36/36,
+  36/36, 42/42, 33/33 — reconstruction and CLI harness byte-untouched, `app\retrieval.py` and
+  `app\reconstruction.py` byte-identical to HEAD: the no-reconstruction-delta proof); migration
+  002 applied to `longmem`, no-arg migrate → "Up to date: 2 applied, 0 pending"; `longmem`
+  pristine via the postgres MCP; floor-verifier **pass**; and a live piped REPL beat where the
+  same query's relevance moved 0.4686 → 0.5637 across a `:correct` — the fix moving recall,
+  visible in the debug view. Queue renumbered (gate → 1 and it inherits the entities fact-chain
+  column, suite → 2, Unity → 3, pre-ship gates → 4).
 
 ## Immediate queue
 
-1. Fact-level correction target (slated by explicit ruling 2026-07-17): versioned memories-row
-   facts + corrected embedding so retrieval follows the fix — migration-002-class design, its
-   own spec session. **Specced 2026-07-18** (`fact-level-correction.md`; four scope forks ruled
-   in the dated `decisions.md` entry) — **build next**.
-2. Mid-dialogue gate + threshold values, efficacy definitions, per-signal fire logging (the
-   block-with-"reconstructing"-signal miss path binds here).
-3. Test-suite scoped session (Sets A-authorial, B, C + degradation cases now runnable; the
-   Set A fact-chain additions become runnable with item 1).
-4. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
+1. Mid-dialogue gate + threshold values, efficacy definitions, per-signal fire logging (the
+   block-with-"reconstructing"-signal miss path binds here; **the entities fact-chain column
+   rides here** — the honest deferral of the 2026-07-18 embedding-only ruling, a
+   migration-003-class additive column when the GIN path gets its first reader).
+2. Test-suite scoped session (Sets A-authorial incl. the fact-chain pair, B, C + degradation
+   cases — all now runnable).
+3. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
    choreography incl. the 60-day drift beat and the correction-override beat (both live in the
-   REPL: `:as-of` jumps + scene boundaries + band crossings; `:correct`).
-5. Before the demo ships: re-rule the escalation failure path (see open questions) and pick a
+   REPL: `:as-of` jumps + scene boundaries + band crossings; `:correct` — which now moves
+   retrieval too).
+4. Before the demo ships: re-rule the escalation failure path (see open questions) and pick a
    real-provider smoke moment (one live observe + one live dialogue turn + one live
    reconstruction with keys) ahead of demo choreography.
 
-*(Done 2026-07-18: **Authorial-correction endpoint v1** — the correction-override beat is live;
+*(Done 2026-07-18: **Fact-level correction v1** — retrieval follows the fix; migration 002
+applied; see the verified-floors table and session log. Also done 2026-07-18:
+**Authorial-correction endpoint v1** — the correction-override beat is live;
 see the verified-floors table and session log. Done 2026-07-17: **Reconstruction v1** — the
 thesis mechanism is live; see the verified-floors
 table and session log. Done 2026-07-15: **CLI harness v1 + synthetic load driver** — the vertical

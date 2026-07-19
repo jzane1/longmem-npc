@@ -186,6 +186,37 @@ async def main(database_uri: str) -> None:
     check(
         row[10] == event.client_timestamp, "valid_at = client world time (bi-temporal)"
     )
+    # Fact chain (migration 002, fact-level-correction.md): observe mints the
+    # `original` fact head; memories.embedding is frozen (ruled 2026-07-18).
+    check(
+        row[9] is True,
+        "memories.embedding not written at observe (freeze ruling 2026-07-18)",
+    )
+    fact_row = await fetchrow(
+        pool,
+        "SELECT fact_version_id, write_cause, basis_text, embedding IS NULL, "
+        "valid_at, invalid_at FROM memory_fact_versions WHERE memory_id = %s",
+        result.memory_id,
+    )
+    fact_count = await fetchrow(
+        pool,
+        "SELECT count(*) FROM memory_fact_versions WHERE memory_id = %s",
+        result.memory_id,
+    )
+    check(
+        fact_count[0] == 1
+        and fact_row[1] == "original"
+        and fact_row[2] == event.observation_text
+        and fact_row[3] is False
+        and fact_row[4] == event.client_timestamp
+        and fact_row[5] is None,
+        "exactly one live `original` fact head: basis = observation_text "
+        "byte-verbatim, embedding present, valid_at carried",
+    )
+    check(
+        result.fact_version_id == fact_row[0],
+        "IngestResult.fact_version_id names the fact head",
+    )
 
     # ------------------------------------------------------------------ #
     print("\n[6] Novel entity grows the index (same transaction)")
@@ -324,14 +355,18 @@ async def main(database_uri: str) -> None:
     embed_failed = await embed_fail_service.ingest_observation(
         observe_event(agent_id=agent_id)
     )
+    # The queryable signal moved to the live fact head with the 2026-07-18
+    # freeze ruling (memories.embedding is NULL for every post-002 row).
     row5 = await fetchrow(
         pool,
-        "SELECT embedding IS NULL FROM memories WHERE memory_id = %s",
+        "SELECT embedding IS NULL FROM memory_fact_versions "
+        "WHERE memory_id = %s AND invalid_at IS NULL",
         embed_failed.memory_id,
     )
     check(
         row5[0] is True and embed_failed.embedding_failed is True,
-        "embedding NULL in DB and embedding_failed surfaced in payload",
+        "fact-head embedding NULL in DB and embedding_failed surfaced in "
+        "payload (signal home per the freeze ruling)",
     )
 
     # ------------------------------------------------------------------ #

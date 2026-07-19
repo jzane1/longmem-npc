@@ -23,7 +23,7 @@ Forked into **structural pairs by correction verb**, keyed on `write_cause` — 
   resolves to that head; post-correction reconstruction takes the corrected head as its **fixed
   constraint** (pure prompt-assembly assertion — ruled 2026-07-17); a mid-scene correction changes
   served text immediately (the amended invariant's sanctioned cause); no `corrections` row.
-  **Fact chain (specced 2026-07-18, `fact-level-correction.md`):** prior fact head superseded;
+  **Fact chain (specced & built 2026-07-18, `fact-level-correction.md`):** prior fact head superseded;
   one corrected fact head with `basis_text` byte-identical to the operator input and the
   corrected embedding; the superseded fact row still carries the original embedding; **the
   memory ranks by the corrected embedding** *(asserted at the db layer, where order is pure
@@ -64,7 +64,9 @@ moves scores, not rows; detail-hiding assertions land with reconstruction.)*
 - Unknown `decay_class` label → the write still lands, with the agent's default class and
   `decay_class_unknown = true` — never rejected (ruled 2026-07-13; mirrors `scoring_failed`).
 - Embedding-call failure → the write still lands with a NULL embedding; `embedding IS NULL` is the
-  queryable signal and the payload carries `embedding_failed` (ruled 2026-07-13).
+  queryable signal and the payload carries `embedding_failed` (ruled 2026-07-13; since the
+  2026-07-18 freeze ruling the signal's home is the live fact head —
+  `memory_fact_versions.embedding IS NULL`).
 - Embedding-call failure during an **authorial correction** → **all-or-nothing**: nothing written
   on either chain, cache intact, loud error (ruled 2026-07-18 — the deliberate contrast with the
   observe path's land-with-NULL degradation; `fact-level-correction.md`).

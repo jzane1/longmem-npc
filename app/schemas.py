@@ -12,8 +12,10 @@ Structural notes tied to the frozen migration-01 schema:
   and not echoed in results.
 - `location_description`, when supplied, is embed-only (no raw column).
 - `embedding_failed` reflects the 2026-07-13 ruling that an embedding-call
-  failure lands the write with a NULL embedding (`embedding IS NULL` is the
-  queryable signal; this field is its payload mirror).
+  failure lands the write with a NULL embedding; since the 2026-07-18 freeze
+  ruling (fact-level-correction.md) the queryable signal is
+  `memory_fact_versions.embedding IS NULL` on the live fact head — observe
+  no longer writes `memories.embedding`. This field is its payload mirror.
 """
 
 from __future__ import annotations
@@ -147,6 +149,7 @@ class IngestResult(BaseModel):
     # Identifiers
     memory_id: UUID
     detail_id: UUID  # the `original` head
+    fact_version_id: UUID  # the `original` fact head (migration 002)
     gist_span_ids: list[UUID]
     new_component_ids: list[UUID]
     # Computed facts / scores
@@ -190,13 +193,20 @@ class PinResult(BaseModel):
 
 
 class CorrectionResult(BaseModel):
-    """Result of the authorial correction — IDs + instrumentation. No token
-    fields: the endpoint makes no model calls (authorial-correction.md)."""
+    """Result of the authorial correction — both chains' head swaps + IDs +
+    instrumentation. v1's "no token fields — no model calls" line is
+    superseded (fact-level-correction.md, ruled 2026-07-18): one embed call
+    rides the verb, so the corrected fact basis can steer retrieval; its
+    timing and tokens land here."""
 
     memory_id: UUID
-    detail_id: UUID  # the corrected head
+    detail_id: UUID  # the corrected telling head
     superseded_detail_id: UUID
+    fact_version_id: UUID  # the corrected fact head (migration 002)
+    superseded_fact_version_id: UUID
     evicted_cache_rows: int
+    embed_ms: float
+    embedding_tokens: int
     total_ms: float
 
 

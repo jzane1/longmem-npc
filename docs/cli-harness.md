@@ -55,7 +55,7 @@ not re-derive.
 
 ## Scope boundary — do NOT build
 
-The mid-dialogue gate and its degradation ladder (immediate-queue item 2); prompt caching /
+The mid-dialogue gate and its degradation ladder (immediate-queue item 1 since the 2026-07-18 fact-level build); prompt caching /
 prompt-head rebuild (post-August); **reconstruction serving — theta check, cache reads/writes,
 pre-warm, `reconstructed` read_mode** (landed on the retrieval seam 2026-07-17,
 `reconstruction.md`) — in this slice every

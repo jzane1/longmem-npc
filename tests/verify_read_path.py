@@ -426,6 +426,32 @@ async def main(database_uri: str) -> None:
         )
     )
     check(tunnel_result.embedding_failed, "fixture row landed with NULL embedding")
+    # Since migration 002 (fact-level-correction.md) the vector probe joins
+    # the live FACT head; the exclusion's mechanism is its NULL embedding.
+    tunnel_fact = await fetchrow(
+        pool,
+        "SELECT embedding IS NULL FROM memory_fact_versions "
+        "WHERE memory_id = %s AND invalid_at IS NULL",
+        tunnel_result.memory_id,
+    )
+    check(
+        tunnel_fact[0] is True,
+        "the excluded row's live fact head carries the NULL embedding "
+        "(the probe's join target since migration 002)",
+    )
+    fact_counts = await fetchrow(
+        pool,
+        "SELECT (SELECT count(*) FROM memories WHERE agent_id = %s), "
+        "(SELECT count(*) FROM memory_fact_versions f "
+        " JOIN memories m ON m.memory_id = f.memory_id "
+        " WHERE m.agent_id = %s AND f.invalid_at IS NULL)",
+        agent_a,
+        agent_a,
+    )
+    check(
+        fact_counts[0] == fact_counts[1],
+        "every candidate memory has exactly one live fact head (join integrity)",
+    )
     r9 = await retrieval.retrieve_dialogue_init(request(agent_a))
     check(
         tunnel_result.memory_id not in items_by_id(r9),

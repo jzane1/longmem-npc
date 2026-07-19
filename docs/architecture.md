@@ -51,7 +51,11 @@ memory can drift and be defended, while the ground-truth record underneath never
 - **Storage before cognition** build ordering.
 - **Degradation behavior is named and tested per model call.** Importance-scoring failure → store
   the memory with neutral importance plus a `scoring_failed` flag; embedding failure → the write
-  lands with a NULL embedding (`embedding IS NULL` is the queryable signal; ruled 2026-07-13);
+  lands with a NULL embedding (`embedding IS NULL` is the queryable signal; ruled 2026-07-13 —
+  *since the 2026-07-18 freeze ruling the signal lives on the live fact head,
+  `memory_fact_versions.embedding IS NULL`; the authorial-correction verb is the deliberate
+  contrast: all-or-nothing fail-loud on embed failure, and correcting an embed-degraded memory
+  re-embeds it — `fact-level-correction.md`*);
   never lose a write because a model was flaky. **One recorded exception (build-phase stance,
   ruled 2026-07-13, must be re-ruled before the demo ships — see the open question in
   `status.md`):** a gist-escalation call that fails twice hard-stops the write, fail-loud, with
@@ -131,7 +135,7 @@ the sole mechanism that removes a durable fact.
    server-side and returns `identity_version`; the caller freezes it as scene state and passes it
    per read request — the reputation-snapshot contract)*.
 
-### 4.4 The fact-version chain *(specced 2026-07-18 — `fact-level-correction.md`; migration 002)*
+### 4.4 The fact-version chain *(specced & **built** 2026-07-18 — `fact-level-correction.md`; migration 002 live; the build ruled **freeze**: observe writes the vector only to the fact head)*
 
 The memories row's **semantic basis** — the text retrieval ranks by, and its embedding — gains
 the same bi-temporal machinery the telling has: a child chain under the stable `memory_id`
@@ -170,10 +174,9 @@ dated `decisions.md` entry): `relevance × recency(decay class) × importance_no
 normalization; reserved slots for a future encoding-context term and per-call overrides under the
 split-brain topology. importance_norm is clamp + floor (ruled over min-max so invalidation can
 never move other items' scores); the decay math lives once, in `app\decay.py`, shared later by
-the reconstruction theta check. *(Fact-level correction specced 2026-07-18,
-`fact-level-correction.md`: once migration 002 lands, the relevance probe reads the **live
-fact-version head's** embedding — scoring inputs otherwise unchanged; scores move only through
-relevance.)*
+the reconstruction theta check. *(Fact-level correction **built** 2026-07-18,
+`fact-level-correction.md`: the relevance probe reads the **live fact-version head's**
+embedding — scoring inputs otherwise unchanged; scores move only through relevance.)*
 
 **Mid-dialogue gate (non-LLM hybrid):**
 - **Novelty check** — embed the utterance; measure distance against the loaded set; far from all →
@@ -264,8 +267,9 @@ Habituation guards for the future context term: **both a cap and a decay**, as i
   immediately, mid-scene included, and the corrected head becomes the reconstructor's fixed
   constraint for that chain (both ruled 2026-07-17). *(Specced 2026-07-17, **built &
   floor-verified 2026-07-18**, `authorial-correction.md` — chain content only; fact-level
-  correction **specced 2026-07-18**, `fact-level-correction.md`: at its build this verb becomes
-  fact-following — the corrected text is also the embedded fact basis, migration 002.)*
+  correction **specced & built 2026-07-18**, `fact-level-correction.md`: the verb is now
+  fact-following — the corrected text is also the embedded fact basis (migration 002), so
+  retrieval follows the fix.)*
 - **Diegetic** (in-world confrontation; an API event referencing a target `memory_id`): preserves
   the chain and routes through the dissonance path; the new head row is typed `rationalization` or
   `update_with_resentment`, and a correction record is present.

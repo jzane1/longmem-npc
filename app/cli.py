@@ -42,6 +42,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from app.ingest import (
+    CorrectionEmbedFailedError,
     EscalationHardStopError,
     UnknownAgentError,
     UnknownMemoryError,
@@ -227,9 +228,13 @@ async def repl(agent_id: UUID, debug: bool) -> None:
                     print(
                         f"corrected {correction.memory_id}: head "
                         f"{correction.superseded_detail_id} -> "
-                        f"{correction.detail_id}; "
+                        f"{correction.detail_id}; fact "
+                        f"{correction.superseded_fact_version_id} -> "
+                        f"{correction.fact_version_id}; "
                         f"{correction.evicted_cache_rows} cache row(s) "
-                        f"evicted ({correction.total_ms}ms)"
+                        f"evicted (embed {correction.embed_ms}ms/"
+                        f"{correction.embedding_tokens}tok, "
+                        f"{correction.total_ms}ms total)"
                     )
                 elif line.startswith(":as-of"):
                     raw = line[len(":as-of") :].strip()
@@ -257,6 +262,10 @@ async def repl(agent_id: UUID, debug: bool) -> None:
                 # Build-phase fail-loud stance (re-rule before the demo):
                 # nothing was inserted; the observe may be resent safely.
                 print(f"write hard-stopped: {exc}")
+            except CorrectionEmbedFailedError as exc:
+                # All-or-nothing (ruled 2026-07-18): nothing was written on
+                # either chain; the :correct may be re-issued safely.
+                print(f"correction failed: {exc}")
     finally:
         await runner.close()
 

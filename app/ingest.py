@@ -14,11 +14,20 @@ Degradation ladder (write):
       scoring_failed = true (+ default typology when undeclared; the head
       content falls back to the raw observation text since no render exists);
     - unknown decay_class label -> default class + decay_class_unknown = true;
-    - embedding failure -> NULL embedding (embedding_failed in the payload).
+    - embedding failure -> NULL embedding on the `original` FACT head
+      (embedding_failed in the payload; the queryable signal moved to the
+      fact head with the 2026-07-18 freeze ruling — observe no longer writes
+      memories.embedding at all).
   hard — build-phase stance, re-rule before the demo (2026-07-13):
     - escalation failure: retry once, then HARD-STOP with nothing inserted
       (the insert happens after escalation, so no rows exist to roll back;
       a client resend is safe pre-idempotency).
+
+The authorial correction (fact-following since the fact-level build,
+fact-level-correction.md) is the deliberate CONTRAST: all-or-nothing,
+fail-loud — an embed failure there writes nothing (CorrectionEmbedFailedError
+-> 502), because the operator surface has no soft paths and a NULL corrected
+embedding would make the memory vanish from the vector probe.
 """
 
 from __future__ import annotations
@@ -71,6 +80,13 @@ class CorrectionConflictError(RuntimeError):
     """The correction's expected_detail_id no longer names the live head —
     the operator's read is stale; nothing was changed (409, never a silent
     retry against a telling the operator did not see)."""
+
+
+class CorrectionEmbedFailedError(RuntimeError):
+    """The correction's embed call failed: nothing was written on either
+    chain (all-or-nothing, ruled 2026-07-18 — the embed runs BEFORE the
+    transaction opens). 502 at the route, the escalation-hard-stop precedent;
+    the operator retries."""
 
 
 class EscalationHardStopError(RuntimeError):
@@ -316,6 +332,7 @@ class IngestService:
         return IngestResult(
             memory_id=outcome.memory_id,
             detail_id=outcome.detail_id,
+            fact_version_id=outcome.fact_version_id,
             gist_span_ids=outcome.gist_span_ids,
             new_component_ids=outcome.new_component_ids,
             importance_raw=importance,
@@ -454,17 +471,35 @@ class IngestService:
     async def correct(
         self, memory_id: UUID, request: CorrectionRequest
     ) -> CorrectionResult:
-        """Authorial correction (authorial-correction.md): the operator's
-        text byte-verbatim into one supersede-guarded transaction with cache
-        eviction. Fail-loud — the operator surface has no soft paths."""
+        """Authorial correction (authorial-correction.md; fact-following
+        since the fact-level build, fact-level-correction.md): the operator's
+        text byte-verbatim into BOTH chains — the corrected telling head and
+        the corrected fact row with its re-derived embedding — in one
+        supersede-guarded transaction with cache eviction. The embed call
+        runs BEFORE the transaction (never a network call inside one); its
+        failure is all-or-nothing fail-loud (ruled 2026-07-18): nothing
+        written, CorrectionEmbedFailedError -> 502, the operator retries.
+        The operator surface has no soft paths."""
         t_total = time.perf_counter()
         if not request.content.strip():
             raise ValueError("corrected content must be non-empty")
+        t0 = time.perf_counter()
+        try:
+            embed_result = await asyncio.to_thread(
+                self._providers.embedding.embed, [request.content]
+            )
+        except ProviderCallError as exc:
+            raise CorrectionEmbedFailedError(
+                f"correction embed failed for {memory_id}; nothing was "
+                f"written — retry: {exc}"
+            ) from exc
+        embed_ms = _ms(time.perf_counter() - t0)
         outcome = await db.apply_authorial_correction(
             self._pool,
             memory_id=memory_id,
             content=request.content,
             valid_at=request.client_timestamp,
+            embedding=embed_result.vectors[0],
             expected_detail_id=request.expected_detail_id,
         )
         if outcome == "unknown_memory":
@@ -477,6 +512,10 @@ class IngestService:
             memory_id=memory_id,
             detail_id=outcome.detail_id,
             superseded_detail_id=outcome.superseded_detail_id,
+            fact_version_id=outcome.fact_version_id,
+            superseded_fact_version_id=outcome.superseded_fact_version_id,
             evicted_cache_rows=outcome.evicted_cache_rows,
+            embed_ms=embed_ms,
+            embedding_tokens=embed_result.tokens,
             total_ms=_ms(time.perf_counter() - t_total),
         )

@@ -44,10 +44,11 @@ One row per observation. **`observation_text` is immutable after insert.**
 - `memory_id` UUID PK, server default.
 - `agent_id` FK → agents.
 - `observation_text` text NOT NULL.
-- `embedding` vector(1536) — dimension locked. *(Fact-level correction specced 2026-07-18,
-  `fact-level-correction.md`: at migration 002 the retrieval probe moves to the live
-  fact-version head; this column remains the write-time event fact under that spec's suggested
-  dual-write default — dual-write vs freeze is `[SETTLE-AT-BUILD]` there.)*
+- `embedding` vector(1536) — dimension locked. *(Fact-level correction built 2026-07-18,
+  `fact-level-correction.md`: the retrieval probe moved to the live fact-version head, and the
+  build **ruled FREEZE** — observe no longer writes this column; it stays as written for
+  pre-002 rows (their values were backfilled into the fact chain) and the queryable
+  embed-degradation signal now lives on the live fact head.)*
 - `importance_raw` real — stored raw; normalized at read.
 - `scoring_failed` boolean NOT NULL default false — set true when the importance-scoring model
   fails; the write still lands with neutral importance (never lose a write). See architecture §2.
@@ -148,9 +149,9 @@ The entity/topic index: gist matching + entity-gate tripwire.
 ## Indexes
 
 - **HNSW** on `memories.embedding`, `vector_cosine_ops`. *(Ruled 2026-07-13: cosine, for
-  text-embedding-3-small. Fact-level correction specced 2026-07-18: the probe index moves to the
-  fact-version chain at migration 002; this index's fate — drop vs dormant — is
-  `[SETTLE-AT-BUILD]` in `fact-level-correction.md`.)*
+  text-embedding-3-small. Fact-level correction built 2026-07-18: migration 002 **dropped this
+  index** (ruled via explicit question — derived structure, zero readers) and the probe now
+  runs on `memory_fact_versions`' partial HNSW — `fact-level-correction.md`.)*
 - **GIN** on `memories.entities`.
 - FK/lookup indexes: `memories(agent_id)`, `memory_details(memory_id)`,
   `memory_gist_spans(memory_id)`, `corrections(memory_id)`, `reflections(agent_id)`,

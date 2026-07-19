@@ -88,7 +88,8 @@ memories row doesn't have, and that design deserves its own fork surface). *(Tha
 ran 2026-07-18 — specced in `fact-level-correction.md`; at its build the combined verb grows
 this endpoint.)* **The diegetic
 correction event + dissonance path** (sequenced post-August; the `corrections` table stays
-write-less until then). **Purge.** **The mid-dialogue gate** (immediate-queue item 2). If adjacent work looks necessary, stop and report —
+write-less until then). **Purge.** **The mid-dialogue gate** (immediate-queue item 1 since the
+2026-07-18 fact-level build). If adjacent work looks necessary, stop and report —
 with the correct option and its real cost stated, per the reframed contract.
 
 ## Surface (where this attaches)

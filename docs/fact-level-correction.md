@@ -58,6 +58,28 @@ plain-prose re-introduction — and ruled on the re-presentation):
    land-with-stale-embedding (retrieval keeps following the old semantics, the exact problem this
    target exists to fix).
 
+> **Status: BUILT & floor-verified 2026-07-18** (same day as the spec). Every `[SETTLE-AT-BUILD]`
+> item below was ruled at build time (dated "Fact-level correction build rulings" entry in
+> `decisions.md`): two via explicit questions — **dual-write vs freeze ruled FREEZE** (observe no
+> longer writes `memories.embedding`; the fact head is the sole vector home for post-002 rows,
+> and the queryable embed-degradation signal moved there — the recommendation had been
+> dual-write), and **the old `memories_embedding_hnsw` index dropped in 002** — the remaining
+> eight mechanical shapes approved as proposed. Migration `db\migrations\002_fact_versions.sql`
+> applied to `longmem` (ledger: 001 + 002, no-arg migrate a clean no-op under the new wording).
+> The verb landed in `app\db.py` (`apply_authorial_correction` grown: fact supersede + insert in
+> the same transaction; `insert_observation` mints the `original` fact head; the vector probe
+> joins the live fact head) + `app\ingest.py` (embed-before-transaction, `CorrectionEmbedFailedError`)
+> + `app\api.py` (502) + `app\schemas.py` (widened `CorrectionResult`, `IngestResult.fact_version_id`)
+> + `app\cli.py` (both head swaps + embed timing in `:correct`). **`app\retrieval.py` and
+> `app\reconstruction.py` are byte-untouched — the no-reconstruction-delta claim held.** Walker
+> `tests\verify_fact_correction.py` (32 assertions); prior walkers 35→38 (write; incl. the one
+> ruling-driven modification — the [14] degradation-signal query moved to the fact head),
+> 34→36 (read, addition only), 31→33 (authorial, addition only); reconstruction 42/42 and CLI
+> harness 36/36 **unmodified**. floor-verifier **pass** with working postgres MCP tools; live
+> piped REPL beat: the `:correct` line prints both head swaps, and the same query's relevance
+> moved 0.4686 → 0.5637 across the correction — retrieval following the fix, visible in the
+> debug view.
+
 ## Principles this build honors
 
 - **Non-destructive supersession — now on two chains under one `memory_id`.** The fact chain
@@ -187,7 +209,11 @@ CREATE INDEX IF NOT EXISTS memory_fact_versions_memory_id_idx
   column NULL for post-002 observes, splitting its meaning across an epoch — that price rides
   the tag. `[SETTLE-AT-BUILD]` dual-write vs freeze at observe — suggested dual-write; and the
   fate of `memories_embedding_hnsw` (an index is a derived structure, not stored content —
-  dropping it in 002 is sanctioned; leaving it dormant is also priceable).
+  dropping it in 002 is sanctioned; leaving it dormant is also priceable). *(Ruled at build via
+  explicit questions, 2026-07-18: **FREEZE** — the epoch split accepted, one vector home; the
+  column stays as written for pre-002 rows and is never written again. The queryable
+  embed-degradation signal (2026-07-13) moves to the live fact head. And the old index is
+  **dropped in 002**.)*
 - After 002, the standing floor criterion "001 the only migration; no-arg migrate a clean no-op"
   reads **"001 + 002 applied, 0 pending"** — the build updates that wording wherever it is
   recorded.
@@ -230,21 +256,33 @@ The embed call's timing and tokens land in `CorrectionResult` (`[SETTLE-AT-BUILD
 suggested `embed_ms`, `embedding_tokens`); the REPL debug view surfaces them; the load driver is
 untouched (correction is not a driven verb — stop and report if the build finds otherwise).
 
-## `[SETTLE-AT-BUILD]` — physical shapes (stop and report, never silently choose)
+## `[SETTLE-AT-BUILD]` — physical shapes, ruled at build (stop and report, never silently choose)
 
-- Exact table/column/index names (suggested `memory_fact_versions`, `fact_version_id`,
-  `basis_text`; index names per the sketch).
-- Fact-chain `write_cause` CHECK vocabulary (suggested the two live causes only).
-- Partial vs full HNSW; the fate of `memories_embedding_hnsw` (drop in 002 vs leave dormant).
-- Dual-write vs freeze of `memories.embedding` at observe (suggested dual-write).
-- Degraded-path (`fetch_live_candidates`) fact-head join or not.
-- Backfill guard shape.
-- Wire deltas: the exact `CorrectionResult` additions; whether `IngestResult` exposes the
-  original `fact_version_id`.
-- REPL `:correct` debug-view rendering of the new fields.
-- Embed-failure status code (suggested 502-class; verify against the route layer's existing
-  provider-failure surface).
-- Walker name + assertion count (suggested `tests\verify_fact_correction.py`).
+**All ruled 2026-07-18 with the build plan** (dated "Fact-level correction build rulings" entry
+in `decisions.md`; two via explicit questions, marked):
+
+- Exact table/column/index names — **ruled as suggested:** `memory_fact_versions`,
+  `fact_version_id`, `basis_text`; index names per the sketch.
+- Fact-chain `write_cause` CHECK vocabulary — **ruled as suggested:** the two live causes only.
+- Partial vs full HNSW; the fate of `memories_embedding_hnsw` — **ruled: partial (live heads
+  only); the old index DROPPED in 002 (explicit question)** — derived structure, zero readers
+  once the probe moves.
+- Dual-write vs freeze of `memories.embedding` at observe — **ruled: FREEZE (explicit question,
+  against the dual-write recommendation)** — one vector home; the epoch split accepted; the
+  degradation signal moves to the live fact head.
+- Degraded-path (`fetch_live_candidates`) fact-head join — **ruled: unjoined** (no distance is
+  computed there; the query stays byte-identical to v1).
+- Backfill guard shape — **ruled as sketched:** `WHERE NOT EXISTS`, before the indexes.
+- Wire deltas — **ruled:** `CorrectionResult += fact_version_id, superseded_fact_version_id,
+  embed_ms, embedding_tokens` (flat, the v1 `total_ms` style); `IngestResult += fact_version_id`.
+- REPL `:correct` debug-view rendering — **ruled:** both head swaps + embed ms/tokens in the
+  printed line; the new error prints loudly (the hard-stop pattern).
+- Embed-failure status code — **ruled: 502** (`CorrectionEmbedFailedError`, the
+  escalation-hard-stop precedent at the observe route).
+- Walker — **ruled:** `tests\verify_fact_correction.py` (32 assertions, scratch pattern);
+  write-path walker 35 → 38 (incl. the one ruling-driven modification: the [14]
+  degradation-signal query moved to the fact head), read-path 34 → 36 and authorial 31 → 33 by
+  addition only; reconstruction and CLI-harness walkers untouched.
 
 ## Done when
 

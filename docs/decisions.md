@@ -1058,3 +1058,51 @@ superseded-in-part, scope boundary, mechanism, instrumentation); `migration-01.m
 (embedding column, HNSW index, mechanics); `test-suite.md` Set A authorial pair grows the
 fact-chain assertions + a new all-or-nothing degradation case. Docs only — no code, no floors
 changed.
+
+## Fact-level correction build rulings — 2026-07-18
+
+Fact-level correction v1 built and floor-verifier-passed the same day as its spec (new
+structural walker `tests\verify_fact_correction.py`, 32 assertions; all five prior walkers
+re-run green on fresh scratch — 38/38 write (35 → 38), 36/36 read (34 → 36), 36/36 CLI harness
+(untouched), 42/42 reconstruction (**untouched — the proof of the spec's no-reconstruction-delta
+claim**; `app\retrieval.py` and `app\reconstruction.py` byte-identical to HEAD), 33/33 authorial
+(31 → 33); `longmem` pristine via the postgres MCP; migration 002 applied to `longmem` with the
+floor criterion now reading **"001 + 002 applied, 0 pending"**). Jack ruled two shapes via
+explicit questions at plan approval; the remaining eight mechanical shapes were approved as
+proposed.
+
+1. **Dual-write vs freeze = FREEZE (explicit question, against the dual-write
+   recommendation).** Observe no longer writes `memories.embedding` — the `original` fact head
+   on `memory_fact_versions` is the sole vector home for post-002 rows. The recommendation had
+   been dual-write (the 001 all-write-time-facts principle holding for every row); Jack chose
+   one storage home, accepting the epoch split (pre-002 rows keep their column values — now
+   also backfilled into the fact chain — post-002 rows carry NULL there forever). **Stated
+   consequence, implemented with the ruling:** the queryable embed-degradation signal (ruled
+   2026-07-13 as `memories.embedding IS NULL`) moves to the **live fact head**; the write-path
+   walker's [14] signal assertion moved with it — the one non-additive walker change of this
+   build, ruling-driven and recorded. Signal-home annotations propagated to architecture §2,
+   `test-suite.md`, `write-path.md` §c, and the `app\schemas.py`/`app\ingest.py` docstrings.
+2. **The old `memories_embedding_hnsw` index = DROPPED in 002 (explicit question, as
+   recommended).** An index is derived structure, not stored content; after the probe moves it
+   has zero readers. Reversal, if ever wanted, is one CREATE INDEX in a later migration.
+
+Approved-with-plan shapes, as built: names `memory_fact_versions` / `fact_version_id` /
+`basis_text` + index names per the spec sketch; `write_cause CHECK IN ('original',
+'authorial_correction')` (column shape otherwise mirroring `memory_details`); **partial HNSW**
+over live fact heads (`WHERE invalid_at IS NULL`, stated verbatim in the candidate SQL so the
+planner matches); degraded-path `fetch_live_candidates` deliberately unjoined (no distance is
+computed there; byte-identical to v1); backfill `INSERT…SELECT` with the `WHERE NOT EXISTS`
+backstop before the indexes (the walker proves the guard by re-running the 002 file against a
+legacy-shaped row); wire deltas `CorrectionResult += fact_version_id,
+superseded_fact_version_id, embed_ms, embedding_tokens` and `IngestResult += fact_version_id`;
+REPL `:correct` prints both head swaps + embed timing, and `CorrectionEmbedFailedError` prints
+loudly (the hard-stop pattern); embed failure → **502** (the escalation-hard-stop route
+precedent); the correction embeds **before** the transaction opens and a missing live fact head
+inside it raises as a broken-store invariant (rollback, 5xx). A build-observed bonus recorded
+by walker assertion: **correcting an embed-degraded memory re-embeds it** — the correction verb
+is the sanctioned repair path for NULL-fact-embedding rows (closing the retry-verb gap the
+rejected land-with-NULL option would have needed).
+
+Verification also included a live piped REPL beat on scratch (fake mode): the `:correct` line
+prints both head swaps, and the same chapel query's relevance moved 0.4686 → 0.5637 across the
+correction — retrieval following the fix, visible in the debug view.

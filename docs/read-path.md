@@ -117,10 +117,10 @@ Result-level:
   the Set B separation, assertable in payloads.
 - Rows with **NULL embeddings** (the write path's ruled degradation) are unreachable by the vector
   probe — a documented consequence. They remain reachable via the degraded fallback below, and
-  later via the gate's entity/GIN path (item 2). *(Fact-level correction specced 2026-07-18,
-  `fact-level-correction.md`: at migration 002 the probe joins the **live fact-version head**
-  and orders by its embedding — this floor deliberately re-opens at that build; scoring inputs
-  otherwise unchanged.)*
+  later via the gate's entity/GIN path (item 1 since the 2026-07-18 renumber). *(Fact-level correction built 2026-07-18,
+  `fact-level-correction.md`: the probe joins the **live fact-version head** and orders by its
+  embedding — this floor was deliberately re-opened and re-verified, walker 34 → 36 by addition;
+  scoring inputs otherwise unchanged.)*
 
 ## Retrieval scoring
 
@@ -176,7 +176,7 @@ Retrieval is **non-LLM** — no new model role, no new env var. The one model ca
 embedding**, which reuses the write path's embedding provider pair as-is: real
 `text-embedding-3-small` at the locked 1536, and the **deterministic fake** (so the structural
 suite runs offline, keyless, with stable scores). The probe embeds with the same model+dimension
-that embedded the observations. (The gate, also non-LLM, arrives at item 2; reconstruction's model
+that embedded the observations. (The gate, also non-LLM, arrives at item 1 — renumbered 2026-07-18; reconstruction's model
 role, `LONGMEM_MODEL_RECONSTRUCTION`, landed 2026-07-17.)
 
 ## `[SETTLE-AT-BUILD]` — physical shapes, ruled at build (stop and report, never silently choose)

@@ -2,20 +2,30 @@
 
 psycopg v3 with AsyncConnectionPool (stack constant; no ORM, no query
 builder). The observe insert is ONE transaction: memories row + `original`
-memory_details head + memory_gist_spans + any new identity_components land
-together or not at all (write-path.md §pipeline step d). Nothing here ever
-UPDATEs stored content; the only in-place writes are the two agent-row
+memory_details head + `original` memory_fact_versions head (migration 002,
+fact-level-correction.md) + memory_gist_spans + any new identity_components
+land together or not at all (write-path.md §pipeline step d). Nothing here
+ever UPDATEs stored content; the only in-place writes are the two agent-row
 runtime scalars — `set_pinned` (`memories.pinned`, write-path v1) and
 `apply_reputation_delta` (`agents.reputation`, CLI-harness build ruling
 2026-07-15) — both outside the memory-content non-destructive invariant. The
 only DELETE is `apply_authorial_correction`'s cache eviction — derived rows,
 not memory content (the standing eviction invariant, authorial-correction.md).
 
+Two chains under one memory_id since migration 002: the telling chain
+(memory_details) and the fact chain (memory_fact_versions — basis text +
+embedding). Freeze ruling (2026-07-18): observe no longer writes
+memories.embedding; the fact head is the sole vector home for post-002 rows,
+and `memory_fact_versions.embedding IS NULL` on the live head is the
+queryable embed-degradation signal (the 2026-07-13 signal, moved homes).
+
 Read-path candidate queries (read-path.md, 2026-07-14) are read-only: live
 memories (`memories.invalid_at IS NULL`) joined to the unique live detail
 head (`memory_details.invalid_at IS NULL`; uniqueness guaranteed by the
-one-live-head index). Invalidation excludes rows here, in SQL — decay never
-does (the two mechanisms stay distinct).
+one-live-head index) — and, for the vector probe, to the unique live fact
+head, whose embedding the `<=>` distance reads (fact-level-correction.md:
+retrieval follows the fix through this join). Invalidation excludes rows
+here, in SQL — decay never does (the two mechanisms stay distinct).
 
 Reconstruction (reconstruction.md, built 2026-07-17) writes through
 `write_back_reconstruction`: ONE transaction that supersedes the prior head
@@ -140,6 +150,7 @@ class InsertPlan:
 class InsertOutcome:
     memory_id: UUID
     detail_id: UUID
+    fact_version_id: UUID  # the `original` fact head (migration 002)
     gist_span_ids: list[UUID]
     new_component_ids: list[UUID]
 
@@ -169,19 +180,20 @@ async def insert_observation(
                     )
                     new_component_ids.append((await cur.fetchone())[0])
 
-                # 2. the memories row — all write-time facts
+                # 2. the memories row — write-time facts. The observation
+                # embedding is NOT written here (freeze ruling 2026-07-18):
+                # its home is the `original` fact head inserted below.
                 await cur.execute(
-                    "INSERT INTO memories (agent_id, observation_text, embedding, "
+                    "INSERT INTO memories (agent_id, observation_text, "
                     "importance_raw, scoring_failed, typology, typology_confidence, "
                     "typology_source, provenance, pinned, decay_class, "
                     "decay_class_unknown, valid_at, location_name, location_embedding, "
                     "entities, event_time, affect_valence, affect_arousal, affect_detail) "
-                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
                     "%s, %s, %s, %s, %s) RETURNING memory_id",
                     (
                         plan.agent_id,
                         plan.observation_text,
-                        _vector(plan.embedding),
                         plan.importance_raw,
                         plan.scoring_failed,
                         plan.typology,
@@ -213,7 +225,24 @@ async def insert_observation(
                 )
                 detail_id = (await cur.fetchone())[0]
 
-                # 4. gist spans — offsets into the immutable observation_text
+                # 4. the `original` fact head (migration 002) — the semantic
+                # basis retrieval ranks by: observation_text byte-verbatim +
+                # the observation embedding (NULL = embed-failure degradation;
+                # the queryable signal lives here since the freeze ruling).
+                await cur.execute(
+                    "INSERT INTO memory_fact_versions (memory_id, basis_text, "
+                    "embedding, write_cause, valid_at) "
+                    "VALUES (%s, %s, %s, 'original', %s) RETURNING fact_version_id",
+                    (
+                        memory_id,
+                        plan.observation_text,
+                        _vector(plan.embedding),
+                        plan.valid_at,
+                    ),
+                )
+                fact_version_id = (await cur.fetchone())[0]
+
+                # 5. gist spans — offsets into the immutable observation_text
                 gist_span_ids: list[UUID] = []
                 for span in plan.spans:
                     if isinstance(span.component_ref, int):
@@ -239,6 +268,7 @@ async def insert_observation(
     return InsertOutcome(
         memory_id=memory_id,
         detail_id=detail_id,
+        fact_version_id=fact_version_id,
         gist_span_ids=gist_span_ids,
         new_component_ids=new_component_ids,
     )
@@ -270,21 +300,34 @@ _CANDIDATE_FROM = (
     "ON d.memory_id = m.memory_id AND d.invalid_at IS NULL "
     "WHERE m.agent_id = %s AND m.invalid_at IS NULL"
 )
+# The vector probe additionally joins the live FACT head — the embedding the
+# <=> distance reads (fact-level-correction.md: retrieval follows the fix).
+# `fv.invalid_at IS NULL` is stated verbatim so the planner matches the
+# partial-HNSW predicate on memory_fact_versions.
+_VECTOR_CANDIDATE_FROM = (
+    "FROM memories m JOIN memory_details d "
+    "ON d.memory_id = m.memory_id AND d.invalid_at IS NULL "
+    "JOIN memory_fact_versions fv "
+    "ON fv.memory_id = m.memory_id AND fv.invalid_at IS NULL "
+    "WHERE m.agent_id = %s AND m.invalid_at IS NULL"
+)
 
 
 async def fetch_vector_candidates(
     pool: AsyncConnectionPool, agent_id: UUID, embedding: list[float], limit: int
 ) -> list[CandidateRow]:
-    """Over-fetched vector probe: live rows with embeddings, nearest first
-    (HNSW cosine). NULL-embedding rows are unreachable here by design — the
-    write path's ruled degradation consequence; they stay reachable on the
-    degraded path below and via the gate's GIN path later."""
+    """Over-fetched vector probe: live rows with live-fact-head embeddings,
+    nearest first (partial HNSW cosine on memory_fact_versions). NULL-fact-
+    embedding rows are unreachable here by design — the write path's ruled
+    degradation consequence, its signal on the fact head since the freeze
+    ruling; they stay reachable on the degraded path below and via the gate's
+    GIN path later."""
     vec = _vector(embedding)
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
-            f"SELECT {_CANDIDATE_COLUMNS}, m.embedding <=> %s AS distance "
-            f"{_CANDIDATE_FROM} AND m.embedding IS NOT NULL "
-            "ORDER BY m.embedding <=> %s LIMIT %s",
+            f"SELECT {_CANDIDATE_COLUMNS}, fv.embedding <=> %s AS distance "
+            f"{_VECTOR_CANDIDATE_FROM} AND fv.embedding IS NOT NULL "
+            "ORDER BY fv.embedding <=> %s LIMIT %s",
             (vec, agent_id, vec, limit),
         )
         rows = await cur.fetchall()
@@ -559,10 +602,13 @@ async def write_back_reconstruction(
 
 @dataclass(frozen=True)
 class CorrectionApplied:
-    """Row-level outcome of `apply_authorial_correction`."""
+    """Row-level outcome of `apply_authorial_correction` — both chains'
+    head swaps (fact fields since the fact-level build, 2026-07-18)."""
 
     detail_id: UUID
     superseded_detail_id: UUID
+    fact_version_id: UUID
+    superseded_fact_version_id: UUID
     evicted_cache_rows: int
 
 
@@ -577,19 +623,25 @@ async def apply_authorial_correction(
     memory_id: UUID,
     content: str,
     valid_at: datetime,
+    embedding: list[float],
     expected_detail_id: UUID | None = None,
 ) -> CorrectionApplied | Literal["unknown_memory", "stale_head"]:
-    """The operator's replace-model correction (authorial-correction.md): ONE
-    transaction — supersede the live head at the correction's world time,
-    insert the corrected `authorial_correction` head (valid_at = the same
-    instant; the coherent-chain-timeline precedent), and evict every cache
-    row for the memory (the standing eviction invariant: any non-
-    reconstruction chain writer evicts). `content` is the operator's text
-    byte-verbatim — no model call rides here. With `expected_detail_id` the
+    """The operator's replace-model correction (authorial-correction.md;
+    fact-following since the fact-level build, fact-level-correction.md): ONE
+    transaction — supersede the live telling head at the correction's world
+    time, insert the corrected `authorial_correction` head (valid_at = the
+    same instant; the coherent-chain-timeline precedent), supersede the live
+    fact head and insert the corrected fact row (basis_text byte-verbatim +
+    the pre-computed embedding — the caller embeds BEFORE this transaction;
+    no network call rides inside it), and evict every cache row for the
+    memory (the standing eviction invariant). `content` is the operator's
+    text byte-verbatim in both chains. With `expected_detail_id` the telling
     supersede is a compare-and-swap: a head that moved since the operator
-    read it reports "stale_head" and changes nothing (never silently correct
-    a telling the operator did not see). "unknown_memory" = no live head,
-    which by the one-live-head construction means no such memory."""
+    read it reports "stale_head" and changes nothing — the fact supersede
+    needs no CAS of its own (this verb is the fact chain's only post-observe
+    writer, and the telling-head CAS already serializes racing corrections).
+    "unknown_memory" = no live telling head, which by the one-live-head
+    construction means no such memory."""
     try:
         async with pool.connection() as conn:
             async with conn.transaction():
@@ -618,6 +670,31 @@ async def apply_authorial_correction(
                     )
                     detail_id = (await cur.fetchone())[0]
                     await cur.execute(
+                        "UPDATE memory_fact_versions SET invalid_at = %s "
+                        "WHERE memory_id = %s AND invalid_at IS NULL "
+                        "RETURNING fact_version_id",
+                        (valid_at, memory_id),
+                    )
+                    fact_row = await cur.fetchone()
+                    if fact_row is None:
+                        # Post-002 invariant: every memory carries exactly one
+                        # live fact head (observe mints it; the backfill
+                        # guarantees pre-002 rows). Absence is a broken store,
+                        # not an operator error — fail loud, roll back.
+                        raise RuntimeError(
+                            f"no live fact head for {memory_id}; the store "
+                            "violates the one-live-fact-head invariant"
+                        )
+                    superseded_fact = fact_row[0]
+                    await cur.execute(
+                        "INSERT INTO memory_fact_versions (memory_id, "
+                        "basis_text, embedding, write_cause, valid_at) VALUES "
+                        "(%s, %s, %s, 'authorial_correction', %s) "
+                        "RETURNING fact_version_id",
+                        (memory_id, content, _vector(embedding), valid_at),
+                    )
+                    fact_version_id = (await cur.fetchone())[0]
+                    await cur.execute(
                         "DELETE FROM reconstruction_cache WHERE memory_id = %s",
                         (memory_id,),
                     )
@@ -627,5 +704,7 @@ async def apply_authorial_correction(
     return CorrectionApplied(
         detail_id=detail_id,
         superseded_detail_id=superseded,
+        fact_version_id=fact_version_id,
+        superseded_fact_version_id=superseded_fact,
         evicted_cache_rows=evicted,
     )

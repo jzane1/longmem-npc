@@ -337,6 +337,32 @@ async def main(database_uri: str) -> None:
         and sources[m_event].anchor_cause == "authorial_correction",
         "the drift anchor resolves to the corrected head (derivable)",
     )
+    # Fact-following (fact-level-correction.md, built 2026-07-18): the same
+    # verb swaps the fact head; the drift write-back above minted NO fact row.
+    facts = await fetchall(
+        pool,
+        "SELECT write_cause, basis_text, invalid_at, fact_version_id "
+        "FROM memory_fact_versions WHERE memory_id = %s ORDER BY created_at",
+        m_event,
+    )
+    check(
+        len(facts) == 2
+        and facts[0][0] == "original"
+        and facts[0][2] == t_c
+        and facts[1][0] == "authorial_correction"
+        and facts[1][1] == CORRECTED
+        and facts[1][2] is None,
+        "fact chain: original -> corrected only (the reconstruction "
+        "write-back never touches facts); corrected basis byte-verbatim",
+    )
+    check(
+        result.fact_version_id == facts[1][3]
+        and result.superseded_fact_version_id == facts[0][3]
+        and result.embed_ms >= 0
+        and result.embedding_tokens > 0,
+        "CorrectionResult carries the fact IDs + embed timing/tokens "
+        "(widened at the fact-level build)",
+    )
 
     # ------------------------------------------------------------------ #
     print(

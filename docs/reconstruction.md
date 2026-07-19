@@ -60,7 +60,7 @@ scene-frozen decay band** (the pre-demo drift driver); and identity-document plu
 
 ## Scope boundary — do NOT build
 
-The mid-dialogue gate (immediate-queue item 2) — in this slice **every retrieval is dialogue init**,
+The mid-dialogue gate (immediate-queue item 1 since the 2026-07-18 fact-level build) — in this slice **every retrieval is dialogue init**,
 so all cache misses resolve inside the pre-warm; the **block-with-"reconstructing"-signal mid-scene
 miss path binds to the gate**, and the signal's wire shape is deliberately **not settled here**.
 The authorial-correction endpoint (**built 2026-07-18**) — its obligations toward this layer
@@ -69,7 +69,7 @@ stated here and built there. *(A third consequence was ruled 2026-07-17 at that 
 `authorial_correction`-anchored chains the fixed constraint follows the anchor — an assembly
 change that deliberately re-opens this floor at that build; `authorial-correction.md`.)* The diegetic/dissonance path, reflection (the identity document stays **seed-prose-only**),
 purge, prompt caching, and split-brain per-call weights (post-August). The pytest suite (Set C
-rides item 3; this build ships the structural walker `tests\verify_reconstruction.py`). And **any
+rides item 2 since the 2026-07-18 renumber; this build ships the structural walker `tests\verify_reconstruction.py`). And **any
 new DB schema or migration** — `reconstruction_cache` and `identity_documents` exist; the
 composed cache key lives in the existing text column. If adjacent work looks necessary, **stop and
 report** rather than expand scope.
@@ -236,7 +236,7 @@ input/output token counts (feeding the per-100-turn cost table), batch size, `ca
 `cache_misses`, `write_backs`, `drift_refusals`, lazy-bootstrap flag. Per-item: `read_mode` is
 already in the payload; the debug view (`render_debug`) grows the reconstruction counters. The
 load driver's aggregate table gains the reconstruction terms (`[SETTLE-AT-BUILD]` shape). No gate
-term — the gate is item 2.
+term — the gate is item 1 (renumbered 2026-07-18).
 
 ## `[SETTLE-AT-BUILD]` — physical shapes, ruled at build (stop and report, never silently choose)
 
