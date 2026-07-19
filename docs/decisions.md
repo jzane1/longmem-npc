@@ -1201,3 +1201,75 @@ pointers; `authorial-correction.md`
 `test-suite.md` Set D + ladder-row pointer; CLAUDE.md deliberately unchanged (the
 within-scene invariant needs no amendment — which memories surface was never under the
 byte-identity guarantee). Docs only — no code, no floors changed.
+
+## Mid-dialogue gate build rulings — 2026-07-19
+
+Mid-dialogue gate v1 built and floor-verifier-passed the same day as its spec (new structural
+walker `tests\verify_gate.py`, **51 assertions** — grown past the plan's ~34 estimate by
+addition; all seven prior walkers re-run green, each on fresh scratch — 40/40 write (38 → 40,
+the additive entities-freeze pair), 36/36 read (**byte-untouched — the loader-parity proof**),
+36/36 CLI harness (fixture `gate_enabled` pin + one ok-label edit, assertion bodies untouched),
+42/42 reconstruction (fixture pin only), 34/34 authorial (33 → 34 additive), 34/34
+fact-correction (32 → 34 additive); migration 003 applied to `longmem`, no-arg migrate →
+**"Up to date: 3 migration(s) applied, 0 pending"**; `longmem` pristine via the postgres MCP).
+Jack ruled two shapes via explicit questions at plan approval; the remaining shapes were
+approved with the plan.
+
+1. **Damper = as suggested (explicit question; the spec's promotable flag closed).**
+   Fruitless = a gate fetch appending zero new memory IDs; after
+   `gate_damper_fruitless_max` (default 2) consecutive, the **novelty signal** is suppressed
+   for the scene remainder; the entity tripwire stays live (near-ground-truth); a scene
+   boundary resets streak and suppression; the streak is caller-held wire state
+   (`gate_fruitless_streak`, the reputation_snapshot trust class). **Rejected:** suppressing
+   both signals (silences the demo-legible near-ground-truth signal for economy); no damper
+   in v1 (unlimited fruitless probes).
+2. **Correction-path NER failure = clean loud error, nothing written (explicit question).**
+   `CorrectionNlpFailedError` → 502 at the route, the embed-failure precedent's exact shape;
+   the NER runs before the embed, before the transaction. **Rejected:** unwrapped 500 (a
+   stack trace instead of guidance); degrade-with-copy-forward (silently violates
+   "corrections move entities" — the freeze ruling's own target).
+
+Approved-with-plan shapes, as built: knobs `gate_novelty_threshold` 0.5 / `gate_fetch_k` 3 /
+`gate_damper_fruitless_max` 2 / **`gate_enabled` 1** (the fixture-pin shape — the
+`reconstruction_theta = 0` precedent — doubling as the integrator kill-switch scaffold; the
+reserved per-signal kill-switch may later grow its own knobs); signal constants
+`"novelty"` / `"entity_tripwire"` + rungs `entity_only | novelty_only | closed` (the
+`TRIGGER_*` precedent); `app\gate.py` as a PURE decision module (the decay.py precedent) with
+retrieval owning all IO and `cosine_distance` imported from reconstruction (one
+implementation); coverage semantics (component covered iff any term, canonical or alias,
+case-insensitive, appears in any loaded fact-head's entities; **coverage-basis-absent ⇒
+novelty_only**, never fire-on-every-mention; empty loaded set ⇒ trivially novel); timing
+contract `gate_ms` = loaded/components fetch + evaluation, `sql_ms` = probe only (0.0 closed);
+wire deltas (`loaded_memory_ids` + `gate_fruitless_streak` on both requests,
+`RetrievedMemory.gate_fetched`, nested defaulted `GateInstrumentation`,
+`CorrectionRequest.entities`, `CorrectionResult += entities, nlp_ms`); efficacy comparators
+(`novelty_outscored` = top fetched score > min loaded score under the turn's probe;
+`entity_covered` = any fetched fact-head's entities ∩ the uncovered terms); prompt sub-header
+`"Recalled just now, mid-conversation:"` inside the single `[memories]` block, loaded items in
+the caller's append-only order (payload order stays `(−score, memory_id)`); the callback as
+function params only (never Pydantic fields), forwarded on gated turns, fired once before the
+blocking retelling call; runner bookkeeping keyed on the server's `gate.evaluated`.
+
+Accepted properties, recorded: the degraded GIN `&&` overlap is byte-exact against stored
+entity strings (aliases never sit in entities arrays — the Python coverage check has no such
+limit); gated payloads may exceed k (append-only, damper-bounded); fire-turn scores mix
+Python cosine (loaded) with SQL `<=>` (fetched) — not under byte-identity;
+`fetch_entity_candidates` has no LIMIT (Python-scored, the fetch_live_candidates precedent);
+the damper streak is caller-trusted wire state.
+
+Build-surfaced learnings, recorded honestly: (a) **pgvector rows need `.to_list()`** — a
+selected `vector` column returns a `Vector` object, not an iterable (the first walker run
+caught the loaded-set fetch failing quiet into the ladder's loader fallback — the fail-quiet
+rung worked as designed while the bug hid behind it); (b) **fake-mode calibration
+corrected**: under the trigram fake, ordinary distinct English prose lands ~0.45–0.75 cosine
+distance (shared trigrams), not the estimated ~1.0 — echoes ~0.04, near-copies ~0.08; the 0.5
+default STANDS (echoes/near-copies vs distinct prose separate cleanly), but guaranteed-novel
+walker fixtures need trigram-rare wording chosen by measurement (the damper text's min
+distance ≥ 0.73); the spec's calibration parenthetical and `app\config.py` comment were
+corrected (comment-only). Verification also included the live piped REPL beat (loader turn →
+mid-scene novelty fetch → both-signal fire with `fruitless=yes` → `:correct` →
+**`(reconstructing…)` printed DURING the blocked turn**, `blocked=yes` — the
+latency-becomes-characterization beat live, with the corrected fact basis also making the old
+wording read as novel: retrieval-follows-the-fix visible in the gate's min-distance) and a
+standalone load-driver run emitting `gate_check` p50/p95 + the gate block with real
+fire/efficacy data.

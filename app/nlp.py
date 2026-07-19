@@ -137,6 +137,28 @@ def _find_term_spans(text: str, term: str) -> list[tuple[int, int]]:
     return [(m.start(), m.end()) for m in pattern.finditer(text)]
 
 
+def find_term_spans(text: str, term: str) -> list[tuple[int, int]]:
+    """The gate's tripwire atom, promoted public 2026-07-19
+    (mid-dialogue-gate.md): mention detection is this same case-insensitive
+    whole-word match — mechanical string work stays mechanical, no spaCy on
+    the read path."""
+    return _find_term_spans(text, term)
+
+
+def extract_entities(text: str) -> list[str]:
+    """NER-only pass — the run_write_pass step-4 mirror without coref/affect:
+    surface entity strings whose labels sit in NER_CATEGORY, document order,
+    no dedup (the caller merges with operator-supplied entities using the
+    observe-path dedup). Used by the correction verb's entities re-derivation
+    (fork 3, 2026-07-19); the lru-cached spaCy model means no extra load."""
+    doc = _spacy()(text)
+    return [
+        ent.text.strip()
+        for ent in doc.ents
+        if ent.text.strip() and ent.label_ in NER_CATEGORY
+    ]
+
+
 def _dedupe_overlapping(spans: list[GistSpanCandidate]) -> list[GistSpanCandidate]:
     """Drop spans fully contained in an already-kept span (longest first)."""
     kept: list[GistSpanCandidate] = []

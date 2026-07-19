@@ -239,8 +239,8 @@ input/output token counts (feeding the per-100-turn cost table), batch size, `ca
 `cache_misses`, `write_backs`, `drift_refusals`, lazy-bootstrap flag. Per-item: `read_mode` is
 already in the payload; the debug view (`render_debug`) grows the reconstruction counters. The
 load driver's aggregate table gains the reconstruction terms (`[SETTLE-AT-BUILD]` shape). No gate
-term — the gate is item 1 (renumbered 2026-07-18; specced 2026-07-19, `mid-dialogue-gate.md` —
-the term lands at its build).
+term — the gate is item 1 (renumbered 2026-07-18; specced & built 2026-07-19,
+`mid-dialogue-gate.md` — the term landed at its build).
 
 ## `[SETTLE-AT-BUILD]` — physical shapes, ruled at build (stop and report, never silently choose)
 

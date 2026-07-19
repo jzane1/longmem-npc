@@ -43,6 +43,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from typing import Callable
+from uuid import UUID
 
 from psycopg_pool import AsyncConnectionPool
 
@@ -85,6 +87,13 @@ _BLOCK_REPUTATION = (
 )
 _BLOCK_MEMORIES_HEADER = "[memories]\nWhat you remember, most salient first:"
 _MEMORY_LINE = "- ({memory_id}) {content}"
+# Gated turns (mid-dialogue-gate.md, built 2026-07-19): the [memories] block
+# becomes the scene's loaded set in the caller's append-only order — a
+# byte-stable prefix across the scene, the structure prompt caching later
+# attaches to — with this turn's gate fetches under a marked sub-header
+# inside the same block (bracket labels stay top-level-block-only). The
+# payload's item order is unchanged (deterministic score order).
+_MEMORY_RECOLLECTION_SUBHEADER = "Recalled just now, mid-conversation:"
 _BLOCK_CONTRACT_WITH_VOCAB = (
     "[output]\nReturn ONLY a JSON object with keys: prose (your spoken line, "
     'in character), directive (an object {{"type": <one of {vocabulary}>, '
@@ -111,10 +120,18 @@ def assemble_system_prompt(
     scale_max: float,
     items: list[RetrievedMemory],
     vocabulary: list[str],
+    *,
+    loaded_order: list[UUID] | None = None,
 ) -> str:
     """The prompt prefix, seed-prose-only (identity recompile rides with
     reconstruction). Exposed as a function so the walker can assert block
-    order and byte-stability without a model call."""
+    order and byte-stability without a model call.
+
+    `loaded_order` (gate build 2026-07-19): on gated turns the caller's
+    append-only loaded-set order shapes the [memories] block — loaded items
+    in that order, then any gate-fetched items under the recollection
+    sub-header. None (loader turns, pre-gate callers) => the v1 rendering,
+    byte-identical: items in payload rank order."""
     blocks: list[str] = []
     if seed_identity:
         blocks.append(_BLOCK_IDENTITY.format(seed=seed_identity))
@@ -124,10 +141,29 @@ def assemble_system_prompt(
         )
     )
     if items:
+        if loaded_order is None:
+            ordered = list(items)
+            fetched: list[RetrievedMemory] = []
+        else:
+            order_index = {memory_id: i for i, memory_id in enumerate(loaded_order)}
+            loaded_items = [item for item in items if not item.gate_fetched]
+            # Defensive: items outside the caller's list (shouldn't happen —
+            # closed-gate serving is the loaded set) append after, payload order.
+            ordered = sorted(
+                loaded_items,
+                key=lambda item: order_index.get(item.memory_id, len(order_index)),
+            )
+            fetched = [item for item in items if item.gate_fetched]
         lines = [
             _MEMORY_LINE.format(memory_id=item.memory_id, content=item.content)
-            for item in items
+            for item in ordered
         ]
+        if fetched:
+            lines.append(_MEMORY_RECOLLECTION_SUBHEADER)
+            lines.extend(
+                _MEMORY_LINE.format(memory_id=item.memory_id, content=item.content)
+                for item in fetched
+            )
         blocks.append(_BLOCK_MEMORIES_HEADER + "\n" + "\n".join(lines))
     if vocabulary:
         blocks.append(_BLOCK_CONTRACT_WITH_VOCAB.format(vocabulary=vocabulary))
@@ -171,7 +207,10 @@ class DialogueService:
         self._retrieval = retrieval
 
     async def run_dialogue_turn(
-        self, request: DialogueTurnRequest
+        self,
+        request: DialogueTurnRequest,
+        *,
+        on_reconstruct: Callable[[], None] | None = None,
     ) -> DialogueTurnResult:
         t_total = time.perf_counter()
 
@@ -193,7 +232,9 @@ class DialogueService:
 
         # --- retrieval: the built read seam, passed through unreinterpreted
         # (incl. the caller-frozen scene state — reconstruction build
-        # 2026-07-17; past-theta items reconstruct inside this call).
+        # 2026-07-17 — and the caller-held loaded set + damper streak —
+        # gate build 2026-07-19; past-theta items reconstruct inside this
+        # call, and a blocking mid-scene serve fires on_reconstruct).
         retrieval = await self._retrieval.retrieve_dialogue_init(
             DialogueInitRequest(
                 agent_id=request.agent_id,
@@ -202,7 +243,10 @@ class DialogueService:
                 as_of=request.as_of,
                 identity_version=request.identity_version,
                 scene_started_at=request.scene_started_at,
-            )
+                loaded_memory_ids=request.loaded_memory_ids,
+                gate_fruitless_streak=request.gate_fruitless_streak,
+            ),
+            on_reconstruct=on_reconstruct,
         )
 
         # --- prompt assembly + the single dialogue call -------------------
@@ -215,6 +259,14 @@ class DialogueService:
             scale_max,
             retrieval.items,
             vocabulary,
+            # The append-only prompt order applies only when the gate
+            # actually evaluated (a gate-disabled agent with loaded IDs took
+            # the loader path — its prompt stays byte-identical to v1).
+            loaded_order=(
+                request.loaded_memory_ids
+                if retrieval.instrumentation.gate.evaluated
+                else None
+            ),
         )
 
         t0 = time.perf_counter()

@@ -23,6 +23,7 @@ from app.db import build_pool
 from app.ingest import (
     CorrectionConflictError,
     CorrectionEmbedFailedError,
+    CorrectionNlpFailedError,
     EscalationHardStopError,
     IngestService,
     UnknownAgentError,
@@ -114,9 +115,9 @@ async def correct_memory(memory_id: UUID, body: CorrectionRequest) -> Correction
     """Authorial correction (authorial-correction.md; fact-following since
     the fact-level build): memory-scoped operator verb — /v1/events/* stays
     diegetic. Fail-loud: 404 unknown memory, 409 stale expected_detail_id,
-    422 invalid content, 502 embed failure with nothing written (the
-    all-or-nothing ruling, 2026-07-18 — the escalation-hard-stop precedent);
-    nothing partial."""
+    422 invalid content, 502 embed or NER failure with nothing written (the
+    all-or-nothing rulings, 2026-07-18 / 2026-07-19 — the
+    escalation-hard-stop precedent); nothing partial."""
     try:
         return await app.state.service.correct(memory_id, body)
     except UnknownMemoryError as exc:
@@ -124,6 +125,8 @@ async def correct_memory(memory_id: UUID, body: CorrectionRequest) -> Correction
     except CorrectionConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except CorrectionEmbedFailedError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except CorrectionNlpFailedError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

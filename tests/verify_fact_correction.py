@@ -351,6 +351,13 @@ async def main(database_uri: str) -> None:
     )
     t_c = NOW - timedelta(hours=1)
     original_fact_vec_text = facts_e[0][6]
+    pre_fact_entities = (
+        await fetchrow(
+            pool,
+            "SELECT entities FROM memory_fact_versions WHERE fact_version_id = %s",
+            facts_e[0][4],
+        )
+    )[0]
     result = await ingest.correct(
         m_event, CorrectionRequest(content=CORRECTED, client_timestamp=t_c)
     )
@@ -399,6 +406,24 @@ async def main(database_uri: str) -> None:
         and result.embedding_tokens > 0,
         "CorrectionResult carries both fact IDs + the embed call's "
         "timing/tokens (v1's no-token line superseded)",
+    )
+    # Entities follow the correction (gate build 2026-07-19, fork 3): the
+    # corrected fact head carries the NER merge; the superseded row keeps
+    # its own (non-destructive, the embedding precedent above).
+    fact_entities = await fetchall(
+        pool,
+        "SELECT write_cause, entities FROM memory_fact_versions "
+        "WHERE memory_id = %s ORDER BY created_at",
+        m_event,
+    )
+    check(
+        (fact_entities[-1][1] or []) == result.entities and result.nlp_ms >= 0.0,
+        "corrected fact head carries the merged entities; CorrectionResult "
+        "echoes them + nlp_ms",
+    )
+    check(
+        fact_entities[0][1] == pre_fact_entities,
+        "the superseded fact row keeps ITS entities (non-destructive record)",
     )
 
     # ------------------------------------------------------------------ #

@@ -89,6 +89,14 @@ class CorrectionEmbedFailedError(RuntimeError):
     the operator retries."""
 
 
+class CorrectionNlpFailedError(RuntimeError):
+    """The correction's NER pass failed (broken/missing spaCy install):
+    nothing was written — the NER runs before the embed, before the
+    transaction (fail-loud, ruled 2026-07-19 with the gate build; the embed
+    precedent's shape). 502 at the route; the operator fixes the environment
+    and retries."""
+
+
 class EscalationHardStopError(RuntimeError):
     """Escalation failed twice: the write was aborted, nothing was inserted."""
 
@@ -474,15 +482,34 @@ class IngestService:
         """Authorial correction (authorial-correction.md; fact-following
         since the fact-level build, fact-level-correction.md): the operator's
         text byte-verbatim into BOTH chains — the corrected telling head and
-        the corrected fact row with its re-derived embedding — in one
-        supersede-guarded transaction with cache eviction. The embed call
-        runs BEFORE the transaction (never a network call inside one); its
-        failure is all-or-nothing fail-loud (ruled 2026-07-18): nothing
-        written, CorrectionEmbedFailedError -> 502, the operator retries.
-        The operator surface has no soft paths."""
+        the corrected fact row with its re-derived embedding AND re-derived
+        entities (fork 3, 2026-07-19: mechanical NER over the corrected text
+        merged with the optional operator field, the observe-path merge
+        mirrored) — in one supersede-guarded transaction with cache eviction.
+        The NER and embed calls run BEFORE the transaction (never a network
+        call inside one); each failure is all-or-nothing fail-loud: nothing
+        written, CorrectionNlpFailedError / CorrectionEmbedFailedError -> 502,
+        the operator retries. The operator surface has no soft paths."""
         t_total = time.perf_counter()
         if not request.content.strip():
             raise ValueError("corrected content must be non-empty")
+        t0 = time.perf_counter()
+        try:
+            ner_entities = await asyncio.to_thread(
+                nlp.extract_entities, request.content
+            )
+        except Exception as exc:  # noqa: BLE001 — any NLP-stack failure is the same operator story
+            raise CorrectionNlpFailedError(
+                f"correction NER failed for {memory_id}; nothing was "
+                f"written — fix the NLP install and retry: {exc}"
+            ) from exc
+        nlp_ms = _ms(time.perf_counter() - t0)
+        # The observe-path merge, byte-for-byte (ingest_observation): NER
+        # first, then operator-supplied, case-insensitive dedup.
+        entities: list[str] = []
+        for name in [*ner_entities, *(request.entities or [])]:
+            if name and name.lower() not in {e.lower() for e in entities}:
+                entities.append(name)
         t0 = time.perf_counter()
         try:
             embed_result = await asyncio.to_thread(
@@ -500,6 +527,7 @@ class IngestService:
             content=request.content,
             valid_at=request.client_timestamp,
             embedding=embed_result.vectors[0],
+            entities=entities or None,
             expected_detail_id=request.expected_detail_id,
         )
         if outcome == "unknown_memory":
@@ -515,7 +543,9 @@ class IngestService:
             fact_version_id=outcome.fact_version_id,
             superseded_fact_version_id=outcome.superseded_fact_version_id,
             evicted_cache_rows=outcome.evicted_cache_rows,
+            entities=entities,
             embed_ms=embed_ms,
             embedding_tokens=embed_result.tokens,
+            nlp_ms=nlp_ms,
             total_ms=_ms(time.perf_counter() - t_total),
         )

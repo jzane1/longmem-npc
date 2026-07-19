@@ -95,11 +95,15 @@ class CorrectionRequest(BaseModel):
     t_c (prior head invalid_at = corrected head valid_at — the coherent-
     chain-timeline precedent). `expected_detail_id`, when supplied, makes the
     supersede a compare-and-swap: 409 if the live head moved since the
-    operator read it (never a silent correction of an unseen telling)."""
+    operator read it (never a silent correction of an unseen telling).
+    `entities` (fork 3, 2026-07-19, mid-dialogue-gate.md): optional
+    operator-supplied entities merged with the mechanical NER pass over the
+    corrected text — the observe-path merge mirrored; absent => NER alone."""
 
     content: str = Field(min_length=1)
     client_timestamp: datetime
     expected_detail_id: UUID | None = None
+    entities: list[str] | None = None
 
     @field_validator("client_timestamp")
     @classmethod
@@ -197,7 +201,10 @@ class CorrectionResult(BaseModel):
     instrumentation. v1's "no token fields — no model calls" line is
     superseded (fact-level-correction.md, ruled 2026-07-18): one embed call
     rides the verb, so the corrected fact basis can steer retrieval; its
-    timing and tokens land here."""
+    timing and tokens land here. Since the gate build (fork 3, 2026-07-19)
+    the verb also re-derives entities: `entities` is the merged NER +
+    operator-field list written to the corrected fact head, `nlp_ms` the
+    mechanical NER pass's timing (non-LLM — no token count exists)."""
 
     memory_id: UUID
     detail_id: UUID  # the corrected telling head
@@ -205,8 +212,10 @@ class CorrectionResult(BaseModel):
     fact_version_id: UUID  # the corrected fact head (migration 002)
     superseded_fact_version_id: UUID
     evicted_cache_rows: int
+    entities: list[str] = Field(default_factory=list)
     embed_ms: float
     embedding_tokens: int
+    nlp_ms: float = 0.0
     total_ms: float
 
 
@@ -256,6 +265,16 @@ class DialogueInitRequest(BaseModel):
     # document lazy-bootstraps; an unknown version is a loud contract error.
     identity_version: str | None = None
     scene_started_at: datetime | None = None
+    # Caller-held loaded set (mid-dialogue-gate.md fork 1, 2026-07-19 — the
+    # third application of the caller-freezes-scene-state contract): the
+    # scene's already-surfaced memory IDs, append-only, reset by the caller
+    # at scene boundaries. Absent -> loader turn, v1 byte-parity (the gate
+    # never evaluates). `gate_fruitless_streak` is the damper's caller-held
+    # consecutive-fruitless-fetch count (same trust class as
+    # reputation_snapshot). The RESERVED `entities` slot above is NOT the
+    # gate's input — the tripwire reads the utterance text.
+    loaded_memory_ids: list[UUID] | None = None
+    gate_fruitless_streak: int = Field(default=0, ge=0)
 
     @field_validator("event_time", "as_of", "scene_started_at")
     @classmethod
@@ -281,6 +300,41 @@ class RetrievedMemory(BaseModel):
     recency: float
     importance_norm: float
     importance_raw: float  # the debug view's raw axis (as fed to the formula)
+    gate_fetched: bool = False  # appended by a mid-scene gate fetch this turn
+    # (mid-dialogue-gate.md, 2026-07-19); the caller appends these IDs to its
+    # loaded set. Defaulted: pre-gate construction sites stand.
+
+
+class GateInstrumentation(BaseModel):
+    """The mid-dialogue gate's per-turn record (mid-dialogue-gate.md, built
+    2026-07-19). Fully defaulted — loader turns carry the all-default shape
+    (`evaluated=False`). `signals_fired` uses the gate's named constants
+    (app\\gate.py — the escalated_by precedent); instrumentation-only by
+    fork 4 (no gate_events table; the load driver aggregates these fields,
+    and the reserved novelty kill-switch decision reads run artifacts).
+    Timing decomposition: `gate_ms` = loaded-set fetch + components fetch +
+    signal evaluation + decision; the probe/lexical fetch stays in `sql_ms`
+    (0.0 on closed turns — the zero-probe-SQL claim); the one utterance
+    embed stays in `embed_ms` (it doubles as the fetch probe). Efficacy
+    booleans are None unless their signal fired with a computable basis
+    (§11 comparators, ruled with the build)."""
+
+    evaluated: bool = False  # False = loader turn (absent fields or gate_enabled 0)
+    fired: bool = False
+    signals_fired: list[str] = Field(default_factory=list)
+    degraded_rung: str | None = None  # entity_only | novelty_only | closed
+    novelty_min_distance: float | None = None
+    null_embedding_loaded_count: int = 0  # excluded from the novelty basis
+    loaded_missing_count: int = 0  # unknown/foreign/dead IDs dropped by the join
+    uncovered_entities: list[str] = Field(default_factory=list)  # canonicals
+    fetched_memory_ids: list[UUID] = Field(default_factory=list)
+    fetched_new_count: int = 0
+    fruitless: bool = False  # a fire that appended zero new IDs (damper input)
+    damper_active: bool = False  # novelty suppressed this turn (streak >= max)
+    novelty_outscored: bool | None = None  # top fetched score > min loaded score
+    entity_covered: bool | None = None  # fetch contained the tripwire entity
+    gate_ms: float = 0.0
+    reconstructing_blocked: bool = False  # a mid-scene serve blocked (fork 5)
 
 
 class RetrievalInstrumentation(BaseModel):
@@ -315,6 +369,9 @@ class RetrievalInstrumentation(BaseModel):
     drift_refusals: int = 0
     identity_version_effective: str | None = None
     identity_bootstrapped: bool = False  # no version passed; ensured lazily
+    # The gate stage (mid-dialogue-gate.md, built 2026-07-19). Defaulted:
+    # pre-gate constructions and payload shapes stand.
+    gate: GateInstrumentation = Field(default_factory=GateInstrumentation)
 
 
 class RetrievalResult(BaseModel):
@@ -322,7 +379,9 @@ class RetrievalResult(BaseModel):
     verbatim (route-is-pass-through). Reserved request fields are never
     echoed here."""
 
-    items: list[RetrievedMemory]  # ranked, <= k
+    items: list[RetrievedMemory]  # ranked; <= k on loader turns. Gated turns
+    # serve the whole loaded set (+ any gate fetch), so the count may exceed
+    # k — append-only within a scene, damper-bounded (mid-dialogue-gate.md).
     instrumentation: RetrievalInstrumentation
 
 
@@ -367,6 +426,11 @@ class DialogueTurnRequest(BaseModel):
     # (reconstruction build 2026-07-17; the reputation_snapshot precedent).
     identity_version: str | None = None
     scene_started_at: datetime | None = None
+    # Caller-held loaded set + damper streak (mid-dialogue-gate.md fork 1,
+    # 2026-07-19) — passed through to retrieval unreinterpreted, the
+    # identity_version precedent. Absent -> loader turn, v1 byte-parity.
+    loaded_memory_ids: list[UUID] | None = None
+    gate_fruitless_streak: int = Field(default=0, ge=0)
     debug: bool = False
 
     @field_validator("as_of", "scene_started_at")
@@ -380,8 +444,9 @@ class DialogueTurnRequest(BaseModel):
 class DialogueTurnInstrumentation(BaseModel):
     """Per-turn timing + token accounting, recorded once at the seam.
 
-    Feeds architecture §11's latency histogram (no gate term in the slice)
-    and the per-100-turn cost table. Token counts are unconditional;
+    Feeds architecture §11's latency histogram — the gate term landed with
+    the gate build (2026-07-19, `retrieval.gate.gate_ms`; the reservation is
+    closed) — and the per-100-turn cost table. Token counts are unconditional;
     `cost_usd` is populated only when LONGMEM_PRICE_* env vars are set
     (build ruling 2026-07-15 — no hardcoded model pricing), covering the
     dialogue call plus the priced share of the query embedding.

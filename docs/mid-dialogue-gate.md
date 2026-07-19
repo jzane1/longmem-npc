@@ -91,6 +91,37 @@ The **fruitless-retrieval damper** was deliberately *not* forked: its mechanism 
 architecture §6) stays `[SETTLE-AT-BUILD]` with a full suggested default below — **flagged
 promotable**: if Jack wants it ruled rather than suggested, promote it before the build.
 
+> **Status: BUILT & floor-verified 2026-07-19** (same day as the spec). Two `[SETTLE-AT-BUILD]`
+> items were ruled via explicit questions at plan approval (dated "Mid-dialogue gate build
+> rulings" entry in `decisions.md`): **the damper = as suggested** (the promotable flag closed —
+> fruitless = zero new IDs appended; 2 consecutive suppress the NOVELTY signal for the scene
+> remainder; tripwire live; scene reset) and **correction-path NER failure = clean loud error,
+> nothing written** (`CorrectionNlpFailedError` → 502, the embed precedent). The remaining
+> shapes were approved with the plan, including **`gate_enabled`** as the fixture-pin /
+> kill-switch-scaffold knob. New: `app\gate.py` (pure decision module),
+> `db\migrations\003_fact_entities.sql` (applied to `longmem`; no-arg migrate → **"Up to date:
+> 3 migration(s) applied, 0 pending"**), the gated/loader branch + `_gated` in
+> `app\retrieval.py`, the freeze at observe + `GateRow` + three gate fetchers in `app\db.py`,
+> the NER merge + `CorrectionNlpFailedError` in `app\ingest.py` (+ 502 in `app\api.py`), the
+> pre-serve callback in `app\reconstruction.py` (one defaulted param), loaded-set/streak state
+> in `app\session.py`, the prompt partition + `"Recalled just now, mid-conversation:"`
+> sub-header in `app\dialogue.py`, `GateInstrumentation` + wire deltas in `app\schemas.py`,
+> four knobs in `app\config.py`, the CLI gate line + `(reconstructing…)` print, and the
+> load-driver `gate_check` series + gate block. Walker `tests\verify_gate.py` (**51
+> assertions** — grown past the ~34 estimate, addition only); prior walkers: write-path 38 → 40
+> (additive freeze pair), authorial 33 → 34 and fact 32 → 34 (additive entities-chain),
+> read-path 36 **byte-untouched** (the loader-parity proof), cli-harness 36 (fixture pin + one
+> ok-label edit), reconstruction 42 (fixture pin only, assertion bodies untouched).
+> floor-verifier **pass** with working postgres MCP tools; `longmem` pristine. Live piped REPL
+> beat: loader turn → mid-scene novelty fetch → both-signal fire with `fruitless=yes` →
+> `:correct` → **`(reconstructing…)` printed DURING the blocked turn** (`blocked=yes`), the
+> latency-becomes-characterization beat live. Standalone driver run emits `gate_check` p50/p95
+> + the gate block with real fire/efficacy data. **Build-measured calibration correction,
+> recorded honestly:** under the trigram fake, ordinary distinct prose lands ~0.45–0.75 (not
+> the estimated ~1.0 — shared English trigrams); echoes ~0.04, near-copies ~0.08. The 0.5
+> default stands; guaranteed-novel *fixtures* need trigram-rare wording (the walker's damper
+> text was chosen by measurement, min-distance ≥ 0.73).
+
 ## Principles this build honors
 
 - **Non-LLM, structurally.** No gate model, no gate env var, no gate pricing entry — the

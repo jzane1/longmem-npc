@@ -66,6 +66,10 @@ SEED_PROSE = "The ford keeper, wary of strangers."
 AGENT_CONFIG = {
     "decay_classes": {"episodic": 86400, "semantic": 604800},
     "decay_class_default": "episodic",
+    # gate_enabled = 0 (gate build 2026-07-19): the correction-override beat
+    # here asserts under v1 every-turn retrieval; the gated behavior is
+    # verify_gate.py's floor. FIXTURE-ONLY pin — production runs the gate.
+    "gate_enabled": 0.0,
 }
 
 # Semantic (tau 7d) rows at 10 days sit past theta (0.5) for ANY
@@ -362,6 +366,17 @@ async def main(database_uri: str) -> None:
         and result.embedding_tokens > 0,
         "CorrectionResult carries the fact IDs + embed timing/tokens "
         "(widened at the fact-level build)",
+    )
+    # Entities follow the correction (gate build 2026-07-19, fork 3).
+    corrected_entities = await fetchrow(
+        pool,
+        "SELECT entities FROM memory_fact_versions WHERE fact_version_id = %s",
+        result.fact_version_id,
+    )
+    check(
+        (corrected_entities[0] or []) == result.entities and result.nlp_ms >= 0.0,
+        "the corrected fact head carries the re-derived entities; the result "
+        "echoes them + the mechanical NER pass's timing",
     )
 
     # ------------------------------------------------------------------ #

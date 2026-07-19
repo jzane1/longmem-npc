@@ -111,6 +111,18 @@ def render_debug(result: DialogueTurnResult) -> str:
         f"candidates={ret.candidate_count} k={ret.k_effective}"
         f"{'  [degraded: ' + str(ret.degraded_reason) + ']' if ret.degraded else ''}"
     )
+    if ret.gate.evaluated:
+        g = ret.gate
+        lines.append(
+            f"  gate:      fired={g.signals_fired if g.fired else 'no'} "
+            f"min_dist={g.novelty_min_distance} "
+            f"fetched={g.fetched_new_count} fruitless={'yes' if g.fruitless else 'no'} "
+            f"damper={'on' if g.damper_active else 'off'} "
+            f"rung={g.degraded_rung or '-'} "
+            f"blocked={'yes' if g.reconstructing_blocked else 'no'} {g.gate_ms}ms"
+        )
+    else:
+        lines.append("  gate:      (loader turn)")
     lines.append(
         f"  recon:     hits={ret.cache_hits} misses={ret.cache_misses} "
         f"write_backs={ret.write_backs} refusals={ret.drift_refusals} "
@@ -169,6 +181,10 @@ def _parse_as_of(text: str) -> datetime:
 async def repl(agent_id: UUID, debug: bool) -> None:
     runner = await SessionRunner.create(agent_id)
     runner.debug = debug
+    # Fork 5 (mid-dialogue-gate.md): the pre-serve callback prints DURING a
+    # blocking mid-scene retelling — the pause reads as recall, not lag (it
+    # fires just before the retelling call blocks the turn).
+    runner.on_reconstruct = lambda: print("(reconstructing…)", flush=True)
     nlp_warm = False
     print(
         f"longmem-npc CLI — agent {agent_id}  "

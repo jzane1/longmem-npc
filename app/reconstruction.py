@@ -45,6 +45,7 @@ import re
 import time
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Callable
 from uuid import UUID
 
 from psycopg_pool import AsyncConnectionPool
@@ -281,6 +282,7 @@ class ReconstructionService:
             tuple[float, float | None, float, float, float, db.CandidateRow]
         ],
         as_of: datetime,
+        on_reconstruct: Callable[[], None] | None = None,
     ) -> ServeOutcome:
         t0 = time.perf_counter()
         theta = agent_knob(config, "reconstruction_theta", self._settings)
@@ -382,6 +384,14 @@ class ReconstructionService:
             retellings: dict[str, str] = {}
             call_ok = False
             if items:
+                # The pre-serve callback (mid-dialogue-gate.md fork 5,
+                # 2026-07-19): fired ONCE, the moment a real blocking
+                # retelling call is about to run — the caller can show
+                # "(reconstructing…)" DURING the pause (latency becomes
+                # characterization, architecture §7). Absent parameter =>
+                # behavior byte-identical to the pre-gate floor.
+                if on_reconstruct is not None:
+                    on_reconstruct()
                 try:  # single attempt (ruled): read latency, not a lost write
                     result = await asyncio.to_thread(
                         self._providers.reconstruction.reconstruct,

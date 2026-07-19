@@ -145,10 +145,10 @@ the same bi-temporal machinery the telling has: a child chain under the stable `
 both the telling head and the embedded fact basis in one transaction, so retrieval follows the
 fix. Only the embedding follows the correction (ruled 2026-07-18); importance, typology, decay
 class, entities, and affect stand as write-time facts about the *event*. *(Amended by the
-2026-07-19 gate-spec rulings, `mid-dialogue-gate.md`: **entities now also follows** — migration
-003 gives it a fact-chain home, and the correction verb re-derives it via mechanical NER merged
-with an optional operator field, mirroring observe. Importance, typology, decay class, and
-affect still stand as write-time facts.)* Accepted asymmetry: a
+2026-07-19 gate-spec rulings, `mid-dialogue-gate.md`, **built the same day**: **entities now
+also follows** — migration 003 gives it a fact-chain home, and the correction verb re-derives
+it via mechanical NER merged with an optional operator field, mirroring observe. Importance,
+typology, decay class, and affect still stand as write-time facts.)* Accepted asymmetry: a
 corrected memory's embedding basis is the operator's corrected text rather than
 observation-class text — the same ground-truth rule as constraint-follows-anchor.
 
@@ -168,8 +168,8 @@ write-time facts from day one.
   at write from day one:** the entities column + GIN index serve the gate now and the planned
   encoding-context read boost later. *(Gate spec 2026-07-19, freeze ruling — the 002 embedding
   precedent applied: migration 003 gives entities a fact-chain home; observe writes the fact
-  head only, `memories.entities` frozen, the GIN moves to live fact heads;
-  `mid-dialogue-gate.md`.)*
+  head only, `memories.entities` frozen, the GIN moves to live fact heads. **Built the same
+  day — migration 003 live**; `mid-dialogue-gate.md`.)*
 
 ## 6. Read path
 
@@ -185,8 +185,9 @@ the reconstruction theta check. *(Fact-level correction **built** 2026-07-18,
 `fact-level-correction.md`: the relevance probe reads the **live fact-version head's**
 embedding — scoring inputs otherwise unchanged; scores move only through relevance.)*
 
-**Mid-dialogue gate (non-LLM hybrid)** *(specced 2026-07-19, `mid-dialogue-gate.md` — five
-scope forks ruled; the loaded set is caller-held scene state per the ruled contract)*:
+**Mid-dialogue gate (non-LLM hybrid)** *(specced & **built** 2026-07-19,
+`mid-dialogue-gate.md` — five scope forks ruled; the loaded set is caller-held scene state per
+the ruled contract; migration 003 live)*:
 - **Novelty check** — embed the utterance; measure distance against the loaded set; far from all →
   fetch.
 - **Entity tripwire** — an uncovered mention of an identity-components entry → fetch. (Most
@@ -334,14 +335,15 @@ invalidation doubles as compiler-cache eviction.
 - **Latency histogram:** p50/p95, decomposed into gate check, retrieval SQL, first token, total.
 - **Gate efficacy, per signal:** novelty metric = fraction of fires where the fetched memory
   out-scores the loaded set; entity metric = near-ground-truth "did the retrieval contain that
-  entity." Log which signal fired per gate event. *(Specced 2026-07-19 — instrumentation-only
-  fire logs ruled, no `gate_events` table; `mid-dialogue-gate.md`.)*
+  entity." Log which signal fired per gate event. *(Specced & **built** 2026-07-19 —
+  instrumentation-only fire logs ruled, no `gate_events` table; the comparators live in the
+  gate instrumentation + load-driver gate block; `mid-dialogue-gate.md`.)*
 - **Cost:** itemized per 100-turn session.
 - **Synthetic load driver:** Python, scripted sessions at volume; a first-class artifact co-built
   with the CLI harness. **No distribution exists without it.** *(Built 2026-07-15,
   `app\load_driver.py`: reuses the session-runner core; emits the latency p50/p95 decomposition —
-  no gate term yet (lands with the gate build — specced 2026-07-19, `mid-dialogue-gate.md`) —
-  and the itemized per-100-turn token/USD table.)*
+  the gate term **landed 2026-07-19** (`gate_check` over gate-evaluated turns + the per-100-turn
+  gate block; `mid-dialogue-gate.md`) — and the itemized per-100-turn token/USD table.)*
 
 ## 12. Integrator surface requirements
 

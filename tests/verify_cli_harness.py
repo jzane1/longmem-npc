@@ -69,6 +69,12 @@ AGENT_CONFIG = {
     # over verbatim serving; the swapped behavior is verify_reconstruction.py's
     # floor (same rationale as verify_read_path.py's pin).
     "reconstruction_theta": 0.0,
+    # gate_enabled = 0 knob-disables the mid-dialogue gate (built 2026-07-19)
+    # for the same reason: this walker's session-runner turns keep the v1
+    # every-turn-retrieves contract; the gated behavior is verify_gate.py's
+    # floor. FIXTURE-ONLY — the gate is production-active at real defaults
+    # (and runs live in §10's driver agent, which carries no pin).
+    "gate_enabled": 0.0,
 }
 
 T_FORGE = "Mara sharpened my blade at the forge while John watched."
@@ -521,7 +527,10 @@ async def main(database_uri: str) -> None:
         row = report["latency_ms"].get(series)
         if row is None or row["p50"] < 0 or row["p95"] < row["p50"]:
             fail("latency aggregates", f"{series}: {row}")
-    ok("latency p50/p95 emitted for every §11 series (no gate term)")
+    ok(
+        "latency p50/p95 emitted for every §11 series "
+        "(the gate term landed 2026-07-19 — asserted in verify_gate.py)"
+    )
     check(
         report["per_100_turns"]["dialogue"]["input_tokens_per_100_turns"] > 0
         and report["per_100_turns"]["dialogue"]["usd_per_100_turns"] is None

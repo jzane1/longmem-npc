@@ -57,7 +57,7 @@ moves scores, not rows; detail-hiding assertions land with reconstruction.)*
 - Within-scene text stability: absent a diegetic event or an authorial correction on that memory
   (amended 2026-07-17), repeated reads within one scene are byte-identical.
 
-## Set D — mid-dialogue gate (~8–10 scenarios) *(specced 2026-07-19, `mid-dialogue-gate.md`)*
+## Set D — mid-dialogue gate (~8–10 scenarios) *(specced & built 2026-07-19, `mid-dialogue-gate.md` — the 51-assertion walker covers these)*
 
 - **Loader-parity:** a request without `loaded_memory_ids` behaves byte-identically to v1
   (payload shape and SQL).
@@ -99,7 +99,7 @@ moves scores, not rows; detail-hiding assertions land with reconstruction.)*
 - Escalation call fails twice → **HARD-STOP**, nothing inserted — structurally assertable as zero
   rows (build-phase stance ruled 2026-07-13; re-rule owed before the demo ships — see `status.md`).
 - Gate degradation ladder: embeddings down → entity-only lexical fetch; no entities → novelty-only;
-  both out → gate closed, loaded set served, fail-quiet. *(Specced 2026-07-19: the lexical fetch
+  both out → gate closed, loaded set served, fail-quiet. *(Specced & built 2026-07-19: the lexical fetch
   reads the post-003 fact-head entities GIN — `mid-dialogue-gate.md`.)*
 - Malformed model responses (unparseable structured output, unknown action directive) → log, ignore,
   turn succeeds.

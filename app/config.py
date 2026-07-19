@@ -116,6 +116,30 @@ SERVICE_DEFAULTS: dict[str, float] = {
     # Drift budget: refuse a reconstruction write-back whose embedding's
     # cosine distance from the anchor exceeds this (ruled 2026-07-17).
     "drift_budget_threshold": 0.35,
+    # --- mid-dialogue gate (mid-dialogue-gate.md; build rulings 2026-07-19) --
+    # Non-LLM: no gate model role, no pricing entry. All floats (agent_knob
+    # contract); integer-valued knobs are cast at the call site.
+    # Novelty fires when the min cosine distance from the utterance embedding
+    # to the loaded set's fact-head embeddings is >= this. Calibration split
+    # honestly (measured at build): fake-provider echoes ~0.04, near-copies
+    # ~0.08, ordinary distinct prose ~0.45-0.75 (fixture property — shared
+    # English trigrams keep unrelated sentences under the naive ~1.0);
+    # real-provider paraphrase ~0.05-0.25; 0.5 sits above the 0.35 drift
+    # line's "left the neighborhood".
+    "gate_novelty_threshold": 0.5,
+    # New items appended per gate fetch (a full retrieval_top_k re-fetch
+    # would swamp the loaded set).
+    "gate_fetch_k": 3.0,
+    # Damper (ruled 2026-07-19): after this many CONSECUTIVE fruitless
+    # fetches (zero new IDs appended), the novelty signal is suppressed for
+    # the scene remainder; the entity tripwire stays live; scene boundary
+    # resets.
+    "gate_damper_fruitless_max": 2.0,
+    # Whole-gate switch: 0.0 => every request is a loader turn (v1 behavior).
+    # The fixture-pin shape (the reconstruction_theta = 0 precedent) and the
+    # integrator kill-switch scaffold — the reserved per-signal kill-switch
+    # decision may later grow its own knobs (see decisions.md).
+    "gate_enabled": 1.0,
 }
 
 

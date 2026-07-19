@@ -70,6 +70,11 @@ SEED_PROSE = "The ford keeper, wary of strangers."
 AGENT_CONFIG = {
     "decay_classes": {"episodic": 86400, "semantic": 604800},
     "decay_class_default": "episodic",
+    # gate_enabled = 0 (gate build 2026-07-19): this walker's runner beats
+    # assert the reconstruction contract under v1 every-turn retrieval;
+    # the gated behavior is verify_gate.py's floor. FIXTURE-ONLY pin —
+    # production runs the gate at real defaults.
+    "gate_enabled": 0.0,
 }
 
 # Fixture corpus. Ages are chosen so `semantic` (tau 7d) rows sit past theta

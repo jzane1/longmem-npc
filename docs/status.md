@@ -1,22 +1,22 @@
 # longmem-npc — Status
 
 **Last updated:** 2026-07-19
-**Phase:** **the gate is specced** — mid-dialogue gate v1 build target specced 2026-07-19
-(`mid-dialogue-gate.md`), five scope forks ruled by Jack (dated entry in `decisions.md`):
-the **loaded set is caller-held scene state** (reputation-style — the third use of the ruled
-contract); **migration 003 entities = FREEZE to the fact head** (the 002 embedding precedent;
-old entities GIN dropped, partial GIN on live fact heads); **correction entities = NER +
-optional operator field** (mirrors observe's merge); **fire logs instrumentation-only** (the
-reserved kill-switch reads run artifacts); **reconstructing signal = post-hoc fields + a
-pre-serve callback** (the REPL can print "(reconstructing…)" *during* the pause — the
-recommendation reversal recorded honestly). **Migration 003 is a fact of the target** — the
-entities fact-chain column, closing the 2026-07-18 honest deferral. Seven floors stand
-verified (see the table); docs only this session — no code, no floors changed. **One open
-decision owed before the demo ships:** the escalation hard-stop failure path re-rule
-(build-phase stance, 2026-07-13); the **damper mechanism** is `[SETTLE-AT-BUILD]`-suggested
-and flagged promotable if Jack wants it ruled before the build.
-Next: **the gate build** — thresholds, efficacy wiring, per-signal fire logging, migration
-003, the loaded-set plumbing.
+**Phase:** **the gate is live** — mid-dialogue gate v1 specced AND built & floor-verified
+2026-07-19 (`mid-dialogue-gate.md`), the same day. Retrieval is conditional for the first
+time: a scene's first turn loads the set; every later turn passes the non-LLM gate (novelty +
+entity tripwire + damper) against the **caller-held loaded set**, closed turns serve the set
+with zero probe SQL, fires append `gate_fetch_k` new items under the marked recollection
+block. **Migration 003 is applied** (`003_fact_entities.sql` — the entities fact-chain column;
+freeze at observe; old entities GIN dropped, partial GIN on live fact heads; the floor
+criterion now reads "001 + 002 + 003 applied, 0 pending"), corrections move entities (NER +
+optional operator field), and the fork-5 pre-serve callback prints "(reconstructing…)"
+**during** a blocked mid-scene serve — live in the piped REPL beat, `blocked=yes` in the gate
+debug line. **Eight floors stand verified** (see the table). Jack ruled two build shapes via
+explicit questions (damper as suggested — the promotable flag closed; correction-path NER
+failure → clean 502). **One open decision owed before the demo ships:** the escalation
+hard-stop failure path re-rule (build-phase stance, 2026-07-13).
+Next: **the test-suite scoped session** (immediate-queue item 1 after the renumber) — Sets
+A–D + degradation cases, all now runnable.
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -53,6 +53,8 @@ and the structured behavior output survive the interview. Research publication c
 | Authorial-correction v1 — memory-scoped operator verb (`POST /v1/memories/{id}/correction` in `app\api.py` → `IngestService.correct` in `app\ingest.py` → one-transaction `apply_authorial_correction` in `app\db.py`: predicate supersede + optional `expected_detail_id` compare-and-swap + corrected `authorial_correction` head at t_c + cache eviction with count) + the constraint-follows-anchor reconstruction delta (`app\reconstruction.py` `build_reconstruction_item`, anchor-cause-aware; `db.ReconstructionSource.anchor_cause`) + wire models (`app\schemas.py`) + REPL surface (`app\session.py` `runner.correct`, `app\cli.py` `:correct`) | floor-verifier **pass** against all five prior floors (reconstruction deliberately re-opened by the constraint-follows-anchor ruling, re-verified): structural walker `tests\verify_authorial_correction.py` re-run independently (31 assertions, every done-when criterion incl. the re-ruled stored-coherence time-travel criterion) on fresh scratch `longmem_test`; all four prior walkers re-run clean (42/42 — grown +1 by the corrected-item assertion, addition only; 36/36; 34/34; 35/35); `db\migrate.py` no-arg a clean no-op on `longmem` (no migration needed, as specced); `longmem` confirmed pristine via the postgres MCP; independent code spot-checks (transaction + CAS rollback, eviction inside the transaction, byte-verbatim no-model path, retrieval/scoring untouched vs HEAD); plus a live piped REPL correction-override beat (read verbatim → `:correct` head swap → corrected read, one scene) | 2026-07-18 |
 | Reconstruction v1 — serving-stage engine (`app\reconstruction.py`: theta partition at the scene-frozen basis → decay-band cache → batched retelling call → drift-budgeted atomic write-back → serve-only-persisted-text) + serving swap (`app\retrieval.py`, retrieval/scoring untouched) + identity-document plumbing (`app\identity.py` + scene-boundary recompile in `app\ingest.py` + caller-frozen scene state in `app\session.py`) + reconstruction provider triad and the **locality-sensitive fake embedding** (`app\providers.py`) + reconstruction SQL (`app\db.py`) + wire/instrumentation deltas (`app\schemas.py`) + knobs/role/pricing (`app\config.py`) + debug/aggregate surfacing (`app\cli.py`, `app\load_driver.py`) + 422 mapping (`app\api.py`) | floor-verifier **pass** against all four prior floors: structural walker `tests\verify_reconstruction.py` re-run independently (41 assertions, every done-when criterion) on fresh scratch `longmem_test`; all three prior walkers re-run clean (35/35, 34/34, 36/36 — the read-side pair pin `reconstruction_theta = 0` in fixture configs, assertion bodies untouched, verified against git); schema frozen (`001` the only migration; migrate **`--database-uri` on `/longmem`** → "Up to date, 0 pending" — no-arg blocked by the `.env` sandbox pointer, flagged); `longmem` confirmed pristine **via the postgres MCP (tools worked this dispatch)**; independent code spot-checks (atomic write-back, derivable anchor, scene-basis binding, retrieval byte-identical to HEAD); plus a live piped REPL drift beat (verbatim → 46-day jump → reconstructed write-back → call-free cache hit) and a standalone load-driver run with the reconstruction latency/cost rows | 2026-07-17 |
 | Fact-level correction v1 — **migration 002** (`db\migrations\002_fact_versions.sql`: `memory_fact_versions` fact chain + guarded backfill + one-live-head partial unique + **partial HNSW** over live heads + `memories_embedding_hnsw` **dropped**, ruled) + the fact-following verb (`app\db.py` `apply_authorial_correction` grown: fact supersede + insert in the same transaction; `app\ingest.py` embed-before-transaction + `CorrectionEmbedFailedError`; `app\api.py` 502) + the **freeze ruling** (`insert_observation` mints the `original` fact head — the sole vector home; `memories.embedding` no longer written; the embed-degradation signal moved to the live fact head) + the vector probe on the live fact head (`fetch_vector_candidates`) + wire deltas (`CorrectionResult` widened, `IngestResult.fact_version_id`) + REPL surfacing (`app\cli.py`) | floor-verifier **pass** against all six prior floors (read-path + write-path deliberately re-opened, re-verified): structural walker `tests\verify_fact_correction.py` re-run independently (32 assertions, every done-when criterion incl. db-layer distance-0 retrieval-follows-the-fix, the backfill guard via a legacy-shaped row, and all-or-nothing embed failure) on fresh scratch `longmem_test`; all five prior walkers re-run clean (38/38 — grown 35 → 38 incl. the one ruling-driven modification, the embed-signal query moved to the fact head; 36/36 read, 34 → 36 addition only; 33/33 authorial, 31 → 33 addition only; 42/42 reconstruction and 36/36 CLI harness **byte-untouched — the no-reconstruction-delta proof**, `app\retrieval.py`/`app\reconstruction.py` byte-identical to HEAD); migration 002 applied to `longmem`, no-arg migrate → **"Up to date: 2 applied, 0 pending"** (the criterion's new wording); `longmem` confirmed pristine via the postgres MCP (all product tables 0 rows, ledger = 001+002, old index absent, three fact indexes present); independent code spot-checks (one transaction with the embed outside it, CAS + broken-store rollbacks, sole DELETE still cache eviction, degraded path byte-identical); plus a live piped REPL beat: `:correct` prints both head swaps + embed timing, and the same query's relevance moved 0.4686 → 0.5637 across the correction | 2026-07-18 |
+
+| Mid-dialogue gate v1 — **migration 003** (`db\migrations\003_fact_entities.sql`: `memory_fact_versions.entities` + guarded backfill + partial GIN on live fact heads + `memories_entities_gin` **dropped**, freeze ruled) + the gate stage (`app\gate.py` pure decision module: novelty + entity tripwire + damper, named signal constants; `app\retrieval.py` gated/loader branch — loader path v1-byte-parity, closed turns zero probe SQL, fires append `gate_fetch_k` new items via SQL-excluded probe or the GIN's entity-only rung) + the **entities freeze at observe** (`insert_observation` writes the fact head only) + the correction verb's NER + operator-field entities merge (`app\ingest.py`, `CorrectionNlpFailedError` → 502) + the fork-5 pre-serve callback (`app\reconstruction.py`, one defaulted param) + caller-held loaded-set/streak scene state (`app\session.py`) + the prompt recollection partition (`app\dialogue.py`) + `GateInstrumentation` wire deltas (`app\schemas.py`) + four knobs (`app\config.py`) + CLI gate line + load-driver `gate_check`/gate block | floor-verifier **pass** against all seven prior floors (write-path, retrieval, dialogue, session-runner, reconstruction, and both correction floors deliberately re-opened, re-verified): structural walker `tests\verify_gate.py` re-run independently (**51 assertions**, every done-when criterion incl. loader-parity, all ladder rungs, the blocking-callback beat, migration-003 legacy-row guard, and entities-follow-correction) on fresh scratch `longmem_test`; all seven prior walkers re-run clean, each on fresh scratch (40/40 write — 38 → 40 additive freeze pair; 36/36 read — **byte-untouched, the loader-parity proof**; 36/36 CLI harness — fixture pin + label edit only; 42/42 reconstruction — fixture pin only; 34/34 authorial — 33 → 34 additive; 34/34 fact — 32 → 34 additive); migration 003 applied to `longmem`, no-arg migrate → **"Up to date: 3 migration(s) applied, 0 pending"**; `longmem` pristine via the postgres MCP (ledger 001+002+003, all product tables 0 rows, new partial GIN present, old GIN absent); independent code spot-checks (loader path behavior-identical, callback-absent serve identical, one embed per turn, sole DELETE still cache eviction, no gate model role, reserved slots inert); plus the live piped REPL beat (loader → mid-scene novelty fetch → both-signal fire → `:correct` → **`(reconstructing…)` printed during the blocked turn**) and a standalone load-driver run with `gate_check` p50/p95 + the gate fire/efficacy block | 2026-07-19 |
 
 ## Open questions needing Jack's ruling
 
@@ -505,26 +507,53 @@ and the structured behavior output survive the interview. Research publication c
   closed), `fact-level-correction.md`, `reconstruction.md`, `read-path.md`, `cli-harness.md`,
   `authorial-correction.md`, `migration-01.md` 003 pointers, `test-suite.md` **Set D** (new,
   ~8–10 scenarios) + ladder-row pointer. Docs only — no code, no floors changed.
+- **2026-07-19** — **Mid-dialogue gate v1 built, verified, and committed — retrieval is
+  conditional, and the reserved §11 gate term is live.** Jack ruled two shapes via explicit
+  questions at plan approval (dated "Mid-dialogue gate build rulings" entry in `decisions.md`):
+  **damper = as suggested** (fruitless = zero new IDs; 2 consecutive suppress novelty for the
+  scene remainder; tripwire live; scene reset — the spec's promotable flag closed) and
+  **correction-path NER failure = clean loud error** (`CorrectionNlpFailedError` → 502, the
+  embed precedent; nothing written). The remaining shapes were approved with the plan, incl.
+  **`gate_enabled`** (fixture pin + kill-switch scaffold). New: `app\gate.py` (pure decision
+  module — the decay.py precedent; named signal constants, the `TRIGGER_*` mirror),
+  `db\migrations\003_fact_entities.sql` (entities fact-chain column + guarded backfill +
+  partial GIN on live heads + old GIN dropped; applied to `longmem` — "001 + 002 + 003
+  applied, 0 pending"), the gated/loader branch in `app\retrieval.py` (loader = v1
+  byte-parity; closed = zero probe SQL; fire = SQL-excluded probe reusing the turn's one
+  embed, or the GIN entity-only rung), the entities freeze at observe + `GateRow` + three
+  gate fetchers (`app\db.py`), the correction NER merge (`app\ingest.py` + 502 in
+  `app\api.py`), the fork-5 pre-serve callback (`app\reconstruction.py`, one defaulted
+  param), caller-held loaded-set/streak state (`app\session.py`), the prompt recollection
+  partition (`app\dialogue.py`), `GateInstrumentation` (`app\schemas.py`), four knobs
+  (`app\config.py`), the CLI gate line + `(reconstructing…)` print, and the load-driver
+  `gate_check` series + gate block. Walker `tests\verify_gate.py` (**51 assertions**); prior
+  walkers 40/40 (write, +2 freeze), 36/36 (read, **byte-untouched** — the loader-parity
+  proof), 36/36 (CLI, pin + label only), 42/42 (reconstruction, pin only), 34/34 (authorial,
+  +1), 34/34 (fact, +2), each on fresh scratch; floor-verifier **pass** with working postgres
+  MCP tools; live piped REPL beat with **`(reconstructing…)` printed during the blocked
+  mid-scene turn**; standalone driver run with real gate fire/efficacy rows.
+  **Build-surfaced learnings** (recorded in `decisions.md`): pgvector rows need `.to_list()`
+  (the bug hid behind the fail-quiet ladder — the loader fallback worked as designed);
+  fake-mode calibration corrected (ordinary distinct prose ~0.45–0.75, not ~1.0; the 0.5
+  threshold stands; guaranteed-novel fixtures need trigram-rare wording — chosen by
+  measurement). Queue renumbered (suite → 1, Unity → 2, pre-ship gates → 3); the gate
+  pointers in prior specs gained "built" markers.
 
 ## Immediate queue
 
-1. Mid-dialogue gate + threshold values, efficacy definitions, per-signal fire logging (the
-   block-with-"reconstructing"-signal miss path binds here; **the entities fact-chain column
-   rides here** — the honest deferral of the 2026-07-18 embedding-only ruling, a
-   migration-003-class additive column when the GIN path gets its first reader).
-   **Specced 2026-07-19** (`mid-dialogue-gate.md` — five scope forks ruled; migration 003 a
-   fact of the target; build next).
-2. Test-suite scoped session (Sets A-authorial incl. the fact-chain pair, B, C + degradation
-   cases — all now runnable).
-3. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
-   choreography incl. the 60-day drift beat and the correction-override beat (both live in the
-   REPL: `:as-of` jumps + scene boundaries + band crossings; `:correct` — which now moves
-   retrieval too).
-4. Before the demo ships: re-rule the escalation failure path (see open questions) and pick a
+1. Test-suite scoped session (Sets A-authorial incl. the fact-chain pair, B, C, **D — the
+   gate set**, + degradation cases — all now runnable).
+2. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
+   choreography incl. the 60-day drift beat, the correction-override beat, and the
+   gate-recollect beat (all live in the REPL: `:as-of` jumps + scene boundaries + band
+   crossings; `:correct` — which now moves retrieval AND entities; the gate debug line +
+   `(reconstructing…)`).
+3. Before the demo ships: re-rule the escalation failure path (see open questions) and pick a
    real-provider smoke moment (one live observe + one live dialogue turn + one live
    reconstruction with keys) ahead of demo choreography.
 
-*(Done 2026-07-18: **Fact-level correction v1** — retrieval follows the fix; migration 002
+*(Done 2026-07-19: **Mid-dialogue gate v1** — retrieval is conditional; migration 003
+applied; see the verified-floors table and session log. Done 2026-07-18: **Fact-level correction v1** — retrieval follows the fix; migration 002
 applied; see the verified-floors table and session log. Also done 2026-07-18:
 **Authorial-correction endpoint v1** — the correction-override beat is live;
 see the verified-floors table and session log. Done 2026-07-17: **Reconstruction v1** — the
@@ -553,8 +582,9 @@ access.)*
   floor-verified the same day; shapes ruled at build; dated `decisions.md` entry).
 - Reflection spec end-to-end (mechanism explicitly post-August — ruled 2026-07-14).
 - Gate threshold values + efficacy definitions wired to instrumentation. — **Consolidated into
-  `mid-dialogue-gate.md` 2026-07-19** (threshold defaults suggested under `[SETTLE-AT-BUILD]`;
-  efficacy comparators + per-signal fire logging specced; instrumentation-only fire logs ruled).
+  `mid-dialogue-gate.md` 2026-07-19 and now BUILT** (same day; thresholds ruled with the build
+  plan; the efficacy comparators live in `GateInstrumentation` + the load-driver gate block;
+  instrumentation-only fire logs as ruled).
 - Unity client C# API surface: send event, open dialogue, directive callback, reputation read,
   reconstructing-signal hook, scene-boundary emission.
 - Demo choreography: injected-timestamp time travel; decay + correction-override + gate-recollect

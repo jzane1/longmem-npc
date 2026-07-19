@@ -23,11 +23,15 @@ events: {"kind": "observe", "text": ...} | {"kind": "utterance", "text": ...,
 generator produces a deterministic mix (same seed -> same script -> same fake
 outputs, byte for byte).
 
-Emits the §11 aggregates: the latency histogram (p50/p95 — retrieval SQL,
-query embed, first token, dialogue total, turn total; no gate term in the
-slice) and the itemized per-100-turn cost table (tokens per model role,
-unconditionally; USD only for roles priced via LONGMEM_PRICE_* — build
-ruling 2026-07-15).
+Emits the §11 aggregates: the latency histogram (p50/p95 — gate check
+(landed with the gate build 2026-07-19, over gate-evaluated turns only — a
+series padded with loader-turn zeros would lie), retrieval SQL, query embed,
+first token, dialogue total, turn total) and the itemized per-100-turn cost
+table (tokens per model role, unconditionally; USD only for roles priced via
+LONGMEM_PRICE_* — build ruling 2026-07-15; the gate is non-LLM, no cost
+row), plus the per-100-turn gate block (fires per signal, efficacy
+fractions, fruitless fetches, damper activations — instrumentation-only by
+fork 4, the reserved kill-switch decision's evidence).
 """
 
 from __future__ import annotations
@@ -45,6 +49,7 @@ from psycopg.types.json import Jsonb
 
 from app.config import Settings, load_settings
 from app.db import build_pool
+from app.gate import GATE_SIGNAL_ENTITY, GATE_SIGNAL_NOVELTY
 from app.providers import build_providers
 from app.schemas import DialogueTurnResult, IngestResult
 from app.session import SessionRunner
@@ -186,7 +191,9 @@ def _aggregate(
     observes: list[IngestResult],
 ) -> dict:
     prices = settings.prices
+    gates = [t.instrumentation.retrieval.gate for t in turns]
     series = {
+        "gate_check": [g.gate_ms for g in gates if g.evaluated],
         "retrieval_sql": [t.instrumentation.retrieval.sql_ms for t in turns],
         "query_embed": [t.instrumentation.retrieval.embed_ms for t in turns],
         "reconstruction": [
@@ -278,12 +285,38 @@ def _aggregate(
         cost["embedding"]["usd_per_100_turns"] = round(
             cost["embedding"]["usd_per_100_turns"] * 100.0 / n_turns, 6
         )
+    # The gate block (mid-dialogue-gate.md §11 closure): per-signal fire
+    # rates + the ruled efficacy fractions, computed over the fires whose
+    # boolean was computable (non-None); None when no such fire happened.
+    fired = [g for g in gates if g.fired]
+
+    def _efficacy(values: list[bool | None]) -> float | None:
+        known = [v for v in values if v is not None]
+        if not known:
+            return None
+        return round(sum(1 for v in known if v) / len(known), 3)
+
+    gate_block = {
+        "evaluated_turns": sum(1 for g in gates if g.evaluated),
+        "fires_per_100_turns": per_100(len(fired)),
+        "novelty_fires_per_100_turns": per_100(
+            sum(1 for g in fired if GATE_SIGNAL_NOVELTY in g.signals_fired)
+        ),
+        "entity_fires_per_100_turns": per_100(
+            sum(1 for g in fired if GATE_SIGNAL_ENTITY in g.signals_fired)
+        ),
+        "novelty_efficacy": _efficacy([g.novelty_outscored for g in fired]),
+        "entity_efficacy": _efficacy([g.entity_covered for g in fired]),
+        "fruitless_fetches": sum(1 for g in gates if g.fruitless),
+        "damper_activated_turns": sum(1 for g in gates if g.damper_active),
+    }
     return {
         "agent_id": str(agent_id),
         "turns": len(turns),
         "observes": len(observes),
         "latency_ms": latency,
         "per_100_turns": cost,
+        "gate": gate_block,
         "degraded_turns": sum(1 for t in turns if t.instrumentation.degraded),
         "write_backs": sum(t.instrumentation.retrieval.write_backs for t in turns),
         "drift_refusals": sum(
@@ -302,6 +335,20 @@ def _print_report(report: dict) -> None:
         f"reconstruction: {report['write_backs']} write-backs, "
         f"{report['cache_hits']} cache hits, "
         f"{report['drift_refusals']} drift refusals"
+    )
+    g = report["gate"]
+    novelty_eff = g["novelty_efficacy"]
+    entity_eff = g["entity_efficacy"]
+    print(
+        f"gate: {g['evaluated_turns']} evaluated turns, "
+        f"{g['fires_per_100_turns']} fires/100 "
+        f"(novelty {g['novelty_fires_per_100_turns']}, "
+        f"entity {g['entity_fires_per_100_turns']}), "
+        f"efficacy novelty="
+        f"{novelty_eff if novelty_eff is not None else '(no fires)'} "
+        f"entity={entity_eff if entity_eff is not None else '(no fires)'}, "
+        f"{g['fruitless_fetches']} fruitless, "
+        f"{g['damper_activated_turns']} damper-active"
     )
     print("\nlatency (ms)                p50        p95")
     for name, row in report["latency_ms"].items():

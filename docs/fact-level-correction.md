@@ -114,7 +114,7 @@ plain-prose re-introduction — and ruled on the re-presentation):
 re-derivation**: gist spans on corrected chains have zero consumers (the corrected-anchor prompt
 branch ignores them), and the span rows remain immutable facts about the original observation.
 **The entities fact column + the gate's GIN path** — rides with the gate (immediate-queue
-item 2); the honest deferral is recorded in fork 1. *(Specced 2026-07-19 — migration 003,
+item 2); the honest deferral is recorded in fork 1. *(Specced & built 2026-07-19 — migration 003 applied,
 `mid-dialogue-gate.md`; the gate is item 1 since the 2026-07-18 renumber.)* **Purge** (its docs contract now names fact
 versions — architecture §12). **Diegetic fact-writes** — unslated; any future in-world mechanism
 that moves *facts* rather than tellings needs its own ruling. **Re-embedding on an
@@ -219,7 +219,8 @@ CREATE INDEX IF NOT EXISTS memory_fact_versions_memory_id_idx
   **dropped in 002**.)*
 - After 002, the standing floor criterion "001 the only migration; no-arg migrate a clean no-op"
   reads **"001 + 002 applied, 0 pending"** — the build updates that wording wherever it is
-  recorded.
+  recorded. *(Since the gate build, 2026-07-19: **"001 + 002 + 003 applied, 0 pending"** —
+  migration 003, `mid-dialogue-gate.md`.)*
 
 ## The retrieval delta
 

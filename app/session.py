@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timezone
+from typing import Callable
 from uuid import UUID
 
 from psycopg_pool import AsyncConnectionPool
@@ -85,6 +86,18 @@ class SessionRunner:
         self.scene_started_at: datetime | None = None  # the scene basis
         self.as_of: datetime | None = None  # session time-travel override
         self.debug: bool = False  # rendering hint; inert to the seams
+        # Caller-held loaded set + damper streak (mid-dialogue-gate.md fork 1,
+        # 2026-07-19 — the third application of the caller-freezes-scene-state
+        # contract, and caller-side ONLY: no fourth scene-boundary server
+        # consumer). None => the next turn is a loader; the loader turn's
+        # served IDs seed the set; gate fetches append; scene() and session
+        # start reset both.
+        self.loaded_memory_ids: list[UUID] | None = None
+        self.gate_fruitless_streak: int = 0
+        # Fork 5: the pre-serve callback — set by the REPL to print
+        # "(reconstructing…)" DURING a blocking mid-scene serve; the future
+        # Unity hook attaches here. None => nothing fires (the load driver).
+        self.on_reconstruct: Callable[[], None] | None = None
 
     @classmethod
     async def create(
@@ -159,8 +172,16 @@ class SessionRunner:
         action_vocabulary: list[str] | None = None,
         k: int | None = None,
     ) -> DialogueTurnResult:
-        """One dialogue turn through the seam, under the frozen scene state."""
-        return await self._dialogue.run_dialogue_turn(
+        """One dialogue turn through the seam, under the frozen scene state.
+
+        Loaded-set bookkeeping (gate build 2026-07-19) is keyed on what the
+        SERVER reports (`gate.evaluated`), not on what was sent — a
+        gate-disabled agent's runner state stays coherent instead of stale:
+        loader turn -> the served IDs become the loaded set, streak resets;
+        gated fire -> this turn's gate-fetched IDs append, streak resets on
+        a productive fetch and increments on a fruitless one; gated closed
+        -> untouched."""
+        result = await self._dialogue.run_dialogue_turn(
             DialogueTurnRequest(
                 agent_id=self.agent_id,
                 utterance=text,
@@ -171,9 +192,26 @@ class SessionRunner:
                 as_of=self.as_of,
                 identity_version=self.identity_version,
                 scene_started_at=self.scene_started_at,
+                loaded_memory_ids=self.loaded_memory_ids,
+                gate_fruitless_streak=self.gate_fruitless_streak,
                 debug=self.debug,
-            )
+            ),
+            on_reconstruct=self.on_reconstruct,
         )
+        gate_inst = result.instrumentation.retrieval.gate
+        if not gate_inst.evaluated:
+            self.loaded_memory_ids = [item.memory_id for item in result.items]
+            self.gate_fruitless_streak = 0
+        elif gate_inst.fired:
+            self.loaded_memory_ids = (self.loaded_memory_ids or []) + [
+                item.memory_id for item in result.items if item.gate_fetched
+            ]
+            self.gate_fruitless_streak = (
+                self.gate_fruitless_streak + 1
+                if gate_inst.fetched_new_count == 0
+                else 0
+            )
+        return result
 
     async def observe(self, text: str) -> IngestResult:
         """One observe event through the write seam, at the session's time."""
@@ -203,6 +241,10 @@ class SessionRunner:
         await self._refresh_snapshot()
         self.identity_version = result.identity_version
         self.scene_started_at = self._now()
+        # Gate scene reset (caller-side only): next turn is a loader; the
+        # damper's suppression dies with the scene.
+        self.loaded_memory_ids = None
+        self.gate_fruitless_streak = 0
         return result
 
     async def pin(self, memory_id: UUID, pinned: bool) -> PinResult:

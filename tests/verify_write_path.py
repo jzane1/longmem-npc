@@ -217,6 +217,23 @@ async def main(database_uri: str) -> None:
         result.fact_version_id == fact_row[0],
         "IngestResult.fact_version_id names the fact head",
     )
+    # Entities freeze (migration 003, gate build 2026-07-19 — the same
+    # precedent as the embedding): the fact head is the sole entities home.
+    entities_row = await fetchrow(
+        pool,
+        "SELECT m.entities, fv.entities FROM memories m "
+        "JOIN memory_fact_versions fv ON fv.memory_id = m.memory_id "
+        "WHERE m.memory_id = %s",
+        result.memory_id,
+    )
+    check(
+        entities_row[0] is None,
+        "memories.entities not written at observe (freeze ruling 2026-07-19)",
+    )
+    check(
+        (entities_row[1] or []) == result.entities,
+        "the fact head carries the merged entities IngestResult echoes",
+    )
 
     # ------------------------------------------------------------------ #
     print("\n[6] Novel entity grows the index (same transaction)")

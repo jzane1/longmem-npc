@@ -181,16 +181,19 @@ async def insert_observation(
                     new_component_ids.append((await cur.fetchone())[0])
 
                 # 2. the memories row — write-time facts. The observation
-                # embedding is NOT written here (freeze ruling 2026-07-18):
-                # its home is the `original` fact head inserted below.
+                # embedding is NOT written here (freeze ruling 2026-07-18),
+                # and neither is entities (freeze ruling 2026-07-19, the same
+                # precedent): both live on the `original` fact head below.
+                # memories.entities is frozen — pre-003 rows keep their
+                # values; post-003 rows carry NULL here forever.
                 await cur.execute(
                     "INSERT INTO memories (agent_id, observation_text, "
                     "importance_raw, scoring_failed, typology, typology_confidence, "
                     "typology_source, provenance, pinned, decay_class, "
                     "decay_class_unknown, valid_at, location_name, location_embedding, "
-                    "entities, event_time, affect_valence, affect_arousal, affect_detail) "
+                    "event_time, affect_valence, affect_arousal, affect_detail) "
                     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
-                    "%s, %s, %s, %s, %s) RETURNING memory_id",
+                    "%s, %s, %s, %s) RETURNING memory_id",
                     (
                         plan.agent_id,
                         plan.observation_text,
@@ -206,7 +209,6 @@ async def insert_observation(
                         plan.valid_at,
                         plan.location_name,
                         _vector(plan.location_embedding),
-                        plan.entities,
                         plan.event_time,
                         plan.affect_valence,
                         plan.affect_arousal,
@@ -228,15 +230,18 @@ async def insert_observation(
                 # 4. the `original` fact head (migration 002) — the semantic
                 # basis retrieval ranks by: observation_text byte-verbatim +
                 # the observation embedding (NULL = embed-failure degradation;
-                # the queryable signal lives here since the freeze ruling).
+                # the queryable signal lives here since the freeze ruling) +
+                # entities (migration 003, freeze ruling 2026-07-19 — the
+                # gate's coverage/lexical basis, moved by corrections).
                 await cur.execute(
                     "INSERT INTO memory_fact_versions (memory_id, basis_text, "
-                    "embedding, write_cause, valid_at) "
-                    "VALUES (%s, %s, %s, 'original', %s) RETURNING fact_version_id",
+                    "embedding, entities, write_cause, valid_at) "
+                    "VALUES (%s, %s, %s, %s, 'original', %s) RETURNING fact_version_id",
                     (
                         memory_id,
                         plan.observation_text,
                         _vector(plan.embedding),
+                        plan.entities,
                         plan.valid_at,
                     ),
                 )
@@ -344,6 +349,99 @@ async def fetch_live_candidates(
         await cur.execute(f"SELECT {_CANDIDATE_COLUMNS} {_CANDIDATE_FROM}", (agent_id,))
         rows = await cur.fetchall()
     return [CandidateRow(*row) for row in rows]
+
+
+@dataclass(frozen=True)
+class GateRow:
+    """A candidate row plus its live fact head's gate-relevant facts
+    (mid-dialogue-gate.md, built 2026-07-19). `embedding` rides only on the
+    loaded-set fetch (the novelty basis; NULL = the embed-degradation row,
+    excluded from the basis and counted); `entities` rides on all three gate
+    fetchers (the coverage basis and the entity-covered efficacy check)."""
+
+    row: CandidateRow
+    embedding: list[float] | None
+    entities: list[str] | None
+
+
+async def fetch_loaded_set(
+    pool: AsyncConnectionPool, agent_id: UUID, memory_ids: list[UUID]
+) -> list[GateRow]:
+    """The gate's keyed fetch of the caller-held loaded set (fork 1,
+    2026-07-19): live rows joined to their live fact heads, by ID. Unknown,
+    foreign, or invalidated IDs simply don't join — the live-head predicates
+    are the filter; the service counts the drop-outs. NULL fact-head
+    embeddings ride (they stay in the coverage basis and closed-gate serving,
+    out of the novelty basis)."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            f"SELECT {_CANDIDATE_COLUMNS}, fv.embedding, fv.entities "
+            f"{_VECTOR_CANDIDATE_FROM} AND m.memory_id = ANY(%s)",
+            (agent_id, memory_ids),
+        )
+        rows = await cur.fetchall()
+    return [
+        GateRow(
+            row=CandidateRow(*row[:8]),
+            embedding=row[8].to_list() if row[8] is not None else None,
+            entities=row[9],
+        )
+        for row in rows
+    ]
+
+
+async def fetch_gate_candidates(
+    pool: AsyncConnectionPool,
+    agent_id: UUID,
+    embedding: list[float],
+    limit: int,
+    exclude_ids: list[UUID],
+) -> list[GateRow]:
+    """The gate's fire probe: the standard over-fetched vector probe with the
+    loaded set excluded (append-only — a fetch never re-returns what the
+    scene already holds) and the fact head's entities alongside (the
+    entity-covered efficacy check reads them)."""
+    vec = _vector(embedding)
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            f"SELECT {_CANDIDATE_COLUMNS}, fv.embedding <=> %s AS distance, "
+            f"fv.entities {_VECTOR_CANDIDATE_FROM} AND fv.embedding IS NOT NULL "
+            "AND NOT (m.memory_id = ANY(%s)) "
+            "ORDER BY fv.embedding <=> %s LIMIT %s",
+            (vec, agent_id, exclude_ids, vec, limit),
+        )
+        rows = await cur.fetchall()
+    return [
+        GateRow(row=CandidateRow(*row[:9]), embedding=None, entities=row[9])
+        for row in rows
+    ]
+
+
+async def fetch_entity_candidates(
+    pool: AsyncConnectionPool,
+    agent_id: UUID,
+    terms: list[str],
+    exclude_ids: list[UUID],
+) -> list[GateRow]:
+    """The gate ladder's entity-only rung (embeddings down): lexical fetch
+    off the partial GIN over live fact heads — `fv.invalid_at IS NULL` is
+    stated in the FROM verbatim so the planner matches the partial-index
+    predicate (the 002 precedent). No LIMIT: the service ranks by
+    recency x importance_norm in Python (the fetch_live_candidates
+    precedent). The && overlap is byte-exact against stored entity strings —
+    an accepted degraded-rung property (build ruling 2026-07-19)."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            f"SELECT {_CANDIDATE_COLUMNS}, fv.entities "
+            f"{_VECTOR_CANDIDATE_FROM} AND fv.entities && %s::text[] "
+            "AND NOT (m.memory_id = ANY(%s))",
+            (agent_id, terms, exclude_ids),
+        )
+        rows = await cur.fetchall()
+    return [
+        GateRow(row=CandidateRow(*row[:8]), embedding=None, entities=row[8])
+        for row in rows
+    ]
 
 
 async def set_pinned(pool: AsyncConnectionPool, memory_id: UUID, pinned: bool) -> bool:
@@ -624,6 +722,7 @@ async def apply_authorial_correction(
     content: str,
     valid_at: datetime,
     embedding: list[float],
+    entities: list[str] | None = None,
     expected_detail_id: UUID | None = None,
 ) -> CorrectionApplied | Literal["unknown_memory", "stale_head"]:
     """The operator's replace-model correction (authorial-correction.md;
@@ -633,7 +732,10 @@ async def apply_authorial_correction(
     same instant; the coherent-chain-timeline precedent), supersede the live
     fact head and insert the corrected fact row (basis_text byte-verbatim +
     the pre-computed embedding — the caller embeds BEFORE this transaction;
-    no network call rides inside it), and evict every cache row for the
+    no network call rides inside it — + the corrected entities since
+    migration 003: the NER + operator-field merge, computed by the caller,
+    so corrections move entities the way they move the embedding), and evict
+    every cache row for the
     memory (the standing eviction invariant). `content` is the operator's
     text byte-verbatim in both chains. With `expected_detail_id` the telling
     supersede is a compare-and-swap: a head that moved since the operator
@@ -688,10 +790,10 @@ async def apply_authorial_correction(
                     superseded_fact = fact_row[0]
                     await cur.execute(
                         "INSERT INTO memory_fact_versions (memory_id, "
-                        "basis_text, embedding, write_cause, valid_at) VALUES "
-                        "(%s, %s, %s, 'authorial_correction', %s) "
+                        "basis_text, embedding, entities, write_cause, valid_at) "
+                        "VALUES (%s, %s, %s, %s, 'authorial_correction', %s) "
                         "RETURNING fact_version_id",
-                        (memory_id, content, _vector(embedding), valid_at),
+                        (memory_id, content, _vector(embedding), entities, valid_at),
                     )
                     fact_version_id = (await cur.fetchone())[0]
                     await cur.execute(
