@@ -1273,3 +1273,59 @@ latency-becomes-characterization beat live, with the corrected fact basis also m
 wording read as novel: retrieval-follows-the-fix visible in the gate's min-distance) and a
 standalone load-driver run emitting `gate_check` p50/p95 + the gate block with real
 fire/efficacy data.
+
+## Test-suite build rulings — 2026-07-20
+
+Structural pytest suite v1 built and floor-verifier-passed (immediate-queue item 1;
+`docs\test-suite.md` was already the spec — no separate spec session). 38 scenarios in
+`tests\test_*.py`: Sets A (authorial pair incl. the fact chain; the diegetic pair still lands
+with the dissonance mechanism), B, C, D, + the degradation cases. `app\`, `db\`, and all
+seven `verify_*.py` walkers byte-identical to HEAD — the eight floors stand by construction
+(the verifier's recorded reasoning; re-running identical bytes proves nothing new). Jack
+ruled three shapes via explicit questions at plan time; the remaining shapes were approved
+with the plan.
+
+1. **Stop-hook budget = fast subset (explicit question).** Scenarios that CALL the write
+   pass at the service level (observe, or the correction verb with its NER merge) carry the
+   pytest marker `nlp` — they trigger the lazy spaCy+fastcoref load (~75 s cold on this
+   machine for the first call; the load, not the scenarios, dominates) — and
+   `run-suite.ps1` now runs `python -m pytest tests -x -q -m "not nlp"` (31 scenarios,
+   ~14 s). The FULL suite (38) runs on demand, at floor verification, and before any commit
+   touching `app\`. **Rejected:** full suite at every turn-end (a multi-minute cold-start
+   tax on every future session, docs-only ones included); measure-first-then-re-rule (the
+   measurement happened at build anyway — cold 82 s / warm 30 s full, 14 s subset — and
+   confirms the split).
+2. **Postgres unreachable at the hook = skip cleanly, loud notice (explicit question).**
+   A conftest session-fixture probe: unreachable ⇒ every DB-backed test SKIPS, a visible
+   `STRUCTURAL SUITE SKIPPED: postgres unreachable` warning prints, exit code 0 — the
+   hook's existing dormant-when-prerequisites-missing philosophy extended to the DB
+   prerequisite. Pure no-DB scenarios still run. **Rejected:** go-red (docs-only sessions
+   could not end a turn cleanly without Docker running).
+3. **CI = CI-ready now, workflow later (explicit question).** The suite is one-command,
+   offline, keyless (fake providers pinned in fixtures regardless of `.env`), deterministic
+   (two consecutive full runs asserted), and scratch-DB self-managing; no `.github\`
+   workflow this session — it lands as its own later item (natural home: the public-flip
+   sprint). **Rejected:** workflow-this-session (an extra build-and-debug chunk — pgvector
+   service container + ~2 GB model caching — on top of 38 scenarios). Until it lands,
+   regressions are caught only on-machine; stated and accepted.
+
+Approved-with-plan shapes, as built: runner = pytest 9.1.1 with NO pytest-asyncio — each
+scenario is a sync `def` wrapping `asyncio.run(..., loop_factory=asyncio.SelectorEventLoop)`
+via `conftest.run_structural` (the walker idiom; the Windows psycopg constraint);
+`requirements.txt` += `pytest==9.1.1`, `httpx==0.28.1` (the latter closing the 2026-07-16
+unpinned-httpx audit observation — the suite is its fifth consumer); scratch DB =
+**`longmem_suite`**, deliberately distinct from the walkers' `longmem_test` so a Stop-hook
+run never collides with a walker loop (session fixture: DROP IF EXISTS → CREATE → migrate
+001–003 by subprocess → tests → DROP; per-test TRUNCATE of product tables — fixture reset of
+a disposable scratch store, outside the memory-content invariant exactly as the walkers'
+DB drops are); unmarked scenarios seed at the db layer through the real
+`db.insert_observation` (`InsertPlan` with explicit fixture facts + the pure fake embedding
+— no NLP import path); per-set configs mirror the walker pins with production-vs-fixture
+stated per key (Sets A/B: theta 0 + gate off; Set C: PRODUCTION theta, gate off; Set D:
+PRODUCTION gate, theta 0); fixture texts reuse the walkers' measured trigram corpus;
+`pytest.ini` registers the marker + `testpaths` + `-p no:cacheprovider` (no repo-tree
+cache residue); the escalation hard-stop degradation test asserts the CURRENT build-phase
+stance and says so in its docstring — the owed production re-rule changes exactly that test.
+
+Measured at build (recorded for hook-budget honesty): full suite 82 s cold-cache /
+~30 s warm; `-m "not nlp"` subset ~14 s; unreachable-skip ~3 s.

@@ -1,5 +1,14 @@
 # longmem-npc — Test suite spec
 
+**BUILT 2026-07-20** — 38 pytest scenarios in `tests\test_*.py` (Sets A–D + degradation; the
+Set A diegetic pair still lands with the dissonance mechanism). Build rulings 2026-07-20
+(dated `decisions.md` entry): the suite-gate Stop hook runs the `-m "not nlp"` subset (the 7
+`nlp`-marked scenarios call the write pass at the service level and pay the lazy
+spaCy+fastcoref load; the full suite runs on demand + at floor verification); Postgres
+unreachable ⇒ loud clean skip, exit green; **CI-ready now** (offline, keyless, deterministic,
+self-managed scratch `longmem_suite`) with the CI workflow itself sequenced later — "runs in
+CI" below reads as that readiness until the workflow lands.
+
 Scenario suite in `tests\`: fixture + runner, runs in CI. The suite gets its own scoped build
 session — it is a first-class deliverable, not an afterthought.
 

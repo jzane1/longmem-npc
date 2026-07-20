@@ -1,22 +1,22 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-07-19
-**Phase:** **the gate is live** — mid-dialogue gate v1 specced AND built & floor-verified
-2026-07-19 (`mid-dialogue-gate.md`), the same day. Retrieval is conditional for the first
-time: a scene's first turn loads the set; every later turn passes the non-LLM gate (novelty +
-entity tripwire + damper) against the **caller-held loaded set**, closed turns serve the set
-with zero probe SQL, fires append `gate_fetch_k` new items under the marked recollection
-block. **Migration 003 is applied** (`003_fact_entities.sql` — the entities fact-chain column;
-freeze at observe; old entities GIN dropped, partial GIN on live fact heads; the floor
-criterion now reads "001 + 002 + 003 applied, 0 pending"), corrections move entities (NER +
-optional operator field), and the fork-5 pre-serve callback prints "(reconstructing…)"
-**during** a blocked mid-scene serve — live in the piped REPL beat, `blocked=yes` in the gate
-debug line. **Eight floors stand verified** (see the table). Jack ruled two build shapes via
-explicit questions (damper as suggested — the promotable flag closed; correction-path NER
-failure → clean 502). **One open decision owed before the demo ships:** the escalation
-hard-stop failure path re-rule (build-phase stance, 2026-07-13).
-Next: **the test-suite scoped session** (immediate-queue item 1 after the renumber) — Sets
-A–D + degradation cases, all now runnable.
+**Last updated:** 2026-07-20
+**Phase:** **the suite is green and its gate hook is live** — structural pytest suite v1
+built & floor-verified 2026-07-20 (38 scenarios in `tests\test_*.py`: Sets A–D +
+degradation; `docs\test-suite.md` was already the spec, so the session went straight to a
+scoped build). **The suite-gate Stop hook is active for the first time since it was
+written (2026-07-12):** every turn-end now runs the `-m "not nlp"` subset (31 scenarios,
+~14 s — ruled 2026-07-20; the 7 `nlp`-marked scenarios call the write pass at the service
+level, pay the lazy spaCy+fastcoref load, and run on demand + at floor verification),
+Postgres unreachable ⇒ loud clean skip with a green exit, and the suite is CI-ready
+(offline, keyless, self-managed scratch `longmem_suite`) with the CI workflow sequenced
+later. `app\`, `db\`, and all seven walkers are byte-untouched — the eight prior floors
+stand by construction; **nine floors now stand verified** (see the table). Jack ruled
+three build shapes via explicit questions (hook subset; skip-clean on unreachable;
+CI-ready-now, workflow later). **One open decision owed before the demo ships:** the
+escalation hard-stop failure path re-rule (build-phase stance, 2026-07-13) — the suite
+asserts the current stance and flags itself in that test's docstring.
+Next: **Unity project + reference scene** (immediate-queue item 1 after the renumber).
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -55,6 +55,8 @@ and the structured behavior output survive the interview. Research publication c
 | Fact-level correction v1 — **migration 002** (`db\migrations\002_fact_versions.sql`: `memory_fact_versions` fact chain + guarded backfill + one-live-head partial unique + **partial HNSW** over live heads + `memories_embedding_hnsw` **dropped**, ruled) + the fact-following verb (`app\db.py` `apply_authorial_correction` grown: fact supersede + insert in the same transaction; `app\ingest.py` embed-before-transaction + `CorrectionEmbedFailedError`; `app\api.py` 502) + the **freeze ruling** (`insert_observation` mints the `original` fact head — the sole vector home; `memories.embedding` no longer written; the embed-degradation signal moved to the live fact head) + the vector probe on the live fact head (`fetch_vector_candidates`) + wire deltas (`CorrectionResult` widened, `IngestResult.fact_version_id`) + REPL surfacing (`app\cli.py`) | floor-verifier **pass** against all six prior floors (read-path + write-path deliberately re-opened, re-verified): structural walker `tests\verify_fact_correction.py` re-run independently (32 assertions, every done-when criterion incl. db-layer distance-0 retrieval-follows-the-fix, the backfill guard via a legacy-shaped row, and all-or-nothing embed failure) on fresh scratch `longmem_test`; all five prior walkers re-run clean (38/38 — grown 35 → 38 incl. the one ruling-driven modification, the embed-signal query moved to the fact head; 36/36 read, 34 → 36 addition only; 33/33 authorial, 31 → 33 addition only; 42/42 reconstruction and 36/36 CLI harness **byte-untouched — the no-reconstruction-delta proof**, `app\retrieval.py`/`app\reconstruction.py` byte-identical to HEAD); migration 002 applied to `longmem`, no-arg migrate → **"Up to date: 2 applied, 0 pending"** (the criterion's new wording); `longmem` confirmed pristine via the postgres MCP (all product tables 0 rows, ledger = 001+002, old index absent, three fact indexes present); independent code spot-checks (one transaction with the embed outside it, CAS + broken-store rollbacks, sole DELETE still cache eviction, degraded path byte-identical); plus a live piped REPL beat: `:correct` prints both head swaps + embed timing, and the same query's relevance moved 0.4686 → 0.5637 across the correction | 2026-07-18 |
 
 | Mid-dialogue gate v1 — **migration 003** (`db\migrations\003_fact_entities.sql`: `memory_fact_versions.entities` + guarded backfill + partial GIN on live fact heads + `memories_entities_gin` **dropped**, freeze ruled) + the gate stage (`app\gate.py` pure decision module: novelty + entity tripwire + damper, named signal constants; `app\retrieval.py` gated/loader branch — loader path v1-byte-parity, closed turns zero probe SQL, fires append `gate_fetch_k` new items via SQL-excluded probe or the GIN's entity-only rung) + the **entities freeze at observe** (`insert_observation` writes the fact head only) + the correction verb's NER + operator-field entities merge (`app\ingest.py`, `CorrectionNlpFailedError` → 502) + the fork-5 pre-serve callback (`app\reconstruction.py`, one defaulted param) + caller-held loaded-set/streak scene state (`app\session.py`) + the prompt recollection partition (`app\dialogue.py`) + `GateInstrumentation` wire deltas (`app\schemas.py`) + four knobs (`app\config.py`) + CLI gate line + load-driver `gate_check`/gate block | floor-verifier **pass** against all seven prior floors (write-path, retrieval, dialogue, session-runner, reconstruction, and both correction floors deliberately re-opened, re-verified): structural walker `tests\verify_gate.py` re-run independently (**51 assertions**, every done-when criterion incl. loader-parity, all ladder rungs, the blocking-callback beat, migration-003 legacy-row guard, and entities-follow-correction) on fresh scratch `longmem_test`; all seven prior walkers re-run clean, each on fresh scratch (40/40 write — 38 → 40 additive freeze pair; 36/36 read — **byte-untouched, the loader-parity proof**; 36/36 CLI harness — fixture pin + label edit only; 42/42 reconstruction — fixture pin only; 34/34 authorial — 33 → 34 additive; 34/34 fact — 32 → 34 additive); migration 003 applied to `longmem`, no-arg migrate → **"Up to date: 3 migration(s) applied, 0 pending"**; `longmem` pristine via the postgres MCP (ledger 001+002+003, all product tables 0 rows, new partial GIN present, old GIN absent); independent code spot-checks (loader path behavior-identical, callback-absent serve identical, one embed per turn, sole DELETE still cache eviction, no gate model role, reserved slots inert); plus the live piped REPL beat (loader → mid-scene novelty fetch → both-signal fire → `:correct` → **`(reconstructing…)` printed during the blocked turn**) and a standalone load-driver run with `gate_check` p50/p95 + the gate fire/efficacy block | 2026-07-19 |
+
+| Structural pytest suite v1 — `pytest.ini` (marker registration, `testpaths`, no cache residue) + `tests\conftest.py` (scratch **`longmem_suite`** session lifecycle: probe → create → migrate 001–003 → per-test TRUNCATE → drop; unreachable ⇒ loud skip, exit green; db-layer `InsertPlan` seeding with the pure fake embedding — the fast path never imports the NLP loaders; per-set configs with production-vs-fixture pins stated) + **38 scenarios** in five `test_*.py` files (Set A: authorial + fact chain incl. the db-layer distance-0 rank pair, CAS rollback, the pure constraint-follows-anchor test, and the marked route contract; Set B: decay-vs-invalidation incl. the two-time-travel-mechanics-agree and IDs-on-the-wire pairs; Set C: write-back chain shape, cache hit/frozen basis, band crossing, identity bump, correction eviction + re-anchor, drift refusal + refusal caching; Set D: loader parity, closed gate, novelty/tripwire/both fires, damper + reset, efficacy, runner append-only, marked entities-follow-correction; degradation: every ruled ladder row incl. the build-phase hard-stop, flagged as such in its docstring) + the Stop-hook subset edit (`-m "not nlp"`, ruled) + `pytest==9.1.1`/`httpx==0.28.1` pins | floor-verifier **pass** against all eight prior floors, standing by construction: `app\`, `db\`, and all seven walkers **byte-identical to HEAD** (the verifier's recorded git-diff proof — identical bytes need no re-run); full suite re-run twice independently (38/38, 38/38 — the determinism criterion), the subset re-run with API keys scrubbed (31/31 in ~14 s — the keyless + no-spaCy proof), the unreachable-skip beat (30 skipped + the one pure no-DB test, exit 0, loud warning), the hook contract both ways (green → exit 0; `stop_hook_active` guard short-circuits; red path + dormant guards read intact with the subset flag), a structural-only audit of all five files (no assertion touches model prose), no-arg migrate → "Up to date: 3 migration(s) applied, 0 pending", `longmem` pristine via the postgres MCP (ten product tables 0 rows, ledger 001+002+003, **no `longmem_suite` residue**), and pins == installed versions | 2026-07-20 |
 
 ## Open questions needing Jack's ruling
 
@@ -538,21 +540,44 @@ and the structured behavior output survive the interview. Research publication c
   threshold stands; guaranteed-novel fixtures need trigram-rare wording — chosen by
   measurement). Queue renumbered (suite → 1, Unity → 2, pre-ship gates → 3); the gate
   pointers in prior specs gained "built" markers.
+- **2026-07-20** — **Structural pytest suite v1 built, verified, and committed — the
+  suite-gate Stop hook is live.** `docs\test-suite.md` was already the spec, so the session
+  went plan-mode orient → three explicit-question rulings → scoped build (dated "Test-suite
+  build rulings" entry in `decisions.md`): **the Stop hook runs the `-m "not nlp"` subset**
+  (the 7 marked scenarios call the write pass at the service level and pay the lazy
+  spaCy+fastcoref load — measured: full suite 82 s cold / ~30 s warm, subset ~14 s);
+  **Postgres unreachable ⇒ loud clean skip, exit green** (the hook's dormant philosophy
+  extended to the DB prerequisite; pure no-DB scenarios still run); **CI-ready now,
+  workflow later** (public-flip-sprint home; until then regressions are caught
+  on-machine — stated and accepted). New: `pytest.ini`, `tests\conftest.py` (scratch
+  **`longmem_suite`** lifecycle, deliberately distinct from the walkers' `longmem_test`;
+  db-layer `InsertPlan` seeding with the pure fake embedding so unmarked scenarios never
+  trigger the loaders; per-set configs with production-vs-fixture pins stated), and 38
+  scenarios across `test_set_a_correction.py` (8), `test_set_b_decay.py` (5),
+  `test_set_c_reconstruction.py` (7), `test_set_d_gate.py` (9), `test_degradation.py` (9);
+  `requirements.txt` pins pytest 9.1.1 + httpx 0.28.1 (closing the 2026-07-16 unpinned
+  observation). `app\`, `db\`, and all seven walkers byte-untouched — the floors stand by
+  construction. floor-verifier **pass** on all nine criteria (two independent full-suite
+  runs, the keyless subset run, the unreachable beat, the hook contract both ways, the
+  structural-only audit, migrate no-op, `longmem` pristine via the postgres MCP with no
+  scratch residue). The escalation hard-stop test asserts the current build-phase stance
+  and says so in its docstring — the owed re-rule changes exactly that test. Queue
+  renumbered (Unity → 1, pre-ship gates → 2).
 
 ## Immediate queue
 
-1. Test-suite scoped session (Sets A-authorial incl. the fact-chain pair, B, C, **D — the
-   gate set**, + degradation cases — all now runnable).
-2. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
+1. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
    choreography incl. the 60-day drift beat, the correction-override beat, and the
    gate-recollect beat (all live in the REPL: `:as-of` jumps + scene boundaries + band
    crossings; `:correct` — which now moves retrieval AND entities; the gate debug line +
    `(reconstructing…)`).
-3. Before the demo ships: re-rule the escalation failure path (see open questions) and pick a
-   real-provider smoke moment (one live observe + one live dialogue turn + one live
-   reconstruction with keys) ahead of demo choreography.
+2. Before the demo ships: re-rule the escalation failure path (see open questions; the
+   suite's hard-stop test tracks the current stance) and pick a real-provider smoke moment
+   (one live observe + one live dialogue turn + one live reconstruction with keys) ahead of
+   demo choreography.
 
-*(Done 2026-07-19: **Mid-dialogue gate v1** — retrieval is conditional; migration 003
+*(Done 2026-07-20: **Structural pytest suite v1** — 38 scenarios green, the Stop hook live
+on the `-m "not nlp"` subset; see the verified-floors table and session log. Done 2026-07-19: **Mid-dialogue gate v1** — retrieval is conditional; migration 003
 applied; see the verified-floors table and session log. Done 2026-07-18: **Fact-level correction v1** — retrieval follows the fix; migration 002
 applied; see the verified-floors table and session log. Also done 2026-07-18:
 **Authorial-correction endpoint v1** — the correction-override beat is live;

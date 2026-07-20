@@ -19,7 +19,10 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) { exit 0 }
 python -m pytest --version *> $null
 if ($LASTEXITCODE -ne 0) { exit 0 }             # pytest not installed yet
 
-$out = python -m pytest tests -x -q 2>&1 | Out-String
+# Subset ruling 2026-07-20: `nlp`-marked scenarios load spaCy+fastcoref
+# (minutes per process) — the turn-end gate runs everything else; the full
+# suite runs on demand and at floor verification.
+$out = python -m pytest tests -x -q -m "not nlp" 2>&1 | Out-String
 if ($LASTEXITCODE -eq 0) { exit 0 }
 
 # Red suite: feed the tail of the output back to Claude and refuse the stop.

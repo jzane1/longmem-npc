@@ -12,6 +12,12 @@
 psycopg[binary,pool]==3.3.4
 pgvector==0.5.0
 
+# structural test suite (tests\test_*.py; walkers need only httpx) — ruled 2026-07-20
+pytest==9.1.1
+# httpx: ASGITransport vehicle for four walkers + the suite (pin closes the
+# 2026-07-16 audit observation)
+httpx==0.28.1
+
 # API surface
 fastapi==0.139.0
 uvicorn==0.51.0
