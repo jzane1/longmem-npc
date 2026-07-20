@@ -13,9 +13,13 @@ Postgres unreachable ⇒ loud clean skip with a green exit, and the suite is CI-
 later. `app\`, `db\`, and all seven walkers are byte-untouched — the eight prior floors
 stand by construction; **nine floors now stand verified** (see the table). Jack ruled
 three build shapes via explicit questions (hook subset; skip-clean on unreachable;
-CI-ready-now, workflow later). **One open decision owed before the demo ships:** the
-escalation hard-stop failure path re-rule (build-phase stance, 2026-07-13) — the suite
-asserts the current stance and flags itself in that test's docstring.
+CI-ready-now, workflow later). **A fake-mode latency pass then landed two measured
+performance fixes (2026-07-20, same day): reads ~54 ms → ~5–10 ms (named vector param
+kills a 44 ms psycopg wire stall) and writes ~215 ms → ~63 ms (taming fastcoref's
+per-observe dataset fingerprint), plus a suite-concurrency fix (per-`pid` scratch DB) —
+re-verified 38/38 + all seven walkers green.** **One open decision owed before the demo
+ships:** the escalation hard-stop failure path re-rule (build-phase stance, 2026-07-13) —
+the suite asserts the current stance and flags itself in that test's docstring.
 Next: **Unity project + reference scene** (immediate-queue item 1 after the renumber).
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
@@ -563,6 +567,29 @@ and the structured behavior output survive the interview. Research publication c
   scratch residue). The escalation hard-stop test asserts the current build-phase stance
   and says so in its docstring — the owed re-rule changes exactly that test. Queue
   renumbered (Unity → 1, pre-ship gates → 2).
+- **2026-07-20** — **Fake-mode latency/compute pass + two measured perf fixes + a
+  suite-concurrency fix (Jack ordered the profiling, then ruled "apply both").** A
+  scratchpad-only profiler (load-driver instrumentation + `EXPLAIN ANALYZE` + a cProfile of
+  the NLP pass + a psycopg vector-param micro-benchmark) found two big, corpus-independent
+  pits — full write-up in the dated "Latency-fix + suite-concurrency rulings" entry in
+  `decisions.md`. Fixes (three files, no floor behavior changed): **(pit #2)** `app\db.py` —
+  the four vector-probe queries bind the 1536-dim query vector as a **named** param so it
+  rides the wire once instead of twice, killing a ~44 ms Windows-loopback Nagle/delayed-ACK
+  stall (server did the query in 1.3 ms; EXPLAIN confirms HNSW used); **reads ~54 ms →
+  ~5–10 ms, a gate fire ~55 ms → ~7 ms** (measured). **(pit #1)** `app\nlp.py`
+  `_tame_datasets_fingerprint()` (called from the `_coref()` loader) — `disable_caching()` +
+  a guarded short-circuit of the `datasets` fingerprint Hasher, which otherwise dill-pickles
+  fastcoref's internal spaCy model every observe; coref output unchanged; **writes ~215 ms →
+  ~63 ms** (measured). **(b)** `tests\conftest.py` — scratch DB is now `longmem_suite_<pid>`
+  so two overlapping suite runs (the Stop hook fires one per turn-end) can't force-drop each
+  other (the `AdminShutdown` false-RED seen during the profiling turns). Re-verified: full
+  suite **38/38**, all seven walkers green (40/36/36/42/34/34/51 on fresh scratch), migrate a
+  clean no-op, `longmem` pristine, no scratch residue. The pit #1 fix is the one library
+  monkeypatch — guarded to degrade to the slow-but-correct path; flagged as a version-fragility
+  cost, trivially revertible. Deferred (recorded in the decisions entry): connection-per-query
+  churn (secondary); and a real-mode COST flag — escalation fired 24/40 (60%) on realistic
+  prose, each an extra LLM call in real mode. **Next: a real-mode smoke run to confirm the
+  end-to-end picture, then the demo work.**
 
 ## Immediate queue
 

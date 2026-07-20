@@ -2,9 +2,14 @@
 
 The suite is the CI-shaped regression net over the verified floors: offline,
 keyless (fake providers pinned regardless of .env), deterministic, and
-scratch-DB self-managing. It runs on `longmem_suite` — deliberately distinct
-from the walkers' `longmem_test`, so a Stop-hook run can never collide with
-a walker loop mid-build-session. The product `longmem` is never connected to.
+scratch-DB self-managing. It runs on `longmem_suite_<pid>` — deliberately
+distinct from the walkers' `longmem_test`, so a run can never collide with a
+walker loop, AND per-process so two suite runs never collide with EACH OTHER
+(ruled 2026-07-20): the setup `DROP ... WITH (FORCE)` of a shared fixed-name
+DB would force-kill a concurrently-running suite's live connections
+(AdminShutdown). The Stop hook fires a run at every turn-end, so rapid
+consecutive turns can overlap runs — the pid suffix makes each run own its
+DB. The product `longmem` is never connected to.
 
 Stop-hook contract (ruled 2026-07-20): scenarios that CALL the write pass at
 the service level (observe, or the correction verb with its NER merge) carry
@@ -55,7 +60,11 @@ from app.providers import (
     Providers,
 )
 
-SUITE_DB = "longmem_suite"
+# Per-process name: two overlapping runs (the Stop hook can fire one at every
+# turn-end) never share a scratch DB, so no run's force-drop can kill another's
+# connections. A hard-killed run leaks an empty `longmem_suite_<pid>`; the next
+# same-pid run drops it (DROP IF EXISTS), and it never collides with a live run.
+SUITE_DB = f"longmem_suite_{os.getpid()}"
 NOW = datetime(2026, 7, 20, 12, 0, 0, tzinfo=timezone.utc)
 SEED_PROSE = "The ford keeper, wary of strangers."
 

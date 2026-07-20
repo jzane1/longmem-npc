@@ -309,12 +309,21 @@ _CANDIDATE_FROM = (
 # <=> distance reads (fact-level-correction.md: retrieval follows the fix).
 # `fv.invalid_at IS NULL` is stated verbatim so the planner matches the
 # partial-HNSW predicate on memory_fact_versions.
+#
+# NAMED params (%(agent_id)s, not %s): the vector-probe queries below reference
+# the 1536-dim query vector TWICE (SELECT distance + ORDER BY, the HNSW-index
+# form). Positional %s sends that ~6 KB param on the wire once per placeholder;
+# two large params cross a segment boundary into a ~44 ms Windows-loopback
+# Nagle/delayed-ACK stall (server executes the query in ~1.3 ms). A named param
+# is sent ONCE, referenced twice in SQL — measured 44 ms -> 1 ms per read, with
+# the HNSW `ORDER BY embedding <=> ...` expression unchanged. So every consumer
+# of this clause binds by name (all-named or all-positional, never mixed).
 _VECTOR_CANDIDATE_FROM = (
     "FROM memories m JOIN memory_details d "
     "ON d.memory_id = m.memory_id AND d.invalid_at IS NULL "
     "JOIN memory_fact_versions fv "
     "ON fv.memory_id = m.memory_id AND fv.invalid_at IS NULL "
-    "WHERE m.agent_id = %s AND m.invalid_at IS NULL"
+    "WHERE m.agent_id = %(agent_id)s AND m.invalid_at IS NULL"
 )
 
 
@@ -330,10 +339,10 @@ async def fetch_vector_candidates(
     vec = _vector(embedding)
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
-            f"SELECT {_CANDIDATE_COLUMNS}, fv.embedding <=> %s AS distance "
+            f"SELECT {_CANDIDATE_COLUMNS}, fv.embedding <=> %(qv)s AS distance "
             f"{_VECTOR_CANDIDATE_FROM} AND fv.embedding IS NOT NULL "
-            "ORDER BY fv.embedding <=> %s LIMIT %s",
-            (vec, agent_id, vec, limit),
+            "ORDER BY fv.embedding <=> %(qv)s LIMIT %(lim)s",
+            {"qv": vec, "agent_id": agent_id, "lim": limit},
         )
         rows = await cur.fetchall()
     return [CandidateRow(*row) for row in rows]
@@ -376,8 +385,8 @@ async def fetch_loaded_set(
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
             f"SELECT {_CANDIDATE_COLUMNS}, fv.embedding, fv.entities "
-            f"{_VECTOR_CANDIDATE_FROM} AND m.memory_id = ANY(%s)",
-            (agent_id, memory_ids),
+            f"{_VECTOR_CANDIDATE_FROM} AND m.memory_id = ANY(%(ids)s)",
+            {"agent_id": agent_id, "ids": memory_ids},
         )
         rows = await cur.fetchall()
     return [
@@ -404,11 +413,11 @@ async def fetch_gate_candidates(
     vec = _vector(embedding)
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
-            f"SELECT {_CANDIDATE_COLUMNS}, fv.embedding <=> %s AS distance, "
+            f"SELECT {_CANDIDATE_COLUMNS}, fv.embedding <=> %(qv)s AS distance, "
             f"fv.entities {_VECTOR_CANDIDATE_FROM} AND fv.embedding IS NOT NULL "
-            "AND NOT (m.memory_id = ANY(%s)) "
-            "ORDER BY fv.embedding <=> %s LIMIT %s",
-            (vec, agent_id, exclude_ids, vec, limit),
+            "AND NOT (m.memory_id = ANY(%(exclude)s)) "
+            "ORDER BY fv.embedding <=> %(qv)s LIMIT %(lim)s",
+            {"qv": vec, "agent_id": agent_id, "exclude": exclude_ids, "lim": limit},
         )
         rows = await cur.fetchall()
     return [
@@ -433,9 +442,9 @@ async def fetch_entity_candidates(
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
             f"SELECT {_CANDIDATE_COLUMNS}, fv.entities "
-            f"{_VECTOR_CANDIDATE_FROM} AND fv.entities && %s::text[] "
-            "AND NOT (m.memory_id = ANY(%s))",
-            (agent_id, terms, exclude_ids),
+            f"{_VECTOR_CANDIDATE_FROM} AND fv.entities && %(terms)s::text[] "
+            "AND NOT (m.memory_id = ANY(%(exclude)s))",
+            {"agent_id": agent_id, "terms": terms, "exclude": exclude_ids},
         )
         rows = await cur.fetchall()
     return [

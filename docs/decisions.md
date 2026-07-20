@@ -1329,3 +1329,65 @@ stance and says so in its docstring — the owed production re-rule changes exac
 
 Measured at build (recorded for hook-budget honesty): full suite 82 s cold-cache /
 ~30 s warm; `-m "not nlp"` subset ~14 s; unreachable-skip ~3 s.
+
+## Latency-fix + suite-concurrency rulings — 2026-07-20
+
+Jack ordered a fake-mode latency/compute pass (offline profiling before any real-mode run),
+then, on the findings, ruled: **apply the two identified pits' fixes and harden the suite
+concurrency gap** ("go ahead and complete both (a) and (b)"). All measurement lived in the
+scratchpad (harness + EXPLAIN ANALYZE + cProfile + a psycopg micro-benchmark); the fixes
+touch three files and no floor's behavior — re-verified: full suite 38/38, all seven walkers
+green (40/36/36/42/34/34/51), migrate a clean no-op, `longmem` pristine.
+
+**Fake-mode caveat (why these are worth fixing before real mode):** fake providers make model
+CALLS ~0, so the profiled costs are pure infrastructure/local-compute underneath the eventual
+LLM round-trips — both pits are removable waste, not model latency.
+
+1. **Pit #2 — the vector probe sent the query vector as a param TWICE (44 ms wire stall) →
+   named param.** `fetch_vector_candidates` / `fetch_gate_candidates` (and, for the shared
+   `_VECTOR_CANDIDATE_FROM` clause, `fetch_loaded_set` / `fetch_entity_candidates`) bound the
+   1536-dim query vector with positional `%s` in both the SELECT-distance and ORDER-BY slots.
+   Two ~6 KB params cross a segment boundary into a Windows-loopback Nagle/delayed-ACK stall:
+   **server executes in ~1.3 ms (EXPLAIN ANALYZE, HNSW index used), client observed ~46 ms,
+   flat across 100/1k/5k rows.** Micro-benchmark: positional-twice 44 ms, `binary`/`prepare`
+   no effect, **named `%(qv)s` referenced twice → sent once on the wire → 1 ms.** Fix: those
+   four queries bind by name (all-named per query; the HNSW `ORDER BY embedding <=> ...`
+   expression is unchanged). Measured end-to-end: retrieval ~54 ms → ~5–10 ms; a gate fire
+   ~55 ms → ~7 ms; a reconstruction cache-hit read 54 ms → 7.6 ms. **Rejected:** `TCP_NODELAY`
+   alone (treats the symptom, still ships the vector twice); query rewrite to alias the
+   distance in ORDER BY (breaks HNSW index use — pgvector needs the literal expression).
+
+2. **Pit #1 — fastcoref re-fingerprints its dataset every observe (~90 ms) → tame the
+   `datasets` fingerprint.** cProfile: ~90 ms of a ~136–194 ms write pass is `FCoref.predict`
+   → `datasets.Dataset.map()` deriving a content fingerprint by dill-pickling the transform's
+   closure, which reaches fastcoref's internal spaCy model (the `datasets` spaCy dill-reducer
+   serializes the whole pipeline) — all to name a cache file never read. Lever measurements:
+   `datasets.disable_caching()` alone ≈ no change (it doesn't skip fingerprint COMPUTATION);
+   short-circuiting the fingerprint `Hasher.hash` → **136 ms → 48 ms (3×)**; batching amortizes
+   (24 ms/text at 16) but observe is one-at-a-time. Fix (`app\nlp.py` `_tame_datasets_fingerprint`,
+   called from the `_coref()` loader): `disable_caching()` + replace `Hasher.hash` with a
+   constant. **Safe** because caching is off (constant fingerprints can't collide on a cache
+   file) and the fingerprint otherwise only sets an ephemeral dataset's `_fingerprint`; coref
+   OUTPUT is unchanged (the walkers' assertion surface — all seven still green). **Guarded:**
+   wrapped so any `datasets`-internals drift is swallowed, leaving the slow-but-correct path —
+   the worst case loses the optimization, never breaks a write. Measured end-to-end:
+   write pass ~215 ms → ~63 ms. This is the one **library-internal monkeypatch** among the
+   fixes — flagged as a version-fragility cost (benign failure mode), easy to revert.
+   **Rejected:** `disable_caching()` alone (ineffective); a write-pass batching redesign
+   (architectural, doesn't help single-observe latency — the demo's actual shape).
+
+3. **Suite concurrency (b) — per-process scratch DB name.** The suite's session fixture
+   DROP/CREATEs a fixed-name `longmem_suite`; the Stop hook fires a run at every turn-end, so
+   rapid consecutive turns overlapped two runs and one's `DROP ... WITH (FORCE)` force-killed
+   the other's live connections (`psycopg.errors.AdminShutdown` — a false-RED surfaced during
+   the profiling turns). Fix (`tests\conftest.py`): `SUITE_DB = f"longmem_suite_{os.getpid()}"`
+   so overlapping runs never share a DB. A hard-killed run leaks an empty `longmem_suite_<pid>`
+   (dropped by the next same-pid run; never collides with a live run). **Rejected:** a global
+   lockfile (serializes runs, slower, another failure mode); sweeping all `longmem_suite_*` at
+   startup (would drop a concurrently-running suite's DB — reintroduces the collision).
+
+Not fixed (secondary, recorded for later): connection-per-query churn (~5–10 `pool.connection()`
+acquisitions per turn, plus one write-back transaction per aged memory) — minor next to the two
+pits, a batching candidate. And a real-mode COST flag (not a latency pit): escalation fired on
+24/40 observes (60%) with realistic prose — each is an extra LLM call in real mode; eyeball the
+trigger thresholds before the real run.

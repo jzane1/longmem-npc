@@ -88,10 +88,48 @@ def _spacy():
     return spacy.load(SPACY_MODEL)
 
 
+def _tame_datasets_fingerprint() -> None:
+    """Kill the biggest write-path cost: fastcoref's per-observation dataset
+    fingerprinting.
+
+    `FCoref.predict` builds a fresh `datasets.Dataset` and `.map()`s a
+    tokenizer over it on EVERY call. `datasets` derives a content fingerprint
+    for that map by dill-pickling the transform's closure — which reaches
+    fastcoref's internal spaCy pipeline, and `datasets`' spaCy dill-reducer
+    then serializes the whole model. Measured (cProfile + wall clock): ~90 ms
+    of a ~136 ms write pass, every observation, entirely to name a cache file
+    we never read.
+
+    Fix: turn caching off (the mapped dataset is consumed in-process and never
+    re-read) and replace the fingerprint Hasher with a constant. Safe together
+    because caching is disabled — constant fingerprints can't collide on any
+    cache file — and the fingerprint otherwise only sets an ephemeral dataset's
+    `_fingerprint` attribute; it never affects the tokenizer's OUTPUT, so
+    coref results (the walkers' assertion surface) are byte-identical. Measured
+    ~136 ms -> ~48 ms per write (the residue is the real coref inference).
+
+    Guarded end to end: this is an OPTIMIZATION, never a correctness lever. Any
+    drift in the `datasets` internals (attr renamed or gone) is swallowed and
+    leaves the slow-but-correct path exactly as it was — the worst case is we
+    stop saving the 90 ms, never a wrong or failed write.
+    """
+    try:
+        import datasets
+        from datasets.fingerprint import Hasher
+
+        datasets.disable_caching()
+        if not getattr(Hasher, "_longmem_tamed", False):
+            Hasher.hash = staticmethod(lambda _obj: "longmem-nofingerprint")
+            Hasher._longmem_tamed = True
+    except Exception:  # noqa: BLE001 — optimization only; never break the pass
+        pass
+
+
 @lru_cache(maxsize=1)
 def _coref():
     from fastcoref import FCoref
 
+    _tame_datasets_fingerprint()
     return FCoref(device="cpu")
 
 
