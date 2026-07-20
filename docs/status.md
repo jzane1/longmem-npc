@@ -598,10 +598,16 @@ and the structured behavior output survive the interview. Research publication c
    gate-recollect beat (all live in the REPL: `:as-of` jumps + scene boundaries + band
    crossings; `:correct` — which now moves retrieval AND entities; the gate debug line +
    `(reconstructing…)`).
-2. Before the demo ships: re-rule the escalation failure path (see open questions; the
-   suite's hard-stop test tracks the current stance) and pick a real-provider smoke moment
-   (one live observe + one live dialogue turn + one live reconstruction with keys) ahead of
-   demo choreography.
+2. Before the demo ships (pre-ship gates): (a) re-rule the escalation failure path (see open
+   questions; the suite's hard-stop test tracks the current stance); (b) a real-provider smoke
+   moment (one live observe + one live dialogue turn + one live reconstruction with keys); and
+   (c) **re-run the latency/compute profiling in REAL mode.** The 2026-07-20 pass was
+   fake-mode only (model calls ~0), so the true end-to-end picture — LLM round-trips
+   dominating, plus the flagged ~60% escalation-call rate — is still UNMEASURED; the two
+   fake-mode fixes cleared the infra noise so the real-mode numbers should read clean. The
+   scratchpad harness + `latency_report.json` are the fake-mode baseline to diff against.
+   **Sequencing (Jack, 2026-07-20): paused here — possible architecture changes from industry
+   reading land first, then the real-mode testing, each in its own session.**
 
 *(Done 2026-07-20: **Structural pytest suite v1** — 38 scenarios green, the Stop hook live
 on the `-m "not nlp"` subset; see the verified-floors table and session log. Done 2026-07-19: **Mid-dialogue gate v1** — retrieval is conditional; migration 003
