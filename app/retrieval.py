@@ -63,6 +63,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import re
 import time
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
@@ -71,7 +72,7 @@ from typing import Callable
 from psycopg_pool import AsyncConnectionPool
 
 from app import db, decay, gate
-from app.config import Settings, agent_knob
+from app.config import Settings, agent_knob, text_search_config
 from app.ingest import UnknownAgentError
 from app.providers import ProviderCallError, Providers
 from app.reconstruction import ReconstructionService, ServeOutcome
@@ -130,6 +131,29 @@ class _QueryContext:
         return _QueryContext(
             entities=entities, event_time=event_time, location_name=location
         )
+
+
+_LEXICAL_TOKEN_RE = re.compile(r"[^\W\d_]{3,}", re.UNICODE)
+_LEXICAL_TOKEN_CAP = 16
+
+
+def lexical_tsquery(text: str) -> str | None:
+    """The hybrid lexical channel's query builder (Target B, 2026-07-20):
+    a mechanical token-OR tsquery over the utterance — casefolded word
+    tokens of >= 3 letters, deduped in order, capped at 16, joined with
+    ' | '. OR, not AND: a real utterance never full-AND-matches a stored
+    memory (websearch/plainto semantics would kill the channel); ts_rank
+    orders the LIMIT cut by match count, and the read-path scoring formula
+    does the real ranking after the union. Tokens are letter-runs only, so
+    the to_tsquery syntax is injection-safe by construction. None = no
+    usable token (the channel contributes nothing this turn)."""
+    seen: list[str] = []
+    for token in _LEXICAL_TOKEN_RE.findall(text.casefold()):
+        if token not in seen:
+            seen.append(token)
+            if len(seen) >= _LEXICAL_TOKEN_CAP:
+                break
+    return " | ".join(seen) if seen else None
 
 
 def context_boost(
@@ -301,6 +325,13 @@ class RetrievalService:
         # scoring loop is byte-identical to v1 (the parity contract).
         context = _QueryContext.from_request(request)
 
+        # Hybrid lexical channel instrumentation (Target B, 2026-07-20):
+        # zero on gated and degraded turns — the channel is loader-scope v1
+        # (the gate's fire probe and the ladder's entity-only rung are noted
+        # future consumers, not built).
+        lexical_sql_ms = 0.0
+        lexical_candidate_count = 0
+
         # --- gate stage (mid-dialogue-gate.md fork 1: the loaded set is
         # caller-held scene state; absent -> loader turn, v1 byte-parity;
         # gate_enabled 0 -> loader regardless, the fixture-pin/kill-switch
@@ -350,7 +381,10 @@ class RetrievalService:
                 on_reconstruct=on_reconstruct,
             )
         else:
-            # --- LOADER path: byte-identical to read-path v1 ----------------
+            # --- LOADER path: byte-identical to read-path v1 (the hybrid
+            # lexical union, Target B 2026-07-20, is additive-only: dedup by
+            # memory_id, scoring formula untouched; lexical_fetch_k = 0
+            # disables it outright — the gate_enabled kill-switch shape) ----
             t0 = time.perf_counter()
             if query_vector is not None:
                 overfetch = agent_knob(
@@ -365,6 +399,31 @@ class RetrievalService:
                     self._pool, request.agent_id
                 )
             sql_ms = _ms(time.perf_counter() - t0)
+            # Hybrid lexical channel: only where the vector probe ran (the
+            # degraded branch above already fetches EVERY live row — a union
+            # could add nothing). Lexical hits carry their true cosine
+            # distance; NULL-embedding fact heads are lexically reachable
+            # with relevance null (never a filter — exact-name recall now
+            # softens the embed-degradation consequence).
+            lex_k = int(agent_knob(config, "lexical_fetch_k", self._settings))
+            if query_vector is not None and lex_k > 0:
+                tsquery = lexical_tsquery(request.query_text)
+                if tsquery is not None:
+                    t0 = time.perf_counter()
+                    lexical = await db.fetch_lexical_candidates(
+                        self._pool,
+                        request.agent_id,
+                        tsquery,
+                        query_vector,
+                        lex_k,
+                        text_search_config(config),
+                    )
+                    lexical_sql_ms = _ms(time.perf_counter() - t0)
+                    lexical_candidate_count = len(lexical)
+                    seen_ids = {row.memory_id for row in candidates}
+                    candidates = candidates + [
+                        row for row in lexical if row.memory_id not in seen_ids
+                    ]
             t0 = time.perf_counter()
             serve_input = _sort_scored(
                 self._score_rows(candidates, config, as_of, context)
@@ -386,6 +445,8 @@ class RetrievalService:
             instrumentation=RetrievalInstrumentation(
                 embed_ms=embed_ms,
                 sql_ms=sql_ms,
+                lexical_sql_ms=lexical_sql_ms,
+                lexical_candidate_count=lexical_candidate_count,
                 score_ms=score_ms,
                 total_ms=_ms(time.perf_counter() - t_total),
                 embedding_tokens=embed_tokens,

@@ -360,6 +360,13 @@ class RetrievalInstrumentation(BaseModel):
     embedding_tokens: int
     candidate_count: int
     k_effective: int
+    # Hybrid lexical channel (built 2026-07-20, migration 004). Defaulted:
+    # pre-hybrid constructions stand. `sql_ms` stays the vector probe alone;
+    # the lexical fetch's time and raw (pre-dedup) hit count get their own
+    # lines — the instrument-at-the-seam decomposition. Both zero on gated,
+    # degraded, tokenless, and lexical_fetch_k=0 turns.
+    lexical_sql_ms: float = 0.0
+    lexical_candidate_count: int = 0
     degraded: bool = False
     degraded_reason: str | None = None
     as_of_effective: datetime

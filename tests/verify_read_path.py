@@ -38,6 +38,7 @@ sys.path.insert(0, str(REPO_ROOT))
 from psycopg.types.json import Jsonb
 
 from app import api as api_module
+from app import db as db_module
 from app.config import Settings
 from app.db import build_pool
 from app.ingest import IngestService
@@ -527,10 +528,28 @@ async def main(database_uri: str) -> None:
         fact_counts[0] == fact_counts[1],
         "every candidate memory has exactly one live fact head (join integrity)",
     )
-    r9 = await retrieval.retrieve_dialogue_init(request(agent_a))
+    # The vector-path exclusion, proven AT THE PROBE (sharpened at the
+    # Target B build, 2026-07-20: the served payload is no longer a proxy
+    # for the probe — the lexical channel can reach this row honestly).
+    probe_rows = await db_module.fetch_vector_candidates(
+        pool,
+        agent_a,
+        FakeEmbeddingProvider().embed([T_FRESH]).vectors[0],
+        100,
+    )
     check(
-        tunnel_result.memory_id not in items_by_id(r9),
-        "NULL-embedding row never appears via the vector path",
+        tunnel_result.memory_id not in {row.memory_id for row in probe_rows},
+        "NULL-embedding row never appears via the vector path (asserted on "
+        "the probe itself)",
+    )
+    r9 = await retrieval.retrieve_dialogue_init(request(agent_a))
+    tunnel_item = items_by_id(r9).get(tunnel_result.memory_id)
+    check(
+        tunnel_item is not None and tunnel_item.relevance is None,
+        "the lexical channel reaches the embed-degraded row on the healthy "
+        "path with relevance null (Target B: never a filter — exact-token "
+        "recall softens the embed-degradation consequence; the ruled "
+        "degraded-path and gate-GIN reaches stand)",
     )
 
     # ------------------------------------------------------------------ #
@@ -567,6 +586,76 @@ async def main(database_uri: str) -> None:
         )
         and r10.instrumentation.embedding_tokens == 0,
         "degraded result still ranked; no tokens spent",
+    )
+
+    # ------------------------------------------------------------------ #
+    print("\n[13] Hybrid lexical channel (Target B, migration 004, 2026-07-20)")
+    # Own agents; overfetch pinned to 1.0 so a k=1 vector probe returns ONE
+    # row and lexical-only reach is provable through the served payload.
+    lex_config = {**AGENT_CONFIG, "retrieval_overfetch_factor": 1.0}
+    agent_lex = await make_agent(pool, "read-walker-npc-lex", lex_config)
+    T_MILLER = "The miller counted his sacks at dawn."
+    T_ZEPH = "Zephyrine bartered salt for iron."
+    Q_LEX = "The miller counted his sacks at dawn, and Zephyrine watched."
+    lex_ids = {
+        "miller": await seed(ingest, agent_lex, T_MILLER, NOW - timedelta(days=14)),
+        "zeph": await seed(
+            ingest, agent_lex, T_ZEPH, NOW - timedelta(days=14), pinned=True
+        ),
+    }
+    r_lex = await retrieval.retrieve_dialogue_init(
+        request(agent_lex, query_text=Q_LEX, k=1)
+    )
+    check(
+        r_lex.items and r_lex.items[0].memory_id == lex_ids["zeph"],
+        "lexical-only reach: the rare-name row is SERVED although the k=1 "
+        "vector probe (overfetch 1.0) could not have returned it alongside "
+        "the near-verbatim row (pin + recency outrank once reachable)",
+    )
+    check(
+        r_lex.instrumentation.lexical_candidate_count == 2
+        and r_lex.instrumentation.candidate_count == 2,
+        "raw lexical hits vs deduped union: both rows match the token-OR "
+        "tsquery (2 raw), the union holds 2 — the vector row was deduped, "
+        "not doubled",
+    )
+    top = r_lex.items[0]
+    check(
+        top.relevance is not None
+        and top.recency == 1.0
+        and top.score == top.relevance * top.recency * top.importance_norm,
+        "a lexical hit flows through the UNCHANGED scoring formula with its "
+        "true cosine relevance (pin recency 1.0)",
+    )
+    tokenless = await retrieval.retrieve_dialogue_init(
+        request(agent_lex, query_text="Ox?", k=1)
+    )
+    check(
+        tokenless.instrumentation.lexical_candidate_count == 0
+        and tokenless.instrumentation.lexical_sql_ms == 0.0,
+        "no usable token (< 3 letters) => the channel contributes nothing, "
+        "zero lexical SQL",
+    )
+    agent_lex0 = await make_agent(
+        pool,
+        "read-walker-npc-lex0",
+        {**lex_config, "lexical_fetch_k": 0.0},
+    )
+    lex0_ids = {
+        "miller": await seed(ingest, agent_lex0, T_MILLER, NOW - timedelta(days=14)),
+        "zeph": await seed(
+            ingest, agent_lex0, T_ZEPH, NOW - timedelta(days=14), pinned=True
+        ),
+    }
+    r_lex0 = await retrieval.retrieve_dialogue_init(
+        request(agent_lex0, query_text=Q_LEX, k=1)
+    )
+    check(
+        r_lex0.instrumentation.lexical_candidate_count == 0
+        and r_lex0.instrumentation.candidate_count == 1
+        and r_lex0.items[0].memory_id == lex0_ids["miller"],
+        "lexical_fetch_k = 0 is the kill-switch: pure-vector candidates, "
+        "the rare-name row stays unreachable (v1 behavior)",
     )
 
     # ------------------------------------------------------------------ #

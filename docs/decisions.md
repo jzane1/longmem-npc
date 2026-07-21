@@ -1465,3 +1465,48 @@ session. Source papers per change are traced in `Research Papers\CHANGES-FROM-RE
 **Paper provenance (Target A):** RaMem (arXiv 2606.22844) — the mechanism; Position: Episodic
 Memory (2502.06975) — context as a defining episodic property; TARG (2511.09803 §3.4) — the
 budget-calibration recipe. Full trace: `Research Papers\CHANGES-FROM-RESEARCH.md`.
+
+## Hybrid lexical channel build rulings — 2026-07-20
+
+**Context.** Target B of the research-adoption slate (scope ruled in the slate entry above).
+Built & floor-verified the same session as Target A. Mechanism sources: the lexical/semantic
+complementarity finding (Memory in the LLM Era survey, arXiv 2604.01707 §7) and Engram's
+dense+lexical fusion evidence (arXiv 2606.09900); trace in
+`Research Papers\CHANGES-FROM-RESEARCH.md`.
+
+**Build shapes (approved with the plan; one design correction surfaced at build):**
+
+1. **Token-OR tsquery, not websearch/plainto AND semantics — the build-surfaced correction.**
+   The plan sketched `websearch_to_tsquery`; at build it surfaced that websearch/plainto AND
+   semantics would make the channel inert (a real utterance never full-AND-matches a stored
+   memory). Shape built: `lexical_tsquery` — casefolded word tokens of ≥ 3 letters (letter-runs
+   only: to_tsquery syntax injection-safe by construction), deduped in order, capped 16,
+   OR-joined; ts_rank + memory_id orders the deterministic LIMIT cut; the read-path scoring
+   formula does the real ranking after the union. The 3-letter minimum and 16-token cap are
+   module constants — flagged by the floor-verifier as future knob candidates if an integrator
+   ever needs them tunable.
+2. **Migration 004 = index-only.** A partial GIN over live fact heads,
+   `to_tsvector('simple', basis_text) WHERE invalid_at IS NULL` (the 002/003 partial-index
+   precedent). No table/column changes, no data DML.
+3. **The string knob follows the decay_classes precedent.** `text_search_config` is a plain
+   agents.config key with `TEXT_SEARCH_CONFIG_DEFAULT = "simple"` in `app\config.py` (the
+   float-only SERVICE_DEFAULTS/agent_knob contract doesn't fit a string). 'simple' is baked
+   into the index expression (an expression index binds one config); the default-config SQL
+   branch bakes the same literal so the planner matches the partial GIN; an override
+   parameterizes `::regconfig` and runs the same predicate unindexed — correct, slower, stated
+   in the migration header.
+4. **Union is additive-only, scoring untouched.** Lexical candidates union into the vector
+   over-fetch before scoring, dedup by memory_id (vector row kept); lexical hits carry their
+   TRUE cosine distance (the all-named-params wire convention). `lexical_fetch_k` (default 8.0;
+   **0.0 = the kill-switch**, pure-vector v1 — the gate_enabled shape).
+5. **NULL-embedding fact heads are lexically reachable, relevance null — designed.** The fetch
+   deliberately omits the `embedding IS NOT NULL` filter: exact-token recall softens the
+   embed-degradation consequence (never a filter). This sharpened read-path walker criterion
+   [9]: the vector-path exclusion is now asserted ON THE PROBE itself, and the healthy-path
+   lexical reach of a degraded row is asserted honestly (relevance null).
+6. **Loader-scope v1.** The gate's fire probe and the degradation ladder's entity-only rung are
+   noted future consumers of the channel, deliberately not built (scope discipline). Degraded
+   loader turns skip it (the fallback already fetches every live row).
+7. **The mechanical ledger-pin update:** `verify_gate.py`'s exact-ledger assertion grew
+   001+002+003 → +004 (the per-migration precedent); nothing else in that walker changed.
+   Read-path walker 42 → 48 (criterion [13] + the sharpened [9]); suite 40 → 41.

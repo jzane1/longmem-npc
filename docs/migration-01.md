@@ -169,7 +169,9 @@ The entity/topic index: gist matching + entity-gate tripwire.
   table — the seam migration 02+ lands on; each migration's DDL and its ledger row commit in one
   transaction, so a half-applied migration can never be logged complete. Migration 002 — the
   fact-version chain — specced 2026-07-18, `fact-level-correction.md`; migration 003 — the
-  entities fact-chain column — specced & built 2026-07-19, `mid-dialogue-gate.md`.)*
+  entities fact-chain column — specced & built 2026-07-19, `mid-dialogue-gate.md`; migration
+  004 — the hybrid lexical channel's partial FTS GIN over live fact heads — built 2026-07-20
+  with the research-adoption slate, annotated in `read-path.md`.)*
 - Docker: `pgvector/pgvector` for Postgres 16; connection string from `.env`.
 
 ## Done when

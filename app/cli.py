@@ -112,6 +112,7 @@ def render_debug(result: DialogueTurnResult) -> str:
     lines.append("-- timing / tokens --")
     lines.append(
         f"  retrieval: embed={ret.embed_ms}ms sql={ret.sql_ms}ms "
+        f"lex={ret.lexical_candidate_count}/{ret.lexical_sql_ms}ms "
         f"score={ret.score_ms}ms total={ret.total_ms}ms "
         f"candidates={ret.candidate_count} k={ret.k_effective}"
         f"{'  [degraded: ' + str(ret.degraded_reason) + ']' if ret.degraded else ''}"

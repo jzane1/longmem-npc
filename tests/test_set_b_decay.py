@@ -247,3 +247,50 @@ def test_context_term_parity_and_exact_factor(scene):
         assert by_id(half)[stamped].content == p[stamped].content
 
     run_structural(scene, scenario)
+
+
+T_MILLER = "The miller counted his sacks at dawn."
+T_ZEPH = "Zephyrine bartered salt for iron."
+Q_LEX = "The miller counted his sacks at dawn, and Zephyrine watched."
+
+
+def test_lexical_channel_reach_and_kill_switch(scene):
+    """Hybrid lexical channel (built 2026-07-20, migration 004): a rare-name
+    row outside the k=1 vector probe's reach (overfetch pinned 1.0) is
+    served via the token-OR lexical union with the UNCHANGED scoring
+    formula; dedup is exact; lexical_fetch_k = 0 restores pure-vector v1
+    behavior (the kill-switch shape)."""
+
+    async def scenario(ctx):
+        lex_config = {**V1_CONFIG, "retrieval_overfetch_factor": 1.0}
+        agent = await ctx.make_agent("b-lexical", lex_config)
+        await ctx.seed(agent, T_MILLER, NOW - timedelta(days=14))
+        zeph = (
+            await ctx.seed(agent, T_ZEPH, NOW - timedelta(days=14), pinned=True)
+        ).memory_id
+        retrieval = ctx.retrieval()
+        r = await retrieval.retrieve_dialogue_init(
+            request(agent, query_text=Q_LEX, k=1)
+        )
+        assert r.items and r.items[0].memory_id == zeph
+        assert r.instrumentation.lexical_candidate_count == 2
+        assert r.instrumentation.candidate_count == 2  # dedup exact
+        top = r.items[0]
+        assert top.relevance is not None and top.recency == 1.0
+        assert top.score == top.relevance * top.recency * top.importance_norm
+
+        off = await ctx.make_agent(
+            "b-lexical-off", {**lex_config, "lexical_fetch_k": 0.0}
+        )
+        miller_off = (
+            await ctx.seed(off, T_MILLER, NOW - timedelta(days=14))
+        ).memory_id
+        await ctx.seed(off, T_ZEPH, NOW - timedelta(days=14), pinned=True)
+        r_off = await retrieval.retrieve_dialogue_init(
+            request(off, query_text=Q_LEX, k=1)
+        )
+        assert r_off.instrumentation.lexical_candidate_count == 0
+        assert r_off.instrumentation.candidate_count == 1
+        assert r_off.items[0].memory_id == miller_off
+
+    run_structural(scene, scenario)

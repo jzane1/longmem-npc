@@ -1,13 +1,16 @@
 # longmem-npc — Status
 
 **Last updated:** 2026-07-21
-**Phase (current session):** **research-adoption slate in progress** — the 45-paper research
-sweep (2026-07-20, `Research Papers\FINDINGS.md`, gitignored) produced a ruled two-target
-adoption slate: **Target A, the encoding-context read term + TARG gate-calibration utility, is
-built & floor-verified 2026-07-21** (see the new floors row; walker 36 → 42, suite 38 → 40, no
-migration, reconstruction/gate/decay byte-untouched); **Target B, the hybrid lexical retrieval
-channel (migration 004), is next in this session**, then the queue re-slate + the
-research-traceability doc.
+**Phase:** **the research-adoption slate is landed** — the 45-paper research sweep (2026-07-20,
+`Research Papers\FINDINGS.md`, gitignored) produced a ruled two-target adoption slate, and both
+targets are **built & floor-verified 2026-07-21**: **Target A, the encoding-context read term +
+TARG gate-calibration utility** (read walker 36 → 42, suite 38 → 40, no migration) and
+**Target B, the hybrid lexical retrieval channel** (**migration 004** — partial FTS GIN over
+live fact heads; token-OR candidate union, scoring formula untouched; read walker 42 → 48,
+suite 40 → 41; the gate walker's ledger pin grew +004, its sole change). **Eleven floors now
+stand verified.** The research queue items (eval harness w/ judged categories, graph memory,
+recall-reinforced decay, conflict/staleness detection) are slated below;
+`Research Papers\CHANGES-FROM-RESEARCH.md` traces every landed + queued change to its papers.
 **Prior phase:** **the suite is green and its gate hook is live** — structural pytest suite v1
 built & floor-verified 2026-07-20 (38 scenarios in `tests\test_*.py`: Sets A–D +
 degradation; `docs\test-suite.md` was already the spec, so the session went straight to a
@@ -68,6 +71,8 @@ and the structured behavior output survive the interview. Research publication c
 | Mid-dialogue gate v1 — **migration 003** (`db\migrations\003_fact_entities.sql`: `memory_fact_versions.entities` + guarded backfill + partial GIN on live fact heads + `memories_entities_gin` **dropped**, freeze ruled) + the gate stage (`app\gate.py` pure decision module: novelty + entity tripwire + damper, named signal constants; `app\retrieval.py` gated/loader branch — loader path v1-byte-parity, closed turns zero probe SQL, fires append `gate_fetch_k` new items via SQL-excluded probe or the GIN's entity-only rung) + the **entities freeze at observe** (`insert_observation` writes the fact head only) + the correction verb's NER + operator-field entities merge (`app\ingest.py`, `CorrectionNlpFailedError` → 502) + the fork-5 pre-serve callback (`app\reconstruction.py`, one defaulted param) + caller-held loaded-set/streak scene state (`app\session.py`) + the prompt recollection partition (`app\dialogue.py`) + `GateInstrumentation` wire deltas (`app\schemas.py`) + four knobs (`app\config.py`) + CLI gate line + load-driver `gate_check`/gate block | floor-verifier **pass** against all seven prior floors (write-path, retrieval, dialogue, session-runner, reconstruction, and both correction floors deliberately re-opened, re-verified): structural walker `tests\verify_gate.py` re-run independently (**51 assertions**, every done-when criterion incl. loader-parity, all ladder rungs, the blocking-callback beat, migration-003 legacy-row guard, and entities-follow-correction) on fresh scratch `longmem_test`; all seven prior walkers re-run clean, each on fresh scratch (40/40 write — 38 → 40 additive freeze pair; 36/36 read — **byte-untouched, the loader-parity proof**; 36/36 CLI harness — fixture pin + label edit only; 42/42 reconstruction — fixture pin only; 34/34 authorial — 33 → 34 additive; 34/34 fact — 32 → 34 additive); migration 003 applied to `longmem`, no-arg migrate → **"Up to date: 3 migration(s) applied, 0 pending"**; `longmem` pristine via the postgres MCP (ledger 001+002+003, all product tables 0 rows, new partial GIN present, old GIN absent); independent code spot-checks (loader path behavior-identical, callback-absent serve identical, one embed per turn, sole DELETE still cache eviction, no gate model role, reserved slots inert); plus the live piped REPL beat (loader → mid-scene novelty fetch → both-signal fire → `:correct` → **`(reconstructing…)` printed during the blocked turn**) and a standalone load-driver run with `gate_check` p50/p95 + the gate fire/efficacy block | 2026-07-19 |
 
 | Encoding-context read term v1 + gate-calibration utility — the research-adoption slate's Target A (ruled 2026-07-20 with the plan; RaMem arXiv 2606.22844 + TARG 2511.09803 — `Research Papers\CHANGES-FROM-RESEARCH.md` traces provenance): the formerly-reserved `DialogueInitRequest` context fields (`location_name`/`entities`/`event_time`) are **consumed** as client-supplied scene context — a soft multiplicative nudge `score ×= 1 + Σ w_i·match_i` (fact-head entity coverage, casefolded; `exp(−Δ/scale)` event-time kernel; casefold location match), **never a filter or penalty, ≥ 1 always**; a no-context request skips the term — **scoring byte-identical to v1** (the parity contract). Four knobs in `SERVICE_DEFAULTS` (per-agent overridable); applies on loader + gated (same context to loaded and fetched) + degraded paths; instrumentation-level surfacing (`context_active`/`context_components`) so the scored tuple and serving stage stay untouched. `CandidateRow`/`_CANDIDATE_COLUMNS` widened (+ `event_time`/`location_name`/`fact_entities`; degraded FROM gains a LEFT JOIN so legacy-shaped rows stay reachable); `DialogueTurnRequest` + session-runner scene context (scene-boundary reset) + REPL `:context`; `weight_overrides` **stays reserved**. A2: `--gate-budget` TARG-style calibration in the load driver — **report-only**, (1−rate)-quantile threshold recommendation off the run's novelty-distance CDF. **No migration** — schema frozen at 001+002+003. | floor-verifier **pass** against all eight prior floors (read-path floor deliberately re-opened — the one ruling-driven walker change): `tests\verify_read_path.py` re-run independently on fresh scratch (**42 assertions**, grown 36 → 42 — criterion [7] re-scoped from "reserved fields inert" to the context contract: no-context parity, exact ×1.75 / ×1.125 / ×1.0 factors casefolded both sides, factor-moves-score-only, never-echoed, weight_overrides-only still inert); the other six walkers **byte-identical to HEAD** and re-run green on fresh scratch (40/36/42/34/34/51); full suite **40 passed twice** (grown 38 → 40: Set B parity + exact factor, Set D gated-path factor with the gate decision proven untouched) + the keyless `-m "not nlp"` subset (33/33, API keys scrubbed in-process); `db\migrate.py` no-arg → "Up to date: 3 migration(s) applied, 0 pending"; `longmem` pristine via the postgres MCP (exact COUNT(*) on all ten product tables → 0; ledger exactly 001+002+003; no scratch residue); seven independent code spot-checks (context=None takes the v1 arithmetic path verbatim; `context_boost` pure, exactly 1.0 on no-match; same context to loaded+fetched; `gate.decide` inputs context-free; degraded LEFT JOIN proven with a live legacy-shaped row; `weight_overrides` consumer-free by grep; calibration writes nothing); plus a live piped REPL beat (stamped row score exactly ×1.75 under `:context entities=mara loc="the forge" time=<iso>`, bare row unchanged, `context: active (entities, event_time, location)` debug line, `:context clear`) and a standalone load-driver run with the `--gate-budget 0.3` calibration block | 2026-07-21 |
+
+| Hybrid lexical retrieval channel v1 — the research-adoption slate's Target B (ruled 2026-07-20; survey 2604.01707 §7 + Engram 2606.09900): **migration 004** (`db\migrations\004_lexical_index.sql`, index-only — partial FTS GIN `to_tsvector('simple', basis_text)` over live fact heads, the 002/003 partial-index precedent) + the token-OR lexical candidate fetch (`lexical_tsquery`: casefolded ≥3-letter letter-runs, deduped, capped 16, OR-joined — the build-surfaced correction over websearch/plainto AND semantics, which would have made the channel inert; ts_rank + memory_id deterministic LIMIT) **unioned into the loader's vector over-fetch before scoring** — dedup by memory_id, scoring formula untouched, lexical hits carry their TRUE cosine distance (all-named params), NULL-embedding fact heads lexically reachable with relevance null (never a filter — exact-token recall softens the embed-degradation consequence). `lexical_fetch_k` knob (8.0; **0.0 = kill-switch**, pure-vector v1); `text_search_config` string knob ('simple' default baked into the index expression, the decay_classes plain-key precedent; overrides run unindexed, stated). Loader-scope v1 — the gate fire probe + entity-only rung are noted future consumers. Instrumentation `lexical_sql_ms` + `lexical_candidate_count`; CLI debug `lex=` field. | floor-verifier **pass** against all nine prior floors (read-path floor re-opened, re-verified; the gate walker's sole change is the mechanical ledger pin +004): `tests\verify_read_path.py` re-run independently on fresh scratch (**48 assertions**, 42 → 48 — new criterion [13]: lexical-only reach proven through the SERVED payload on a k=1/overfetch-1.0 agent, raw-2/union-2 exact dedup, unchanged formula, tokenless zero-SQL, kill-switch restores v1; criterion [9] **sharpened**: vector-path exclusion asserted on the probe itself + the honest lexical reach of an embed-degraded row); all seven walkers green on fresh scratch (40/48/36/42/34/34/51); migration 004 applied 001→004 in order on fresh scratch with an idempotent second run; **applied to `longmem`** — no-arg migrate → "Up to date: 4 migration(s) applied, 0 pending", index present with the exact expression + predicate (pg_indexes.indexdef); `longmem` pristine via the postgres MCP (exact COUNT(*) 0 on all ten product tables, ledger exactly 001..004, no scratch residue); full suite **41 passed twice** (40 → 41: the Set B lexical reach + kill-switch scenario) + keyless subset 34/34; floor economy by git-diff (reconstruction/gate/decay/ingest/dialogue/session/conftest and five walkers byte-identical to HEAD); seven independent code spot-checks (004 index-only; injection-safe tokenizer; additive-only union; v1-byte-identical when disabled/tokenless/gated/degraded; default-branch expression textually matches the index; all-named params; `_score_rows` zero hunks in this diff); plus the live REPL beat (k=1/overfetch-1.0: the pinned rare-name row served via lexical reach, `lex=2/3.63ms candidates=2 k=1`) | 2026-07-21 |
 
 | Structural pytest suite v1 — `pytest.ini` (marker registration, `testpaths`, no cache residue) + `tests\conftest.py` (scratch **`longmem_suite`** session lifecycle: probe → create → migrate 001–003 → per-test TRUNCATE → drop; unreachable ⇒ loud skip, exit green; db-layer `InsertPlan` seeding with the pure fake embedding — the fast path never imports the NLP loaders; per-set configs with production-vs-fixture pins stated) + **38 scenarios** in five `test_*.py` files (Set A: authorial + fact chain incl. the db-layer distance-0 rank pair, CAS rollback, the pure constraint-follows-anchor test, and the marked route contract; Set B: decay-vs-invalidation incl. the two-time-travel-mechanics-agree and IDs-on-the-wire pairs; Set C: write-back chain shape, cache hit/frozen basis, band crossing, identity bump, correction eviction + re-anchor, drift refusal + refusal caching; Set D: loader parity, closed gate, novelty/tripwire/both fires, damper + reset, efficacy, runner append-only, marked entities-follow-correction; degradation: every ruled ladder row incl. the build-phase hard-stop, flagged as such in its docstring) + the Stop-hook subset edit (`-m "not nlp"`, ruled) + `pytest==9.1.1`/`httpx==0.28.1` pins | floor-verifier **pass** against all eight prior floors, standing by construction: `app\`, `db\`, and all seven walkers **byte-identical to HEAD** (the verifier's recorded git-diff proof — identical bytes need no re-run); full suite re-run twice independently (38/38, 38/38 — the determinism criterion), the subset re-run with API keys scrubbed (31/31 in ~14 s — the keyless + no-spaCy proof), the unreachable-skip beat (30 skipped + the one pure no-DB test, exit 0, loud warning), the hook contract both ways (green → exit 0; `stop_hook_active` guard short-circuits; red path + dormant guards read intact with the subset flag), a structural-only audit of all five files (no assertion touches model prose), no-arg migrate → "Up to date: 3 migration(s) applied, 0 pending", `longmem` pristine via the postgres MCP (ten product tables 0 rows, ledger 001+002+003, **no `longmem_suite` residue**), and pins == installed versions | 2026-07-20 |
 
@@ -621,6 +626,24 @@ and the structured behavior output survive the interview. Research publication c
   working postgres MCP tools; live REPL `:context` beat (exact ×1.75). No migration. A
   mid-session laptop crash cost nothing: the working tree survived and every check re-ran
   green post-crash.
+- **2026-07-21** — **Target B (hybrid lexical channel) built, floor-verified, and committed —
+  the research-adoption slate is landed.** Migration 004 (index-only: partial FTS GIN over
+  live fact heads) + a token-OR lexical candidate fetch unioned into the loader's vector
+  over-fetch before scoring — dedup exact, scoring formula untouched, lexical hits carrying
+  true cosine relevance, NULL-embedding rows lexically reachable with relevance null (the
+  embed-degradation consequence honestly softened; read walker criterion [9] sharpened to
+  assert the vector-path exclusion on the probe itself). **Build-surfaced correction:**
+  websearch/plainto AND semantics would have made the channel inert for utterances — the
+  token-OR shape (casefolded ≥3-letter runs, capped 16) was built instead, recorded in the
+  dated "Hybrid lexical channel build rulings" entry. `lexical_fetch_k` kill-switch (0.0 =
+  pure-vector v1); `text_search_config` string knob ('simple' baked into the index expression,
+  overrides run unindexed — stated). Read walker 42 → 48; gate walker's ledger pin +004 (its
+  sole change); suite 40 → 41 + keyless subset 34/34; 004 applied to `longmem` ("4 applied,
+  0 pending", idempotent); floor-verifier **pass**; live k=1/overfetch-1.0 REPL beat (the
+  pinned rare-name row served via lexical-only reach, `lex=2 candidates=2 k=1`). Session end:
+  the research queue items slated (immediate queue 3–6), and
+  `Research Papers\CHANGES-FROM-RESEARCH.md` written (gitignored) tracing every landed and
+  queued change to its source papers for the future README.
 
 ## Immediate queue
 
@@ -638,9 +661,51 @@ and the structured behavior output survive the interview. Research publication c
    fake-mode fixes cleared the infra noise so the real-mode numbers should read clean. The
    scratchpad harness + `latency_report.json` are the fake-mode baseline to diff against.
    **Sequencing (Jack, 2026-07-20): paused here — possible architecture changes from industry
-   reading land first, then the real-mode testing, each in its own session.**
+   reading land first, then the real-mode testing, each in its own session.** *(The
+   architecture-changes session ran 2026-07-20→21: the two-target research slate landed —
+   see the floors table. Real-mode testing remains next, and the real-mode profiling now also
+   covers the lexical channel's SQL line + the context term's score path.)*
 
-*(Done 2026-07-20: **Structural pytest suite v1** — 38 scenarios green, the Stop hook live
+*(Research-adoption queue — slated 2026-07-21 with the landed slate, each its own
+spec/build session; ordering after the Unity/pre-ship items is Jack's to re-slate. Papers per
+item are traced in `Research Papers\CHANGES-FROM-RESEARCH.md`.)*
+
+3. **Judged eval harness v1** (ruled: includes LLM-judged categories + a judge model role/env
+   var from v1; judged signal only meaningful in real mode — sequenced with that stated).
+   Starter categories: selective-forgetting single/multi-hop (MemoryAgentBench 2507.05257),
+   abstention/premise (LongMemEval 2410.10813, LME-V2 2605.12493), reconstruction FactScore
+   **retargeted** — gist-precision stays ~100%, detail-recall may decay (LoCoMo 2402.17753),
+   FAMA stale-leakage (2604.20006), MemTrace trajectory probe + reach-vs-use attribution
+   (2606.17328), and the judge-free keyword-retention check (2511.10277) which fits the
+   structural suite today. Harness shape: Insert/Query over the existing session-runner loop;
+   accuracy-vs-latency Pareto reporting.
+4. **Graph/associative memory** — spec session with the de-risked design notes: Postgres-native,
+   no graph DB (SPRIG 2602.23372 — app-side seeded PPR is sparse linear algebra);
+   concept-mediated edges against `identity_components`, NOT raw entities (GAAMA 2603.27910 —
+   entity graphs mega-hub, concept graphs stay ~30× sparser); bi-temporal edge supersession is
+   our extension (edges from live heads only; corrections re-derive); the lexical channel
+   (Target B) is the hybrid seeding base; graph term = a small additive nudge (GAAMA's 0.1
+   ablation). Cheapest first step: HippoRAG's node-specificity IDF on the entity tripwire.
+5. **Recall-reinforced decay** — spec session (ruled 2026-07-20: its own session). The "what
+   counts as recall" fork + a migration; must not conflate decay with invalidation (invariant)
+   nor break within-scene byte-identity. MemoryBank 2305.10250; survey 2512.13564 §5.2.3.
+6. **Automatic conflict/staleness detection** — spec session; the write-time counterpart of the
+   dissonance path. STALE 2605.06527 (CUPMEM-style adjudication riding `identity_components`);
+   Nous 2606.22030 (trust provenance-capped, never content-inferred — maps to
+   `typology`/`typology_source`); MemConflict 2605.20926 (taxonomy + near-floor SOTA = a
+   differentiator). Non-destructive: detection routes through supersession, never delete.
+7. Smaller queued notes: the reflection design dossier (ground reflective writes in cited
+   memory_ids + an RRR repetition detector — honest-lying 2605.29463; periodic
+   evidence-conditioned identity refresh — AI-YOU 2607.10539; persona-lensed retrieval routing
+   — self-reports; idle-time scheduling — sleep-time 2504.13171); richer `seed_identity`
+   authoring guidance (interview-depth beats a persona paragraph, self-reports study); the
+   Whisper soft-steering hook + safe-default action fallback for the Unity C# API surface item
+   (bounded-autonomy 2604.04703).
+
+*(Done 2026-07-21: **Encoding-context read term v1 + gate-calibration utility** and **Hybrid
+lexical retrieval channel v1 (migration 004)** — the research-adoption slate's two targets;
+see the verified-floors table and session log.
+Done 2026-07-20: **Structural pytest suite v1** — 38 scenarios green, the Stop hook live
 on the `-m "not nlp"` subset; see the verified-floors table and session log. Done 2026-07-19: **Mid-dialogue gate v1** — retrieval is conditional; migration 003
 applied; see the verified-floors table and session log. Done 2026-07-18: **Fact-level correction v1** — retrieval follows the fix; migration 002
 applied; see the verified-floors table and session log. Also done 2026-07-18:

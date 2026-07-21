@@ -192,6 +192,17 @@ its own integrator knob. A no-context request skips the factor — v1-byte-ident
 a filter, never a penalty; applies on loader, gated, and degraded paths. `weight_overrides` stays
 reserved; affect stays deliberately absent. `read-path.md` carries the annotated contract.)*
 
+*(**Hybrid lexical channel built 2026-07-20** — Target B of the same slate, **migration 004**:
+a token-OR full-text candidate fetch off a partial GIN over live fact heads
+(`to_tsvector('simple', basis_text)`), unioned into the vector over-fetch before scoring —
+dedup by memory_id, the scoring formula untouched, lexical hits carrying their true cosine
+relevance (NULL-embedding heads reachable with relevance null — exact-token recall softens the
+embed-degradation consequence). `lexical_fetch_k` knob, 0 = kill-switch; `text_search_config`
+string knob, `'simple'` default baked into the index expression, overrides run unindexed.
+Loader-scope v1 — the gate's fire probe and the ladder's entity-only rung are noted future
+consumers. This is the seeding base any future graph/PPR term builds on (SPRIG, GAAMA — the
+sequenced graph-memory queue item).)*
+
 **Mid-dialogue gate (non-LLM hybrid)** *(specced & **built** 2026-07-19,
 `mid-dialogue-gate.md` — five scope forks ruled; the loaded set is caller-held scene state per
 the ruled contract; migration 003 live)*:

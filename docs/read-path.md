@@ -32,6 +32,28 @@ it are in [decisions.md](decisions.md); the schema it reads is frozen in
 > query-embedded-as-is ruling stands; `weight_overrides` stays reserved. The term applies on
 > loader, gated, and degraded paths alike (it is lexical/structural, never a vector dependency,
 > never a filter, never a penalty).
+>
+> **Hybrid lexical channel BUILT 2026-07-20 (migration 004)** (Target B of the same ruled slate;
+> mechanism sources: the lexical/semantic complementarity line in the Memory-in-the-LLM-Era
+> survey arXiv 2604.01707 §7 and Engram arXiv 2606.09900 — see `Research Papers\FINDINGS.md`):
+> a **token-OR lexical candidate fetch** (`to_tsquery` over casefolded ≥3-letter word tokens,
+> deduped, capped 16 — OR deliberately, since an utterance never full-AND-matches a memory)
+> against a **partial GIN full-text index over live fact heads**
+> (`to_tsvector('simple', basis_text) WHERE invalid_at IS NULL`,
+> `db\migrations\004_lexical_index.sql`), ranked `ts_rank` + memory_id for a deterministic
+> LIMIT, **unioned into the vector over-fetch before scoring** (dedup by memory_id; the scoring
+> formula is untouched — lexical hits carry their TRUE cosine relevance, and a NULL-embedding
+> fact head is lexically reachable with relevance null: exact-token recall softens the
+> embed-degradation consequence, never a filter). Knob `lexical_fetch_k` (default 8; **0 = the
+> kill-switch**, pure-vector v1 behavior); string knob `text_search_config` (default `'simple'`,
+> the `decay_classes`-style plain agents.config key — an override runs the same predicate
+> unindexed, correct but slower, stated in the migration). Loader-scope v1: gated fire probes
+> and the ladder's entity-only rung are **noted future consumers, not built**. Instrumentation:
+> `lexical_sql_ms` + `lexical_candidate_count` (raw, pre-dedup); `sql_ms` stays the vector probe
+> alone. Walker criterion [13] asserts lexical-only reach through the served payload, exact
+> dedup, the unchanged formula, the tokenless no-op, and the kill-switch; criterion [9]'s
+> serving assertion was **sharpened** (the probe-level exclusion is now asserted on the probe
+> itself; the lexical reach of an embed-degraded row is asserted honestly).
 
 ## Principles this build honors
 

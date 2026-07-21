@@ -153,7 +153,27 @@ SERVICE_DEFAULTS: dict[str, float] = {
     "context_weight_location": 0.25,
     # Time-proximity kernel scale: match = exp(-|event_time - query|/scale).
     "context_time_scale_seconds": 86400.0,
+    # --- hybrid lexical channel (read-path.md; ruled 2026-07-20) ------------
+    # Lexical candidates unioned into the vector over-fetch before scoring
+    # (dedup by memory_id; the scoring formula is untouched — lexical-only
+    # hits carry their TRUE cosine relevance where the fact head has an
+    # embedding). 0.0 disables the channel (the gate_enabled kill-switch
+    # shape): pure-vector candidates, v1-byte-identical.
+    "lexical_fetch_k": 8.0,
 }
+
+# The lexical channel's text-search config: a string knob, so it follows the
+# decay_classes precedent (a plain agents.config key + a module default)
+# rather than the float-only SERVICE_DEFAULTS/agent_knob contract. The
+# migration-004 index expression bakes this default; an agent override still
+# works but runs unindexed (correct, slower — stated in the migration).
+TEXT_SEARCH_CONFIG_DEFAULT = "simple"
+
+
+def text_search_config(agent_config: dict) -> str:
+    """Per-agent text_search_config override, else the service default."""
+    value = agent_config.get("text_search_config")
+    return str(value) if value else TEXT_SEARCH_CONFIG_DEFAULT
 
 
 def load_env(path: Path = ENV_PATH) -> dict[str, str]:

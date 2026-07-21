@@ -364,6 +364,59 @@ async def fetch_vector_candidates(
     return [CandidateRow(*row) for row in rows]
 
 
+async def fetch_lexical_candidates(
+    pool: AsyncConnectionPool,
+    agent_id: UUID,
+    tsquery: str,
+    embedding: list[float],
+    limit: int,
+    ts_config: str,
+) -> list[CandidateRow]:
+    """The hybrid lexical channel (read-path Target B, 2026-07-20): live rows
+    whose live fact head's basis_text full-text-matches the prepared token-OR
+    tsquery (built by retrieval.lexical_tsquery — word tokens only, so the
+    to_tsquery syntax is injection-safe by construction), ranked ts_rank DESC
+    with a memory_id tiebreak for a deterministic LIMIT cut. Returns the same
+    CandidateRow shape as the vector probe — including the TRUE cosine
+    distance (the fact head has an embedding wherever the vector probe could
+    have seen it; a NULL-embedding hit carries distance NULL, the honest
+    degraded-item shape) — so lexical hits flow through the shared scoring
+    loop unchanged. With the service-default config the expression matches
+    migration 004's partial GIN; an agent-overridden config runs the same
+    predicate unindexed (correct, slower — stated behavior). All-named params
+    (the vector-probe convention)."""
+    from app.config import TEXT_SEARCH_CONFIG_DEFAULT
+
+    vec = _vector(embedding)
+    if ts_config == TEXT_SEARCH_CONFIG_DEFAULT:
+        # Literal-baked config: textually identical to the 004 index
+        # expression, so the planner matches the partial GIN.
+        tsv = "to_tsvector('simple', fv.basis_text)"
+        tsq = "to_tsquery('simple', %(tsq)s)"
+        params: dict = {}
+    else:
+        tsv = "to_tsvector(%(cfg)s::regconfig, fv.basis_text)"
+        tsq = "to_tsquery(%(cfg)s::regconfig, %(tsq)s)"
+        params = {"cfg": ts_config}
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            f"SELECT {_CANDIDATE_COLUMNS}, fv.entities, "
+            f"fv.embedding <=> %(qv)s AS distance "
+            f"{_VECTOR_CANDIDATE_FROM} AND {tsv} @@ {tsq} "
+            f"ORDER BY ts_rank({tsv}, {tsq}) DESC, m.memory_id "
+            "LIMIT %(lim)s",
+            {
+                **params,
+                "tsq": tsquery,
+                "qv": vec,
+                "agent_id": agent_id,
+                "lim": limit,
+            },
+        )
+        rows = await cur.fetchall()
+    return [CandidateRow(*row) for row in rows]
+
+
 async def fetch_live_candidates(
     pool: AsyncConnectionPool, agent_id: UUID
 ) -> list[CandidateRow]:

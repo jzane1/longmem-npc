@@ -559,8 +559,17 @@ async def main(database_uri: str) -> None:
     )
     check(
         [row[0] for row in ledger]
-        == ["001_foundation.sql", "002_fact_versions.sql", "003_fact_entities.sql"],
-        "the ledger records 001 + 002 + 003",
+        == [
+            "001_foundation.sql",
+            "002_fact_versions.sql",
+            "003_fact_entities.sql",
+            # 004 joined the ledger at the hybrid-lexical build (Target B,
+            # 2026-07-20) — the mechanical ledger-pin update every migration
+            # makes to prior walkers (the 002/003 precedent). The gate
+            # mechanics this walker verifies are untouched by 004.
+            "004_lexical_index.sql",
+        ],
+        "the ledger records 001 + 002 + 003 + 004",
     )
     indexes = {
         row[0]
