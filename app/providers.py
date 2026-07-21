@@ -451,6 +451,33 @@ class DriftingReconstructionProvider:
 # Real implementations (constructed only in real mode; SDKs imported lazily)
 # ---------------------------------------------------------------------------
 
+
+def _first_text_block(response) -> str:
+    """The first text block's text, or "" (=> JSONDecodeError at the parse
+    site). Thinking-capable models (sonnet-5+) put a thinking block at
+    content[0], so indexing content[0].text crashes on them (found in the
+    2026-07-21 real-mode smoke; parse-side hardening ruled by Jack)."""
+    for block in response.content:
+        if getattr(block, "type", None) == "text":
+            return block.text
+    return ""
+
+
+def _lenient_json_text(text: str) -> str:
+    """The JSON-in-text contract read tolerantly: models sometimes wrap the
+    object in markdown code fences despite "No other text" (haiku-4.5 did so
+    3/3 on the escalation prompt in the 2026-07-21 diagnostic)."""
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        first_newline = stripped.find("\n")
+        if first_newline != -1:
+            stripped = stripped[first_newline + 1 :]
+        stripped = stripped.rstrip()
+        if stripped.endswith("```"):
+            stripped = stripped[:-3]
+    return stripped.strip()
+
+
 _WRITE_SYSTEM = (
     "You are the write-time memory scorer for a game NPC. Given an observation, "
     "return ONLY a JSON object with keys: rendered_content (a first-person prose "
@@ -511,7 +538,7 @@ class RealWriteProvider:
         input_tokens = response.usage.input_tokens
         output_tokens = response.usage.output_tokens
         try:
-            payload = json.loads(response.content[0].text)
+            payload = json.loads(_lenient_json_text(_first_text_block(response)))
             rendered = str(payload["rendered_content"])
             importance = float(payload["importance_raw"])
             typology = payload.get("typology") if declared_typology is None else None
@@ -590,7 +617,7 @@ class RealEscalationProvider:
         input_tokens = response.usage.input_tokens
         output_tokens = response.usage.output_tokens
         try:
-            payload = json.loads(response.content[0].text)
+            payload = json.loads(_lenient_json_text(_first_text_block(response)))
             by_canonical = {c["canonical"]: c for c in known_components}
             spans: list[GistSpanCandidate] = []
             for item in payload["spans"]:
@@ -677,7 +704,7 @@ class RealDialogueProvider:
         input_tokens = final.usage.input_tokens
         output_tokens = final.usage.output_tokens
         try:
-            payload = json.loads("".join(chunks))
+            payload = json.loads(_lenient_json_text("".join(chunks)))
             prose = payload["prose"]
             if not isinstance(prose, str) or not prose:
                 raise ValueError("prose missing, empty, or not a string")
@@ -769,7 +796,7 @@ class RealReconstructionProvider:
         input_tokens = response.usage.input_tokens
         output_tokens = response.usage.output_tokens
         try:
-            payload = json.loads(response.content[0].text)
+            payload = json.loads(_lenient_json_text(_first_text_block(response)))
             if not isinstance(payload, dict):
                 raise ValueError("batched output is not a JSON object")
         except (ValueError, TypeError, json.JSONDecodeError, IndexError) as exc:
