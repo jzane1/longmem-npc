@@ -1510,3 +1510,38 @@ dense+lexical fusion evidence (arXiv 2606.09900); trace in
 7. **The mechanical ledger-pin update:** `verify_gate.py`'s exact-ledger assertion grew
    001+002+003 → +004 (the per-migration precedent); nothing else in that walker changed.
    Read-path walker 42 → 48 (criterion [13] + the sharpened [9]); suite 40 → 41.
+
+## Real-mode parse hardening ruling — 2026-07-21
+
+**Context.** The real-mode testing session (pre-ship gates b + c — the first session ever to
+construct the real providers) broke on its first live smoke, in two independent ways, both
+parse-side; the models' actual output was valid in every captured sample:
+
+1. **sonnet-5 emits a leading `thinking` content block** (thinking-on-by-default model
+   family), so `response.content[0].text` — the shape every real provider had used since the
+   write-path build (2026-07-13, pre-dating that model behavior) — raised `AttributeError`
+   on `RealReconstructionProvider`, an exception NOT in its catch tuple: the whole dialogue
+   turn crashed rather than degrading. Diagnostic: content[0] = thinking block, content[1] =
+   flawless JSON.
+2. **haiku-4.5 wraps its escalation JSON in markdown code fences** despite the prompt's
+   "No other text" (3/3 samples in the raw-response diagnostic; the write prompt on the same
+   model returned bare JSON). Both parse attempts fail identically, so the seam's
+   retry-once-then-hard-stop made EVERY escalating observe hard-stop in real mode.
+
+**Ruled (Jack, via explicit question): parse-side hardening only.** Two helpers in
+`app\providers.py` — `_first_text_block()` (first text-type block, "" when none => the
+existing JSONDecodeError path) and `_lenient_json_text()` (strip markdown fences before
+`json.loads`) — applied at the four JSON-in-text parse sites (write, escalation,
+reconstruction, dialogue-accumulated-stream). Prompts, fakes, and every seam byte-untouched.
+Alternatives presented and not adopted: prompt-only fence fix (relies on per-call model
+obedience; one fenced reply is another hard-stopped write) and a model swap off sonnet-5
+(leaves the escalation defect and the latent thinking-block fragility). Commit `1388bf6`;
+re-verified suite 41/41 + all seven walkers green (40/48/36/42/34/34/51) + the gate-b smoke
+end-to-end.
+
+**Carried observations (no ruling asked):** the hardcoded `max_tokens=1024` (2026-07-16
+observation) now also bounds sonnet-5's adaptive-thinking spend inside dialogue calls — no
+observed truncation (30/30 turns parsed; out-tokens p50 well under budget), but it is the
+first place to look if real-mode `MalformedOutputError` ever appears; a
+`thinking: {"type": "disabled"}` request-side knob is a possible future lever for the
+non-streaming reconstruction call (cost/latency, quality tradeoff — Jack's call if raised).

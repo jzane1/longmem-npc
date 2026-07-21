@@ -1,36 +1,30 @@
 # longmem-npc — Status
 
 **Last updated:** 2026-07-21
-**Phase:** **the research-adoption slate is landed** — the 45-paper research sweep (2026-07-20,
-`Research Papers\FINDINGS.md`, gitignored) produced a ruled two-target adoption slate, and both
-targets are **built & floor-verified 2026-07-21**: **Target A, the encoding-context read term +
-TARG gate-calibration utility** (read walker 36 → 42, suite 38 → 40, no migration) and
-**Target B, the hybrid lexical retrieval channel** (**migration 004** — partial FTS GIN over
-live fact heads; token-OR candidate union, scoring formula untouched; read walker 42 → 48,
-suite 40 → 41; the gate walker's ledger pin grew +004, its sole change). **Eleven floors now
-stand verified.** The research queue items (eval harness w/ judged categories, graph memory,
-recall-reinforced decay, conflict/staleness detection) are slated below;
-`Research Papers\CHANGES-FROM-RESEARCH.md` traces every landed + queued change to its papers.
-**Prior phase:** **the suite is green and its gate hook is live** — structural pytest suite v1
-built & floor-verified 2026-07-20 (38 scenarios in `tests\test_*.py`: Sets A–D +
-degradation; `docs\test-suite.md` was already the spec, so the session went straight to a
-scoped build). **The suite-gate Stop hook is active for the first time since it was
-written (2026-07-12):** every turn-end now runs the `-m "not nlp"` subset (31 scenarios,
-~14 s — ruled 2026-07-20; the 7 `nlp`-marked scenarios call the write pass at the service
-level, pay the lazy spaCy+fastcoref load, and run on demand + at floor verification),
-Postgres unreachable ⇒ loud clean skip with a green exit, and the suite is CI-ready
-(offline, keyless, self-managed scratch `longmem_suite`) with the CI workflow sequenced
-later. `app\`, `db\`, and all seven walkers are byte-untouched — the eight prior floors
-stand by construction; **nine floors now stand verified** (see the table). Jack ruled
-three build shapes via explicit questions (hook subset; skip-clean on unreachable;
-CI-ready-now, workflow later). **A fake-mode latency pass then landed two measured
-performance fixes (2026-07-20, same day): reads ~54 ms → ~5–10 ms (named vector param
-kills a 44 ms psycopg wire stall) and writes ~215 ms → ~63 ms (taming fastcoref's
-per-observe dataset fingerprint), plus a suite-concurrency fix (per-`pid` scratch DB) —
-re-verified 38/38 + all seven walkers green.** **One open decision owed before the demo
-ships:** the escalation hard-stop failure path re-rule (build-phase stance, 2026-07-13) —
-the suite asserts the current stance and flags itself in that test's docstring.
-Next: **Unity project + reference scene** (immediate-queue item 1 after the renumber).
+**Phase:** **real mode is proven — pre-ship gates (b) and (c) are closed** (2026-07-21, the
+first-ever real-provider session, run with live ANTHROPIC + OPENAI keys). The smoke's
+live observe/reconstruction/dialogue receipts are on record, and the real-mode profiling is
+diffed against the 2026-07-20 fake baseline: **every infra series flat** (sql, nlp, insert,
+gate, correction txn, degraded scan, connection floor — the fake-mode fixes held), with the
+true picture LLM-dominated as predicted — observe p50 3.4 s (haiku 1.7 s + escalation 1.4 s
+when it fires), dialogue turn p50 4.1 s (first-token 2.2 s), loader read ~180 ms (real query
+embed ~175 ms), cold 8-item reconstruction 16.3 s, cache-hit reread 3.7 ms call-free,
+**$0.44/100 priced turns** (standard rates). **A build-surfaced defect was ruled, fixed, and
+floor-verified same-session** (commit `1388bf6`, `app\providers.py` parse hardening —
+sonnet-5's leading thinking block crashed reconstruction and haiku's markdown-fenced JSON
+hard-stopped every escalating observe; suite 41/41 ×2, all seven walkers green,
+floor-verifier **pass**). **Report-only calibration findings now await rulings:** escalation
+fires **79% on realistic prose** (0% on synthetic driver prose — prose-dependent; feeds the
+owed failure-path re-rule, now with real data and 0 hard-stops in 80 observes); the gate
+novelty CDF separates cleanly under real embeddings (0.3 fire-budget ⇒ threshold ~0.59 on
+realistic prose); the 0.35 drift budget is well-placed (max observed accepted drift 0.244);
+the lexical channel's ts_rank cost is a linear-in-matches watch-item (the 004 GIN is proven
+by EXPLAIN). **Prior phase:** the research-adoption slate landed 2026-07-21 (Target A
+encoding-context term + Target B hybrid lexical channel, migration 004);
+`Research Papers\CHANGES-FROM-RESEARCH.md` traces provenance. **Eleven floors stand
+verified.** **One open decision owed before the demo ships:** the escalation failure-path
+re-rule — now widened by the data to cover the trigger set/threshold too.
+Next: **Unity project + reference scene** (immediate-queue item 1).
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -644,6 +638,55 @@ and the structured behavior output survive the interview. Research publication c
   the research queue items slated (immediate queue 3–6), and
   `Research Papers\CHANGES-FROM-RESEARCH.md` written (gitignored) tracing every landed and
   queued change to its source papers for the future README.
+- **2026-07-21** — **Real-mode testing session: pre-ship gates (b) and (c) closed — real mode
+  proven end-to-end, after a build-surfaced parse fix (the first session ever to construct
+  the real providers).** Env preflight: real mode requires all six model vars —
+  `LONGMEM_MODEL_RECONSTRUCTION` was missing from `.env`; Jack ruled it **`claude-sonnet-5`**
+  (env-injected this session; the `.env` line is his to add) and ruled the run **priced at
+  standard rates** (the nine `LONGMEM_PRICE_*` per-Mtok: sonnet-5 3.00/15.00,
+  haiku-4.5 1.00/5.00, embedding 0.02 — intro pricing declined so the cost table stays honest
+  after 2026-08-31). **The first smoke FAILED and surfaced a real defect:** sonnet-5 emits a
+  leading thinking block, so `content[0].text` crashed reconstruction with an uncaught
+  AttributeError; haiku-4.5 wrapped its escalation JSON in markdown fences 3/3 despite
+  "No other text" — every escalating observe hard-stopped. **Jack ruled parse-side
+  hardening** (dated "Real-mode parse hardening ruling" entry in `decisions.md`; commit
+  `1388bf6`): `_first_text_block` + `_lenient_json_text` at the four JSON-in-text parse
+  sites in `app\providers.py`; fakes/prompts/seams untouched; re-verified suite 41/41 ×2 +
+  all seven walkers green (40/48/36/42/34/34/51) + floor-verifier **pass** (diff exactly the
+  two helpers + four sites; helper edge cases proven in-process; `longmem` pristine, zero
+  scratch residue). **Gate (b) receipts** (piped REPL on scratch `longmem_smoke`, production
+  knobs, no pins): live observe `[escalated]` with real render + tokens; one batched
+  sonnet-5 reconstruction — 6 misses → **5 write-backs + 1 honest drift refusal**
+  (in 856/out 853 tok, drift-embed 441); streaming dialogue first_token 2.9 s with a
+  `recall` directive carrying memory IDs and the model delta applied 0.0 → 0.02; call-free
+  cache-hit reread (recon 3.4 ms, turn 4.3 s vs 17.6 s cold); gate evaluated + closed with
+  **zero probe SQL** (min_dist 0.408); `lex=` + `context: active` debug lines live.
+  **Gate (c)** (staged scratchpad probe on `longmem_real`, diffed vs the surviving fake
+  baseline; artifacts scratchpad-only/gitignored: `latency_report_real.json`,
+  `diff_summary.txt`, `driver_report_real.json`, `explain_real.txt`): every infra series
+  FLAT; the real numbers are the phase-header headline set. **Escalation re-measured:
+  63/80 = 79% on realistic prose** (real haiku importance p50 0.61 vs the 0.45 threshold;
+  triggers: importance 43, unresolved_reference 31, novel_entity 11, low_confidence 9,
+  identity_affect 6; ~1.4 s + ~$0.0021 per fire ⇒ ~+$0.17/100 observes) **vs 0/26 on the
+  driver's synthetic prose** — the rate is prose-distribution-dependent; 0 hard-stops in 80
+  observes post-fix (feeds open question (a)). **Gate under real embeddings:** all four
+  fixture scenarios reproduce exactly (closed 0/20 echo dist 0.0; novelty 20/20 at 0.64;
+  tripwire 20/20; both 20/20); novelty CDF class p50s echo 0.00 / paraphrase 0.15 /
+  related 0.50 / unrelated 0.70 — the current 0.5 threshold ≈ a 40% fire budget;
+  recommendations (report-only): budget 0.2 → 0.65, 0.3 → 0.59, 0.4 → 0.50 on realistic
+  prose vs the driver's 0.3 → 0.33 on its generator prose — calibration must run on real
+  game prose. **Drift budget well-placed:** 16 live retellings re-embedded vs original
+  anchors: p50 0.157 / p95 0.239 / max 0.244 — all under 0.35; observed refusals (1 smoke +
+  1 probe) are the tail working. **Lexical channel:** EXPLAIN proves the 004 partial GIN is
+  chosen (Bitmap Index Scan); the cost is ts_rank over the match set — the ≥3-letter
+  tokenizer admits "the"/"did" and 'simple' keeps stopwords, so common words match ~every
+  row: ~77 ms p50 at 5 k rows (3 ms on the 7-row smoke), linear in matches — watch-item
+  with report-only options (tokenizer stoplist / min length 4); kill-switch verified =
+  byte-shape v1. **Context term: ~0.03 ms** (score p50 0.08 → 0.11, active 50/50).
+  **Stock driver (6×10 turns, priced): $0.44/100 turns** (dialogue $0.41 of it), turn p50
+  2.9 s, gate 15 fires/100 with novelty efficacy 0.857, 2 fruitless, 3 damper-active turns.
+  Spend for the whole session: order $2 (~205 haiku-class + ~110 sonnet-class calls,
+  ~1 200 embeds). `longmem` pristine via the postgres MCP; zero scratch residue.
 
 ## Immediate queue
 
@@ -652,19 +695,17 @@ and the structured behavior output survive the interview. Research publication c
    gate-recollect beat (all live in the REPL: `:as-of` jumps + scene boundaries + band
    crossings; `:correct` — which now moves retrieval AND entities; the gate debug line +
    `(reconstructing…)`).
-2. Before the demo ships (pre-ship gates): (a) re-rule the escalation failure path (see open
-   questions; the suite's hard-stop test tracks the current stance); (b) a real-provider smoke
-   moment (one live observe + one live dialogue turn + one live reconstruction with keys); and
-   (c) **re-run the latency/compute profiling in REAL mode.** The 2026-07-20 pass was
-   fake-mode only (model calls ~0), so the true end-to-end picture — LLM round-trips
-   dominating, plus the flagged ~60% escalation-call rate — is still UNMEASURED; the two
-   fake-mode fixes cleared the infra noise so the real-mode numbers should read clean. The
-   scratchpad harness + `latency_report.json` are the fake-mode baseline to diff against.
-   **Sequencing (Jack, 2026-07-20): paused here — possible architecture changes from industry
-   reading land first, then the real-mode testing, each in its own session.** *(The
-   architecture-changes session ran 2026-07-20→21: the two-target research slate landed —
-   see the floors table. Real-mode testing remains next, and the real-mode profiling now also
-   covers the lexical channel's SQL line + the context term's score path.)*
+2. Before the demo ships (pre-ship gate): **(a) re-rule the escalation failure path — now the
+   sole remaining gate, and widened by real data (2026-07-21).** The hard-stop path never
+   fired in 80 real observes post-fix, but escalation FIRES on **79% of realistic prose**
+   (real haiku importance p50 0.61 vs the 0.45 threshold; +1.4 s and ~$0.0021 per fire) vs 0%
+   on synthetic driver prose — the re-rule should cover the trigger set / thresholds, not
+   just the failure behavior. The suite's hard-stop test tracks the current stance.
+   *(Done 2026-07-21: **(b) the real-provider smoke** — live observe + dialogue +
+   reconstruction receipts in one REPL transcript — and **(c) the real-mode profiling
+   re-run** incl. the lexical SQL line + context score path; every infra series flat vs the
+   fake baseline. Headline numbers in the 2026-07-21 session-log entry; artifacts are
+   scratchpad-only.)*
 
 *(Research-adoption queue — slated 2026-07-21 with the landed slate, each its own
 spec/build session; ordering after the Unity/pre-ship items is Jack's to re-slate. Papers per
