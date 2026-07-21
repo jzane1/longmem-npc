@@ -23,3 +23,6 @@ UserSettings/
 
 # Claude Code personal overrides
 CLAUDE.local.md
+
+#Ignoring research folder, since it's a big upload. (I'm Jack making this change. Please just keep it here.)
+Research Papers/
