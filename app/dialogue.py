@@ -241,6 +241,11 @@ class DialogueService:
                 query_text=request.utterance,
                 k=request.k,
                 as_of=request.as_of,
+                # Scene context (encoding-context build 2026-07-20): passed
+                # through unreinterpreted, the k/as_of precedent.
+                location_name=request.location_name,
+                entities=request.entities,
+                event_time=request.event_time,
                 identity_version=request.identity_version,
                 scene_started_at=request.scene_started_at,
                 loaded_memory_ids=request.loaded_memory_ids,

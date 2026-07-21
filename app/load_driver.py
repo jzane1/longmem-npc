@@ -136,11 +136,16 @@ async def run_driver(
     script: list[list[dict]] | None = None,
     seed: int = 0,
     agent_id: UUID | None = None,
+    gate_budget: float | None = None,
 ) -> dict:
     """Drive the script through the seams; return the §11 aggregates.
 
     Separable from main() so the structural walker can run it in-process on
-    an injected scratch Settings.
+    an injected scratch Settings. `gate_budget` (encoding-context build,
+    2026-07-20 — the TARG calibration recipe, arXiv 2511.09803 §3.4) adds a
+    report-only gate_calibration block: the gate_novelty_threshold value
+    that would fire on ~that fraction of evaluated turns, read off the run's
+    empirical novelty-distance CDF. It never sets the knob.
     """
     script = script if script is not None else generate_script(sessions, turns, seed)
     pool = build_pool(settings.database_uri)
@@ -179,9 +184,54 @@ async def run_driver(
             await runner.close()  # pool is driver-owned; close is a no-op
     finally:
         await pool.close()
-    report = _aggregate(settings, agent_id, turn_results, ingest_results)
+    report = _aggregate(
+        settings, agent_id, turn_results, ingest_results, gate_budget=gate_budget
+    )
     report["sessions"] = len(script)
     return report
+
+
+def gate_budget_calibration(
+    gates: list, budget: float, default_threshold: float
+) -> dict:
+    """TARG-style budget calibration (arXiv 2511.09803 §3.4), adapted from
+    their logit-uncertainty score to our non-LLM novelty distance: the
+    threshold tau at the (1 - budget) quantile of the per-turn novelty
+    min-distance CDF fires on ~budget of evaluated turns. Report-only.
+
+    Turns whose min_distance is None (empty loaded set / all-NULL embeddings
+    — trivially novel, they fire regardless of tau) are counted honestly but
+    sit outside the CDF; the projected rate covers calibratable turns only.
+    The default_threshold is the SERVICE default — a per-agent
+    agents.config override is not consulted here (stated, not silent)."""
+    distances = [
+        g.novelty_min_distance
+        for g in gates
+        if g.evaluated and g.novelty_min_distance is not None
+    ]
+    trivially_novel = sum(
+        1 for g in gates if g.evaluated and g.novelty_min_distance is None
+    )
+    if not distances:
+        return {
+            "target_fire_rate": budget,
+            "samples": 0,
+            "trivially_novel_turns": trivially_novel,
+            "recommended_threshold": None,
+            "projected_fire_rate": None,
+            "rate_at_service_default": None,
+        }
+    recommended = percentile(distances, 1.0 - budget)
+    projected = sum(1 for d in distances if d >= recommended) / len(distances)
+    at_default = sum(1 for d in distances if d >= default_threshold) / len(distances)
+    return {
+        "target_fire_rate": budget,
+        "samples": len(distances),
+        "trivially_novel_turns": trivially_novel,
+        "recommended_threshold": recommended,
+        "projected_fire_rate": round(projected, 3),
+        "rate_at_service_default": round(at_default, 3),
+    }
 
 
 def _aggregate(
@@ -189,6 +239,8 @@ def _aggregate(
     agent_id: UUID,
     turns: list[DialogueTurnResult],
     observes: list[IngestResult],
+    *,
+    gate_budget: float | None = None,
 ) -> dict:
     prices = settings.prices
     gates = [t.instrumentation.retrieval.gate for t in turns]
@@ -310,6 +362,13 @@ def _aggregate(
         "fruitless_fetches": sum(1 for g in gates if g.fruitless),
         "damper_activated_turns": sum(1 for g in gates if g.damper_active),
     }
+    report_gate_calibration = (
+        gate_budget_calibration(
+            gates, gate_budget, settings.defaults["gate_novelty_threshold"]
+        )
+        if gate_budget is not None
+        else None
+    )
     return {
         "agent_id": str(agent_id),
         "turns": len(turns),
@@ -317,6 +376,7 @@ def _aggregate(
         "latency_ms": latency,
         "per_100_turns": cost,
         "gate": gate_block,
+        "gate_calibration": report_gate_calibration,
         "degraded_turns": sum(1 for t in turns if t.instrumentation.degraded),
         "write_backs": sum(t.instrumentation.retrieval.write_backs for t in turns),
         "drift_refusals": sum(
@@ -350,6 +410,23 @@ def _print_report(report: dict) -> None:
         f"{g['fruitless_fetches']} fruitless, "
         f"{g['damper_activated_turns']} damper-active"
     )
+    cal = report.get("gate_calibration")
+    if cal is not None:
+        if cal["recommended_threshold"] is None:
+            print(
+                f"gate calibration: no calibratable samples "
+                f"({cal['trivially_novel_turns']} trivially-novel turns)"
+            )
+        else:
+            print(
+                f"gate calibration (target {cal['target_fire_rate']}): "
+                f"recommended gate_novelty_threshold="
+                f"{cal['recommended_threshold']} "
+                f"(projected rate {cal['projected_fire_rate']}, "
+                f"service default fires at {cal['rate_at_service_default']}; "
+                f"{cal['samples']} samples, "
+                f"{cal['trivially_novel_turns']} trivially novel) — report-only"
+            )
     print("\nlatency (ms)                p50        p95")
     for name, row in report["latency_ms"].items():
         print(f"  {name:<24} {row['p50']:>8}   {row['p95']:>8}")
@@ -376,7 +453,16 @@ def main() -> None:
     parser.add_argument("--agent", type=UUID, help="existing agent (else create one)")
     parser.add_argument("--database-uri", help="override .env DATABASE_URI")
     parser.add_argument("--json", type=Path, help="also write the report as JSON")
+    parser.add_argument(
+        "--gate-budget",
+        type=float,
+        help="target novelty fire-rate in (0,1): report the "
+        "gate_novelty_threshold the run's empirical CDF recommends "
+        "(TARG-style calibration; report-only, never sets the knob)",
+    )
     args = parser.parse_args()
+    if args.gate_budget is not None and not (0.0 < args.gate_budget < 1.0):
+        parser.error("--gate-budget must be strictly between 0 and 1")
 
     settings = load_settings()
     if args.database_uri:
@@ -393,6 +479,7 @@ def main() -> None:
             script=script,
             seed=args.seed,
             agent_id=args.agent,
+            gate_budget=args.gate_budget,
         ),
         loop_factory=asyncio.SelectorEventLoop,
     )

@@ -166,7 +166,7 @@ write-time facts from day one.
   stated per-field degradation when absent. Stored as typed columns per component (per-component
   read weights require it); location is embedded via the same 1536 model. **Entities are captured
   at write from day one:** the entities column + GIN index serve the gate now and the planned
-  encoding-context read boost later. *(Gate spec 2026-07-19, freeze ruling — the 002 embedding
+  encoding-context read boost later *(the read boost **landed 2026-07-20** — §6)*. *(Gate spec 2026-07-19, freeze ruling — the 002 embedding
   precedent applied: migration 003 gives entities a fact-chain home; observe writes the fact
   head only, `memories.entities` frozen, the GIN moves to live fact heads. **Built the same
   day — migration 003 live**; `mid-dialogue-gate.md`.)*
@@ -184,6 +184,13 @@ never move other items' scores); the decay math lives once, in `app\decay.py`, s
 the reconstruction theta check. *(Fact-level correction **built** 2026-07-18,
 `fact-level-correction.md`: the relevance probe reads the **live fact-version head's**
 embedding — scoring inputs otherwise unchanged; scores move only through relevance.)*
+*(**Encoding-context term built 2026-07-20** — ruled with the research-adoption slate
+(client-supplied fields; RaMem, arXiv 2606.22844): the request's `location_name`/`entities`/
+`event_time` now multiply a soft context factor into the score — entity coverage over the live
+fact head's entities + an event-time proximity kernel + casefold location match, each weighted by
+its own integrator knob. A no-context request skips the factor — v1-byte-identical scoring; never
+a filter, never a penalty; applies on loader, gated, and degraded paths. `weight_overrides` stays
+reserved; affect stays deliberately absent. `read-path.md` carries the annotated contract.)*
 
 **Mid-dialogue gate (non-LLM hybrid)** *(specced & **built** 2026-07-19,
 `mid-dialogue-gate.md` — five scope forks ruled; the loaded set is caller-held scene state per

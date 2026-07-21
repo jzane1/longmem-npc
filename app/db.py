@@ -283,7 +283,14 @@ async def insert_observation(
 class CandidateRow:
     """One live memory joined to its live detail head, as retrieval reads it.
     `write_cause` (added at the reconstruction build) feeds read-mode honesty:
-    a served head that is itself a reconstruction row reads as such."""
+    a served head that is itself a reconstruction row reads as such.
+    `event_time`/`location_name`/`fact_entities` (encoding-context build,
+    2026-07-20) feed the context term's match components; `fact_entities` is
+    the LIVE fact head's entities (migration 003 — entities follow
+    correction), NULL-able on the degraded path's legacy-shaped rows.
+    Field order is load-bearing: the fetchers construct positionally from
+    SELECT order (…write_cause, event_time, location_name, fact_entities
+    [, distance])."""
 
     memory_id: UUID
     detail_id: UUID
@@ -293,16 +300,24 @@ class CandidateRow:
     decay_class: str | None
     valid_at: datetime
     write_cause: str
+    event_time: datetime | None = None
+    location_name: str | None = None
+    fact_entities: list[str] | None = None
     distance: float | None = None  # cosine distance; None on the degraded path
 
 
 _CANDIDATE_COLUMNS = (
     "m.memory_id, d.detail_id, d.content, m.importance_raw, m.pinned, "
-    "m.decay_class, m.valid_at, d.write_cause"
+    "m.decay_class, m.valid_at, d.write_cause, m.event_time, m.location_name"
 )
 _CANDIDATE_FROM = (
     "FROM memories m JOIN memory_details d "
     "ON d.memory_id = m.memory_id AND d.invalid_at IS NULL "
+    # LEFT join (encoding-context build): fv.entities feeds the context term,
+    # but a legacy-shaped row without a live fact head STAYS reachable on this
+    # degraded path (the never-blank ruling outranks the join).
+    "LEFT JOIN memory_fact_versions fv "
+    "ON fv.memory_id = m.memory_id AND fv.invalid_at IS NULL "
     "WHERE m.agent_id = %s AND m.invalid_at IS NULL"
 )
 # The vector probe additionally joins the live FACT head — the embedding the
@@ -339,7 +354,8 @@ async def fetch_vector_candidates(
     vec = _vector(embedding)
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
-            f"SELECT {_CANDIDATE_COLUMNS}, fv.embedding <=> %(qv)s AS distance "
+            f"SELECT {_CANDIDATE_COLUMNS}, fv.entities, "
+            f"fv.embedding <=> %(qv)s AS distance "
             f"{_VECTOR_CANDIDATE_FROM} AND fv.embedding IS NOT NULL "
             "ORDER BY fv.embedding <=> %(qv)s LIMIT %(lim)s",
             {"qv": vec, "agent_id": agent_id, "lim": limit},
@@ -353,9 +369,14 @@ async def fetch_live_candidates(
 ) -> list[CandidateRow]:
     """Degraded-path candidates: every live memory, NULL embeddings included
     (ruled 2026-07-14: never-blank-a-dialogue). Unordered — the service ranks
-    by recency x importance_norm."""
+    by recency x importance_norm. fv.entities rides via the LEFT join (the
+    context term still applies on the degraded path — it is lexical, not
+    vector); rows without a live fact head carry NULL entities and stay."""
     async with pool.connection() as conn, conn.cursor() as cur:
-        await cur.execute(f"SELECT {_CANDIDATE_COLUMNS} {_CANDIDATE_FROM}", (agent_id,))
+        await cur.execute(
+            f"SELECT {_CANDIDATE_COLUMNS}, fv.entities {_CANDIDATE_FROM}",
+            (agent_id,),
+        )
         rows = await cur.fetchall()
     return [CandidateRow(*row) for row in rows]
 
@@ -384,16 +405,16 @@ async def fetch_loaded_set(
     out of the novelty basis)."""
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
-            f"SELECT {_CANDIDATE_COLUMNS}, fv.embedding, fv.entities "
+            f"SELECT {_CANDIDATE_COLUMNS}, fv.entities, fv.embedding "
             f"{_VECTOR_CANDIDATE_FROM} AND m.memory_id = ANY(%(ids)s)",
             {"agent_id": agent_id, "ids": memory_ids},
         )
         rows = await cur.fetchall()
     return [
         GateRow(
-            row=CandidateRow(*row[:8]),
-            embedding=row[8].to_list() if row[8] is not None else None,
-            entities=row[9],
+            row=CandidateRow(*row[:11]),
+            embedding=row[11].to_list() if row[11] is not None else None,
+            entities=row[10],
         )
         for row in rows
     ]
@@ -413,15 +434,16 @@ async def fetch_gate_candidates(
     vec = _vector(embedding)
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
-            f"SELECT {_CANDIDATE_COLUMNS}, fv.embedding <=> %(qv)s AS distance, "
-            f"fv.entities {_VECTOR_CANDIDATE_FROM} AND fv.embedding IS NOT NULL "
+            f"SELECT {_CANDIDATE_COLUMNS}, fv.entities, "
+            f"fv.embedding <=> %(qv)s AS distance "
+            f"{_VECTOR_CANDIDATE_FROM} AND fv.embedding IS NOT NULL "
             "AND NOT (m.memory_id = ANY(%(exclude)s)) "
             "ORDER BY fv.embedding <=> %(qv)s LIMIT %(lim)s",
             {"qv": vec, "agent_id": agent_id, "exclude": exclude_ids, "lim": limit},
         )
         rows = await cur.fetchall()
     return [
-        GateRow(row=CandidateRow(*row[:9]), embedding=None, entities=row[9])
+        GateRow(row=CandidateRow(*row), embedding=None, entities=row[10])
         for row in rows
     ]
 
@@ -448,7 +470,7 @@ async def fetch_entity_candidates(
         )
         rows = await cur.fetchall()
     return [
-        GateRow(row=CandidateRow(*row[:8]), embedding=None, entities=row[8])
+        GateRow(row=CandidateRow(*row), embedding=None, entities=row[10])
         for row in rows
     ]
 

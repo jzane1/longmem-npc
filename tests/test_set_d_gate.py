@@ -350,3 +350,48 @@ def test_entities_follow_correction(scene):
         assert [row[0] for row in live_before] == ["original"]
 
     run_structural(scene, scenario)
+
+
+def test_context_term_applies_on_gated_turns(scene):
+    """The encoding-context term (built 2026-07-20) rides the gated path
+    too: on a closed gate the loaded set's scores carry the same exact
+    factor, and the gate decision itself is untouched by context fields
+    (context nudges scores; it never opens or closes the gate)."""
+
+    async def scenario(ctx):
+        agent = await ctx.make_agent("d-context", GATE_CONFIG, COMPONENTS)
+        stamped = await ctx.seed(
+            agent,
+            T_CHAPEL,
+            NOW - timedelta(hours=3),
+            entities=["Mara"],
+            event_time=NOW,
+            location_name="The Chapel",
+        )
+        other = await ctx.seed(agent, T_BRIDGE, NOW - timedelta(hours=2))
+        ids = [stamped.memory_id, other.memory_id]
+        retrieval = ctx.retrieval()
+        no_ctx = await retrieval.retrieve_dialogue_init(
+            request(agent, T_CHAPEL, loaded=ids)
+        )
+        with_ctx = await retrieval.retrieve_dialogue_init(
+            DialogueInitRequest(
+                agent_id=agent,
+                query_text=T_CHAPEL,
+                as_of=NOW,
+                scene_started_at=NOW,
+                loaded_memory_ids=ids,
+                entities=["mara"],
+                event_time=NOW,
+                location_name="the chapel",
+            )
+        )
+        for result in (no_ctx, with_ctx):
+            g = result.instrumentation.gate
+            assert g.evaluated and not g.fired and g.signals_fired == []
+        assert with_ctx.instrumentation.context_active is True
+        p, c = by_id(no_ctx), by_id(with_ctx)
+        assert c[stamped.memory_id].score == p[stamped.memory_id].score * 1.75
+        assert c[other.memory_id].score == p[other.memory_id].score
+
+    run_structural(scene, scenario)

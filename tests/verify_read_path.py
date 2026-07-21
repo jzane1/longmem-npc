@@ -77,6 +77,10 @@ T_FIRE = "The forge fire went out during the storm."
 T_ROAD = "I overheard talk of bandits on the north road."
 T_TWIN = "The baron doubled the tax on iron."
 T_TUNNEL = "A merchant whispered about a hidden tunnel under the keep."
+# Encoding-context fixtures (2026-07-20 build): stamped vs bare, same age so
+# recency is identical and only the context factor separates them.
+T_CTX = "Mara reforged the ceremonial hinge before dusk."
+T_BARE = "A dull grey drizzle settled over the empty stalls."
 
 PASSED: list[str] = []
 
@@ -377,29 +381,100 @@ async def main(database_uri: str) -> None:
     )
 
     # ------------------------------------------------------------------ #
-    print("\n[7] Reserved fields inert, never echoed")
+    print(
+        "\n[7] Encoding-context term (consumed 2026-07-20; formerly the "
+        "reserved-fields criterion) + weight_overrides still reserved"
+    )
     plain = await retrieval.retrieve_dialogue_init(request(agent_a))
-    loaded = await retrieval.retrieve_dialogue_init(
+    check(
+        plain.instrumentation.context_active is False
+        and plain.instrumentation.context_components == [],
+        "no-context request: context_active False (the v1-parity contract — "
+        "criteria 1-6, 8-10 above assert unchanged scoring end to end)",
+    )
+    wo = await retrieval.retrieve_dialogue_init(
         request(
             agent_a,
-            location_name="the forge",
-            entities=["Mara", "John"],
-            event_time=NOW,
             weight_overrides=WeightOverrides(relevance=9.0, recency=0.1),
         )
     )
     check(
-        items_json(plain) == items_json(loaded),
-        "identical items and scores with and without reserved fields",
+        items_json(plain) == items_json(wo),
+        "weight_overrides stays reserved-inert: identical items and scores",
     )
-    payload = json.loads(loaded.model_dump_json())
+    # The context fixtures live on their OWN agent so every agent_a count
+    # elsewhere in this walker stands byte-identical.
+    agent_ctx = await make_agent(pool, "read-walker-npc-ctx", AGENT_CONFIG)
+    ctx_ids = {
+        "stamped": await seed(
+            ingest,
+            agent_ctx,
+            T_CTX,
+            NOW - timedelta(hours=4),
+            entities=["Mara"],
+            event_time=NOW,
+            location_name="The Forge",
+        ),
+        "bare": await seed(ingest, agent_ctx, T_BARE, NOW - timedelta(hours=4)),
+    }
+    plain_c = await retrieval.retrieve_dialogue_init(request(agent_ctx))
+    full_c = await retrieval.retrieve_dialogue_init(
+        request(
+            agent_ctx,
+            entities=["mara"],  # lowercase: proves the casefold contract
+            event_time=NOW,
+            location_name="the forge",
+        )
+    )
+    check(
+        full_c.instrumentation.context_active is True
+        and full_c.instrumentation.context_components
+        == ["entities", "event_time", "location"],
+        "context request: context_active with the supplied components",
+    )
+    p_items, c_items = items_by_id(plain_c), items_by_id(full_c)
+    check(
+        c_items[ctx_ids["stamped"]].score == p_items[ctx_ids["stamped"]].score * 1.75,
+        "stamped row's score is EXACTLY plain x 1.75 "
+        "(1 + 0.25 entity coverage + 0.25 e^0 time kernel + 0.25 location, "
+        "casefolded both sides)",
+    )
+    check(
+        c_items[ctx_ids["bare"]].score == p_items[ctx_ids["bare"]].score,
+        "bare row's score is exactly unchanged (factor 1.0 — the context "
+        "term never penalizes)",
+    )
+    check(
+        c_items[ctx_ids["stamped"]].relevance == p_items[ctx_ids["stamped"]].relevance
+        and c_items[ctx_ids["stamped"]].recency == p_items[ctx_ids["stamped"]].recency
+        and c_items[ctx_ids["stamped"]].importance_norm
+        == p_items[ctx_ids["stamped"]].importance_norm,
+        "the factor moves score only: relevance/recency/importance_norm "
+        "components are untouched",
+    )
+    half_c = await retrieval.retrieve_dialogue_init(
+        request(agent_ctx, entities=["mara", "zz-nobody-of-that-name"])
+    )
+    check(
+        items_by_id(half_c)[ctx_ids["stamped"]].score
+        == p_items[ctx_ids["stamped"]].score * 1.125
+        and half_c.instrumentation.context_components == ["entities"],
+        "entity coverage is fractional over the ASKED-FOR set: half overlap "
+        "-> exactly x (1 + 0.25/2), entities the sole active component",
+    )
+    payload = json.loads(full_c.model_dump_json())
     check(
         set(payload) == {"items", "instrumentation"}
-        and not any(
-            key in json.dumps(payload)
-            for key in ("location_name", "event_time", "weight_overrides")
-        ),
-        "no reserved field is echoed in the result",
+        and all(
+            not (
+                {"location_name", "event_time", "entities", "weight_overrides"}
+                & set(item)
+            )
+            for item in payload["items"]
+        )
+        and "weight_overrides" not in json.dumps(payload),
+        "context fields are consumed, never echoed: the result shape is "
+        "items + instrumentation, item payloads carry no request fields",
     )
 
     # ------------------------------------------------------------------ #

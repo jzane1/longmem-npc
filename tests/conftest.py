@@ -244,6 +244,8 @@ class Ctx:
         entities: list[str] | None = None,
         embedding=_UNSET,
         spans: tuple = (),
+        event_time: datetime | None = None,
+        location_name: str | None = None,
     ) -> db.InsertOutcome:
         """Db-layer seed through the real atomic insert — no write-pass call,
         so unmarked scenarios never trigger the NLP loaders. Values are
@@ -267,6 +269,8 @@ class Ctx:
             embedding=vec,
             entities=entities,
             spans=[db.SpanPlan(s, e, None, "person") for (s, e) in spans],
+            event_time=event_time,
+            location_name=location_name,
         )
         return await db.insert_observation(self.pool, plan)
 

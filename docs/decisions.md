@@ -1391,3 +1391,77 @@ acquisitions per turn, plus one write-back transaction per aged memory) — mino
 pits, a batching candidate. And a real-mode COST flag (not a latency pit): escalation fired on
 24/40 observes (60%) with realistic prose — each is an extra LLM call in real mode; eyeball the
 trigger thresholds before the real run.
+
+## Research-adoption slate + encoding-context build rulings — 2026-07-20
+
+**Context.** The research sweep (45 papers; consolidated in `Research Papers\FINDINGS.md`, a
+gitignored working folder) produced a prioritized shortlist. Jack ruled the adoption slate at
+plan approval, then the encoding-context term (Target A) was built and floor-verified the same
+session. Source papers per change are traced in `Research Papers\CHANGES-FROM-RESEARCH.md`.
+
+**Slate rulings (Jack, at plan approval — four explicit questions):**
+
+1. **Slate scope = two build targets now, rest queued.** Target A: the encoding-context read
+   term + a TARG-style gate-calibration utility. Target B: a hybrid lexical retrieval channel
+   (migration 004). Each lands and floor-verifies separately. Queued as their own future
+   sessions: the judged eval harness, graph/associative memory, recall-reinforced decay, and
+   automatic conflict/staleness detection (see the status.md queue). **Rejected:** one-target
+   minimal (leaves the cheap lexical win unbuilt); three-targets-incl-eval-harness (session
+   too large for the one-floor-per-session discipline).
+2. **Encoding-context source = client-supplied fields.** The reserved
+   `DialogueInitRequest.location_name/entities/event_time` are consumed AS SUPPLIED — the game
+   client knows the scene's place/cast/time. **Rejected:** RaMem-style LLM query decomposition
+   (a new model role + per-turn call, and it would supersede the 2026-07-14
+   query-embedded-as-is ruling, which stands).
+3. **Eval harness (queued) = v1 includes LLM-judged categories** (judge model role + env var)
+   alongside structural scenarios, with the honest constraint stated: judged signal is only
+   meaningful in real provider mode. **Rejected:** structural-first-judge-later (Jack wants the
+   judge surface designed in from v1).
+4. **Recall-reinforced decay = its own later spec session.** It needs a migration plus a real
+   ruling on what counts as "recall" (gate fetch? reconstruction serve? dialogue surface?) and
+   careful handling against invariant #2 (decay ≠ invalidation) and within-scene byte-identity.
+   **Rejected:** folding it into this slate.
+
+**Encoding-context build shapes (approved with the plan; the walker + suite assert them):**
+
+- **Soft multiplicative nudge:** `score ×= 1 + Σ w_i·match_i` over the components the request
+  supplies — entity coverage (|query ∩ live-fact-head entities| / |query|, casefolded both
+  sides; fact-head entities so the match follows correction, migration 003), event-time
+  proximity (`exp(−|Δ|/context_time_scale_seconds)`), casefold location equality. Factor ≥ 1
+  always: never a filter, never a penalty; NULL row fields contribute 0. Applies on loader,
+  gated (loaded + fetched, same context), and degraded paths (the term is lexical/structural,
+  not a vector dependency).
+- **The parity contract:** a request with no context fields skips the term entirely — zero
+  extra float ops, scoring byte-identical to v1 (the loader-parity precedent). Walker
+  criterion [7] asserts the exact factors (×1.75 full match at default knobs, ×1.125 half
+  entity coverage, ×1.0 bare row).
+- **Knobs:** `context_weight_entities` / `context_weight_event_time` /
+  `context_weight_location` (0.25 each) + `context_time_scale_seconds` (86400.0), all
+  SERVICE_DEFAULTS, per-agent overridable. Conservative defaults; a build-level choice, not a
+  ruling.
+- **Instrumentation-level surfacing** (`context_active` + `context_components`): the scored
+  tuple and the serving stage are deliberately untouched — `app\reconstruction.py` is
+  byte-identical to HEAD (the fact-level build's no-delta precedent). Per-item factor
+  visibility deferred until something needs it.
+- **CandidateRow widening:** `_CANDIDATE_COLUMNS` + `CandidateRow` grew
+  `event_time`/`location_name`/`fact_entities` (defaulted, before `distance`); every fetcher's
+  positional construction moved with it; the degraded path's FROM gained a **LEFT JOIN** to
+  live fact heads so a legacy-shaped row (no live fact head) stays reachable — the never-blank
+  ruling outranks the join.
+- **Caller surface:** `DialogueTurnRequest` gained the three passthrough fields (the k/as_of
+  precedent); the session runner holds scene context (fourth application of the
+  caller-holds-scene-state contract; scene boundary resets it); REPL `:context` meta-command
+  (shlex-split key=value: loc/entities/time; quoted values carry spaces).
+- **The one ruling-driven walker change:** read-path criterion [7] ("reserved fields inert")
+  asserted the superseded contract and was re-scoped to the context contract; walker 36 → 42.
+  `weight_overrides` stays reserved-inert, asserted as before. Suite 38 → 40 (Set B parity +
+  exact factor; Set D gated-path factor with the gate decision proven untouched — context
+  nudges scores, never opens or closes the gate).
+- **TARG calibration = report-only** (`--gate-budget <rate>`): recommends the
+  `gate_novelty_threshold` at the (1−rate) quantile of a run's novelty min-distance CDF;
+  trivially-novel turns counted separately; reads the service default only (stated in the
+  report); never writes a knob.
+
+**Paper provenance (Target A):** RaMem (arXiv 2606.22844) — the mechanism; Position: Episodic
+Memory (2502.06975) — context as a defining episodic property; TARG (2511.09803 §3.4) — the
+budget-calibration recipe. Full trace: `Research Papers\CHANGES-FROM-RESEARCH.md`.

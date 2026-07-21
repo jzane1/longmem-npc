@@ -190,3 +190,60 @@ def test_ids_and_scores_ride_the_wire(scene):
         assert body["items"] == second.json()["items"]
 
     run_structural(scene, scenario)
+
+
+T_CTX = "Mara reforged the ceremonial hinge before dusk."
+T_BARE = "A dull grey drizzle settled over the empty stalls."
+
+
+def test_context_term_parity_and_exact_factor(scene):
+    """Encoding-context term (built 2026-07-20): a no-context request stays
+    byte-identical to v1 scoring (the parity contract); supplied context
+    multiplies EXACTLY (1 + sum w_i * match_i) into score — never any other
+    component, never a penalty on an unstamped row, casefolded both sides."""
+
+    async def scenario(ctx):
+        agent = await ctx.make_agent("b-context", V1_CONFIG)
+        stamped = (
+            await ctx.seed(
+                agent,
+                T_CTX,
+                NOW - timedelta(hours=4),
+                entities=["Mara"],
+                event_time=NOW,
+                location_name="The Forge",
+            )
+        ).memory_id
+        bare = (await ctx.seed(agent, T_BARE, NOW - timedelta(hours=4))).memory_id
+        retrieval = ctx.retrieval()
+        plain = await retrieval.retrieve_dialogue_init(request(agent))
+        assert plain.instrumentation.context_active is False
+        assert plain.instrumentation.context_components == []
+        full = await retrieval.retrieve_dialogue_init(
+            request(
+                agent,
+                entities=["mara"],
+                event_time=NOW,
+                location_name="the forge",
+            )
+        )
+        assert full.instrumentation.context_active is True
+        assert full.instrumentation.context_components == [
+            "entities",
+            "event_time",
+            "location",
+        ]
+        p, c = by_id(plain), by_id(full)
+        assert c[stamped].score == p[stamped].score * 1.75
+        assert c[bare].score == p[bare].score
+        assert c[stamped].relevance == p[stamped].relevance
+        assert c[stamped].recency == p[stamped].recency
+        assert c[stamped].importance_norm == p[stamped].importance_norm
+        half = await retrieval.retrieve_dialogue_init(
+            request(agent, entities=["mara", "zz-unknown-name"])
+        )
+        assert by_id(half)[stamped].score == p[stamped].score * 1.125
+        assert by_id(half)[bare].score == p[bare].score
+        assert by_id(half)[stamped].content == p[stamped].content
+
+    run_structural(scene, scenario)

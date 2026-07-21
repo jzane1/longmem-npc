@@ -8,9 +8,13 @@ docs\\mid-dialogue-gate.md, built 2026-07-19).
 
 Pipeline per dialogue-init request:
   resolve agent + knobs -> embed the query probe (as-is; ONE embed per turn —
-  it is also the gate's novelty basis and the fire probe) -> GATE (when the
-  request carries the caller-held loaded set and gate_enabled != 0;
-  otherwise the LOADER path, byte-identical to v1):
+  it is also the gate's novelty basis and the fire probe) -> build the
+  QUERY CONTEXT from the request's client-supplied context fields
+  (encoding-context term, ruled 2026-07-20: entities/event_time/location
+  consumed as a soft multiplicative score nudge; ABSENT fields => no
+  context object => scoring byte-identical to v1 — the loader-parity
+  precedent) -> GATE (when the request carries the caller-held loaded set
+  and gate_enabled != 0; otherwise the LOADER path, byte-identical to v1):
     LOADER: vector over-fetch -> score (relevance x recency x
     importance_norm; pin exemption) -> top-k;
     GATED:  fetch the loaded set by ID + the live identity components ->
@@ -60,7 +64,7 @@ from __future__ import annotations
 import asyncio
 import math
 import time
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Callable
 
@@ -89,7 +93,83 @@ def _clamp(value: float, lo: float, hi: float) -> float:
 
 # The scored-tuple shape shared with the serving stage:
 # (score, relevance | None, recency, importance_norm, importance_raw, row).
+# Deliberately unchanged by the encoding-context build: the context factor
+# folds into `score`, so app\reconstruction.py stays byte-untouched (the
+# fact-level build's no-delta precedent).
 _Scored = tuple[float, float | None, float, float, float, db.CandidateRow]
+
+
+@dataclass(frozen=True)
+class _QueryContext:
+    """The request's client-supplied context fields, normalized once per
+    turn (encoding-context term, ruled 2026-07-20: the client supplies scene
+    context — the service never derives or composes it, preserving the
+    2026-07-14 query-embedded-as-is ruling). A field the request omits is
+    None here and its component contributes nothing."""
+
+    entities: frozenset[str] | None  # casefolded
+    event_time: datetime | None
+    location_name: str | None  # casefolded
+
+    @staticmethod
+    def from_request(
+        request: DialogueInitRequest,
+    ) -> "_QueryContext | None":
+        """None when the request supplies no context field at all — the
+        no-context turn skips the term entirely, keeping scores
+        byte-identical to v1 (the parity contract the walkers assert)."""
+        entities = (
+            frozenset(e.casefold() for e in request.entities)
+            if request.entities
+            else None
+        )
+        event_time = request.event_time
+        location = request.location_name.casefold() if request.location_name else None
+        if entities is None and event_time is None and location is None:
+            return None
+        return _QueryContext(
+            entities=entities, event_time=event_time, location_name=location
+        )
+
+
+def context_boost(
+    row: db.CandidateRow,
+    context: _QueryContext,
+    *,
+    w_entities: float,
+    w_event_time: float,
+    w_location: float,
+    time_scale_seconds: float,
+) -> float:
+    """The encoding-context multiplicative factor, always >= 1.0 — a soft
+    prior, never a penalty or a filter (RaMem's selective activation shape:
+    content ranking is the fallback; a non-matching row keeps its full
+    content score). Pure, module-level: the walker asserts it without a
+    service.
+
+      factor = 1 + w_ent * |query ∩ fact_entities| / |query|   (coverage of
+               the ASKED-FOR entities, casefolded; fact-head entities so the
+               match follows correction — migration 003)
+             + w_time * exp(-|event_time - query| / scale)     (proximity
+               kernel; NULL event_time rows contribute 0, never a penalty)
+             + w_loc  * [location_name casefold-equal]
+    """
+    boost = 0.0
+    if context.entities is not None and row.fact_entities:
+        row_entities = {e.casefold() for e in row.fact_entities}
+        overlap = len(context.entities & row_entities)
+        if overlap:
+            boost += w_entities * (overlap / len(context.entities))
+    if context.event_time is not None and row.event_time is not None:
+        delta = abs((row.event_time - context.event_time).total_seconds())
+        boost += w_event_time * math.exp(-delta / time_scale_seconds)
+    if (
+        context.location_name is not None
+        and row.location_name is not None
+        and row.location_name.casefold() == context.location_name
+    ):
+        boost += w_location
+    return 1.0 + boost
 
 
 def _sort_scored(scored: list[_Scored]) -> list[_Scored]:
@@ -113,14 +193,32 @@ class RetrievalService:
         self._reconstruction = ReconstructionService(pool, providers, settings)
 
     def _score_rows(
-        self, candidates: list[db.CandidateRow], config: dict, as_of: datetime
+        self,
+        candidates: list[db.CandidateRow],
+        config: dict,
+        as_of: datetime,
+        context: _QueryContext | None = None,
     ) -> list[_Scored]:
         """The read-path v1 scoring loop, extracted verbatim at the gate
         build (a source-layout move only — the loader path's behavior, SQL,
-        and payloads are byte-identical; the walkers prove it)."""
+        and payloads are byte-identical; the walkers prove it).
+
+        `context` (encoding-context build, 2026-07-20): when the request
+        supplied context fields, every row's score is multiplied by the
+        context_boost factor; None (the no-context turn) skips the factor
+        entirely — zero extra float ops, byte-identical v1 scores."""
         k_importance = agent_knob(config, "decay_k_importance", self._settings)
         floor = agent_knob(config, "importance_norm_floor", self._settings)
         neutral = agent_knob(config, "importance_neutral", self._settings)
+        if context is not None:
+            w_entities = agent_knob(config, "context_weight_entities", self._settings)
+            w_event_time = agent_knob(
+                config, "context_weight_event_time", self._settings
+            )
+            w_location = agent_knob(config, "context_weight_location", self._settings)
+            time_scale = agent_knob(
+                config, "context_time_scale_seconds", self._settings
+            )
         scored: list[_Scored] = []
         for row in candidates:
             # The write path never stores NULL importance; fixture rows might.
@@ -145,6 +243,17 @@ class RetrievalService:
             else:  # no vector for this row — no relevance computed, honest null
                 rel = None
                 score = rec * imp
+            if context is not None:
+                # The context term is lexical/structural, so it applies on
+                # the degraded (relevance-null) path too — never a filter.
+                score *= context_boost(
+                    row,
+                    context,
+                    w_entities=w_entities,
+                    w_event_time=w_event_time,
+                    w_location=w_location,
+                    time_scale_seconds=time_scale,
+                )
             scored.append((score, rel, rec, imp, raw, row))
         return scored
 
@@ -186,6 +295,11 @@ class RetrievalService:
         except ProviderCallError as exc:
             degraded_reason = f"query embedding failed: {exc}"
         embed_ms = _ms(time.perf_counter() - t0)
+
+        # --- query context (encoding-context term, ruled 2026-07-20) ------
+        # Client-supplied fields only; None on a no-context turn => the
+        # scoring loop is byte-identical to v1 (the parity contract).
+        context = _QueryContext.from_request(request)
 
         # --- gate stage (mid-dialogue-gate.md fork 1: the loaded set is
         # caller-held scene state; absent -> loader turn, v1 byte-parity;
@@ -229,6 +343,7 @@ class RetrievalService:
                 seed_identity=agent["seed_identity"],
                 as_of=as_of,
                 query_vector=query_vector,
+                context=context,
                 loaded_rows=loaded_rows,
                 components=components,
                 t_gate=t_gate,
@@ -251,7 +366,9 @@ class RetrievalService:
                 )
             sql_ms = _ms(time.perf_counter() - t0)
             t0 = time.perf_counter()
-            serve_input = _sort_scored(self._score_rows(candidates, config, as_of))[:k]
+            serve_input = _sort_scored(
+                self._score_rows(candidates, config, as_of, context)
+            )[:k]
             score_ms = _ms(time.perf_counter() - t0)
             candidate_count = len(candidates)
             gate_inst = GateInstrumentation()  # evaluated=False, all defaults
@@ -277,6 +394,20 @@ class RetrievalService:
                 degraded=bool(reasons),
                 degraded_reason="; ".join(reasons) if reasons else None,
                 as_of_effective=as_of,
+                context_active=context is not None,
+                context_components=(
+                    [
+                        name
+                        for name, value in (
+                            ("entities", context.entities),
+                            ("event_time", context.event_time),
+                            ("location", context.location_name),
+                        )
+                        if value is not None
+                    ]
+                    if context is not None
+                    else []
+                ),
                 reconstruction_ms=outcome.reconstruction_ms,
                 reconstruction_input_tokens=outcome.input_tokens,
                 reconstruction_output_tokens=outcome.output_tokens,
@@ -299,6 +430,7 @@ class RetrievalService:
         seed_identity: str | None,
         as_of: datetime,
         query_vector: list[float] | None,
+        context: _QueryContext | None,
         loaded_rows: list[db.GateRow],
         components: list[dict],
         t_gate: float,
@@ -354,7 +486,7 @@ class RetrievalService:
             replace(gr.row, distance=distances.get(gr.row.memory_id))
             for gr in loaded_rows
         ]
-        loaded_scored = self._score_rows(loaded_candidates, config, as_of)
+        loaded_scored = self._score_rows(loaded_candidates, config, as_of, context)
         score_ms = _ms(time.perf_counter() - t_score)
 
         # --- decision: fire (fetch + append) or closed (serve the set) ----
@@ -390,7 +522,7 @@ class RetrievalService:
             t_score = time.perf_counter()
             gk = int(agent_knob(config, "gate_fetch_k", self._settings))
             fetched_scored = self._score_rows(
-                [gr.row for gr in fetched_rows], config, as_of
+                [gr.row for gr in fetched_rows], config, as_of, context
             )
             fetched_top = _sort_scored(fetched_scored)[:gk]
             score_ms = round(score_ms + _ms(time.perf_counter() - t_score), 2)

@@ -350,7 +350,14 @@ gate is non-LLM: no token or USD row exists for it.
   fixture property; real-provider paraphrase distances run ~0.05–0.25; 0.5 sits above the
   0.35 drift threshold's "left the neighborhood" line). `gate_fetch_k` — suggested **3**
   (a full `retrieval_top_k` re-fetch would swamp the loaded set). `gate_damper_fruitless_max`
-  — suggested **2**.
+  — suggested **2**. *(**Tuning recipe added 2026-07-20** — the TARG budget-calibration
+  pattern, arXiv 2511.09803 §3.4, adopted with the research slate:
+  `python -m app.load_driver --gate-budget <rate>` reports the `gate_novelty_threshold` value
+  at the `(1 − rate)` quantile of a run's empirical novelty-min-distance CDF — i.e. "fire on
+  roughly N% of turns," a designer-legible target — plus the observed rate at the service
+  default. **Report-only**: it never sets the knob, and per-agent `agents.config` overrides are
+  not consulted (stated in the report). Calibrate against real-provider runs before trusting
+  the number — the fake embedding's distance distribution is a fixture property.)*
 - **Damper mechanism (promotable — see the fork preamble):** fruitless = a gate fetch
   appending zero new memory IDs (structural; the alternative comparator is the
   novelty-efficacy boolean); after `gate_damper_fruitless_max` consecutive, the **novelty

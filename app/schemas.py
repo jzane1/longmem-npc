@@ -241,20 +241,24 @@ class DialogueInitRequest(BaseModel):
     """Dialogue-init retrieval request (read-path.md request contract).
 
     `query_text` is embedded AS-IS (ruled 2026-07-14: the integrator authors
-    the probe; the service never composes prose). `location_name`/`entities`/
-    `event_time` are RESERVED slots for the post-August encoding-context term:
-    accepted + shape-validated, not consumed, not echoed. Affect is
-    deliberately NOT reserved (ruled 2026-07-14) — its query-side shape
-    arrives with the encoding-context term. `as_of` is the world-time
-    override for age computation (Set B / time-travel surface).
+    the probe; the service never composes prose — that ruling stands).
+    `location_name`/`entities`/`event_time` are the CLIENT-SUPPLIED
+    encoding-context fields (consumed since the 2026-07-20 encoding-context
+    build; formerly reserved): each supplied field adds a weighted match
+    component to a soft multiplicative score nudge (RaMem-shape; knobs in
+    config). Absent fields => the term is skipped entirely and scoring is
+    byte-identical to the pre-context read path. Affect is deliberately NOT
+    a context field (ruled 2026-07-14) — its query-side shape is still
+    undesigned. `as_of` is the world-time override for age computation
+    (Set B / time-travel surface).
     """
 
     agent_id: UUID
     query_text: str = Field(min_length=1)
     k: int | None = Field(default=None, ge=1)
-    location_name: str | None = None  # RESERVED — inert in v1
-    entities: list[str] | None = None  # RESERVED — inert in v1
-    event_time: datetime | None = None  # RESERVED — inert in v1
+    location_name: str | None = None  # context: casefold match vs the row's
+    entities: list[str] | None = None  # context: fact-head entity coverage
+    event_time: datetime | None = None  # context: proximity kernel
     weight_overrides: WeightOverrides | None = None  # RESERVED — inert in v1
     as_of: datetime | None = None  # defaults to server now (UTC)
     # Caller-frozen scene state (reconstruction build 2026-07-17): the
@@ -271,8 +275,9 @@ class DialogueInitRequest(BaseModel):
     # at scene boundaries. Absent -> loader turn, v1 byte-parity (the gate
     # never evaluates). `gate_fruitless_streak` is the damper's caller-held
     # consecutive-fruitless-fetch count (same trust class as
-    # reputation_snapshot). The RESERVED `entities` slot above is NOT the
-    # gate's input — the tripwire reads the utterance text.
+    # reputation_snapshot). The context `entities` field above is NOT the
+    # gate's input — the tripwire reads the utterance text; the context term
+    # and the gate consume the same request independently.
     loaded_memory_ids: list[UUID] | None = None
     gate_fruitless_streak: int = Field(default=0, ge=0)
 
@@ -295,7 +300,9 @@ class RetrievedMemory(BaseModel):
     # real since the reconstruction build (2026-07-17); honest to what was
     # actually served — a failed reconstruction serves the head and says so.
     pinned: bool
-    score: float  # relevance x recency x importance_norm
+    score: float  # relevance x recency x importance_norm, times the
+    # encoding-context factor when the request supplied context fields
+    # (2026-07-20 build; factor >= 1, absent on no-context turns)
     relevance: float | None  # null on the degraded (no-vector) path
     recency: float
     importance_norm: float
@@ -356,6 +363,12 @@ class RetrievalInstrumentation(BaseModel):
     degraded: bool = False
     degraded_reason: str | None = None
     as_of_effective: datetime
+    # Encoding-context term (built 2026-07-20). Defaulted: pre-context
+    # constructions and payload shapes stand. Which components were active
+    # is instrumentation-level by design — the scored tuple and the serving
+    # stage are deliberately untouched (reconstruction byte-identical).
+    context_active: bool = False
+    context_components: list[str] = Field(default_factory=list)
     # Reconstruction serving stage (reconstruction.md, built 2026-07-17).
     # All defaulted: pre-swap constructions and payload shapes stand. Failures
     # in the serving stage reuse degraded/degraded_reason above.
@@ -422,6 +435,13 @@ class DialogueTurnRequest(BaseModel):
     action_vocabulary: list[str] | None = None
     k: int | None = Field(default=None, ge=1)
     as_of: datetime | None = None
+    # Caller-held scene context (encoding-context build 2026-07-20) — passed
+    # through to retrieval unreinterpreted, the k/as_of precedent. The game
+    # client knows the scene's location/participants/time; the service never
+    # derives them (ruled: client-supplied fields, no LLM decomposition).
+    location_name: str | None = None
+    entities: list[str] | None = None
+    event_time: datetime | None = None
     # Caller-frozen scene state, passed through to retrieval unreinterpreted
     # (reconstruction build 2026-07-17; the reputation_snapshot precedent).
     identity_version: str | None = None
@@ -433,7 +453,7 @@ class DialogueTurnRequest(BaseModel):
     gate_fruitless_streak: int = Field(default=0, ge=0)
     debug: bool = False
 
-    @field_validator("as_of", "scene_started_at")
+    @field_validator("as_of", "scene_started_at", "event_time")
     @classmethod
     def _tz_aware(cls, value: datetime | None) -> datetime | None:
         if value is not None and value.tzinfo is None:

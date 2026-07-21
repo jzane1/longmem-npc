@@ -17,6 +17,21 @@ it are in [decisions.md](decisions.md); the schema it reads is frozen in
 > retrieval-only — the Sonnet dialogue call rides with the CLI harness (built 2026-07-15).
 > Reconstruction **landed on this seam 2026-07-17** (`reconstruction.md` — the serving boundary
 > below held; retrieval and scoring were untouched by the swap, as drawn).
+>
+> **Encoding-context term BUILT 2026-07-20** (ruled with the research-adoption slate; RaMem,
+> arXiv 2606.22844, is the mechanism source — see `Research Papers\FINDINGS.md`): the three
+> formerly-reserved request fields (`location_name`/`entities[]`/`event_time`) are now
+> **consumed** as client-supplied scene context — a soft multiplicative score nudge,
+> `score ×= 1 + Σ w_i·match_i` over the components the request supplies (entity coverage of the
+> live fact head's entities, casefolded; an `exp(-Δ/scale)` event-time proximity kernel; casefold
+> location equality). Knobs `context_weight_entities` / `context_weight_event_time` /
+> `context_weight_location` / `context_time_scale_seconds` (service defaults in `app\config.py`,
+> per-agent overridable). **A request with no context fields skips the term entirely — scoring
+> stays byte-identical to v1** (the parity contract; walker criterion [7] asserts the exact
+> factors). Ruled client-supplied (no LLM query decomposition) — the 2026-07-14
+> query-embedded-as-is ruling stands; `weight_overrides` stays reserved. The term applies on
+> loader, gated, and degraded paths alike (it is lexical/structural, never a vector dependency,
+> never a filter, never a penalty).
 
 ## Principles this build honors
 
@@ -48,7 +63,8 @@ theta check, cache reads/writes, pre-warm, `reconstructed` read_mode** (landed o
 2026-07-17, `reconstruction.md`); the dialogue/Sonnet call, action directive, reputation
 (CLI-harness target, built 2026-07-15);
 correction endpoints; purge; reflection; the encoding-context scoring term (its request fields are
-**reserved only**); per-call weight overrides (**slot reserved only**); and **any new DB schema or
+**reserved only** — *consumed since the 2026-07-20 build; see the banner note*); per-call weight
+overrides (**slot reserved only** — still reserved); and **any new DB schema or
 migration**. If adjacent work looks necessary, **stop and report** rather than expand scope.
 
 ## The retrieval service (the seam)
@@ -86,7 +102,7 @@ reconstruction on miss, `read_mode = "reconstructed"` past threshold.
 | `agent_id` | target NPC (FK → agents). |
 | `query_text` | **required** — the relevance probe, embedded **as-is** (ruled 2026-07-14: the integrator authors it — opening utterance or scene blurb; the service never composes prose; a template would be a hidden hardcoded authorial artifact). |
 | `k` | optional; default = integrator knob (per-agent via `agents.config`, service default in `app\config.py`). |
-| `location_name` / `entities[]` / `event_time` | **RESERVED** (ruled 2026-07-14): accepted and shape-validated, **not consumed by v1 scoring, not echoed** — slots for the post-August encoding-context term, mirroring three of the four write-side context stamps. **Affect is deliberately not reserved** (ruled 2026-07-14): a query-side affect field's shape — and whose affect it would carry — is undesigned; it gets its shape with the encoding-context term rather than as a guessed slot. Documented inert (hostile-integrator discipline: per-field behavior stated). |
+| `location_name` / `entities[]` / `event_time` | **RESERVED** (ruled 2026-07-14): accepted and shape-validated, **not consumed by v1 scoring, not echoed** — slots for the post-August encoding-context term, mirroring three of the four write-side context stamps. **Affect is deliberately not reserved** (ruled 2026-07-14): a query-side affect field's shape — and whose affect it would carry — is undesigned; it gets its shape with the encoding-context term rather than as a guessed slot. Documented inert (hostile-integrator discipline: per-field behavior stated). *(**Consumed since 2026-07-20** — the encoding-context build; see the banner note. Still never echoed; affect still deliberately absent.)* |
 | `weight_overrides` | **RESERVED** slot for per-call split-brain scoring overrides (post-August): accepted, not consumed, not echoed. `[SETTLE-AT-BUILD]` exact shape — **ruled 2026-07-14 as suggested:** `{relevance, recency, importance}` optional float multipliers. |
 | `as_of` | optional world-time override for age computation (time-travel / Set B test surface). `[SETTLE-AT-BUILD]` — **ADOPTED as suggested (ruled 2026-07-14):** tz-aware timestamp, defaults to server now (UTC), surfaced in instrumentation as `as_of_effective`; `tests\CLAUDE.md`'s time-travel line carries the second mechanic. |
 
@@ -162,6 +178,8 @@ computed at read time, returned per item with all components.
   `memory_id`, so repeated identical calls are byte-identical.
 - **Reserved slots** — the encoding-context term multiplies in post-August; per-call
   `weight_overrides` apply under the split-brain topology. Neither is consumed in v1.
+  *(The context term **landed 2026-07-20**, exactly as this line drew it — a multiplicative
+  factor; `weight_overrides` remains reserved.)*
 - **`scoring_failed` rows** flow through normally (importance was neutral at write; no read-time
   special case).
 
@@ -227,7 +245,10 @@ role, `LONGMEM_MODEL_RECONSTRUCTION`, landed 2026-07-17.)
   same age scores strictly lower on recency.
 - **Reserved fields inert.** Requests with and without `location_name`/`entities`/`event_time`/
   `weight_overrides` return identical items and scores (fake provider), and none of those fields
-  is echoed.
+  is echoed. *(**Re-scoped 2026-07-20** by the encoding-context build — the one ruling-driven
+  criterion change: walker criterion [7] now asserts the context contract instead — no-context
+  parity, exact per-component factors, never-penalize, never-echo — while `weight_overrides`-only
+  inertness stands as written.)*
 - **Byte-identity.** Two identical calls (same store, same `as_of`, fake provider) return
   byte-identical `content` per memory_id and identical scores.
 - **NULL-embedding exclusion.** A NULL-embedding row never appears via the vector path; under the

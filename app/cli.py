@@ -24,6 +24,10 @@ Meta-commands (everything else is an utterance):
                        evict; takes effect immediately, mid-scene included)
     :as-of <iso8601>   drive the session at an injected world time
                        (retrieval age math + observe timestamps);  :as-of clear
+    :context [loc=<name>] [entities=<a,b,c>] [time=<iso8601>]
+                       set the scene context the encoding-context term reads
+                       (caller-held; each turn passes it through; a scene
+                       boundary clears it);  :context clear   :context  shows
     :debug [on|off]    toggle the full turn debug view (IDs + scores, parsed
                        structured output, reputation math, tokens + latency)
     :help              this text                          :quit  exit
@@ -37,6 +41,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import shlex
 import sys
 from datetime import datetime, timezone
 from uuid import UUID
@@ -111,6 +116,8 @@ def render_debug(result: DialogueTurnResult) -> str:
         f"candidates={ret.candidate_count} k={ret.k_effective}"
         f"{'  [degraded: ' + str(ret.degraded_reason) + ']' if ret.degraded else ''}"
     )
+    if ret.context_active:
+        lines.append(f"  context:   active ({', '.join(ret.context_components)})")
     if ret.gate.evaluated:
         g = ret.gate
         lines.append(
@@ -176,6 +183,37 @@ def _parse_as_of(text: str) -> datetime:
     if value.tzinfo is None:
         value = value.replace(tzinfo=timezone.utc)
     return value
+
+
+def _apply_context_args(runner: SessionRunner, raw: str) -> None:
+    """Parse `:context` key=value pairs onto the runner's caller-held scene
+    context (encoding-context build 2026-07-20). Keys: loc / entities / time;
+    unset keys keep their current value (set-what-you-name). shlex-split so
+    quoted values carry spaces (:context loc="Rusty Anchor")."""
+    for token in shlex.split(raw):
+        key, sep, value = token.partition("=")
+        if not sep or not value:
+            raise ValueError(f"expected key=value, got {token!r} (see :help)")
+        if key == "loc":
+            runner.context_location = value
+        elif key == "entities":
+            runner.context_entities = [e for e in value.split(",") if e]
+        elif key == "time":
+            runner.context_event_time = _parse_as_of(value)
+        else:
+            raise ValueError(f"unknown context key {key!r} (loc|entities|time)")
+
+
+def _render_context(runner: SessionRunner) -> str:
+    """The current caller-held scene context, honestly including 'none'."""
+    parts = []
+    if runner.context_location is not None:
+        parts.append(f"loc={runner.context_location}")
+    if runner.context_entities is not None:
+        parts.append(f"entities={','.join(runner.context_entities)}")
+    if runner.context_event_time is not None:
+        parts.append(f"time={runner.context_event_time.isoformat()}")
+    return f"context: {' '.join(parts)}" if parts else "context: (none)"
 
 
 async def repl(agent_id: UUID, debug: bool) -> None:
@@ -260,6 +298,18 @@ async def repl(agent_id: UUID, debug: bool) -> None:
                     else:
                         runner.as_of = _parse_as_of(raw)
                         print(f"session time set to {runner.as_of.isoformat()}")
+                elif line.startswith(":context"):
+                    raw = line[len(":context") :].strip()
+                    if raw == "clear":
+                        runner.context_location = None
+                        runner.context_entities = None
+                        runner.context_event_time = None
+                        print("context cleared")
+                    elif raw:
+                        _apply_context_args(runner, raw)
+                        print(_render_context(runner))
+                    else:
+                        print(_render_context(runner))
                 elif line.startswith(":debug"):
                     raw = line[len(":debug") :].strip()
                     runner.debug = raw == "on" if raw else not runner.debug

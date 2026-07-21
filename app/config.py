@@ -140,6 +140,19 @@ SERVICE_DEFAULTS: dict[str, float] = {
     # integrator kill-switch scaffold — the reserved per-signal kill-switch
     # decision may later grow its own knobs (see decisions.md).
     "gate_enabled": 1.0,
+    # --- encoding-context read term (read-path.md; ruled 2026-07-20) --------
+    # The formerly-reserved DialogueInitRequest context fields become a soft
+    # multiplicative nudge: score *= (1 + sum(w_i * match_i)) over the
+    # components the REQUEST supplies (client-supplied fields, ruled — no LLM
+    # query decomposition; the 2026-07-14 query-embedded-as-is ruling stands).
+    # A request with no context fields skips the term entirely — scores stay
+    # byte-identical to v1 (the loader-parity precedent). Never a hard filter:
+    # a non-matching row loses no score (match floors at 0).
+    "context_weight_entities": 0.25,
+    "context_weight_event_time": 0.25,
+    "context_weight_location": 0.25,
+    # Time-proximity kernel scale: match = exp(-|event_time - query|/scale).
+    "context_time_scale_seconds": 86400.0,
 }
 
 

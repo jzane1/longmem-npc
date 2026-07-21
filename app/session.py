@@ -94,6 +94,15 @@ class SessionRunner:
         # start reset both.
         self.loaded_memory_ids: list[UUID] | None = None
         self.gate_fruitless_streak: int = 0
+        # Caller-held scene context (encoding-context build 2026-07-20 — the
+        # fourth application of the caller-holds-scene-state contract): the
+        # REPL's :context meta-command sets these; every turn passes them
+        # through unreinterpreted; scene() resets them (a new scene is a new
+        # place/cast until the caller says otherwise). All None => the
+        # context term is skipped, scoring byte-identical to pre-context.
+        self.context_location: str | None = None
+        self.context_entities: list[str] | None = None
+        self.context_event_time: datetime | None = None
         # Fork 5: the pre-serve callback — set by the REPL to print
         # "(reconstructing…)" DURING a blocking mid-scene serve; the future
         # Unity hook attaches here. None => nothing fires (the load driver).
@@ -190,6 +199,9 @@ class SessionRunner:
                 action_vocabulary=action_vocabulary,
                 k=k,
                 as_of=self.as_of,
+                location_name=self.context_location,
+                entities=self.context_entities,
+                event_time=self.context_event_time,
                 identity_version=self.identity_version,
                 scene_started_at=self.scene_started_at,
                 loaded_memory_ids=self.loaded_memory_ids,
@@ -245,6 +257,11 @@ class SessionRunner:
         # damper's suppression dies with the scene.
         self.loaded_memory_ids = None
         self.gate_fruitless_streak = 0
+        # Scene context dies with the scene too (encoding-context build):
+        # a new scene is a new place/cast until :context says otherwise.
+        self.context_location = None
+        self.context_entities = None
+        self.context_event_time = None
         return result
 
     async def pin(self, memory_id: UUID, pinned: bool) -> PinResult:
