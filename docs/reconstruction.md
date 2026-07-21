@@ -71,7 +71,8 @@ The authorial-correction endpoint (**built 2026-07-18**) — its obligations tow
 stated here and built there. *(A third consequence was ruled 2026-07-17 at that target's spec: on
 `authorial_correction`-anchored chains the fixed constraint follows the anchor — an assembly
 change that deliberately re-opens this floor at that build; `authorial-correction.md`.)* The diegetic/dissonance path, reflection (the identity document stays **seed-prose-only**),
-purge, prompt caching, and split-brain per-call weights (post-August). The pytest suite (Set C
+purge, prompt caching, and split-brain per-call weights (then post-August; *pulled forward
+2026-07-21 — `split-brain-streaming.md`*). The pytest suite (Set C
 rides item 2 since the 2026-07-18 renumber; this build ships the structural walker `tests\verify_reconstruction.py`). And **any
 new DB schema or migration** — `reconstruction_cache` and `identity_documents` exist; the
 composed cache key lives in the existing text column. If adjacent work looks necessary, **stop and

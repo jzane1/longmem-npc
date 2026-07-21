@@ -23,8 +23,11 @@ by EXPLAIN). **Prior phase:** the research-adoption slate landed 2026-07-21 (Tar
 encoding-context term + Target B hybrid lexical channel, migration 004);
 `Research Papers\CHANGES-FROM-RESEARCH.md` traces provenance. **Eleven floors stand
 verified.** **One open decision owed before the demo ships:** the escalation failure-path
-re-rule — now widened by the data to cover the trigger set/threshold too.
-Next: **Unity project + reference scene** (immediate-queue item 1).
+re-rule — now widened by the data to cover the trigger set/threshold too. **Same-day
+follow-on: the latency slate is ruled and the split-brain topology is pulled forward +
+specced** (`split-brain-streaming.md`; viability bar **first word < ~1 s**; all four latency
+levers land pre-demo — see the queue and the dated register entry).
+Next: **split-brain streaming build** (immediate-queue item 1, spec ready).
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -75,7 +78,10 @@ and the structured behavior output survive the interview. Research publication c
 - **Escalation failure path for production (owed before the demo publishes).** The v1 write path
   hard-stops a write when the gist-escalation call fails twice (fail-loud, build-phase tuning
   stance, ruled 2026-07-13). The production/demo behavior — hard-stop vs. some soft degradation —
-  must be re-ruled before the demo ships. Not blocking current work. **Now the sole open
+  must be re-ruled before the demo ships — and the 2026-07-21 real-mode data **widened the
+  re-rule to cover the trigger set/thresholds too** (79% fire rate on realistic prose;
+  importance p50 0.61 vs the 0.45 threshold; 0 hard-stops in 80 observes post-fix; latency
+  lever D's server half). Not blocking current work. **Now the sole open
   question** — the reconstruction flagged shapes were all confirmed 2026-07-17 (see the
   "Reconstruction flagged-shapes confirmations" entry in `decisions.md`).
 
@@ -687,31 +693,69 @@ and the structured behavior output survive the interview. Research publication c
   2.9 s, gate 15 fires/100 with novelty efficacy 0.857, 2 fruitless, 3 damper-active turns.
   Spend for the whole session: order $2 (~205 haiku-class + ~110 sonnet-class calls,
   ~1 200 embeds). `longmem` pristine via the postgres MCP; zero scratch residue.
+- **2026-07-21** — **Latency review + split-brain spec session (same day): the latency slate
+  is ruled and the split-brain topology is pulled forward — specced.** Jack reviewed the
+  real-mode table and ruled the viability bar (**first word < ~1 s** — perceived latency =
+  prose TTFT, the honest decomposition being ~190 ms of our layer inside a ~4 s
+  LLM-dominated turn) and that **all four latency levers land pre-demo** (dated "Latency
+  slate + split-brain pull-forward rulings" entry in `decisions.md`): A split-brain
+  streaming (specced now), B1/B2 dialogue-call experiments, C1 scene-boundary pre-warm, D
+  async observes + the trigger fold-in. **Topology altered by ruling:** §9's serial sketch
+  would put ~0.8–1.5 s of behavior call before the first prose token; Jack re-read the
+  asymmetry — the prose call sees PAST behaviors as world facts ("why did you do that a
+  minute / a week ago"), never the current turn's — so the calls run **concurrently** and
+  the action enters the record for later turns. Two gray areas were surfaced at his request
+  and ruled: same-turn word/action incoherence **accepted as an instrumented design fact**
+  (the turn result records both calls' ranked views + directive — §13's explanation-cause
+  divergence measurable from day one), and the world record is **game-authored action
+  observes + the caller-held recent-actions block** (seam auto-write rejected — it would
+  record unresolved intent as fact). Also ruled: the reserved `WeightOverrides` slot goes
+  **live on the behavior view** via a second scoring pass (dialogue-view byte-parity kept);
+  streaming = **seam + REPL + driver** this slice (SSE rides with Unity).
+  `split-brain-streaming.md` written (ruled topology, scope boundary, mechanism,
+  settle-tags, ten done-when criteria); architecture §9 amended (supersedes-in-part its
+  serial wording); queue restructured (split-brain build → item 1; the pre-ship item grown
+  by the slate; research items renumbered 4–8); the ledger's split-brain entry moved off —
+  the second use of the pull-forward template. Docs only — no code, no floors changed.
 
 ## Immediate queue
 
-1. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
+1. **Split-brain streaming v1 — spec ready** (`split-brain-streaming.md`, specced 2026-07-21;
+   pulled forward off the sequenced-later ledger by the latency-slate ruling): concurrent
+   behavior + streaming-prose calls off one retrieval (first word = prose TTFT); weights live
+   on the behavior view (second scoring pass, dialogue-view parity); caller-held
+   recent-actions block + the game-authored action-observe contract; instrumented divergence
+   record (§13); seam + REPL + driver streaming (SSE rides with Unity). Build session next.
+2. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
    choreography incl. the 60-day drift beat, the correction-override beat, and the
    gate-recollect beat (all live in the REPL: `:as-of` jumps + scene boundaries + band
    crossings; `:correct` — which now moves retrieval AND entities; the gate debug line +
-   `(reconstructing…)`).
-2. Before the demo ships (pre-ship gate): **(a) re-rule the escalation failure path — now the
-   sole remaining gate, and widened by real data (2026-07-21).** The hard-stop path never
-   fired in 80 real observes post-fix, but escalation FIRES on **79% of realistic prose**
-   (real haiku importance p50 0.61 vs the 0.45 threshold; +1.4 s and ~$0.0021 per fire) vs 0%
-   on synthetic driver prose — the re-rule should cover the trigger set / thresholds, not
-   just the failure behavior. The suite's hard-stop test tracks the current stance.
-   *(Done 2026-07-21: **(b) the real-provider smoke** — live observe + dialogue +
-   reconstruction receipts in one REPL transcript — and **(c) the real-mode profiling
-   re-run** incl. the lexical SQL line + context score path; every infra series flat vs the
-   fake baseline. Headline numbers in the 2026-07-21 session-log entry; artifacts are
-   scratchpad-only.)*
+   `(reconstructing…)`) — plus the new game-authored action-observe beat and the SSE
+   streaming route (its consumer arrives here).
+3. Before the demo ships (pre-ship items — **the 2026-07-21 latency slate ruled ALL of these
+   land pre-demo**; fine ordering is Jack's to re-slate):
+   - **(a) re-rule the escalation failure path — widened by real data (2026-07-21).** The
+     hard-stop path never fired in 80 real observes post-fix, but escalation FIRES on **79%
+     of realistic prose** (real haiku importance p50 0.61 vs the 0.45 threshold; +1.4 s and
+     ~$0.0021 per fire) vs 0% on synthetic driver prose — the re-rule should cover the
+     trigger set / thresholds, not just the failure behavior. The suite's hard-stop test
+     tracks the current stance. This is also latency lever **D**'s server half.
+   - **(b) B1/B2 dialogue-latency experiments** against the <1 s first-word bar:
+     haiku-dialogue A/B is a zero-code env swap; thinking-off variants on the sonnet-5 calls
+     are one-liners needing a ruling. Measure, then rule.
+   - **(c) C1 scene-boundary reconstruction pre-warm** (own spec/build session): background-
+     reconstruct at scene start so first turns hit the ~4 ms cache path — the scene-frozen
+     cache key already supports it; kills the 9–16 s cold-scene stall.
+   - **(d) D async observes** (client contract): the Unity client fires observe events
+     without blocking dialogue — the 3.4 s real observe is throughput, not latency.
+   *(Done 2026-07-21: the old **(b) real-provider smoke** and **(c) real-mode profiling
+   re-run** — receipts + headline numbers in the session log; artifacts scratchpad-only.)*
 
 *(Research-adoption queue — slated 2026-07-21 with the landed slate, each its own
 spec/build session; ordering after the Unity/pre-ship items is Jack's to re-slate. Papers per
 item are traced in `Research Papers\CHANGES-FROM-RESEARCH.md`.)*
 
-3. **Judged eval harness v1** (ruled: includes LLM-judged categories + a judge model role/env
+4. **Judged eval harness v1** (ruled: includes LLM-judged categories + a judge model role/env
    var from v1; judged signal only meaningful in real mode — sequenced with that stated).
    Starter categories: selective-forgetting single/multi-hop (MemoryAgentBench 2507.05257),
    abstention/premise (LongMemEval 2410.10813, LME-V2 2605.12493), reconstruction FactScore
@@ -720,22 +764,22 @@ item are traced in `Research Papers\CHANGES-FROM-RESEARCH.md`.)*
    (2606.17328), and the judge-free keyword-retention check (2511.10277) which fits the
    structural suite today. Harness shape: Insert/Query over the existing session-runner loop;
    accuracy-vs-latency Pareto reporting.
-4. **Graph/associative memory** — spec session with the de-risked design notes: Postgres-native,
+5. **Graph/associative memory** — spec session with the de-risked design notes: Postgres-native,
    no graph DB (SPRIG 2602.23372 — app-side seeded PPR is sparse linear algebra);
    concept-mediated edges against `identity_components`, NOT raw entities (GAAMA 2603.27910 —
    entity graphs mega-hub, concept graphs stay ~30× sparser); bi-temporal edge supersession is
    our extension (edges from live heads only; corrections re-derive); the lexical channel
    (Target B) is the hybrid seeding base; graph term = a small additive nudge (GAAMA's 0.1
    ablation). Cheapest first step: HippoRAG's node-specificity IDF on the entity tripwire.
-5. **Recall-reinforced decay** — spec session (ruled 2026-07-20: its own session). The "what
+6. **Recall-reinforced decay** — spec session (ruled 2026-07-20: its own session). The "what
    counts as recall" fork + a migration; must not conflate decay with invalidation (invariant)
    nor break within-scene byte-identity. MemoryBank 2305.10250; survey 2512.13564 §5.2.3.
-6. **Automatic conflict/staleness detection** — spec session; the write-time counterpart of the
+7. **Automatic conflict/staleness detection** — spec session; the write-time counterpart of the
    dissonance path. STALE 2605.06527 (CUPMEM-style adjudication riding `identity_components`);
    Nous 2606.22030 (trust provenance-capped, never content-inferred — maps to
    `typology`/`typology_source`); MemConflict 2605.20926 (taxonomy + near-floor SOTA = a
    differentiator). Non-destructive: detection routes through supersession, never delete.
-7. Smaller queued notes: the reflection design dossier (ground reflective writes in cited
+8. Smaller queued notes: the reflection design dossier (ground reflective writes in cited
    memory_ids + an RRR repetition detector — honest-lying 2605.29463; periodic
    evidence-conditioned identity refresh — AI-YOU 2607.10539; persona-lensed retrieval routing
    — self-reports; idle-time scheduling — sleep-time 2504.13171); richer `seed_identity`
@@ -769,7 +813,9 @@ access.)*
   boundary), identity recompile → reconstruction (**landed 2026-07-17** — the handler recompiles
   server-side and returns `identity_version`), prompt-head rebuild → post-August.
 - Retrieval scoring function: relevance × recency(decay class) × importance_norm; pin exemption;
-  normalization; slots for the future context term and per-call split-brain overrides. —
+  normalization; slots for the future context term and per-call split-brain overrides *(both
+  slots since ruled live: context landed 2026-07-20; behavior-view overrides specced
+  2026-07-21)*. —
   **Consolidated into `read-path.md` 2026-07-14 and now BUILT** (shapes ruled at build; dated
   `decisions.md` entry).
 - Reconstruction call spec: operator-structured prompt with gist as fixed constraint; determinism;
@@ -781,10 +827,12 @@ access.)*
   plan; the efficacy comparators live in `GateInstrumentation` + the load-driver gate block;
   instrumentation-only fire logs as ruled).
 - Unity client C# API surface: send event, open dialogue, directive callback, reputation read,
-  reconstructing-signal hook, scene-boundary emission.
+  reconstructing-signal hook, scene-boundary emission. *(Grown by the 2026-07-21 split-brain
+  spec: the SSE streaming route + the game-authored action-observe contract land here.)*
 - Demo choreography: injected-timestamp time travel; decay + correction-override + gate-recollect
   beats; the 60-day drift plot — a planned beat since the 2026-07-14 re-slating (reconstruction is
-  pre-demo).
+  pre-demo). *(Grown 2026-07-21: the game-authored action-observe beat —
+  `split-brain-streaming.md`.)*
 - README destructive-compression counter-example pick.
 
 ## Sequenced-later ledger (pull-forward eligible)
@@ -799,11 +847,13 @@ Reflection pipeline mechanism (sequenced post-August — hedge resolved 2026-07-
 identity document is seed-prose-only); dissonance path + the diegetic suite pair; the purge
 endpoint (before the public flip — ruled 2026-07-14); prompt caching / prompt-head rebuild
 (revisit when a target needs it or demo latency demands — reframed 2026-07-17 from the ruled
-"only if demo latency demands" wording); encoding-context read term +
-habituation; split-brain topology with per-call weights and re-run cost/latency instrumentation;
-reflection → parameter compiler; Unity Package Manager packaging; docs final + public flip
+"only if demo latency demands" wording); habituation *(the encoding-context read term itself
+landed 2026-07-21 — Target A)*; reflection → parameter compiler; Unity Package Manager packaging; docs final + public flip
 (Apache-2.0). *(Reconstruction — mechanism, drift budget, Set C scenarios — moved off this ledger
-into the immediate queue by the 2026-07-14 re-slating ruling.)*
+into the immediate queue by the 2026-07-14 re-slating ruling.)* *(Split-brain topology with per-call
+weights — moved off this ledger into the immediate queue by the 2026-07-21 latency-slate
+ruling, the second use of the pull-forward template; specced same day,
+`split-brain-streaming.md`.)*
 
 **Research track:** asymmetry ablation (on/off, judge-measured explanation-cause divergence); judged
 drift / Bartlett-style evals; unified-thesis write-up (identity-conditioned reconstructive memory +

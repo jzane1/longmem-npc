@@ -20,7 +20,8 @@ not re-derive.
 > **Single-call reconciliation:** §9's "August ship: a single Sonnet-class call" governs the slice —
 > one call emits prose + action directive + reputation delta together; §9's "the Haiku call emits a
 > delta" describes the *post-August split-brain* behavior call, not this slice. Do not wire a second
-> Haiku behavior call into the vertical slice.
+> Haiku behavior call into the vertical slice. *(Pulled forward pre-demo 2026-07-21 —
+> `split-brain-streaming.md` now governs the second call; this slice stands as built.)*
 
 ## Principles this build honors
 
@@ -41,7 +42,8 @@ not re-derive.
   succeeds"). The behavior analog of the read path's never-blank and the write path's never-lose.
 - **The action-directive contract survives the split-brain migration unchanged** (architecture §9).
   It is written as observed world fact carrying `{type, params}` — no "you decided to," so the
-  post-August behavior call can emit it without a contract change.
+  behavior call — post-August then, pulled forward 2026-07-21 (`split-brain-streaming.md`) —
+  can emit it without a contract change.
 - **Nothing integrator-configurable is hardcoded** — the dialogue model role env var, the
   action-directive vocabulary, the reputation scale / sensitivity / clamp bounds: service defaults in
   `app\config.py`, per-agent overrides via `agents.config` (the existing `agent_knob` pattern).
@@ -61,7 +63,8 @@ prompt-head rebuild (post-August); **reconstruction serving — theta check, cac
 pre-warm, `reconstructed` read_mode** (landed on the retrieval seam 2026-07-17,
 `reconstruction.md`) — in this slice every
 retrieved memory was served **verbatim**, as the read path then shipped; the split-brain behavior
-call and per-call weight overrides (post-August); reflection; correction endpoints; purge;
+call and per-call weight overrides (then post-August; pulled forward 2026-07-21 —
+`split-brain-streaming.md`); reflection; correction endpoints; purge;
 identity-document recompile (rides with reconstruction) — the slice's identity document is
 **seed-prose-only**; a dialogue-turn **HTTP route** (rides with the Unity client surface — the
 harness calls the seam in-process); and **any new DB schema or migration**. If adjacent work looks
@@ -174,8 +177,8 @@ assemble byte-identical prompts (`assemble_system_prompt`, assertable without a 
 Per-turn, from an **integrator-supplied vocabulary** (free `type` + `params`). The emitted directive
 is validated against the vocabulary; an unknown or unparseable directive is **logged, ignored, and
 the turn still succeeds** with `directive_dropped` set. The contract is written to **survive the
-split-brain migration unchanged** (architecture §9) — the post-August behavior call emits the same
-`{type, params}` shape as observed world fact. Vocabulary source is `[SETTLE-AT-BUILD]` —
+split-brain migration unchanged** (architecture §9) — the behavior call (pulled forward
+2026-07-21) emits the same `{type, params}` shape as observed world fact. Vocabulary source is `[SETTLE-AT-BUILD]` —
 **ruled 2026-07-15: per-call → `agents.config` fallback (see the request contract row).**
 
 ## Degradation ladder (dialogue turn)

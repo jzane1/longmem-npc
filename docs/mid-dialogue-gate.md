@@ -167,8 +167,10 @@ reads none of them. **The novelty kill-switch decision** — this target produce
 (per-signal fire logs, efficacy fractions), not its ruling. **`gate_events` persistence**
 (rejected in fork 4; pull-forward eligible). **SSE/streaming transport and the Unity hook
 implementation** — the fork-5 callback is the seam the Unity hook will attach to; the hook
-itself rides the Unity target. **Split-brain per-call weights** (sequenced-later). **The
-pytest suite** (immediate-queue item 2 — Set D below is specced for it, not built here).
+itself rides the Unity target. **Split-brain per-call weights** (sequenced-later then;
+*pulled forward 2026-07-21 — `split-brain-streaming.md`*). **The
+pytest suite** (immediate-queue item 2 then — Set D below was specced for it, not built here;
+*built 2026-07-20*).
 **Reflection-time component pruning** (post-August; until then the tripwire's lookup set only
 grows). If adjacent work looks necessary, stop and report — with the correct option and its
 real cost stated, per the reframed contract.

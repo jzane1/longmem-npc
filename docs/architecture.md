@@ -190,7 +190,9 @@ embedding — scoring inputs otherwise unchanged; scores move only through relev
 fact head's entities + an event-time proximity kernel + casefold location match, each weighted by
 its own integrator knob. A no-context request skips the factor — v1-byte-identical scoring; never
 a filter, never a penalty; applies on loader, gated, and degraded paths. `weight_overrides` stays
-reserved; affect stays deliberately absent. `read-path.md` carries the annotated contract.)*
+reserved in code *(ruled 2026-07-21: goes live for the split-brain BEHAVIOR view at the
+pulled-forward build — `split-brain-streaming.md`; dialogue-view scoring keeps byte-parity)*;
+affect stays deliberately absent. `read-path.md` carries the annotated contract.)*
 
 *(**Hybrid lexical channel built 2026-07-20** — Target B of the same slate, **migration 004**:
 a token-OR full-text candidate fetch off a partial GIN over live fact heads
@@ -311,16 +313,25 @@ correction verb, not pin); unpinning resumes the chain from the frozen head.
 
 ## 9. Behavior output & turn topology
 
-**August ship:** a single Sonnet-class call emitting prose + structured output *(built &
-floor-verified 2026-07-15, `cli-harness.md`; shapes ruled in the dated `decisions.md` entry —
-one `run_dialogue_turn` seam in `app\dialogue.py`, REPL + load driver on a shared session-runner
-core)*.
+**Built slice (was "August ship"):** a single Sonnet-class call emitting prose + structured
+output *(built & floor-verified 2026-07-15, `cli-harness.md`; shapes ruled in the dated
+`decisions.md` entry — one `run_dialogue_turn` seam in `app\dialogue.py`, REPL + load driver
+on a shared session-runner core)*. *(Superseded as the SHIP topology by the 2026-07-21
+pull-forward below — the demo ships the split-brain; this slice stands as the built floor it
+grows from.)*
 
-**Committed target topology (post-August): multi-call split-brain.** A behavior call (Haiku-class,
-with its own retrieval weights) chooses the action; the dialogue call then sees that action **as
-observed world fact — never "you decided to."** The asymmetry is **statistical, not architectural**
-(per-call scoring weights, no masks). Write the action-directive contract so it survives this
-migration unchanged.
+**Committed target topology: multi-call split-brain** *(pulled forward pre-demo and amended
+2026-07-21 — `split-brain-streaming.md`, specced; dated "Latency slate + split-brain
+pull-forward rulings" entry in `decisions.md`)*. A behavior call (Haiku-class, with its own
+retrieval weights) chooses the action; the dialogue call sees **past actions as observed world
+facts — never "you decided to."** *(Amended: never the current turn's action — the two calls
+run **concurrently** within a turn, so prose streams from its first token; the current action
+enters the world record for subsequent turns via game-authored action observes + the
+caller-held recent-actions scene block. Same-turn word/action incoherence is an accepted,
+instrumented design fact — the divergence record feeds §13's ablation.)* The asymmetry is
+**statistical, not architectural** (per-call scoring weights, no masks). Write the
+action-directive contract so it survives this migration unchanged *(it did — built 2026-07-15
+to survive, unchanged by the pull-forward)*.
 
 **Action directive:** per-turn, from an **integrator-supplied vocabulary** (free type + params);
 unknown or unparseable directives → log, ignore, the turn still succeeds.
@@ -329,7 +340,8 @@ unknown or unparseable directives → log, ignore, the turn still succeeds.
 wins; per-NPC sensitivity scalar; hard clamp on a defined scale. Injected into the prompt prefix
 from a **scene-start snapshot**. *(Built 2026-07-15 in the single-call slice: the Sonnet call emits
 the delta, applied in-place to `agents.reputation` by an atomic clamped UPDATE; the snapshot is
-caller-frozen scene state — the "Haiku call" wording is the post-August split-brain behavior call.)*
+caller-frozen scene state — the "Haiku call" wording is the split-brain behavior call,
+pulled forward pre-demo 2026-07-21, `split-brain-streaming.md`.)*
 
 ## 10. Reflection & parameter bundles (mechanism sequenced later — see `status.md`)
 

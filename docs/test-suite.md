@@ -92,6 +92,21 @@ moves scores, not rows; detail-hiding assertions land with reconstruction.)*
   entities (NER + optional operator field, merged); windowed SQL re-derives entity liveness at
   any instant; superseded fact rows keep their entities.
 
+## Set E — split-brain turn topology *(specced 2026-07-21, `split-brain-streaming.md`;
+scenario contract stubbed here, mechanics settle at build)*
+
+- **Concurrency proof:** a deliberately slow behavior fake never delays the first prose chunk
+  (first word = prose TTFT at the seam, structurally timed).
+- **Divergence record:** both calls' ranked `(memory_id, score)` views + directive + delta ride
+  the turn result — structural, never prose.
+- **Dialogue-view parity:** no overrides => dialogue-view scoring byte-identical to the
+  pre-split turn.
+- **Recent-actions block:** in the prose prompt exactly when scene state has actions; reset at
+  the boundary; provably no server-side write.
+- **Degradation rows:** behavior-fail -> no directive + zero delta + flag, prose unaffected;
+  prose-fail pre-token -> fallback line; mid-stream drop -> as ruled at build; both-fail ->
+  never-blank holds.
+
 ## Degradation cases
 
 - Importance-scoring model failure → the write still lands, with neutral importance and a

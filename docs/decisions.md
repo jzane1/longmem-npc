@@ -25,7 +25,10 @@ gate event records which signal fired. The entity tripwire is the most demo-legi
 **Turn topology: single call ships August; split-brain is the committed target.** August: one
 Sonnet-class call emits prose + structured output. Target: a Haiku-class behavior call with its own
 retrieval weights chooses the action; the dialogue call sees it as observed world fact. Contracts
-(especially the action directive) are written to survive the migration.
+(especially the action directive) are written to survive the migration. *(Superseded in part
+2026-07-21 by the "Latency slate + split-brain pull-forward rulings" entry: the split-brain
+lands PRE-demo, the two calls run CONCURRENTLY, and the dialogue call sees only PAST actions
+as world facts — never the current turn's. The contract-survival line stands, and held.)*
 
 **Memory identity: permanent id + version chain (write-back).** One `memory_id` forever; retellings
 insert new detail rows superseding the prior. This resolved the critical fork of the project —
@@ -1545,3 +1548,52 @@ observed truncation (30/30 turns parsed; out-tokens p50 well under budget), but 
 first place to look if real-mode `MalformedOutputError` ever appears; a
 `thinking: {"type": "disabled"}` request-side knob is a possible future lever for the
 non-streaming reconstruction call (cost/latency, quality tradeoff — Jack's call if raised).
+
+## Latency slate + split-brain pull-forward rulings — 2026-07-21
+
+**Context.** The real-mode session's numbers put the player-facing turn at p50 ~4.1 s (first
+token 1.4–2.2 s; a cold-scene reconstruction adds 9–16 s; our own layer costs ~190 ms of it —
+the rest is model inference). Jack reviewed the table and ruled the latency work now.
+
+**Rulings (Jack, via explicit questions + plain-prose gray-area review):**
+
+1. **The viability bar: first word < ~1 s.** The product latency metric is prose
+   time-to-first-token at the seam, not turn total.
+2. **All four levers land before the demo ships:** A — split-brain streaming (specced this
+   session, `split-brain-streaming.md`); B1/B2 — dialogue-call latency experiments
+   (thinking-off one-liners + a haiku-dialogue env A/B, measured before committing); C1 —
+   scene-boundary reconstruction pre-warm (background-reconstruct at scene start so first
+   turns hit the ~4 ms cache; the scene-frozen cache key already supports it); D — async
+   game-side observes + folding the measured 79% escalation fire rate into the owed
+   escalation re-rule. Unchosen-now ≠ dropped: each is an immediate-queue pre-ship item.
+3. **Split-brain pulled forward WHOLE — with a ruled topology alteration.** §9's serial
+   sketch (behavior call, then prose sees that turn's action) would put ~0.8–1.5 s of
+   behavior call in front of the first prose token. Jack re-read the asymmetry: the prose
+   call needs **past** behaviors as world facts ("why did you do that a minute / a week
+   ago"), never the current turn's — so the calls run **concurrently** and the current
+   action enters the record for later turns. §9 amended (supersedes-in-part its serial
+   wording).
+4. **Gray area 1 — same-turn incoherence: accepted, and instrumented.** Concurrent calls
+   mean one turn's words and action are chosen independently; occasional mismatch is the
+   split-brain character (bounded by shared retrieval + the action vocabulary; self-aware
+   from the next turn). Ruled with instrumentation from day one: the turn result records
+   both calls' ranked scored views + the directive — §13's explanation-cause divergence
+   measurable structurally.
+5. **Gray area 2 — the world record is game-authored + a scene block.** Durable: the
+   integrator reports *resolved* actions as ordinary observe events (the store never
+   records unresolved intent; the endpoint exists — a documented contract, zero code).
+   Within-scene: a caller-held recent-actions block in the prose prompt, reset at
+   boundaries. The seam-auto-write alternative was rejected (records intent as fact even
+   when the game contradicts it).
+6. **Per-call weights go LIVE now, behavior view only** — the reserved `WeightOverrides`
+   slot is consumed via a second scoring pass over the same candidate set; dialogue-view
+   scoring stays byte-identical when no overrides ride (the context-term parity precedent).
+   The read-path walker's inertness criterion re-scopes at build (ruling-driven).
+7. **Streaming surface = seam + REPL + driver this slice.** The SSE/HTTP route rides with
+   the Unity client item, where its consumer exists.
+
+**Honest prices stated with the rulings:** this spec alone makes first word = TTFT
+(1.4–2.2 s today) — the <1 s bar additionally needs the B-levers; the serial full-§9 shape
+was presented fairly (lands the asymmetric same-turn framing, costs ~+0.8–1.5 s before the
+first word) and not adopted; the single-call prose-first restructure was presented (cheapest,
+no asymmetry landed) and not adopted.
