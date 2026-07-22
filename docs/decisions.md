@@ -1731,3 +1731,37 @@ any metric/threshold change waits on that data. Added to open questions.
 
 **No code, no floors, no migration this session** — audit + rulings + queue replan only. The demo's
 split-brain-topology and reconstruction code are unchanged; the built floors stand.
+
+## Escalation failure-path + pre-warm + R7 rulings — 2026-07-22
+
+Three follow-on rulings after the external-persona audit replan (same day):
+
+1. **Escalation failure path: retire the hard-stop — soft-degrade in production.** The v1 write path
+   hard-stops a write when the gist-escalation call fails twice (the fail-loud build-phase stance,
+   ruled 2026-07-13). Jack ruled that stance **temporary and now retired**: an escalation failure must
+   **not halt** a live write. The write proceeds and degrades gracefully — the observation is stored,
+   the escalation is skipped/flagged rather than aborting the turn. The exact soft-degrade shape
+   (proceed with the base non-escalated gist + a queryable escalation-failed flag — the `scoring_failed`
+   precedent — vs a bounded retry-then-proceed) is a build detail to settle when the write-path change
+   is built. This is a write-path code change **plus** the structural suite's hard-stop test, which
+   asserts the current build-phase stance and flips with it. Demo-relevant: under real-providers-only
+   with no fake backup take, a hard-stop on an escalation hiccup would kill a recording take. **The
+   trigger-set/threshold half of the widened question (escalation fires on 79% of realistic prose) is
+   NOT ruled here** — it stays a separate, non-blocking cost/latency tuning item.
+
+2. **C1 scene-boundary reconstruction pre-warm BUILD → confirmed POST-demo.** The audit's re-sequencing
+   is confirmed: the demo cold-stall is covered by off-camera warm-init choreography, so the full
+   pre-warm build is not demo-blocking. This relaxes the 2026-07-21 latency slate's "all four levers
+   land pre-demo" wording for lever C1 specifically; the scene-frozen cache key still supports the full
+   background build when it lands post-demo.
+
+3. **R7 (self-referential drift budget) → deferred to the Unity/eval build phase.** Not acted on now;
+   revisited during the pre-demo Unity + Ledger + judged-eval work, decided from the fixed-gist ON/OFF
+   ablation data produced there. (Challenges the 2026-07-17 drift-metric/threshold ruling; the deferral
+   holds that ruling until the data exists.)
+
+**`.env` verification (this session).** Jack fixed the malformed consolidated `LONGMEM_PRICE_*` line in
+a prior thread; verified via `config.load_env`/`load_settings` (values never printed): all eleven
+`LONGMEM_PRICE_*` keys parse as floats, `LONGMEM_MODEL_BEHAVIOR` is present, provider mode is `real`,
+and `load_settings()` succeeds. Immediate-queue item 0 (unblock real mode) is **done** — the 2026-07-21
+flagged `.env` crash is resolved.

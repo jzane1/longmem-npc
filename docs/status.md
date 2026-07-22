@@ -117,9 +117,9 @@ and the structured behavior output survive the interview. Research publication c
 - **R7 — the self-referential drift budget (logged 2026-07-22 from the external-persona audit).** The
   reconstruction drift budget is cosine candidate-vs-anchor < 0.35; it cannot catch a retelling that
   stays under budget while dropping or contradicting a gist fact, or fabricating a never-observed
-  detail. Challenges the 2026-07-17 drift-metric/threshold ruling — surfaced, not acted on. The
-  fixed-gist-constraint ON/OFF ablation (pulled pre-demo with the judged eval harness) will produce the
-  deciding data; any metric/threshold change waits on it.
+  detail. Challenges the 2026-07-17 drift-metric/threshold ruling. **Deferred to the Unity/eval build
+  phase (ruled 2026-07-22)** — not acted on now; the fixed-gist-constraint ON/OFF ablation (in the
+  pre-demo judged-eval work) produces the deciding data, and any metric/threshold change waits on it.
 
 ## Session log
 
@@ -809,9 +809,10 @@ and the structured behavior output survive the interview. Research publication c
 `decisions.md` entry). The audit's #1 finding, confirmed against source: **`app\api.py` has no HTTP
 dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over HTTP.
 
-0. **Unblock real mode (hard prerequisite — real-providers-only ruled 2026-07-22).** Fix `.env`: the
-   malformed `LONGMEM_PRICE_DIALOGUE_IN=…` line + add `LONGMEM_MODEL_BEHAVIOR` (operator-owned, Jack's
-   `.env`). Gates everything downstream now that there is no fake-mode backup take.
+0. **Unblock real mode — DONE (verified 2026-07-22).** Jack fixed the malformed `.env` price line and
+   `LONGMEM_MODEL_BEHAVIOR` is present (prior thread); verified via `config.load_settings` (no values
+   printed): all eleven `LONGMEM_PRICE_*` keys parse, provider mode `real`, `load_settings()` OK. The
+   2026-07-21 flagged crash is resolved; real mode is unblocked for the real-providers-only demo.
 1. **HTTP dialogue-turn route + honest latency metric** (own spec/build session — the true blocker).
    `POST /v1/dialogue/turn` (non-streaming) drains `run_dialogue_turn`'s async generator to the terminal
    `DialogueTurnResult`; stateless (caller holds scene state); coherent at default weights. Add
@@ -833,21 +834,23 @@ dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over
 
 **Pre-ship latency items** (2026-07-21 latency slate; **audit re-sequenced 2026-07-22** — the
    perceived-TTFT metric moved into item 1; pre-warm build proposed post-demo):
-   - **(a) re-rule the escalation failure path — widened by real data (2026-07-21).** The
-     hard-stop path never fired in 80 real observes post-fix, but escalation FIRES on **79%
-     of realistic prose** (real haiku importance p50 0.61 vs the 0.45 threshold; +1.4 s and
-     ~$0.0021 per fire) vs 0% on synthetic driver prose — the re-rule should cover the
-     trigger set / thresholds, not just the failure behavior. The suite's hard-stop test
-     tracks the current stance. This is also latency lever **D**'s server half.
+   - **(a) escalation failure path — RULED 2026-07-22: retire the hard-stop, soft-degrade in
+     production** (the fail-loud stance was temporary; a failed escalation must not halt a live write).
+     BUILD task: write-path soft-degrade (store the observation + an escalation-failed flag rather than
+     aborting — the `scoring_failed` precedent; exact shape settled at build) **plus** flipping the
+     suite's hard-stop test. Demo-relevant under real-providers-only (a hard-stop would kill a take).
+     **Still open (separate, non-blocking):** the trigger-set/threshold tuning — escalation fires on
+     **79% of realistic prose** (importance p50 0.61 vs the 0.45 threshold; +1.4 s + ~$0.0021 per fire),
+     a cost/latency item and latency lever **D**'s server half.
    - **(b) B1/B2 dialogue-latency experiments** against the <1 s first-word bar:
      haiku-dialogue A/B is a zero-code env swap; thinking-off variants on the sonnet-5 calls
      are one-liners needing a ruling. Measure, then rule.
-   - **(c) C1 scene-boundary reconstruction pre-warm BUILD → proposed POST-demo** (audit
-     2026-07-22): the demo's 9–16 s cold stall is removed by off-camera warm-init choreography (fire
+   - **(c) C1 scene-boundary reconstruction pre-warm BUILD → CONFIRMED POST-demo (ruled 2026-07-22).**
+     The demo's 9–16 s cold stall is removed by off-camera warm-init choreography (fire
      `/v1/dialogue/init` at each scene basis during a camera cut; within-scene byte-stability ⇒ identical
-     on-camera bytes), so the full pre-warm build is no longer demo-blocking. Relaxes the slate's "all
-     pre-demo" wording — flagged for Jack's confirmation. (The scene-frozen cache key still supports the
-     full background build when it lands.)
+     on-camera bytes), so the full pre-warm build is not demo-blocking. This relaxes the latency slate's
+     "all pre-demo" wording for C1. (The scene-frozen cache key still supports the full background build
+     when it lands post-demo.)
    - **(d) D async observes** (client contract): the Unity client fires observe events
      without blocking dialogue — the 3.4 s real observe is throughput, not latency.
    *(Done 2026-07-21: the old **(b) real-provider smoke** and **(c) real-mode profiling
