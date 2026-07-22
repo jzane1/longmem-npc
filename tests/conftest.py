@@ -52,13 +52,15 @@ from psycopg.types.json import Jsonb
 from app import db
 from app.config import Settings
 from app.providers import (
-    FakeDialogueProvider,
+    FakeBehaviorProvider,
     FakeEmbeddingProvider,
     FakeEscalationProvider,
+    FakeProseProvider,
     FakeReconstructionProvider,
     FakeWriteProvider,
     Providers,
 )
+from app.schemas import DialogueTurnResult
 
 # Per-process name: two overlapping runs (the Stop hook can fire one at every
 # turn-end) never share a scratch DB, so no run's force-drop can kill another's
@@ -192,10 +194,14 @@ class Ctx:
             write=overrides.get("write", FakeWriteProvider()),
             escalation=overrides.get("escalation", FakeEscalationProvider()),
             embedding=overrides.get("embedding", FakeEmbeddingProvider()),
-            dialogue=overrides.get("dialogue", FakeDialogueProvider()),
+            # Split-brain (2026-07-21): the streaming prose provider + the
+            # concurrent behavior provider, either overridable for the
+            # degradation cases.
+            dialogue=overrides.get("dialogue", FakeProseProvider()),
             reconstruction=overrides.get(
                 "reconstruction", FakeReconstructionProvider()
             ),
+            behavior=overrides.get("behavior", FakeBehaviorProvider()),
         )
 
     def retrieval(self, **overrides):
@@ -339,3 +345,18 @@ def by_id(result) -> dict:
 
 def item_ids(result) -> list:
     return [item.memory_id for item in result.items]
+
+
+async def drain_turn(gen) -> tuple[str, DialogueTurnResult]:
+    """Drain the split-brain seam's async generator (run_dialogue_turn) to
+    (streamed_prose, terminal_result) — the non-streaming callers' shape.
+    The seam always yields exactly one terminal DialogueTurnResult."""
+    chunks: list[str] = []
+    result: DialogueTurnResult | None = None
+    async for item in gen:
+        if isinstance(item, DialogueTurnResult):
+            result = item
+        else:
+            chunks.append(item)
+    assert result is not None, "seam yielded no terminal result"
+    return "".join(chunks), result

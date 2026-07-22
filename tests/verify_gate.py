@@ -43,7 +43,7 @@ from psycopg.types.json import Jsonb
 from app import db
 from app.dialogue import (
     _MEMORY_RECOLLECTION_SUBHEADER,
-    assemble_system_prompt,
+    assemble_prose_prompt,
 )
 from app.gate import (
     GATE_RUNG_CLOSED,
@@ -750,7 +750,7 @@ async def main(database_uri: str) -> None:
         fake_item(id_c, "the recollection", fetched=True),
         fake_item(id_a, "first loaded"),
     ]
-    prompt = assemble_system_prompt(
+    prompt = assemble_prose_prompt(
         SEED_PROSE, 0.0, -1.0, 1.0, items, [], loaded_order=[id_a, id_b]
     )
     lines = prompt.splitlines()
@@ -765,7 +765,7 @@ async def main(database_uri: str) -> None:
         "gated prompt: loaded items in the caller's append-only order, then "
         "the recollection sub-header, then this turn's fetches",
     )
-    no_fetch_prompt = assemble_system_prompt(
+    no_fetch_prompt = assemble_prose_prompt(
         SEED_PROSE,
         0.0,
         -1.0,
@@ -778,10 +778,10 @@ async def main(database_uri: str) -> None:
         _MEMORY_RECOLLECTION_SUBHEADER not in no_fetch_prompt,
         "the sub-header appears only when a gate fetch happened this turn",
     )
-    v1_prompt = assemble_system_prompt(
+    v1_prompt = assemble_prose_prompt(
         SEED_PROSE, 0.0, -1.0, 1.0, [fake_item(id_a, "first loaded")], []
     )
-    v1_prompt_again = assemble_system_prompt(
+    v1_prompt_again = assemble_prose_prompt(
         SEED_PROSE, 0.0, -1.0, 1.0, [fake_item(id_a, "first loaded")], []
     )
     check(

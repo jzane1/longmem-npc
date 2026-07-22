@@ -26,10 +26,12 @@ outputs, byte for byte).
 Emits the §11 aggregates: the latency histogram (p50/p95 — gate check
 (landed with the gate build 2026-07-19, over gate-evaluated turns only — a
 series padded with loader-turn zeros would lie), retrieval SQL, query embed,
-first token, dialogue total, turn total) and the itemized per-100-turn cost
-table (tokens per model role, unconditionally; USD only for roles priced via
-LONGMEM_PRICE_* — build ruling 2026-07-15; the gate is non-LLM, no cost
-row), plus the per-100-turn gate block (fires per signal, efficacy
+first word (prose TTFT at the seam — the split-brain headline, 2026-07-21),
+behavior (the concurrent behavior call), dialogue total, turn total) and the
+itemized per-100-turn cost table (tokens per model role, unconditionally;
+USD only for roles priced via LONGMEM_PRICE_* — build ruling 2026-07-15; the
+gate is non-LLM, no cost row; the behavior call has its own price pair), plus
+the per-100-turn gate block (fires per signal, efficacy
 fractions, fruitless fetches, damper activations — instrumentation-only by
 fork 4, the reserved kill-switch decision's evidence).
 """
@@ -251,8 +253,11 @@ def _aggregate(
         "reconstruction": [
             t.instrumentation.retrieval.reconstruction_ms for t in turns
         ],
-        "first_token": [t.instrumentation.sonnet_first_token_ms for t in turns],
-        "dialogue_total": [t.instrumentation.sonnet_ms for t in turns],
+        # The split-brain headline: prose TTFT at the seam (the <1s viability
+        # bar) + the concurrent behavior call, which overlaps the prose stream.
+        "first_word": [t.instrumentation.first_word_ms for t in turns],
+        "behavior": [t.instrumentation.behavior_ms for t in turns],
+        "dialogue_total": [t.instrumentation.prose_stream_ms for t in turns],
         "turn_total": [t.instrumentation.total_ms for t in turns],
     }
     latency = {
@@ -274,6 +279,8 @@ def _aggregate(
 
     dialogue_in = sum(t.instrumentation.sonnet_input_tokens for t in turns)
     dialogue_out = sum(t.instrumentation.sonnet_output_tokens for t in turns)
+    behavior_in = sum(t.instrumentation.behavior_input_tokens for t in turns)
+    behavior_out = sum(t.instrumentation.behavior_output_tokens for t in turns)
     write_in = sum(o.instrumentation.haiku_input_tokens for o in observes)
     write_out = sum(o.instrumentation.haiku_output_tokens for o in observes)
     esc_in = sum(o.instrumentation.escalation_input_tokens for o in observes)
@@ -303,6 +310,13 @@ def _aggregate(
                 dialogue_in, dialogue_out, "dialogue_in", "dialogue_out"
             ),
         },
+        "behavior": {
+            "input_tokens_per_100_turns": per_100(behavior_in),
+            "output_tokens_per_100_turns": per_100(behavior_out),
+            "usd_per_100_turns": usd(
+                behavior_in, behavior_out, "behavior_in", "behavior_out"
+            ),
+        },
         "write": {
             "input_tokens_per_100_turns": per_100(write_in),
             "output_tokens_per_100_turns": per_100(write_out),
@@ -328,7 +342,7 @@ def _aggregate(
         },
     }
     # Scale the USD table to per-100-turns too, when priced at all.
-    for row in ("dialogue", "write", "escalation", "reconstruction"):
+    for row in ("dialogue", "behavior", "write", "escalation", "reconstruction"):
         if cost[row]["usd_per_100_turns"] is not None:
             cost[row]["usd_per_100_turns"] = round(
                 cost[row]["usd_per_100_turns"] * 100.0 / n_turns, 6

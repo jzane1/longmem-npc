@@ -1,7 +1,27 @@
 # longmem-npc — Status
 
 **Last updated:** 2026-07-21
-**Phase:** **real mode is proven — pre-ship gates (b) and (c) are closed** (2026-07-21, the
+**Phase:** **split-brain streaming is BUILT — the latency topology is live** (2026-07-21,
+immediate-queue item 1, specced and built the same day). The dialogue seam is now an async
+generator: a streaming **pure-prose** call and a concurrent **behavior** call (directive +
+delta, a new model role) fire off one retrieval; **first word = prose TTFT** (`first_word_ms`,
+the headline latency term). Two scored views ride one candidate set — the dialogue view (served
+ranking) and the behavior view (same served set re-ranked with the now-live `WeightOverrides`,
+exponent-form so all-1.0 is byte-parity with the dialogue view) — and the turn result carries
+both as the **divergence record** (§13's raw data). A caller-held **recent-actions** block feeds
+past actions to later prose prompts as world facts; the four split-brain degradation rows
+(behavior fail, prose-fail-pre-chunk, mid-stream keep-partial, both-fail) all landed. No
+migration. **Twelve floors stand verified.** Verification (this session, inline): CLI-harness
+walker re-opened 36 → 55; read-path walker weight_overrides criterion re-scoped (48); gate
+walker rename-only (51); write/reconstruction/authorial/fact walkers byte-untouched and green
+(40/42/34/34); full suite 41 → 42 (twice) + keyless subset 35; no-arg migrate "4 applied, 0
+pending"; `longmem` pristine via the postgres MCP; live piped REPL streaming beat + a driver run
+with the `first_word` + `behavior` series and the behavior cost row. **Flagged (operator-owned
+`.env`, not fixed):** a malformed consolidated `LONGMEM_PRICE_DIALOGUE_IN=…` line crashes
+`load_settings` on any run that reads `.env` prices — Jack's to fix before real-mode demo runs.
+Next: **Unity project + reference scene** (immediate-queue item 1), then the pre-ship gates.
+
+**Prior phase:** **real mode is proven — pre-ship gates (b) and (c) are closed** (2026-07-21, the
 first-ever real-provider session, run with live ANTHROPIC + OPENAI keys). The smoke's
 live observe/reconstruction/dialogue receipts are on record, and the real-mode profiling is
 diffed against the 2026-07-20 fake baseline: **every infra series flat** (sql, nlp, insert,
@@ -21,13 +41,11 @@ realistic prose); the 0.35 drift budget is well-placed (max observed accepted dr
 the lexical channel's ts_rank cost is a linear-in-matches watch-item (the 004 GIN is proven
 by EXPLAIN). **Prior phase:** the research-adoption slate landed 2026-07-21 (Target A
 encoding-context term + Target B hybrid lexical channel, migration 004);
-`Research Papers\CHANGES-FROM-RESEARCH.md` traces provenance. **Eleven floors stand
-verified.** **One open decision owed before the demo ships:** the escalation failure-path
-re-rule — now widened by the data to cover the trigger set/threshold too. **Same-day
-follow-on: the latency slate is ruled and the split-brain topology is pulled forward +
-specced** (`split-brain-streaming.md`; viability bar **first word < ~1 s**; all four latency
-levers land pre-demo — see the queue and the dated register entry).
-Next: **split-brain streaming build** (immediate-queue item 1, spec ready).
+`Research Papers\CHANGES-FROM-RESEARCH.md` traces provenance. **One open decision owed before
+the demo ships:** the escalation failure-path re-rule — now widened by the data to cover the
+trigger set/threshold too. **Same-day follow-on: the latency slate is ruled and the split-brain
+topology is pulled forward + specced** (`split-brain-streaming.md`; viability bar **first word <
+~1 s**; all four latency levers land pre-demo — see the queue and the dated register entry).
 
 This is the *living* file — update it at the end of every working session. `architecture.md` changes
 only when design changes; `decisions.md` is append-only.
@@ -72,6 +90,8 @@ and the structured behavior output survive the interview. Research publication c
 | Hybrid lexical retrieval channel v1 — the research-adoption slate's Target B (ruled 2026-07-20; survey 2604.01707 §7 + Engram 2606.09900): **migration 004** (`db\migrations\004_lexical_index.sql`, index-only — partial FTS GIN `to_tsvector('simple', basis_text)` over live fact heads, the 002/003 partial-index precedent) + the token-OR lexical candidate fetch (`lexical_tsquery`: casefolded ≥3-letter letter-runs, deduped, capped 16, OR-joined — the build-surfaced correction over websearch/plainto AND semantics, which would have made the channel inert; ts_rank + memory_id deterministic LIMIT) **unioned into the loader's vector over-fetch before scoring** — dedup by memory_id, scoring formula untouched, lexical hits carry their TRUE cosine distance (all-named params), NULL-embedding fact heads lexically reachable with relevance null (never a filter — exact-token recall softens the embed-degradation consequence). `lexical_fetch_k` knob (8.0; **0.0 = kill-switch**, pure-vector v1); `text_search_config` string knob ('simple' default baked into the index expression, the decay_classes plain-key precedent; overrides run unindexed, stated). Loader-scope v1 — the gate fire probe + entity-only rung are noted future consumers. Instrumentation `lexical_sql_ms` + `lexical_candidate_count`; CLI debug `lex=` field. | floor-verifier **pass** against all nine prior floors (read-path floor re-opened, re-verified; the gate walker's sole change is the mechanical ledger pin +004): `tests\verify_read_path.py` re-run independently on fresh scratch (**48 assertions**, 42 → 48 — new criterion [13]: lexical-only reach proven through the SERVED payload on a k=1/overfetch-1.0 agent, raw-2/union-2 exact dedup, unchanged formula, tokenless zero-SQL, kill-switch restores v1; criterion [9] **sharpened**: vector-path exclusion asserted on the probe itself + the honest lexical reach of an embed-degraded row); all seven walkers green on fresh scratch (40/48/36/42/34/34/51); migration 004 applied 001→004 in order on fresh scratch with an idempotent second run; **applied to `longmem`** — no-arg migrate → "Up to date: 4 migration(s) applied, 0 pending", index present with the exact expression + predicate (pg_indexes.indexdef); `longmem` pristine via the postgres MCP (exact COUNT(*) 0 on all ten product tables, ledger exactly 001..004, no scratch residue); full suite **41 passed twice** (40 → 41: the Set B lexical reach + kill-switch scenario) + keyless subset 34/34; floor economy by git-diff (reconstruction/gate/decay/ingest/dialogue/session/conftest and five walkers byte-identical to HEAD); seven independent code spot-checks (004 index-only; injection-safe tokenizer; additive-only union; v1-byte-identical when disabled/tokenless/gated/degraded; default-branch expression textually matches the index; all-named params; `_score_rows` zero hunks in this diff); plus the live REPL beat (k=1/overfetch-1.0: the pinned rare-name row served via lexical reach, `lex=2/3.63ms candidates=2 k=1`) | 2026-07-21 |
 
 | Structural pytest suite v1 — `pytest.ini` (marker registration, `testpaths`, no cache residue) + `tests\conftest.py` (scratch **`longmem_suite`** session lifecycle: probe → create → migrate 001–003 → per-test TRUNCATE → drop; unreachable ⇒ loud skip, exit green; db-layer `InsertPlan` seeding with the pure fake embedding — the fast path never imports the NLP loaders; per-set configs with production-vs-fixture pins stated) + **38 scenarios** in five `test_*.py` files (Set A: authorial + fact chain incl. the db-layer distance-0 rank pair, CAS rollback, the pure constraint-follows-anchor test, and the marked route contract; Set B: decay-vs-invalidation incl. the two-time-travel-mechanics-agree and IDs-on-the-wire pairs; Set C: write-back chain shape, cache hit/frozen basis, band crossing, identity bump, correction eviction + re-anchor, drift refusal + refusal caching; Set D: loader parity, closed gate, novelty/tripwire/both fires, damper + reset, efficacy, runner append-only, marked entities-follow-correction; degradation: every ruled ladder row incl. the build-phase hard-stop, flagged as such in its docstring) + the Stop-hook subset edit (`-m "not nlp"`, ruled) + `pytest==9.1.1`/`httpx==0.28.1` pins | floor-verifier **pass** against all eight prior floors, standing by construction: `app\`, `db\`, and all seven walkers **byte-identical to HEAD** (the verifier's recorded git-diff proof — identical bytes need no re-run); full suite re-run twice independently (38/38, 38/38 — the determinism criterion), the subset re-run with API keys scrubbed (31/31 in ~14 s — the keyless + no-spaCy proof), the unreachable-skip beat (30 skipped + the one pure no-DB test, exit 0, loud warning), the hook contract both ways (green → exit 0; `stop_hook_active` guard short-circuits; red path + dormant guards read intact with the subset flag), a structural-only audit of all five files (no assertion touches model prose), no-arg migrate → "Up to date: 3 migration(s) applied, 0 pending", `longmem` pristine via the postgres MCP (ten product tables 0 rows, ledger 001+002+003, **no `longmem_suite` residue**), and pins == installed versions | 2026-07-20 |
+
+| Split-brain streaming v1 — the dialogue seam re-shaped into two concurrent calls off one retrieval (`split-brain-streaming.md`, ruled topology; the reserved `WeightOverrides` slot goes live for the behavior view): the streaming **prose** call (`app\providers.py` `DialogueProvider.stream_prose` — a sync generator yielding chunks + a `ProseResult`; real streams raw text, no JSON) + the concurrent **behavior** call (`BehaviorProvider.decide` — directive + delta JSON, new `LONGMEM_MODEL_BEHAVIOR` role + `LONGMEM_PRICE_BEHAVIOR_IN/OUT`, hardened parse) + the async-generator seam (`app\dialogue.py` `run_dialogue_turn`: retrieval once → two views → concurrent legs via a worker-thread + `asyncio.Queue` bridge → validate/apply → terminal `DialogueTurnResult`; prompt split `assemble_prose_prompt`/`assemble_behavior_prompt` with a recent-actions block, prose prompt only; behavior view = `rank_behavior_view` exponent-form re-rank of the served set, `resolve_behavior_weights` clamp `[0,4]`) + caller-held recent-actions scene state + `stream_utterance`/`utterance` (`app\session.py`) + REPL live streaming + divergence debug view (`app\cli.py`) + `first_word`/`behavior` series + behavior cost row (`app\load_driver.py`) + wire deltas (`app\schemas.py`: `first_word_ms`/`prose_stream_ms`/`behavior_ms`/behavior tokens; `dialogue_view`/`behavior_view` `ScoredRef` divergence record; `RecentAction`; `weight_overrides` live on `DialogueTurnRequest`). No migration | verified inline this session against all eleven prior floors: **CLI-harness walker re-opened `tests\verify_cli_harness.py` (36 → 55 assertions** incl. concurrency proved with a slow behavior fake — first chunk 0.008 s vs behavior 300 ms; dialogue-view parity at 1.0 + exponent re-rank flip on crafted items; the divergence record; the recent-actions block appears iff scene actions and clears at `:scene`; all four degradation rows) on fresh scratch; read-path walker weight_overrides criterion re-scoped (48); gate walker `assemble_system_prompt` → `assemble_prose_prompt` rename-only (51); write/reconstruction/authorial/fact walkers **byte-identical to HEAD** and green (40/42/34/34); full suite **41 → 42 passed twice** (+ the split-brain divergence/parity scenario) + keyless subset 35; no-arg migrate → "Up to date: 4 migration(s) applied, 0 pending"; `longmem` pristine via the postgres MCP (ten product tables 0 rows, ledger 001–004, no scratch residue); live piped REPL streaming beat + a standalone driver run. **Independent floor-verifier pass recommended as the final gate.** | 2026-07-21 |
 
 ## Open questions needing Jack's ruling
 
@@ -717,22 +737,43 @@ and the structured behavior output survive the interview. Research publication c
   serial wording); queue restructured (split-brain build → item 1; the pre-ship item grown
   by the slate; research items renumbered 4–8); the ledger's split-brain entry moved off —
   the second use of the pull-forward template. Docs only — no code, no floors changed.
+- **2026-07-21** — **Split-brain streaming v1 built, verified, and committed — the latency
+  topology is live, specced and built the same day.** Jack ruled four forks via explicit
+  questions at plan approval (dated "Split-brain streaming build rulings" entry in
+  `decisions.md`): **behavior model role = a new `behavior` role** (`LONGMEM_MODEL_BEHAVIOR` +
+  `LONGMEM_PRICE_BEHAVIOR_IN/OUT`); **seam shape = async generator** (yields prose chunks then
+  the terminal result; `first_word_ms` = time to the first yielded chunk); **mid-stream prose
+  drop = keep the partial + degraded flag**; **behavior view = re-rank the served top-k set**
+  (not the full pool — reuses served text, zero extra SQL/model calls). Build resolutions:
+  exponent-form weighting (`behavior_score = item.score · rel^(w−1) · rec^(w−1) · imp^(w−1)`,
+  so all-1.0 is dialogue-view parity and any other value re-ranks; clamp `[0,4]`); identity
+  shared by BOTH prompts so the asymmetry stays statistical not architectural (§9), the
+  recent-actions block the one ruled prose-only info difference. New: the prose streamer +
+  behavior provider + fakes/failure-injection (`app\providers.py`), the async-generator
+  split-brain seam with the worker-thread + `asyncio.Queue` bridge and the prompt split
+  (`app\dialogue.py`), the `behavior` role + knobs (`app\config.py`), the divergence record +
+  split-brain instrumentation + `RecentAction` + live `weight_overrides` (`app\schemas.py`),
+  caller-held recent-actions + `stream_utterance`/`utterance` (`app\session.py`), the live
+  streaming REPL + divergence debug view (`app\cli.py`), the `first_word`/`behavior` series +
+  behavior cost row (`app\load_driver.py`). Verification inline: CLI-harness walker re-opened
+  36 → 55 (concurrency proved — first chunk 0.008 s vs behavior 300 ms), read-path
+  weight_overrides criterion re-scoped (48), gate walker rename-only (51), four walkers
+  byte-untouched and green (40/42/34/34), suite 41 → 42 ×2 + keyless subset 35, migrate no-op,
+  `longmem` pristine via the postgres MCP, live REPL streaming beat + driver run. No migration.
+  **Independent floor-verifier pass recommended as the final gate.** **Flagged (operator-owned
+  `.env`):** a malformed consolidated `LONGMEM_PRICE_DIALOGUE_IN=…` note-line crashes
+  `load_settings` on any run reading `.env` prices — Jack's to fix. Queue renumbered (Unity →
+  item 1, pre-ship → 2, research → 3–7).
 
 ## Immediate queue
 
-1. **Split-brain streaming v1 — spec ready** (`split-brain-streaming.md`, specced 2026-07-21;
-   pulled forward off the sequenced-later ledger by the latency-slate ruling): concurrent
-   behavior + streaming-prose calls off one retrieval (first word = prose TTFT); weights live
-   on the behavior view (second scoring pass, dialogue-view parity); caller-held
-   recent-actions block + the game-authored action-observe contract; instrumented divergence
-   record (§13); seam + REPL + driver streaming (SSE rides with Unity). Build session next.
-2. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
+1. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
    choreography incl. the 60-day drift beat, the correction-override beat, and the
    gate-recollect beat (all live in the REPL: `:as-of` jumps + scene boundaries + band
    crossings; `:correct` — which now moves retrieval AND entities; the gate debug line +
    `(reconstructing…)`) — plus the new game-authored action-observe beat and the SSE
    streaming route (its consumer arrives here).
-3. Before the demo ships (pre-ship items — **the 2026-07-21 latency slate ruled ALL of these
+2. Before the demo ships (pre-ship items — **the 2026-07-21 latency slate ruled ALL of these
    land pre-demo**; fine ordering is Jack's to re-slate):
    - **(a) re-rule the escalation failure path — widened by real data (2026-07-21).** The
      hard-stop path never fired in 80 real observes post-fix, but escalation FIRES on **79%
@@ -755,7 +796,7 @@ and the structured behavior output survive the interview. Research publication c
 spec/build session; ordering after the Unity/pre-ship items is Jack's to re-slate. Papers per
 item are traced in `Research Papers\CHANGES-FROM-RESEARCH.md`.)*
 
-4. **Judged eval harness v1** (ruled: includes LLM-judged categories + a judge model role/env
+3. **Judged eval harness v1** (ruled: includes LLM-judged categories + a judge model role/env
    var from v1; judged signal only meaningful in real mode — sequenced with that stated).
    Starter categories: selective-forgetting single/multi-hop (MemoryAgentBench 2507.05257),
    abstention/premise (LongMemEval 2410.10813, LME-V2 2605.12493), reconstruction FactScore
@@ -764,22 +805,22 @@ item are traced in `Research Papers\CHANGES-FROM-RESEARCH.md`.)*
    (2606.17328), and the judge-free keyword-retention check (2511.10277) which fits the
    structural suite today. Harness shape: Insert/Query over the existing session-runner loop;
    accuracy-vs-latency Pareto reporting.
-5. **Graph/associative memory** — spec session with the de-risked design notes: Postgres-native,
+4. **Graph/associative memory** — spec session with the de-risked design notes: Postgres-native,
    no graph DB (SPRIG 2602.23372 — app-side seeded PPR is sparse linear algebra);
    concept-mediated edges against `identity_components`, NOT raw entities (GAAMA 2603.27910 —
    entity graphs mega-hub, concept graphs stay ~30× sparser); bi-temporal edge supersession is
    our extension (edges from live heads only; corrections re-derive); the lexical channel
    (Target B) is the hybrid seeding base; graph term = a small additive nudge (GAAMA's 0.1
    ablation). Cheapest first step: HippoRAG's node-specificity IDF on the entity tripwire.
-6. **Recall-reinforced decay** — spec session (ruled 2026-07-20: its own session). The "what
+5. **Recall-reinforced decay** — spec session (ruled 2026-07-20: its own session). The "what
    counts as recall" fork + a migration; must not conflate decay with invalidation (invariant)
    nor break within-scene byte-identity. MemoryBank 2305.10250; survey 2512.13564 §5.2.3.
-7. **Automatic conflict/staleness detection** — spec session; the write-time counterpart of the
+6. **Automatic conflict/staleness detection** — spec session; the write-time counterpart of the
    dissonance path. STALE 2605.06527 (CUPMEM-style adjudication riding `identity_components`);
    Nous 2606.22030 (trust provenance-capped, never content-inferred — maps to
    `typology`/`typology_source`); MemConflict 2605.20926 (taxonomy + near-floor SOTA = a
    differentiator). Non-destructive: detection routes through supersession, never delete.
-8. Smaller queued notes: the reflection design dossier (ground reflective writes in cited
+7. Smaller queued notes: the reflection design dossier (ground reflective writes in cited
    memory_ids + an RRR repetition detector — honest-lying 2605.29463; periodic
    evidence-conditioned identity refresh — AI-YOU 2607.10539; persona-lensed retrieval routing
    — self-reports; idle-time scheduling — sleep-time 2504.13171); richer `seed_identity`
@@ -787,9 +828,11 @@ item are traced in `Research Papers\CHANGES-FROM-RESEARCH.md`.)*
    Whisper soft-steering hook + safe-default action fallback for the Unity C# API surface item
    (bounded-autonomy 2604.04703).
 
-*(Done 2026-07-21: **Encoding-context read term v1 + gate-calibration utility** and **Hybrid
-lexical retrieval channel v1 (migration 004)** — the research-adoption slate's two targets;
-see the verified-floors table and session log.
+*(Done 2026-07-21: **Split-brain streaming v1** — concurrent streaming-prose + behavior calls
+off one retrieval, two scored views + the divergence record, the new `behavior` model role;
+first word = prose TTFT. Also done 2026-07-21: **Encoding-context read term v1 +
+gate-calibration utility** and **Hybrid lexical retrieval channel v1 (migration 004)** — the
+research-adoption slate's two targets; see the verified-floors table and session log.
 Done 2026-07-20: **Structural pytest suite v1** — 38 scenarios green, the Stop hook live
 on the `-m "not nlp"` subset; see the verified-floors table and session log. Done 2026-07-19: **Mid-dialogue gate v1** — retrieval is conditional; migration 003
 applied; see the verified-floors table and session log. Done 2026-07-18: **Fact-level correction v1** — retrieval follows the fix; migration 002
@@ -814,8 +857,8 @@ access.)*
   server-side and returns `identity_version`), prompt-head rebuild → post-August.
 - Retrieval scoring function: relevance × recency(decay class) × importance_norm; pin exemption;
   normalization; slots for the future context term and per-call split-brain overrides *(both
-  slots since ruled live: context landed 2026-07-20; behavior-view overrides specced
-  2026-07-21)*. —
+  slots since ruled live: context landed 2026-07-20; behavior-view overrides **built**
+  2026-07-21 — split-brain streaming)*. —
   **Consolidated into `read-path.md` 2026-07-14 and now BUILT** (shapes ruled at build; dated
   `decisions.md` entry).
 - Reconstruction call spec: operator-structured prompt with gist as fixed constraint; determinism;
@@ -852,7 +895,7 @@ landed 2026-07-21 — Target A)*; reflection → parameter compiler; Unity Packa
 (Apache-2.0). *(Reconstruction — mechanism, drift budget, Set C scenarios — moved off this ledger
 into the immediate queue by the 2026-07-14 re-slating ruling.)* *(Split-brain topology with per-call
 weights — moved off this ledger into the immediate queue by the 2026-07-21 latency-slate
-ruling, the second use of the pull-forward template; specced same day,
+ruling, the second use of the pull-forward template; specced AND built same day,
 `split-brain-streaming.md`.)*
 
 **Research track:** asymmetry ablation (on/off, judge-measured explanation-cause divergence); judged

@@ -226,10 +226,14 @@ class CorrectionResult(BaseModel):
 
 
 class WeightOverrides(BaseModel):
-    """RESERVED (ruled 2026-07-14): per-call split-brain scoring multipliers.
+    """Per-call split-brain scoring multipliers (ruled 2026-07-14 as reserved;
+    LIVE since the split-brain build 2026-07-21 — for the BEHAVIOR view only).
 
-    Accepted and shape-validated, NOT consumed by v1 scoring, not echoed.
-    Becomes live with the post-August split-brain topology.
+    On `DialogueTurnRequest` these resolve the behavior call's second scoring
+    pass over the served top-k (exponent-form on the product score, so 1.0
+    reproduces the dialogue-view order — the parity contract). On
+    `DialogueInitRequest` they stay INERT: the dialogue/retrieval view keeps
+    byte-parity with v1 (the read-path walker asserts it).
     """
 
     relevance: float | None = None
@@ -259,7 +263,8 @@ class DialogueInitRequest(BaseModel):
     location_name: str | None = None  # context: casefold match vs the row's
     entities: list[str] | None = None  # context: fact-head entity coverage
     event_time: datetime | None = None  # context: proximity kernel
-    weight_overrides: WeightOverrides | None = None  # RESERVED — inert in v1
+    weight_overrides: WeightOverrides | None = None  # inert here (dialogue view;
+    # consumed for the BEHAVIOR view on DialogueTurnRequest — split-brain 2026-07-21)
     as_of: datetime | None = None  # defaults to server now (UTC)
     # Caller-frozen scene state (reconstruction build 2026-07-17): the
     # identity version returned by the last scene boundary, and the boundary's
@@ -416,10 +421,40 @@ class RetrievalResult(BaseModel):
 class ActionDirective(BaseModel):
     """One emitted action: free `type` from the integrator-supplied vocabulary
     plus a free params object (architecture §9). Written as observed world
-    fact so the contract survives the split-brain migration unchanged."""
+    fact so the contract survives the split-brain migration unchanged (it did —
+    byte-shape identical after the 2026-07-21 build; done-when 4)."""
 
     type: str
     params: dict = Field(default_factory=dict)
+
+
+class RecentAction(BaseModel):
+    """One resolved directive in the caller-held recent-actions scene block
+    (split-brain-streaming.md): the type + params the behavior call chose on a
+    prior turn, plus that turn's world time. Rendered as world-fact context in
+    the PROSE prompt only (never "you decided to"); caller-held scene state,
+    reset at scene boundaries, never stored server-side."""
+
+    type: str
+    params: dict = Field(default_factory=dict)
+    at: datetime
+
+    @field_validator("at")
+    @classmethod
+    def _tz_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            raise ValueError("timestamp must be timezone-aware")
+        return value
+
+
+class ScoredRef(BaseModel):
+    """One (memory_id, score) tuple in a ranked view — the divergence record's
+    unit (split-brain-streaming.md): the turn result carries both the
+    dialogue-view and behavior-view rankings so §13's explanation-cause
+    divergence is measurable structurally, prose-free."""
+
+    memory_id: UUID
+    score: float
 
 
 class DialogueTurnRequest(BaseModel):
@@ -458,6 +493,15 @@ class DialogueTurnRequest(BaseModel):
     # identity_version precedent. Absent -> loader turn, v1 byte-parity.
     loaded_memory_ids: list[UUID] | None = None
     gate_fruitless_streak: int = Field(default=0, ge=0)
+    # Split-brain streaming (split-brain-streaming.md, 2026-07-21). The reserved
+    # WeightOverrides slot goes LIVE here for the BEHAVIOR view's second scoring
+    # pass (request field wins over agents.config wins over 1.0; 1.0 => the
+    # behavior view reproduces the dialogue view's order — the parity contract).
+    # `recent_actions` is the caller-held scene block of prior resolved
+    # directives, rendered as world-fact context in the prose prompt only;
+    # empty => no block. Neither is stored server-side.
+    weight_overrides: WeightOverrides | None = None
+    recent_actions: list[RecentAction] = Field(default_factory=list)
     debug: bool = False
 
     @field_validator("as_of", "scene_started_at", "event_time")
@@ -480,15 +524,27 @@ class DialogueTurnInstrumentation(BaseModel):
     """
 
     retrieval: RetrievalInstrumentation
-    sonnet_ms: float
-    sonnet_first_token_ms: float
+    # The prose (dialogue-role) call. `sonnet_*` names kept for series
+    # continuity; since the split-brain build this is the STREAMING PROSE call.
+    sonnet_ms: float  # total prose stream duration (== prose_stream_ms)
+    sonnet_first_token_ms: float  # == first_word_ms (prose TTFT at the seam)
     apply_ms: float  # the reputation UPDATE
     total_ms: float
     sonnet_input_tokens: int
     sonnet_output_tokens: int
     cost_usd: float | None = None
-    degraded: bool = False  # the never-blank path was taken
+    degraded: bool = False  # the never-blank / behavior-degraded path was taken
     degraded_reason: str | None = None
+    # Split-brain streaming (split-brain-streaming.md, 2026-07-21). Defaulted:
+    # pre-split constructions stand. `first_word_ms` is the HEADLINE latency
+    # term (prose TTFT at the seam — the <1s viability bar); `prose_stream_ms`
+    # the full stream; the behavior call runs CONCURRENTLY, so `behavior_ms`
+    # overlaps the prose stream rather than adding to the turn serially.
+    first_word_ms: float = 0.0
+    prose_stream_ms: float = 0.0
+    behavior_ms: float = 0.0
+    behavior_input_tokens: int = 0
+    behavior_output_tokens: int = 0
 
 
 class DialogueTurnResult(BaseModel):
@@ -513,4 +569,13 @@ class DialogueTurnResult(BaseModel):
     reputation_sensitivity: float
     reputation_after: float
     items: list[RetrievedMemory]  # retrieval echo: IDs + scores invariant
+    # Divergence record (split-brain-streaming.md, 2026-07-21): the two scored
+    # views the concurrent calls saw — `dialogue_view` is the served ranking
+    # (what the prose call read, dialogue weights), `behavior_view` the same
+    # served memories re-ranked with the behavior call's resolved weights. At
+    # all-1.0 weights the two orders match (parity). Structural, prose-free —
+    # §13's explanation-cause divergence data. Defaulted: pre-split
+    # constructions stand.
+    dialogue_view: list[ScoredRef] = Field(default_factory=list)
+    behavior_view: list[ScoredRef] = Field(default_factory=list)
     instrumentation: DialogueTurnInstrumentation

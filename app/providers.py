@@ -1,14 +1,17 @@
 """providers.py — model provider interfaces: real implementations + deterministic fakes.
 
 Two write-path roles (write-path.md §Model provider interfaces) plus the
-escalation call ruled into v1 (2026-07-13), plus the dialogue role (the
-CLI-harness build, 2026-07-15), plus the reconstruction role (the
+escalation call ruled into v1 (2026-07-13), plus the dialogue + behavior roles
+(the CLI-harness build 2026-07-15, split into two concurrent calls by the
+split-brain build 2026-07-21), plus the reconstruction role (the
 reconstruction build, 2026-07-17):
   - the single Haiku write call (render + importance + typology-when-absent),
   - the LLM-escalation gist call (hard cases, biased loose),
   - the embedding call (text-embedding-3-small @ 1536, locked),
-  - the single Sonnet-class dialogue call (prose + action directive +
-    reputation delta in one structured output; cli-harness.md),
+  - the Sonnet-class dialogue call — since the split-brain build it STREAMS
+    PURE PROSE (no JSON envelope; split-brain-streaming.md),
+  - the concurrent Haiku-class behavior call (action directive + reputation
+    delta as one JSON object; split-brain-streaming.md),
   - the batched Haiku-class reconstruction call (all cache misses of one
     retrieval in one structured call; reconstruction.md).
 
@@ -32,6 +35,7 @@ import hashlib
 import json
 import math
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -104,17 +108,32 @@ class EmbedResult:
 
 
 @dataclass(frozen=True)
-class DialogueCallResult:
-    """Parsed structured output of the single dialogue call.
+class ProseResult:
+    """The streaming prose call's terminal accounting (split-brain-streaming.md,
+    2026-07-21). The prose call streams PURE PROSE — the chunks ARE the
+    player-facing text, yielded as they arrive; this is returned from the
+    stream generator (via StopIteration.value) once the stream closes, so the
+    seam has token counts and the measured first-token latency. There is no
+    JSON envelope on the prose call anymore — the directive + delta moved to
+    the concurrent behavior call."""
 
-    Tolerant parse (cli-harness.md degradation ladder): prose is required — a
-    response with no parseable prose raises MalformedOutputError; a malformed
-    directive or delta degrades field-wise (None + the reason captured) and
-    the call still counts as succeeded. Vocabulary validation of a well-formed
-    directive happens at the seam, not here.
-    """
+    input_tokens: int
+    output_tokens: int
+    first_token_ms: float  # 0.0 on the fake; measured on the streaming real call
 
-    prose: str
+
+@dataclass(frozen=True)
+class BehaviorCallResult:
+    """Parsed structured output of the concurrent behavior call
+    (split-brain-streaming.md): the action directive + the reputation delta,
+    JSON-in-text. This is today's dialogue structured output MINUS prose — the
+    prose rode off to the streaming call. Tolerant parse (the degradation
+    ladder): a malformed directive or delta degrades field-wise (None + the
+    reason captured) and the call still counts as succeeded; behavior-call
+    failure/malformed-JSON is handled at the seam (no directive, zero delta,
+    flag). Vocabulary validation of a well-formed directive happens at the
+    seam, not here."""
+
     directive_type: str | None
     directive_params: dict
     directive_error: str | None  # shape-level parse issue; the seam drops it
@@ -122,7 +141,6 @@ class DialogueCallResult:
     delta_error: str | None
     input_tokens: int
     output_tokens: int
-    first_token_ms: float  # 0.0 on the fake; measured on the streaming real call
 
 
 @dataclass(frozen=True)
@@ -182,13 +200,27 @@ class EmbeddingProvider(Protocol):
 
 
 class DialogueProvider(Protocol):
-    """`system_prompt` is fully assembled at the seam (app\\dialogue.py owns
-    the block shape); `vocabulary` rides separately so the deterministic fake
-    can draw its fixed directive from it."""
+    """The streaming prose call (split-brain-streaming.md). `system_prompt` is
+    fully assembled at the seam (app\\dialogue.py owns the block shape). Returns
+    a SYNC generator that yields prose chunks as they arrive and returns a
+    ProseResult (token counts + first-token latency) via StopIteration.value
+    once the stream closes; the seam runs it in a worker thread and bridges the
+    chunks onto its async output. No vocabulary — the directive moved to the
+    behavior call."""
 
-    def generate(
+    def stream_prose(self, *, system_prompt: str, utterance: str) -> Iterator[str]: ...
+
+
+class BehaviorProvider(Protocol):
+    """The concurrent behavior call (split-brain-streaming.md): chooses the
+    action directive and emits the reputation delta as JSON-in-text.
+    `system_prompt` is fully assembled at the seam; `vocabulary` rides
+    separately so the deterministic fake can draw its fixed directive from
+    it."""
+
+    def decide(
         self, *, system_prompt: str, utterance: str, vocabulary: list[str]
-    ) -> DialogueCallResult: ...
+    ) -> BehaviorCallResult: ...
 
 
 class ReconstructionProvider(Protocol):
@@ -299,26 +331,42 @@ class FakeEmbeddingProvider:
         return EmbedResult(vectors=vectors, tokens=tokens)
 
 
-class FakeDialogueProvider:
-    """Deterministic dialogue: stable prose echo, the vocabulary's first
-    directive, hash-derived delta in [-1, 1) — byte-identical structured
-    output for identical turns (cli-harness.md done-when)."""
+class FakeProseProvider:
+    """Deterministic streaming prose: the stable echo split into word chunks,
+    yielded one at a time (so the seam's chunk bridge and first_word_ms are
+    exercised offline), returning a ProseResult with byte-stable token counts —
+    identical turns reproduce it exactly (split-brain done-when)."""
 
-    def generate(
-        self, *, system_prompt: str, utterance: str, vocabulary: list[str]
-    ) -> DialogueCallResult:
+    def stream_prose(self, *, system_prompt: str, utterance: str) -> Iterator[str]:
         prose = f"[fake dialogue] {utterance}"
+        words = prose.split()
+        for i, word in enumerate(words):
+            # Re-emit with the original spacing so "".join(chunks) == prose.
+            yield word if i == 0 else " " + word
+        return ProseResult(
+            input_tokens=len(system_prompt.split()) + len(utterance.split()),
+            output_tokens=len(words),
+            first_token_ms=0.0,
+        )
+
+
+class FakeBehaviorProvider:
+    """Deterministic behavior: the vocabulary's first directive + a hash-derived
+    delta in [-1, 1) — byte-identical for identical turns (the old fake
+    dialogue provider's directive/delta half, split off with the prose)."""
+
+    def decide(
+        self, *, system_prompt: str, utterance: str, vocabulary: list[str]
+    ) -> BehaviorCallResult:
         delta = round(_stable_unit_float(utterance, "reputation") * 2 - 1, 4)
-        return DialogueCallResult(
-            prose=prose,
+        return BehaviorCallResult(
             directive_type=vocabulary[0] if vocabulary else None,
             directive_params={},
             directive_error=None,
             reputation_delta=delta,
             delta_error=None,
             input_tokens=len(system_prompt.split()) + len(utterance.split()),
-            output_tokens=len(prose.split()),
-            first_token_ms=0.0,
+            output_tokens=2,
         )
 
 
@@ -393,19 +441,61 @@ class FailingEscalationProvider:
         raise ProviderCallError(f"injected escalation failure (call {self.calls})")
 
 
-class FailingDialogueProvider:
-    """Dialogue-call failure: never-blank — the turn returns the fallback line."""
+class FailingProseProvider:
+    """Prose failure BEFORE the first chunk: never-blank — the turn serves the
+    fallback line (split-brain degradation ladder row 2)."""
 
-    def generate(self, **_kwargs) -> DialogueCallResult:
-        raise ProviderCallError("injected dialogue-call failure")
+    def stream_prose(self, *, system_prompt: str, utterance: str) -> Iterator[str]:
+        raise ProviderCallError("injected prose-call failure")
+        yield  # pragma: no cover — makes this a generator function
 
 
-class MalformedDialogueProvider:
-    """Call 'succeeds' but nothing parses (no prose): fallback line, spend accounted."""
+class MidStreamDropProseProvider:
+    """Prose drops AFTER some chunks (split-brain degradation ladder row 3,
+    ruled: keep the partial + degraded flag). Yields two deterministic chunks,
+    then raises — the seam keeps the partial prose and flags the turn."""
 
-    def generate(self, **_kwargs) -> DialogueCallResult:
+    def stream_prose(self, *, system_prompt: str, utterance: str) -> Iterator[str]:
+        yield "partial"
+        yield " prose"
+        raise ProviderCallError("injected mid-stream prose drop")
+
+
+class FailingBehaviorProvider:
+    """Behavior-call failure: no directive, zero delta, degraded flag; the
+    prose stream is unaffected (split-brain ladder row 1)."""
+
+    def decide(self, **_kwargs) -> BehaviorCallResult:
+        raise ProviderCallError("injected behavior-call failure")
+
+
+class MalformedBehaviorProvider:
+    """Behavior 'succeeds' but its JSON does not parse: same as a failure at
+    the seam (no directive, zero delta, flag), spend accounted."""
+
+    def decide(self, **_kwargs) -> BehaviorCallResult:
         raise MalformedOutputError(
-            "injected malformed dialogue output", input_tokens=7, output_tokens=3
+            "injected malformed behavior output", input_tokens=7, output_tokens=3
+        )
+
+
+class SlowBehaviorProvider:
+    """A deliberately slow behavior call: sleeps SLEEP_SECONDS, then returns a
+    normal fake result. The seam runs decide() in a worker thread, so the
+    instant prose fake streams its first chunk long before this returns —
+    proving the two legs are concurrent, not sequential (done-when 1)."""
+
+    SLEEP_SECONDS = 0.3
+
+    def __init__(self) -> None:
+        self._inner = FakeBehaviorProvider()
+
+    def decide(
+        self, *, system_prompt: str, utterance: str, vocabulary: list[str]
+    ) -> BehaviorCallResult:
+        time.sleep(self.SLEEP_SECONDS)
+        return self._inner.decide(
+            system_prompt=system_prompt, utterance=utterance, vocabulary=vocabulary
         )
 
 
@@ -665,14 +755,18 @@ class RealEscalationProvider:
 
 
 class RealDialogueProvider:
-    """Anthropic Sonnet-class single dialogue call (cli-harness.md). Streams so
-    first-token latency is measurable; usage comes from the final message.
+    """Anthropic Sonnet-class streaming PROSE call (split-brain-streaming.md,
+    2026-07-21). Streams PURE PROSE — no JSON envelope; the directive + delta
+    moved to the concurrent behavior call. first-token latency is measured;
+    usage comes from the final message.
 
-    Structured-output contract (build ruling 2026-07-15, JSON-in-text per the
-    write/escalation precedent): ONLY a JSON object
-    {"prose": str, "directive": {"type": str, "params": object} | null,
-     "reputation_delta": float}. The instructions telling the model this live
-    in the seam-assembled system prompt; this class enforces the parse side.
+    `stream_prose` is a sync generator: it yields prose chunks as they arrive
+    and returns a ProseResult (token counts + first-token latency) via
+    StopIteration.value once the stream closes. The seam runs it in a worker
+    thread and bridges the chunks onto its async output. A raise before the
+    first yield is a pre-first-chunk failure (fallback line); a raise after some
+    chunks is a mid-stream drop (keep-partial + flag) — the seam decides by
+    what it received.
     """
 
     def __init__(self, settings: Settings):
@@ -681,12 +775,10 @@ class RealDialogueProvider:
         self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         self._model = settings.model_dialogue
 
-    def generate(
-        self, *, system_prompt: str, utterance: str, vocabulary: list[str]
-    ) -> DialogueCallResult:
+    def stream_prose(self, *, system_prompt: str, utterance: str) -> Iterator[str]:
         t0 = time.perf_counter()
         first_token_ms = 0.0
-        chunks: list[str] = []
+        seen_first = False
         try:
             with self._client.messages.stream(
                 model=self._model,
@@ -695,32 +787,62 @@ class RealDialogueProvider:
                 messages=[{"role": "user", "content": utterance}],
             ) as stream:
                 for text in stream.text_stream:
-                    if not chunks:
+                    if not seen_first:
                         first_token_ms = round((time.perf_counter() - t0) * 1000.0, 2)
-                    chunks.append(text)
+                        seen_first = True
+                    yield text
                 final = stream.get_final_message()
         except Exception as exc:
-            raise ProviderCallError(f"dialogue call failed: {exc}") from exc
-        input_tokens = final.usage.input_tokens
-        output_tokens = final.usage.output_tokens
+            raise ProviderCallError(f"prose call failed: {exc}") from exc
+        return ProseResult(
+            input_tokens=final.usage.input_tokens,
+            output_tokens=final.usage.output_tokens,
+            first_token_ms=first_token_ms,
+        )
+
+
+class RealBehaviorProvider:
+    """Anthropic Haiku-class behavior call (split-brain-streaming.md): the
+    action directive + reputation delta as JSON-in-text, non-streaming. The
+    output contract lives in the seam-assembled system prompt; this class
+    enforces the parse side with the hardened first-text-block + fence-tolerant
+    helpers (2026-07-21). Field-wise salvage below (a malformed directive or
+    delta degrades to None + reason; the call still succeeds). An
+    object-level parse failure is a MalformedOutputError — the seam treats it
+    like a behavior-call failure (no directive, zero delta, flag)."""
+
+    def __init__(self, settings: Settings):
+        import anthropic
+
+        self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        self._model = settings.model_behavior
+
+    def decide(
+        self, *, system_prompt: str, utterance: str, vocabulary: list[str]
+    ) -> BehaviorCallResult:
         try:
-            payload = json.loads(_lenient_json_text("".join(chunks)))
-            prose = payload["prose"]
-            if not isinstance(prose, str) or not prose:
-                raise ValueError("prose missing, empty, or not a string")
-        except (
-            KeyError,
-            ValueError,
-            TypeError,
-            json.JSONDecodeError,
-        ) as exc:
+            response = self._client.messages.create(
+                model=self._model,
+                max_tokens=1024,
+                system=system_prompt,
+                messages=[{"role": "user", "content": utterance}],
+            )
+        except Exception as exc:
+            raise ProviderCallError(f"behavior call failed: {exc}") from exc
+        input_tokens = response.usage.input_tokens
+        output_tokens = response.usage.output_tokens
+        try:
+            payload = json.loads(_lenient_json_text(_first_text_block(response)))
+            if not isinstance(payload, dict):
+                raise ValueError("behavior output is not a JSON object")
+        except (ValueError, TypeError, json.JSONDecodeError, IndexError) as exc:
             raise MalformedOutputError(
-                f"dialogue output unparseable: {exc}",
+                f"behavior output unparseable: {exc}",
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
             ) from exc
 
-        # Field-wise salvage below the required prose (degradation ladder).
+        # Field-wise salvage (the old dialogue parse, minus the required prose).
         directive_type: str | None = None
         directive_params: dict = {}
         directive_error: str | None = None
@@ -747,8 +869,7 @@ class RealDialogueProvider:
         else:
             delta_error = f"reputation_delta missing or non-numeric: {raw_delta!r}"
 
-        return DialogueCallResult(
-            prose=prose,
+        return BehaviorCallResult(
             directive_type=directive_type,
             directive_params=directive_params,
             directive_error=directive_error,
@@ -756,7 +877,6 @@ class RealDialogueProvider:
             delta_error=delta_error,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
-            first_token_ms=first_token_ms,
         )
 
 
@@ -843,16 +963,19 @@ class RealEmbeddingProvider:
 
 @dataclass(frozen=True)
 class Providers:
-    # `dialogue` and `reconstruction` default to their fakes so pre-existing
-    # constructions (the earlier structural walkers) stand unchanged;
-    # build_providers always sets them explicitly.
+    # `dialogue`, `reconstruction`, and `behavior` default to their fakes so
+    # pre-existing constructions (the earlier structural walkers) stand
+    # unchanged; build_providers always sets them explicitly. `dialogue` is now
+    # the streaming PROSE provider; `behavior` is the concurrent directive+delta
+    # call (split-brain-streaming.md, 2026-07-21).
     write: WriteProvider
     escalation: EscalationProvider
     embedding: EmbeddingProvider
-    dialogue: DialogueProvider = field(default_factory=FakeDialogueProvider)
+    dialogue: DialogueProvider = field(default_factory=FakeProseProvider)
     reconstruction: ReconstructionProvider = field(
         default_factory=FakeReconstructionProvider
     )
+    behavior: BehaviorProvider = field(default_factory=FakeBehaviorProvider)
 
 
 def build_providers(settings: Settings) -> Providers:
@@ -864,11 +987,13 @@ def build_providers(settings: Settings) -> Providers:
             embedding=RealEmbeddingProvider(settings),
             dialogue=RealDialogueProvider(settings),
             reconstruction=RealReconstructionProvider(settings),
+            behavior=RealBehaviorProvider(settings),
         )
     return Providers(
         write=FakeWriteProvider(),
         escalation=FakeEscalationProvider(),
         embedding=FakeEmbeddingProvider(),
-        dialogue=FakeDialogueProvider(),
+        dialogue=FakeProseProvider(),
         reconstruction=FakeReconstructionProvider(),
+        behavior=FakeBehaviorProvider(),
     )

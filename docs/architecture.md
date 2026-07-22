@@ -321,8 +321,10 @@ pull-forward below — the demo ships the split-brain; this slice stands as the 
 grows from.)*
 
 **Committed target topology: multi-call split-brain** *(pulled forward pre-demo and amended
-2026-07-21 — `split-brain-streaming.md`, specced; dated "Latency slate + split-brain
-pull-forward rulings" entry in `decisions.md`)*. A behavior call (Haiku-class, with its own
+2026-07-21 — `split-brain-streaming.md`, specced **and BUILT 2026-07-21**: the async-generator
+seam streams pure prose concurrently with the behavior call off one retrieval; two scored views;
+`first_word_ms` the headline. Dated "Latency slate + split-brain pull-forward rulings" and
+"Split-brain streaming build rulings" entries in `decisions.md`)*. A behavior call (Haiku-class, with its own
 retrieval weights) chooses the action; the dialogue call sees **past actions as observed world
 facts — never "you decided to."** *(Amended: never the current turn's action — the two calls
 run **concurrently** within a turn, so prose streams from its first token; the current action

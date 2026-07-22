@@ -1597,3 +1597,78 @@ the rest is model inference). Jack reviewed the table and ruled the latency work
 was presented fairly (lands the asymmetric same-turn framing, costs ~+0.8–1.5 s before the
 first word) and not adopted; the single-call prose-first restructure was presented (cheapest,
 no asymmetry landed) and not adopted.
+
+## Split-brain streaming build rulings — 2026-07-21
+
+**Context.** Immediate-queue item 1 (`split-brain-streaming.md`), built the same day it was
+specced. The seam was split into two concurrent calls off one retrieval: a streaming pure-prose
+call and a behavior call (directive + delta). Four forks were ruled via explicit questions at
+plan approval; the mechanical settle-tags were approved with the plan (annotated onto the spec).
+
+**Rulings (Jack, via explicit questions):**
+
+1. **Behavior model role = a new `behavior` role.** `LONGMEM_MODEL_BEHAVIOR` +
+   `LONGMEM_PRICE_BEHAVIOR_IN/OUT`; added to the CLAUDE.md role list; real-mode config validates
+   it like the other roles. (Reuse of the `reputation` role name was the alternative — declined
+   as under-descriptive, since the call also chooses the action.)
+2. **Seam shape = async generator.** `run_dialogue_turn` yields prose chunks, then the terminal
+   `DialogueTurnResult`; `first_word_ms` = time to the first yielded chunk. The chunk-callback
+   alternative was presented and not adopted.
+3. **Mid-stream prose drop = keep the partial + degraded flag** (partial prose is non-blank).
+   Discard-and-fallback was the alternative.
+4. **Behavior view = re-rank the served top-k set** (not the full over-fetch pool). Same served
+   memories re-scored with resolved weights → a different salience order; reuses served text,
+   zero extra SQL/model calls; divergence = order/score over the shared set. The full-pool
+   variant (behavior-only items serving verbatim live heads) was presented with its plumbing
+   cost and not adopted.
+
+**Build resolutions (settle-tags, stated for the record):**
+
+- **Exponent-form weighting.** The reserved `WeightOverrides {relevance, recency, importance}`
+  applies as component-wise exponents on the product score:
+  `behavior_score = item.score · rel^(w_rel−1) · rec^(w_rec−1) · imp^(w_imp−1)` (zero-component
+  guard). At all-1.0 the exponents vanish so `behavior_score == item.score` — the dialogue-view
+  parity contract — and any other value genuinely re-ranks. A plain per-component multiplier was
+  rejected (a uniform scalar cannot re-rank a product); a weighted sum was rejected (it breaks
+  product-form parity). Weights resolve request → `agents.config` → 1.0, clamped `[0.0, 4.0]`
+  (module constants, not knobs). The behavior view is computed in the dialogue seam from the
+  served `RetrievedMemory` fields, so retrieval stays byte-untouched; `DialogueInitRequest`
+  `weight_overrides` stays inert (the read-path parity contract holds).
+- **Identity in BOTH prompts.** The behavior prompt shares identity + reputation snapshot with
+  the prose prompt (the §9 spec diagram omitted it; resolved to include it) so the asymmetry
+  stays STATISTICAL not architectural — same character + same candidates, only the memory
+  weights and the call type differ. The recent-actions block is the one ruled information
+  difference and is prose-only (the behavior call chooses a new action, it does not explain a
+  past one).
+- **Prompt split.** `assemble_system_prompt` split into `assemble_prose_prompt` (identity +
+  reputation + dialogue-view memories + recent-actions + a pure-prose instruction) and
+  `assemble_behavior_prompt` (identity + reputation + behavior-view memories + the directive/delta
+  JSON contract + vocabulary). The gate walker's sole change is the mechanical
+  `assemble_system_prompt` → `assemble_prose_prompt` rename (its `[]` sixth positional arg is now
+  `recent_actions`, so its [memories]-structure assertions stand).
+- **Recent-actions block** = caller-held scene state (the fifth application of the
+  caller-holds-scene-state contract): each turn's resolved directive appended as world-fact
+  context for later turns' prose prompts, capped at `recent_actions_cap` (default 8), reset at
+  scene boundaries, never stored server-side. `session.utterance` drains the seam and applies the
+  bookkeeping in one place (`_apply_turn_result`); `session.stream_utterance` yields chunks for
+  the REPL.
+
+**Concurrency mechanism.** The behavior leg runs as an `asyncio.create_task(to_thread(...))`; the
+prose leg's sync generator runs in a worker thread pushing chunks onto an `asyncio.Queue` via
+`loop.call_soon_threadsafe`, drained by the async generator. Done-when 1 is proven with a
+deliberately slow behavior fake: the first prose chunk arrives in ~8 ms while the behavior call
+sleeps 300 ms (walker [7]).
+
+**Environment note (flagged, NOT fixed — operator-owned `.env`).** `.env` carries a malformed
+consolidated price line — `LONGMEM_PRICE_DIALOGUE_IN=3.00 / _OUT=15.00, _RECONSTRUCTION_IN=…` —
+which `config.load_settings` cannot parse as a float, so any run that reads `.env` prices
+(real mode, or fake mode without overriding that var) crashes at startup. The 2026-07-21
+real-mode session sidestepped it by env-injecting clean prices. Jack's `.env` to fix; surfaced
+for the pre-ship gates.
+
+**Verification.** CLI-harness walker re-opened 36 → 55; read-path walker weight_overrides
+criterion re-scoped (48); gate walker rename-only (51); write/reconstruction/authorial/fact
+walkers byte-untouched and green (40/42/34/34); full suite 41 → 42 (twice) + keyless subset 35;
+no-arg migrate "4 applied, 0 pending"; `longmem` pristine via the postgres MCP (ten product
+tables 0 rows, ledger 001–004, no scratch residue); live piped REPL streaming beat + a standalone
+driver run with the `first_word` + `behavior` series and the behavior cost row. No migration.

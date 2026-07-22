@@ -18,7 +18,15 @@ from datetime import timedelta
 from uuid import uuid4
 
 import pytest
-from conftest import GATE_CONFIG, NOW, by_id, item_ids, run_structural
+from conftest import (
+    GATE_CONFIG,
+    NOW,
+    V1_CONFIG,
+    by_id,
+    drain_turn,
+    item_ids,
+    run_structural,
+)
 
 from app.gate import GATE_SIGNAL_ENTITY, GATE_SIGNAL_NOVELTY
 from app.schemas import DialogueInitRequest, GateInstrumentation
@@ -297,6 +305,70 @@ def test_runner_append_only_and_scene_reset(scene):
             assert runner.gate_fruitless_streak == 0
         finally:
             await runner.close()
+
+    run_structural(scene, scenario)
+
+
+def test_split_brain_views_parity_and_rerank(scene):
+    """Split-brain (split-brain-streaming.md, 2026-07-21): one retrieval, two
+    scored views. The divergence record rides the turn result over the served
+    set; at default weights the behavior view is byte-identical to the dialogue
+    view (parity); a weight override re-scores the behavior view over the SAME
+    set while the dialogue view is unaffected. The seam streams prose ==
+    content."""
+
+    async def scenario(ctx):
+        from app.dialogue import DialogueService
+        from app.schemas import DialogueTurnRequest, WeightOverrides
+
+        config = {**V1_CONFIG, "action_vocabulary": ["greet", "warn"]}
+        agent = await ctx.make_agent("d-split", config)
+        await ctx.seed(agent, T_BRIDGE, NOW - timedelta(hours=1), importance=0.9)
+        await ctx.seed(agent, T_STORM, NOW - timedelta(hours=20), importance=0.3)
+        await ctx.seed(agent, T_QUARRY, NOW - timedelta(hours=2), importance=0.6)
+        service = DialogueService(
+            ctx.pool, ctx.providers(), ctx.settings, ctx.retrieval()
+        )
+
+        def turn(**over):
+            base = dict(
+                agent_id=agent,
+                utterance="Tell me the news.",
+                reputation_snapshot=0.0,
+                as_of=NOW,
+            )
+            base.update(over)
+            return DialogueTurnRequest(**base)
+
+        prose, r = await drain_turn(service.run_dialogue_turn(turn()))
+        assert prose and r.content == prose  # the seam streamed
+        served = {i.memory_id for i in r.items}
+        assert (
+            served
+            == {v.memory_id for v in r.dialogue_view}
+            == {v.memory_id for v in r.behavior_view}
+        )
+        # parity at default weights: byte-identical order AND scores.
+        assert [v.memory_id for v in r.dialogue_view] == [
+            v.memory_id for v in r.behavior_view
+        ]
+        assert [v.score for v in r.dialogue_view] == [v.score for v in r.behavior_view]
+
+        # a weight override re-scores the behavior view over the SAME set;
+        # the dialogue view stays byte-identical (the parity contract).
+        _p, rw = await drain_turn(
+            service.run_dialogue_turn(
+                turn(weight_overrides=WeightOverrides(relevance=0.0))
+            )
+        )
+        assert {v.memory_id for v in rw.behavior_view} == served
+        assert [v.score for v in rw.dialogue_view] != [
+            v.score for v in rw.behavior_view
+        ]
+        assert [v.memory_id for v in rw.dialogue_view] == [
+            v.memory_id for v in r.dialogue_view
+        ]
+        assert [v.score for v in rw.dialogue_view] == [v.score for v in r.dialogue_view]
 
     run_structural(scene, scenario)
 

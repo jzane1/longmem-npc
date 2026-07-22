@@ -64,15 +64,26 @@ HELP = __doc__.split("Meta-commands", 1)[1]
 # ---------------------------------------------------------------------------
 
 
-def render_turn(result: DialogueTurnResult) -> str:
-    """The normal (non-debug) view: the line, the action, the soft flags."""
-    lines = [f"npc> {result.content}"]
+def render_turn_tail(result: DialogueTurnResult) -> str:
+    """The post-prose lines: the action + the soft flags. Split off the content
+    line so the REPL can stream the prose live and print this tail after
+    (split-brain 2026-07-21)."""
+    lines = []
     if result.directive is not None:
         lines.append(f"  [directive] {result.directive.type} {result.directive.params}")
     if result.directive_dropped:
         lines.append(f"  [directive dropped] {result.directive_dropped_reason}")
     if result.instrumentation.degraded:
         lines.append(f"  [degraded] {result.instrumentation.degraded_reason}")
+    return "\n".join(lines)
+
+
+def render_turn(result: DialogueTurnResult) -> str:
+    """The normal (non-debug) view: the line, the action, the soft flags."""
+    lines = [f"npc> {result.content}"]
+    tail = render_turn_tail(result)
+    if tail:
+        lines.append(tail)
     return "\n".join(lines)
 
 
@@ -104,6 +115,11 @@ def render_debug(result: DialogueTurnResult) -> str:
     lines.append(
         f"  delta:     {result.reputation_delta} ({result.reputation_delta_source})"
     )
+    # Divergence record (split-brain 2026-07-21): the two concurrent calls'
+    # scored views, short-id ranked — re-ordering here is the split brain.
+    lines.append("-- split-brain views (dialogue | behavior) --")
+    lines.append(f"  dialogue:  {[str(r.memory_id)[:8] for r in result.dialogue_view]}")
+    lines.append(f"  behavior:  {[str(r.memory_id)[:8] for r in result.behavior_view]}")
     lines.append("-- reputation --")
     lines.append(
         f"  snapshot={result.reputation_snapshot}  prev={result.reputation_prev}  "
@@ -141,9 +157,13 @@ def render_debug(result: DialogueTurnResult) -> str:
         f"{'  [bootstrapped]' if ret.identity_bootstrapped else ''}"
     )
     lines.append(
-        f"  dialogue:  first_token={ins.sonnet_first_token_ms}ms "
-        f"total={ins.sonnet_ms}ms  tokens in={ins.sonnet_input_tokens} "
+        f"  prose:     first_word={ins.first_word_ms}ms "
+        f"stream={ins.prose_stream_ms}ms  tokens in={ins.sonnet_input_tokens} "
         f"out={ins.sonnet_output_tokens}"
+    )
+    lines.append(
+        f"  behavior:  {ins.behavior_ms}ms  tokens "
+        f"in={ins.behavior_input_tokens} out={ins.behavior_output_tokens}"
         + (f"  cost=${ins.cost_usd}" if ins.cost_usd is not None else "")
     )
     lines.append(f"  apply={ins.apply_ms}ms  turn_total={ins.total_ms}ms")
@@ -319,10 +339,30 @@ async def repl(agent_id: UUID, debug: bool) -> None:
                     print(f"unknown command {line.split()[0]!r} — :help lists them")
                 # -- everything else is a player utterance ------------------
                 else:
-                    result = await runner.utterance(line)
-                    print(render_turn(result))
-                    if runner.debug:
-                        print(render_debug(result))
+                    # Stream the prose live (split-brain 2026-07-21): "npc> "
+                    # is printed lazily on the first chunk, so a mid-scene
+                    # "(reconstructing…)" (fired during retrieval, before any
+                    # chunk) stays on its own line above the streamed line.
+                    result: DialogueTurnResult | None = None
+                    streamed = False
+                    async for item in runner.stream_utterance(line):
+                        if isinstance(item, DialogueTurnResult):
+                            result = item
+                        else:
+                            if not streamed:
+                                print("npc> ", end="", flush=True)
+                                streamed = True
+                            print(item, end="", flush=True)
+                    if streamed:
+                        print()  # newline after the streamed prose
+                    elif result is not None:  # no chunks (fallback line)
+                        print(f"npc> {result.content}")
+                    if result is not None:
+                        tail = render_turn_tail(result)
+                        if tail:
+                            print(tail)
+                        if runner.debug:
+                            print(render_debug(result))
             except (ValueError, UnknownMemoryError) as exc:
                 print(f"error: {exc}")
             except EscalationHardStopError as exc:

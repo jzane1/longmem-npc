@@ -27,7 +27,9 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
   may appear in a spec only as a per-target scope fact Jack explicitly ruled — never as an
   inherited default.
 - Every model role (importance, render, typology, escalation, reconstruction, reputation,
-  reflection, dialogue) has its own env var. The retrieval gate is non-LLM — there is no gate model.
+  reflection, dialogue, behavior) has its own env var. The retrieval gate is non-LLM — there is
+  no gate model. (`dialogue` streams pure prose; `behavior` — the split-brain build, 2026-07-21 —
+  is the concurrent call emitting the action directive + reputation delta.)
 - Python formatting: ruff, enforced mechanically by a PostToolUse hook. Don't hand-format.
 
 ## Invariants — never violate, regardless of how a task is worded

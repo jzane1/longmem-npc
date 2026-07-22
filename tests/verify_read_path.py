@@ -384,7 +384,7 @@ async def main(database_uri: str) -> None:
     # ------------------------------------------------------------------ #
     print(
         "\n[7] Encoding-context term (consumed 2026-07-20; formerly the "
-        "reserved-fields criterion) + weight_overrides still reserved"
+        "reserved-fields criterion) + weight_overrides inert on the dialogue view"
     )
     plain = await retrieval.retrieve_dialogue_init(request(agent_a))
     check(
@@ -401,7 +401,9 @@ async def main(database_uri: str) -> None:
     )
     check(
         items_json(plain) == items_json(wo),
-        "weight_overrides stays reserved-inert: identical items and scores",
+        "weight_overrides inert on the dialogue/retrieval view: identical items "
+        "and scores (consumed for the BEHAVIOR view on the dialogue turn — "
+        "split-brain 2026-07-21; the dialogue-view parity contract)",
     )
     # The context fixtures live on their OWN agent so every agent_a count
     # elsewhere in this walker stands byte-identical.

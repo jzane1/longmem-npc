@@ -1,9 +1,20 @@
 # Split-brain streaming — build target (specced 2026-07-21)
 
-> **Status: SPECCED, not built.** Pulled forward off the sequenced-later ledger by the
-> 2026-07-21 latency slate ruling (dated "Latency slate + split-brain pull-forward rulings"
-> entry in `decisions.md`; the 2026-07-14 reconstruction re-slating is the template). The
-> real-mode profiling session measured the player-facing turn at p50 ~4.1 s with first token
+> **Status: BUILT, verified, and committed 2026-07-21.** The twelfth verified floor. The seam
+> is an async generator streaming pure prose concurrently with the behavior call off one
+> retrieval; two scored views (dialogue view = the served ranking; behavior view = the same
+> served set re-ranked with resolved weights, exponent-form); the divergence record, the
+> recent-actions block, the new `behavior` model role, and the four degradation rows all landed.
+> `first_word_ms` is the headline latency term. Verified: CLI-harness walker re-opened
+> (36 → 55 assertions), read-path walker weight_overrides criterion re-scoped, gate walker's
+> sole change the `assemble_system_prompt` → `assemble_prose_prompt` rename; the other four
+> walkers byte-untouched and green; full suite 41 → 42; no migration. Build rulings recorded in
+> the dated "Split-brain streaming build rulings" entry in `decisions.md`.
+>
+> **Original spec status (SPECCED, not built).** Pulled forward off the sequenced-later ledger
+> by the 2026-07-21 latency slate ruling (dated "Latency slate + split-brain pull-forward
+> rulings" entry in `decisions.md`; the 2026-07-14 reconstruction re-slating is the template).
+> The real-mode profiling session measured the player-facing turn at p50 ~4.1 s with first token
 > 1.4–2.2 s, against Jack's ruled viability bar of **first word < ~1 s**. This target makes
 > perceived latency ≈ prose time-to-first-token and lands the whole §9 split-brain topology —
 > **with a ruled alteration** (below). The companion pre-ship levers (B1/B2 model/thinking
@@ -147,16 +158,37 @@ at build (the context-term criterion [7] precedent).
 | Prose stream drops mid-prose | `[SETTLE-AT-BUILD]` — suggest: keep the partial + degraded flag (partial prose is non-blank); alternative: discard + fallback line |
 | Both fail | Fallback line + zero delta + flags (never-blank holds) |
 
-## `[SETTLE-AT-BUILD]`
+## `[SETTLE-AT-BUILD]` — RESOLVED at build (2026-07-21)
 
-Behavior model role env var name (CLAUDE.md's role list already names `reputation` — adopt or
-add a `behavior` role; one env var either way) + its pricing var names; the behavior call's
-prompt + output schema; weight resolution clamps; recent-actions cap + block format; the
-mid-stream failure row; the seam's streaming shape (async iterator vs the `on_reconstruct`
-callback precedent); fake providers (chunked deterministic prose fake + behavior fake +
-failure-injection variants); walker/suite shape (the CLI-harness walker re-opens — the seam
-changes; the read-path walker's weight_overrides criterion re-scopes; reconstruction/gate
-walkers expected byte-untouched — the retrieval pipeline is not touched).
+- **Behavior model role:** a new `behavior` role — `LONGMEM_MODEL_BEHAVIOR`, priced via
+  `LONGMEM_PRICE_BEHAVIOR_IN/OUT`; added to the CLAUDE.md role list; real-mode config validates
+  it like the other roles (ruled: new role, not a reuse of `reputation`).
+- **Seam streaming shape:** an **async generator** (ruled) — `run_dialogue_turn` yields prose
+  chunks then the terminal `DialogueTurnResult`; the sync SDK is bridged through a worker thread
+  + an `asyncio.Queue`. `session.stream_utterance` yields for the REPL; `session.utterance`
+  drains to the result for the driver/suite/walkers.
+- **Behavior view:** **re-rank the served top-k set** (ruled) with resolved weights — same
+  served memories, a different salience order; reuses served text, zero extra SQL/model calls.
+  Weighting is **exponent-form on the product score**
+  (`behavior_score = item.score · rel^(w-1) · rec^(w-1) · imp^(w-1)`), so all-1.0 reproduces the
+  dialogue-view order (parity) and any other value re-ranks — a build resolution (a plain
+  multiplier is a uniform scalar / no re-rank; a weighted sum breaks product-form parity).
+- **Mid-stream prose drop:** **keep the partial + degraded flag** (ruled; partial prose is
+  non-blank).
+- **Weight clamps:** `[0.0, 4.0]`, defaults 1.0 (per-agent + per-call overridable). Recent-actions
+  cap 8 (`recent_actions_cap`); block = world-fact bullet lines, prose prompt only.
+- **Behavior prompt:** identity + reputation snapshot + behavior-view memories + the
+  `{directive|null, reputation_delta}` JSON contract + vocabulary — **identity is shared with the
+  prose prompt** (build resolution) so the asymmetry stays STATISTICAL not architectural (§9);
+  the recent-actions block is the one ruled prose-only information difference.
+- **Divergence record:** `dialogue_view` + `behavior_view` as `ScoredRef{memory_id, score}` lists
+  on the turn result.
+- **Walker/suite shape:** the CLI-harness walker re-opened (36 → 55); the read-path walker's
+  weight_overrides criterion re-scoped ("inert on the dialogue view; consumed on the behavior
+  view"); the gate walker's sole change was the `assemble_system_prompt` → `assemble_prose_prompt`
+  rename (the prompt helper split); write/reconstruction/authorial/fact walkers byte-untouched;
+  the suite grew a split-brain divergence/parity scenario (41 → 42) and the degradation ladder
+  scenario was rebuilt for the two independent legs.
 
 ## Done-when (the build's floor)
 
