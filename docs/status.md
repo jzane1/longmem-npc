@@ -1,7 +1,17 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-07-21
-**Phase:** **split-brain streaming is BUILT — the latency topology is live** (2026-07-21,
+**Last updated:** 2026-07-22
+**Phase:** **external-persona audit landed — the pre-demo path is re-planned** (2026-07-22). A
+four-persona read-only agent-team audit (critique + solutions; `external-audit-2026-07-22.md` +
+`external-audit-2026-07-22-solutions.md`; rulings in the dated `decisions.md` entry) surfaced the
+true blocker, confirmed against source: **`app\api.py` has no HTTP dialogue-turn route**, so Unity/C#
+cannot reach a dialogue turn today. Three rulings: split-brain divergence → a **separate interview
+clip** (not a main-video beat); the demo records **real-providers-only** (so the `.env` fix is now a
+hard prerequisite); the **judged eval harness is pulled pre-demo** (with a judge-free demo panel + a
+hand-labeled gold set + the fixed-gist ON/OFF ablation). Build order: `.env` fix → `POST
+/v1/dialogue/turn` + honest perceived-TTFT → Unity + **The Ledger** → judged eval. No code, no floors,
+no migration this session. **Prior phase: split-brain streaming is BUILT — the latency topology is
+live** (2026-07-21,
 immediate-queue item 1, specced and built the same day). The dialogue seam is now an async
 generator: a streaming **pure-prose** call and a concurrent **behavior** call (directive +
 delta, a new model role) fire off one retrieval; **first word = prose TTFT** (`first_word_ms`,
@@ -101,9 +111,15 @@ and the structured behavior output survive the interview. Research publication c
   must be re-ruled before the demo ships — and the 2026-07-21 real-mode data **widened the
   re-rule to cover the trigger set/thresholds too** (79% fire rate on realistic prose;
   importance p50 0.61 vs the 0.45 threshold; 0 hard-stops in 80 observes post-fix; latency
-  lever D's server half). Not blocking current work. **Now the sole open
-  question** — the reconstruction flagged shapes were all confirmed 2026-07-17 (see the
-  "Reconstruction flagged-shapes confirmations" entry in `decisions.md`).
+  lever D's server half). Not blocking current work. (The reconstruction flagged shapes were all
+  confirmed 2026-07-17 — see the "Reconstruction flagged-shapes confirmations" entry in `decisions.md`.)
+
+- **R7 — the self-referential drift budget (logged 2026-07-22 from the external-persona audit).** The
+  reconstruction drift budget is cosine candidate-vs-anchor < 0.35; it cannot catch a retelling that
+  stays under budget while dropping or contradicting a gist fact, or fabricating a never-observed
+  detail. Challenges the 2026-07-17 drift-metric/threshold ruling — surfaced, not acted on. The
+  fixed-gist-constraint ON/OFF ablation (pulled pre-demo with the judged eval harness) will produce the
+  deciding data; any metric/threshold change waits on it.
 
 ## Session log
 
@@ -769,16 +785,54 @@ and the structured behavior output survive the interview. Research publication c
   per line + add `LONGMEM_MODEL_BEHAVIOR` for real mode). Queue renumbered (Unity →
   item 1, pre-ship → 2, research → 3–7).
 
+- **2026-07-22** — **External-persona agent-team audit + pre-demo replan (docs only — no code, no
+  floors, no migration).** Ran a four-persona read-only Claude Code agent team (Convai/Inworld-type
+  founder/CEO, senior runtime engineer, memory/cognition researcher, skeptic) through a 3-round
+  critique + a solutions round; findings in `external-audit-2026-07-22.md` +
+  `external-audit-2026-07-22-solutions.md`; persona defs in `.claude\agents\audit-*.md`. Lead-verified
+  the load-bearing findings against source: **`app\api.py` has no HTTP dialogue-turn route** (cognition
+  is REPL-only; Unity can't reach it), `first_word_ms` clocks after retrieval (blind to the 16.3 s cold
+  stall), and the behavior view is byte-parity at default weights (the divergence record is a near-no-op
+  until non-default weights). Jack ruled three forks (dated `decisions.md` entry): split-brain
+  divergence → a **separate interview clip**; the demo records **real-providers-only** (the `.env` fix
+  is now a hard prerequisite); the **judged eval harness is pulled pre-demo** (+ a judge-free demo
+  panel, a hand-labeled gold set, and the fixed-gist ON/OFF ablation). Immediate queue restructured to
+  the pre-demo build path (`.env` fix → `POST /v1/dialogue/turn` + perceived-TTFT → Unity + The Ledger →
+  judged eval); C1 pre-warm BUILD proposed post-demo (off-camera warm-init covers the demo — flagged for
+  confirmation); R7 self-referential drift budget logged as an open question. The build target is now
+  **immediate-queue item 1: the HTTP dialogue-turn route.**
+
 ## Immediate queue
 
-1. Unity project + reference scene — connect MCP for Unity first (`mcp-setup.md`) — then demo
-   choreography incl. the 60-day drift beat, the correction-override beat, and the
-   gate-recollect beat (all live in the REPL: `:as-of` jumps + scene boundaries + band
-   crossings; `:correct` — which now moves retrieval AND entities; the gate debug line +
-   `(reconstructing…)`) — plus the new game-authored action-observe beat and the SSE
-   streaming route (its consumer arrives here).
-2. Before the demo ships (pre-ship items — **the 2026-07-21 latency slate ruled ALL of these
-   land pre-demo**; fine ordering is Jack's to re-slate):
+**Pre-demo build path — re-planned 2026-07-22 from the external-persona audit**
+(`external-audit-2026-07-22.md` + `external-audit-2026-07-22-solutions.md`; three rulings in the dated
+`decisions.md` entry). The audit's #1 finding, confirmed against source: **`app\api.py` has no HTTP
+dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over HTTP.
+
+0. **Unblock real mode (hard prerequisite — real-providers-only ruled 2026-07-22).** Fix `.env`: the
+   malformed `LONGMEM_PRICE_DIALOGUE_IN=…` line + add `LONGMEM_MODEL_BEHAVIOR` (operator-owned, Jack's
+   `.env`). Gates everything downstream now that there is no fake-mode backup take.
+1. **HTTP dialogue-turn route + honest latency metric** (own spec/build session — the true blocker).
+   `POST /v1/dialogue/turn` (non-streaming) drains `run_dialogue_turn`'s async generator to the terminal
+   `DialogueTurnResult`; stateless (caller holds scene state); coherent at default weights. Add
+   `perceived_first_word_ms = now − t_total` (retrieval-inclusive) beside `first_word_ms`; measure the
+   <1 s bar against it. SSE `/turn/stream` iterates the SAME generator later — no rewrite.
+2. **Unity project + reference scene + The Ledger** — connect MCP for Unity first (`mcp-setup.md`);
+   **Wk-2 Unity↔backend HTTP interop is the go/no-go gate** (zero `.cs` today). Minimal `NpcMemory` C#
+   client + `NpcSession` (ports `_apply_turn_result`; directive + reputation callbacks). Gray-box scene
+   shipped as the **intended** systems/dev-tool aesthetic (removes art-risk from the critical path).
+   **The Ledger** = the designer-facing ground-truth-vs-telling inspector: original vs current telling
+   side by side + `read_mode`/scores/IDs + superseded rows greyed-but-present + a real gist/detail number
+   on screen. **Off-camera cache warm-init** (fire `/v1/dialogue/init` at each scene basis during camera
+   cuts) removes the 9–16 s cold stall with zero pre-warm code. Beats: **lead with correction-override**,
+   then **reconstructive drift (constancy-first — gist flat, detail thinning)**; the split-brain
+   divergence is a **separate interview clip** (ruled 2026-07-22), not a main-video beat. The
+   game-authored action-observe beat + async observes (old pre-ship (d)) ride here. The REPL still drives
+   all beats today (`:as-of` jumps + scene boundaries + band crossings; `:correct` moves retrieval AND
+   entities; the gate debug line + `(reconstructing…)`).
+
+**Pre-ship latency items** (2026-07-21 latency slate; **audit re-sequenced 2026-07-22** — the
+   perceived-TTFT metric moved into item 1; pre-warm build proposed post-demo):
    - **(a) re-rule the escalation failure path — widened by real data (2026-07-21).** The
      hard-stop path never fired in 80 real observes post-fix, but escalation FIRES on **79%
      of realistic prose** (real haiku importance p50 0.61 vs the 0.45 threshold; +1.4 s and
@@ -788,9 +842,12 @@ and the structured behavior output survive the interview. Research publication c
    - **(b) B1/B2 dialogue-latency experiments** against the <1 s first-word bar:
      haiku-dialogue A/B is a zero-code env swap; thinking-off variants on the sonnet-5 calls
      are one-liners needing a ruling. Measure, then rule.
-   - **(c) C1 scene-boundary reconstruction pre-warm** (own spec/build session): background-
-     reconstruct at scene start so first turns hit the ~4 ms cache path — the scene-frozen
-     cache key already supports it; kills the 9–16 s cold-scene stall.
+   - **(c) C1 scene-boundary reconstruction pre-warm BUILD → proposed POST-demo** (audit
+     2026-07-22): the demo's 9–16 s cold stall is removed by off-camera warm-init choreography (fire
+     `/v1/dialogue/init` at each scene basis during a camera cut; within-scene byte-stability ⇒ identical
+     on-camera bytes), so the full pre-warm build is no longer demo-blocking. Relaxes the slate's "all
+     pre-demo" wording — flagged for Jack's confirmation. (The scene-frozen cache key still supports the
+     full background build when it lands.)
    - **(d) D async observes** (client contract): the Unity client fires observe events
      without blocking dialogue — the 3.4 s real observe is throughput, not latency.
    *(Done 2026-07-21: the old **(b) real-provider smoke** and **(c) real-mode profiling
@@ -800,8 +857,13 @@ and the structured behavior output survive the interview. Research publication c
 spec/build session; ordering after the Unity/pre-ship items is Jack's to re-slate. Papers per
 item are traced in `Research Papers\CHANGES-FROM-RESEARCH.md`.)*
 
-3. **Judged eval harness v1** (ruled: includes LLM-judged categories + a judge model role/env
-   var from v1; judged signal only meaningful in real mode — sequenced with that stated).
+3. **Judged eval harness v1 — PULLED PRE-DEMO (ruled 2026-07-22 with the Ledger scope).** Judge
+   model role/env var + LLM-judged categories (judged signal real-mode-only — sequenced with that).
+   **Audit additions:** (i) a judge-free gist-precision/detail-recall metric (from existing gist spans +
+   spaCy, no judge call) feeding The Ledger's on-screen numbers; (ii) a small **hand-labeled gold set**
+   so the judge has proven rigor (judge-agreement / meta-eval); (iii) the **fixed-gist-constraint ON/OFF
+   ablation** — turns the self-referential drift-budget hole (R7) into a shown finding; (iv)
+   **real-embedding drift validation** of the demo memory, run EARLY (Wk3, not Wk4).
    Starter categories: selective-forgetting single/multi-hop (MemoryAgentBench 2507.05257),
    abstention/premise (LongMemEval 2410.10813, LME-V2 2605.12493), reconstruction FactScore
    **retargeted** — gist-precision stays ~100%, detail-recall may decay (LoCoMo 2402.17753),

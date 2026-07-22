@@ -1672,3 +1672,62 @@ walkers byte-untouched and green (40/42/34/34); full suite 41 → 42 (twice) + k
 no-arg migrate "4 applied, 0 pending"; `longmem` pristine via the postgres MCP (ten product
 tables 0 rows, ledger 001–004, no scratch residue); live piped REPL streaming beat + a standalone
 driver run with the `first_word` + `behavior` series and the behavior cost row. No migration.
+
+## External-persona audit + pre-demo replan rulings — 2026-07-22
+
+An external-persona **agent-team audit** was run — four read-only personas (a Convai/Inworld-type
+founder/CEO, a senior runtime engineer, a memory/cognition researcher, a skeptic) over a 3-round
+critique + a solutions round; full record in `external-audit-2026-07-22.md` and
+`external-audit-2026-07-22-solutions.md`, persona defs in `.claude\agents\audit-*.md`. Load-bearing
+findings were confirmed against source: **`app\api.py` exposes no HTTP dialogue-turn route** (only
+`dialogue/init` retrieval + observe + scene-boundary + pin + correction), so the entire cognition
+layer is reachable only in-process via `app\session.py` — Unity (C# over HTTP) cannot reach a turn
+today; `first_word_ms` starts its clock at the prose call, **after** retrieval, so it is blind to the
+cold-reconstruction stall; and the behavior view is **byte-parity with the dialogue view at default
+weights**, so the split-brain divergence record is a near-no-op until non-default weights are authored.
+
+Jack ruled three forks and adopted the audit's plan into the immediate queue:
+
+1. **Split-brain in the demo = a separate interview clip, not a main-video beat.** The main demo
+   turn path wraps `run_dialogue_turn` at default weights (coherent by construction — no revert, no
+   incoherence risk). The authored "two brains" divergence becomes a short standalone clip + the
+   paper's asymmetry ablation (Turpin template). The built floor stays. (STAGE-in-video was the
+   alternative — the divergence's on-camera value did not justify the extra Unity work against a
+   byte-parity default.)
+
+2. **Demo records on real providers only** (no fake-mode backup take). Rationale: the on-screen
+   cost/latency table and the drift must be genuine to survive a tier-1 interview, and the fake
+   embedding is calibrated to the mechanism (the 60-day fake drift is an artifact). Consequence: the
+   malformed-`.env` fix (+ `LONGMEM_MODEL_BEHAVIOR`) is now a **hard prerequisite**, not a background
+   flag; real-mode robustness carries no insurance take.
+
+3. **Judged eval harness pulled PRE-demo, with three additions.** Beyond the already-ruled judge
+   model role + LLM-judged categories: (i) a **judge-free gist-precision/detail-recall metric**
+   (computed from existing gist spans + spaCy, no judge call) that feeds the on-screen demo panel's
+   real numbers; (ii) a small **hand-labeled gold set** so the LLM judge has proven rigor
+   (judge-agreement / meta-eval); (iii) the **fixed-gist-constraint ON/OFF ablation** — the decisive
+   test that turns the self-referential drift-budget hole into a shown finding. The two-text
+   side-by-side panel + a real gist/detail number is retained as a demo visual regardless. (This
+   pulls the former research-queue item 3 into the pre-demo phase — a scope expansion Jack accepted
+   with the runway cost stated: the judged harness + gold set is ~1–2 focused weeks on top of the
+   plumbing + Unity estimate, parallelizable with the Unity build.)
+
+**The Ledger.** The demo's ground-truth-vs-telling panel is promoted from a debug view to the
+designer-facing hero surface (the memory inspector Convai/Inworld don't offer) — it is the
+legibility layer and the judge-free measurement as one object.
+
+**Re-sequencing note (flagged, not a new ruling).** The audit showed the demo's 9–16 s cold
+reconstruction stall is removable by **off-camera cache warm-init** (a throwaway `/v1/dialogue/init`
+at each scene basis during a camera cut; within-scene byte-stability guarantees identical on-camera
+bytes), so the **C1 pre-warm BUILD is no longer demo-blocking** and is proposed to move post-demo.
+This relaxes the 2026-07-21 latency slate's "all four levers land pre-demo" wording and is flagged
+for Jack's confirmation. The perceived-TTFT metric fix (retrieval-inclusive) rides with the turn route.
+
+**R7 — self-referential drift budget (logged open item, NOT acted on).** The drift budget is cosine
+candidate-vs-anchor < 0.35; it cannot catch a retelling that stays under budget while dropping or
+contradicting a gist fact, or fabricating a never-observed detail. This challenges the 2026-07-17
+drift-metric/threshold ruling; the fixed-gist ON/OFF ablation (ruling 3) will produce the data, and
+any metric/threshold change waits on that data. Added to open questions.
+
+**No code, no floors, no migration this session** — audit + rulings + queue replan only. The demo's
+split-brain-topology and reconstruction code are unchanged; the built floors stand.
