@@ -2,9 +2,10 @@
 asserted structurally. Marked `nlp` where the scenario CALLS the write pass
 at the service level; the retrieval/gate/dialogue rows are unmarked.
 
-The escalation hard-stop case asserts the CURRENT build-phase stance (ruled
-2026-07-13; the production re-rule is owed before the demo ships — when it
-lands, exactly this test changes). The suite does not settle that question.
+The escalation failure case asserts the ruled SOFT-DEGRADE behavior (ruled
+2026-07-22, retiring the temporary 2026-07-13 fail-loud hard-stop): a
+gist-escalation double failure proceeds with the base NLP-pass gist and sets
+escalation_failed = true, never a lost write.
 """
 
 from __future__ import annotations
@@ -176,27 +177,29 @@ def test_correction_embed_failure_all_or_nothing(scene):
 
 
 @pytest.mark.nlp
-def test_escalation_hard_stop_zero_rows(scene):
-    """Escalation fails twice => HARD-STOP, nothing inserted (BUILD-PHASE
-    stance ruled 2026-07-13; the production re-rule is owed — see module
-    docstring). Structurally assertable as zero rows."""
+def test_escalation_failure_soft_degrades(scene):
+    """Escalation fails twice => SOFT-DEGRADE (ruled 2026-07-22): the write
+    proceeds with the base NLP-pass gist, one memories row lands, and
+    escalation_failed = true. Structurally assertable: row present + flag set,
+    never a lost write."""
 
     async def scenario(ctx):
-        from app.ingest import EscalationHardStopError
         from app.providers import FailingEscalationProvider
 
-        agent = await ctx.make_agent("g-hardstop", V1_CONFIG)
+        agent = await ctx.make_agent("g-escdegrade", V1_CONFIG)
         failing = FailingEscalationProvider()
         service = ctx.ingest(escalation=failing)
-        counts_sql = (
-            "SELECT (SELECT count(*) FROM memories WHERE agent_id = %s), "
-            "(SELECT count(*) FROM identity_components WHERE agent_id = %s)"
+        count_sql = "SELECT count(*) FROM memories WHERE agent_id = %s"
+        before = (await ctx.fetchrow(count_sql, agent))[0]
+        result = await service.ingest_observation(observe(agent))
+        assert failing.calls == 2  # retried exactly once, then degraded
+        assert result.escalation_failed is True  # flagged on the wire
+        assert (await ctx.fetchrow(count_sql, agent))[0] == before + 1  # not lost
+        row = await ctx.fetchrow(
+            "SELECT escalation_failed FROM memories WHERE memory_id = %s",
+            result.memory_id,
         )
-        before = await ctx.fetchrow(counts_sql, agent, agent)
-        with pytest.raises(EscalationHardStopError):
-            await service.ingest_observation(observe(agent))
-        assert failing.calls == 2  # retried exactly once
-        assert await ctx.fetchrow(counts_sql, agent, agent) == before
+        assert row[0] is True  # persisted to the dedicated column (migration 005)
 
     run_structural(scene, scenario)
 

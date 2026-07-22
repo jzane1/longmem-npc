@@ -120,8 +120,9 @@ scenario contract stubbed here, mechanics settle at build)*
 - Embedding-call failure during an **authorial correction** → **all-or-nothing**: nothing written
   on either chain, cache intact, loud error (ruled 2026-07-18 — the deliberate contrast with the
   observe path's land-with-NULL degradation; `fact-level-correction.md`).
-- Escalation call fails twice → **HARD-STOP**, nothing inserted — structurally assertable as zero
-  rows (build-phase stance ruled 2026-07-13; re-rule owed before the demo ships — see `status.md`).
+- Escalation call fails twice → **SOFT-DEGRADE**: the write lands with the base NLP-pass gist and
+  `escalation_failed = true` (result + the dedicated column, migration 005) — structurally assertable
+  as a row present + the flag set (re-ruled 2026-07-22, retiring the 2026-07-13 hard-stop).
 - Gate degradation ladder: embeddings down → entity-only lexical fetch; no entities → novelty-only;
   both out → gate closed, loaded set served, fail-quiet. *(Specced & built 2026-07-19: the lexical fetch
   reads the post-003 fact-head entities GIN — `mid-dialogue-gate.md`.)*

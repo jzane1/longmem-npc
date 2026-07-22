@@ -1765,3 +1765,25 @@ a prior thread; verified via `config.load_env`/`load_settings` (values never pri
 `LONGMEM_PRICE_*` keys parse as floats, `LONGMEM_MODEL_BEHAVIOR` is present, provider mode is `real`,
 and `load_settings()` succeeds. Immediate-queue item 0 (unblock real mode) is **done** — the 2026-07-21
 flagged `.env` crash is resolved.
+
+## Escalation soft-degrade build — 2026-07-22
+
+Built the escalation soft-degrade ruled above. **Flag ruling: a dedicated queryable column**
+(`memories.escalation_failed`, migration 005, mirroring `scoring_failed`) — chosen over a wire-only
+flag (not queryable after the fact) and over reusing `scoring_failed` (which would conflate the
+gist-escalation degrade with the importance/typology score degrade, losing the signal). Migration 005
+is a single boolean, `NOT NULL DEFAULT false`, no backfill.
+
+Build: `_escalate_with_retry` returns `None` on double failure instead of raising; the observe path
+proceeds with the base NLP-pass spans/components and sets `escalation_failed = true`;
+`EscalationHardStopError` and its observe-route 502 are removed; the flag rides `InsertPlan` →
+`memories.escalation_failed` and `IngestResult.escalation_failed`. **Scope is the observe path only** —
+the correction verb's own fail-loud embed/NER → 502 paths (all-or-nothing, ruled 2026-07-18/19) are a
+separate ruling and stay untouched. The suite's `test_escalation_hard_stop_zero_rows` became
+`test_escalation_failure_soft_degrades` (write lands + flag set on the result and the column); the
+write-path walker's `[11]` flipped the same way. The trigger-set/threshold tuning (79%-fire) stays a
+separate, open item.
+
+Verification: migration 005 applied to `longmem` (idempotent — "5 migration(s) applied, 0 pending");
+full structural suite 42 passed. Independent floor-verifier re-verification of the re-opened write-path
+floor: see the status.md session log + verified-floors table.

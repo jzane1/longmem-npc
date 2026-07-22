@@ -568,8 +568,12 @@ async def main(database_uri: str) -> None:
             # makes to prior walkers (the 002/003 precedent). The gate
             # mechanics this walker verifies are untouched by 004.
             "004_lexical_index.sql",
+            # 005 joined the ledger at the escalation soft-degrade build
+            # (2026-07-22) — the same mechanical ledger-pin update. The gate
+            # mechanics this walker verifies are untouched by 005.
+            "005_escalation_failed.sql",
         ],
-        "the ledger records 001 + 002 + 003 + 004",
+        "the ledger records 001 + 002 + 003 + 004 + 005",
     )
     indexes = {
         row[0]

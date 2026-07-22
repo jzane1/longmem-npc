@@ -9,8 +9,9 @@ cannot reach a dialogue turn today. Three rulings: split-brain divergence → a 
 clip** (not a main-video beat); the demo records **real-providers-only** (so the `.env` fix is now a
 hard prerequisite); the **judged eval harness is pulled pre-demo** (with a judge-free demo panel + a
 hand-labeled gold set + the fixed-gist ON/OFF ablation). Build order: `.env` fix → `POST
-/v1/dialogue/turn` + honest perceived-TTFT → Unity + **The Ledger** → judged eval. No code, no floors,
-no migration this session. **Prior phase: split-brain streaming is BUILT — the latency topology is
+/v1/dialogue/turn` + honest perceived-TTFT → Unity + **The Ledger** → judged eval. First pre-ship item
+since taken off the queue: the **escalation soft-degrade** (migration 005, floor-verifier **pass** —
+the 2026-07-13 fail-loud hard-stop retired). **Prior phase: split-brain streaming is BUILT — the latency topology is
 live** (2026-07-21,
 immediate-queue item 1, specced and built the same day). The dialogue seam is now an async
 generator: a streaming **pure-prose** call and a concurrent **behavior** call (directive +
@@ -102,6 +103,8 @@ and the structured behavior output survive the interview. Research publication c
 | Structural pytest suite v1 — `pytest.ini` (marker registration, `testpaths`, no cache residue) + `tests\conftest.py` (scratch **`longmem_suite`** session lifecycle: probe → create → migrate 001–003 → per-test TRUNCATE → drop; unreachable ⇒ loud skip, exit green; db-layer `InsertPlan` seeding with the pure fake embedding — the fast path never imports the NLP loaders; per-set configs with production-vs-fixture pins stated) + **38 scenarios** in five `test_*.py` files (Set A: authorial + fact chain incl. the db-layer distance-0 rank pair, CAS rollback, the pure constraint-follows-anchor test, and the marked route contract; Set B: decay-vs-invalidation incl. the two-time-travel-mechanics-agree and IDs-on-the-wire pairs; Set C: write-back chain shape, cache hit/frozen basis, band crossing, identity bump, correction eviction + re-anchor, drift refusal + refusal caching; Set D: loader parity, closed gate, novelty/tripwire/both fires, damper + reset, efficacy, runner append-only, marked entities-follow-correction; degradation: every ruled ladder row incl. the build-phase hard-stop, flagged as such in its docstring) + the Stop-hook subset edit (`-m "not nlp"`, ruled) + `pytest==9.1.1`/`httpx==0.28.1` pins | floor-verifier **pass** against all eight prior floors, standing by construction: `app\`, `db\`, and all seven walkers **byte-identical to HEAD** (the verifier's recorded git-diff proof — identical bytes need no re-run); full suite re-run twice independently (38/38, 38/38 — the determinism criterion), the subset re-run with API keys scrubbed (31/31 in ~14 s — the keyless + no-spaCy proof), the unreachable-skip beat (30 skipped + the one pure no-DB test, exit 0, loud warning), the hook contract both ways (green → exit 0; `stop_hook_active` guard short-circuits; red path + dormant guards read intact with the subset flag), a structural-only audit of all five files (no assertion touches model prose), no-arg migrate → "Up to date: 3 migration(s) applied, 0 pending", `longmem` pristine via the postgres MCP (ten product tables 0 rows, ledger 001+002+003, **no `longmem_suite` residue**), and pins == installed versions | 2026-07-20 |
 
 | Split-brain streaming v1 — the dialogue seam re-shaped into two concurrent calls off one retrieval (`split-brain-streaming.md`, ruled topology; the reserved `WeightOverrides` slot goes live for the behavior view): the streaming **prose** call (`app\providers.py` `DialogueProvider.stream_prose` — a sync generator yielding chunks + a `ProseResult`; real streams raw text, no JSON) + the concurrent **behavior** call (`BehaviorProvider.decide` — directive + delta JSON, new `LONGMEM_MODEL_BEHAVIOR` role + `LONGMEM_PRICE_BEHAVIOR_IN/OUT`, hardened parse) + the async-generator seam (`app\dialogue.py` `run_dialogue_turn`: retrieval once → two views → concurrent legs via a worker-thread + `asyncio.Queue` bridge → validate/apply → terminal `DialogueTurnResult`; prompt split `assemble_prose_prompt`/`assemble_behavior_prompt` with a recent-actions block, prose prompt only; behavior view = `rank_behavior_view` exponent-form re-rank of the served set, `resolve_behavior_weights` clamp `[0,4]`) + caller-held recent-actions scene state + `stream_utterance`/`utterance` (`app\session.py`) + REPL live streaming + divergence debug view (`app\cli.py`) + `first_word`/`behavior` series + behavior cost row (`app\load_driver.py`) + wire deltas (`app\schemas.py`: `first_word_ms`/`prose_stream_ms`/`behavior_ms`/behavior tokens; `dialogue_view`/`behavior_view` `ScoredRef` divergence record; `RecentAction`; `weight_overrides` live on `DialogueTurnRequest`). No migration | verified inline this session against all eleven prior floors: **CLI-harness walker re-opened `tests\verify_cli_harness.py` (36 → 55 assertions** incl. concurrency proved with a slow behavior fake — first chunk 0.008 s vs behavior 300 ms; dialogue-view parity at 1.0 + exponent re-rank flip on crafted items; the divergence record; the recent-actions block appears iff scene actions and clears at `:scene`; all four degradation rows) on fresh scratch; read-path walker weight_overrides criterion re-scoped (48); gate walker `assemble_system_prompt` → `assemble_prose_prompt` rename-only (51); write/reconstruction/authorial/fact walkers **byte-identical to HEAD** and green (40/42/34/34); full suite **41 → 42 passed twice** (+ the split-brain divergence/parity scenario) + keyless subset 35; no-arg migrate → "Up to date: 4 migration(s) applied, 0 pending"; `longmem` pristine via the postgres MCP (ten product tables 0 rows, ledger 001–004, no scratch residue); live piped REPL streaming beat + a standalone driver run. **floor-verifier pass** (independent, fresh context — re-ran all ten done-when + all seven walkers on fresh scratch 55/48/51/40/42/34/34, full suite 42 ×2 + keyless subset 35, no-arg migrate "4 applied, 0 pending", `longmem` pristine via the postgres MCP, the ten untouched app files + four untouched walkers confirmed byte-identical to HEAD~1 by git-diff, no invariant violated — sole persisted write is the sanctioned `agents.reputation` UPDATE). | 2026-07-21 |
+
+| Escalation soft-degrade v1 — **migration 005** (`db\migrations\005_escalation_failed.sql`: `memories.escalation_failed boolean NOT NULL DEFAULT false`, mirroring `scoring_failed`) + the observe-path soft-degrade (`app\ingest.py` `_escalate_with_retry` returns `None` on double failure instead of raising; the write proceeds with the base NLP-pass gist and sets `escalation_failed`; `EscalationHardStopError` + its observe-route 502 removed) + the flag on `InsertPlan` → the new column and `IngestResult` (`app\db.py`, `app\schemas.py`) + the `app\cli.py` consumer removed (import + REPL `except`, build-surfaced by the floor-verifier). Retires the 2026-07-13 fail-loud hard-stop (ruled 2026-07-22); the correction verb's own fail-loud embed/NER → 502 paths untouched. The trigger-set/threshold tuning (79%-fire) stays a separate open item. | floor-verifier **pass** (write-path floor re-opened, re-verified): `tests\verify_write_path.py` **42** on fresh scratch with the flipped [11] soft-degrade (write lands + `escalation_failed` True on the result AND the column); the two build-surfaced breakages fixed and re-verified — `verify_cli_harness.py` **55** (`app\cli.py` import/except removed) and `verify_gate.py` **51** (mechanical ledger pin +005, the 004 precedent); read/reconstruction/authorial/fact walkers green (48/42/34/34); full suite **42** + keyless subset **35**; migration 005 applied 001→005 on fresh scratch + idempotent second run + column DDL `boolean NOT NULL DEFAULT false`; **applied to `longmem`** (no-arg migrate → "5 migration(s) applied, 0 pending"); `longmem` pristine via the postgres MCP (ten product tables 0 rows, ledger 001–005, no scratch residue); invariants intact (non-destructive proceed — a row lands flagged, never a lost write; no in-place content UPDATE; sole DELETE remains the correction cache eviction). | 2026-07-22 |
 
 ## Open questions needing Jack's ruling
 
@@ -802,6 +805,22 @@ and the structured behavior output survive the interview. Research publication c
   confirmation); R7 self-referential drift budget logged as an open question. The build target is now
   **immediate-queue item 1: the HTTP dialogue-turn route.**
 
+- **2026-07-22** — **Escalation failure path handled — soft-degrade built + floor-verified (migration
+  005).** The first pre-ship item taken off the queue after the audit replan. Jack ruled the escalation
+  fail-loud hard-stop retired (a failed gist-escalation must not halt a live write) and, at build,
+  ruled the degraded-gist signal a **dedicated queryable column** (`memories.escalation_failed`,
+  migration 005 — over a wire-only flag or reusing `scoring_failed`). Build (`decisions.md` "Escalation
+  soft-degrade build"): `_escalate_with_retry` returns `None` on double failure; the observe path
+  proceeds with the base NLP-pass gist + sets the flag; `EscalationHardStopError` + its 502 removed; the
+  flag rides `InsertPlan` → the column + `IngestResult`. Scope observe-path only — the correction verb's
+  fail-loud paths untouched. Suite `test_escalation_hard_stop_zero_rows` →
+  `test_escalation_failure_soft_degrades`; walker [11] flipped. **The floor-verifier caught two misses
+  in the first pass** — an `EscalationHardStopError` consumer left in `app\cli.py` (would have broken
+  the CLI at import) and the gate walker's ledger pin not bumped for 005 — both fixed and re-verified →
+  **pass** (write-path 42, cli-harness 55, gate 51, read/recon/authorial/fact 48/42/34/34, suite 42 +
+  keyless 35, migrate 005 idempotent, `longmem` pristine 001–005). Trigger-set/threshold tuning
+  (79%-fire) stays a separate open item.
+
 ## Immediate queue
 
 **Pre-demo build path — re-planned 2026-07-22 from the external-persona audit**
@@ -834,14 +853,13 @@ dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over
 
 **Pre-ship latency items** (2026-07-21 latency slate; **audit re-sequenced 2026-07-22** — the
    perceived-TTFT metric moved into item 1; pre-warm build proposed post-demo):
-   - **(a) escalation failure path — RULED 2026-07-22: retire the hard-stop, soft-degrade in
-     production** (the fail-loud stance was temporary; a failed escalation must not halt a live write).
-     BUILD task: write-path soft-degrade (store the observation + an escalation-failed flag rather than
-     aborting — the `scoring_failed` precedent; exact shape settled at build) **plus** flipping the
-     suite's hard-stop test. Demo-relevant under real-providers-only (a hard-stop would kill a take).
-     **Still open (separate, non-blocking):** the trigger-set/threshold tuning — escalation fires on
-     **79% of realistic prose** (importance p50 0.61 vs the 0.45 threshold; +1.4 s + ~$0.0021 per fire),
-     a cost/latency item and latency lever **D**'s server half.
+   - **(a) escalation failure path — BUILT 2026-07-22 (soft-degrade; migration 005).** The fail-loud
+     hard-stop is retired: a gist-escalation double failure now proceeds with the base NLP-pass gist and
+     sets the dedicated `memories.escalation_failed` flag — never a lost write (`EscalationHardStopError`
+     + its observe-route 502 removed; suite 42 green). **Still open (separate, non-blocking):** the
+     trigger-set/threshold tuning — escalation fires on **79% of realistic prose** (importance p50 0.61
+     vs the 0.45 threshold; +1.4 s + ~$0.0021 per fire), a cost/latency item and latency lever **D**'s
+     server half.
    - **(b) B1/B2 dialogue-latency experiments** against the <1 s first-word bar:
      haiku-dialogue A/B is a zero-code env swap; thinking-off variants on the sonnet-5 calls
      are one-liners needing a ruling. Measure, then rule.

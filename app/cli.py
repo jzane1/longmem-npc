@@ -48,7 +48,6 @@ from uuid import UUID
 
 from app.ingest import (
     CorrectionEmbedFailedError,
-    EscalationHardStopError,
     UnknownAgentError,
     UnknownMemoryError,
 )
@@ -365,10 +364,6 @@ async def repl(agent_id: UUID, debug: bool) -> None:
                             print(render_debug(result))
             except (ValueError, UnknownMemoryError) as exc:
                 print(f"error: {exc}")
-            except EscalationHardStopError as exc:
-                # Build-phase fail-loud stance (re-rule before the demo):
-                # nothing was inserted; the observe may be resent safely.
-                print(f"write hard-stopped: {exc}")
             except CorrectionEmbedFailedError as exc:
                 # All-or-nothing (ruled 2026-07-18): nothing was written on
                 # either chain; the :correct may be re-issued safely.

@@ -167,6 +167,9 @@ class IngestResult(BaseModel):
     decay_class: str
     decay_class_unknown: bool
     scoring_failed: bool
+    escalation_failed: (
+        bool  # gist-escalation double-failure soft-degrade (ruled 2026-07-22)
+    )
     embedding_failed: bool
     pinned: bool
     # Instrumentation

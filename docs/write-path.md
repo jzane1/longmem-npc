@@ -9,8 +9,9 @@ not re-derive.
 > **Status: BUILT & floor-verified 2026-07-13.** Every `[SETTLE-AT-BUILD]` item and open flag below
 > was ruled at build time (dated "Write-path build — fork rulings" entry in `decisions.md`); the
 > rulings are annotated inline. **The build added no new DB migration — the migration-01 schema
-> stayed frozen.** One ruling is an explicit build-phase stance owed a re-rule before the demo
-> ships: the escalation hard-stop (see the degradation ladder and `status.md` open questions).
+> stayed frozen.** One ruling was an explicit build-phase stance since **re-ruled 2026-07-22 to
+> soft-degrade** — the escalation failure path (see the degradation ladder; migration 005 added the
+> dedicated `escalation_failed` flag).
 
 ## Principles this build honors
 
@@ -30,8 +31,8 @@ not re-derive.
 - **Nothing integrator-configurable is hardcoded** — model roles (per-role env var), decay-class
   map, thresholds, vocabularies.
 - **Degradation is named and tested per model call** (architecture §2) — a flaky model never loses a
-  write, with one recorded exception: the escalation hard-stop (build-phase stance; see the
-  degradation ladder).
+  write. *(The escalation call was the one build-phase exception; re-ruled 2026-07-22 to soft-degrade,
+  so the no-lost-write rule now holds without exception — see the degradation ladder.)*
 
 ## Scope boundary — do NOT build
 
@@ -177,7 +178,7 @@ On write-call failure the head falls back to the raw observation text — never 
 | unknown `decay_class` label | write lands; default class; `decay_class_unknown = true`. |
 | malformed Haiku structured output | log, ignore, apply neutral/default; the write succeeds. |
 | embedding call fails | write lands; NULL embedding (`embedding IS NULL` is the queryable signal; payload mirror `embedding_failed`). *(Ruled 2026-07-13; signal home since the 2026-07-18 freeze: the live fact head — `memory_fact_versions.embedding IS NULL`.)* |
-| escalation call fails twice | **HARD-STOP** — retry once, then abort the write, nothing inserted (fail-loud; escalation precedes the insert, so a client resend is safe pre-idempotency). *(Build-phase stance ruled 2026-07-13 — **must be re-ruled before the demo ships**; open decision in `status.md`.)* |
+| escalation call fails twice | **SOFT-DEGRADE** — retry once, then proceed with the base NLP-pass gist and set `escalation_failed = true` (the write lands, never lost). *(Re-ruled 2026-07-22, retiring the 2026-07-13 fail-loud hard-stop; the flag is the dedicated `memories.escalation_failed` column, migration 005.)* |
 
 ## Model provider interfaces
 
@@ -203,7 +204,8 @@ The provider is selected by config; the ingest service is identical under either
   novel-entity growth (the spam gate on growth is deferred). *(Ruled 2026-07-13: full escalation in
   v1 — separate provider + `LONGMEM_MODEL_ESCALATION`; five triggers, any one fires, all
   integrator-tunable via `agents.config` with defaults in `app\config.py`; novel-entity growth in,
-  spam gate still deferred. Failure path: the build-phase hard-stop in the degradation ladder.)*
+  spam gate still deferred. Failure path: soft-degrade to the base NLP-pass gist, flagged
+  `escalation_failed` — re-ruled 2026-07-22, see the degradation ladder.)*
 - **Idempotency** — **none in v1** (the frozen schema has no dedup column). A client `event_id` +
   dedup window would need schema this build forbids, so it is deferred to a future migration unless
   Jack rules otherwise; v1 accepts `event_id` but does not enforce it. *(Ruled 2026-07-13: as
@@ -257,9 +259,10 @@ The provider is selected by config; the ingest service is identical under either
 
 *Four criteria added by the 2026-07-13 build rulings (the walker asserts all fourteen):*
 
-- **Escalation hard-stop (build-phase stance).** Given an escalation provider that fails twice on a
-  triggered event, the write is aborted loudly and **nothing** is inserted — no `memories`,
-  `memory_details`, `memory_gist_spans`, or `identity_components` rows.
+- **Escalation soft-degrade (re-ruled 2026-07-22).** Given an escalation provider that fails twice on
+  a triggered event, the write **lands** with the base NLP-pass gist — one `memories` row inserted —
+  and `escalation_failed = true` on both the result and the dedicated column (migration 005); never a
+  lost write.
 - **Arousal populated.** Given observation text covered by the Warriner lexicon, the stored
   `affect_arousal` is non-null (normalized 0–1) and dominance rides in `affect_detail`.
 - **Escalation accounting.** Given a fired trigger, the `IngestResult` instrumentation carries

@@ -144,6 +144,7 @@ class InsertPlan:
     affect_detail: dict | None = None
     new_components: list[NewComponent] = field(default_factory=list)
     spans: list[SpanPlan] = field(default_factory=list)
+    escalation_failed: bool = False  # gist-escalation double-failure soft-degrade (005)
 
 
 @dataclass(frozen=True)
@@ -188,17 +189,19 @@ async def insert_observation(
                 # values; post-003 rows carry NULL here forever.
                 await cur.execute(
                     "INSERT INTO memories (agent_id, observation_text, "
-                    "importance_raw, scoring_failed, typology, typology_confidence, "
+                    "importance_raw, scoring_failed, escalation_failed, typology, "
+                    "typology_confidence, "
                     "typology_source, provenance, pinned, decay_class, "
                     "decay_class_unknown, valid_at, location_name, location_embedding, "
                     "event_time, affect_valence, affect_arousal, affect_detail) "
                     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
-                    "%s, %s, %s, %s) RETURNING memory_id",
+                    "%s, %s, %s, %s, %s) RETURNING memory_id",
                     (
                         plan.agent_id,
                         plan.observation_text,
                         plan.importance_raw,
                         plan.scoring_failed,
+                        plan.escalation_failed,
                         plan.typology,
                         plan.typology_confidence,
                         plan.typology_source,

@@ -56,10 +56,10 @@ memory can drift and be defended, while the ground-truth record underneath never
   `memory_fact_versions.embedding IS NULL`; the authorial-correction verb is the deliberate
   contrast: all-or-nothing fail-loud on embed failure, and correcting an embed-degraded memory
   re-embeds it — `fact-level-correction.md`*);
-  never lose a write because a model was flaky. **One recorded exception (build-phase stance,
-  ruled 2026-07-13, must be re-ruled before the demo ships — see the open question in
-  `status.md`):** a gist-escalation call that fails twice hard-stops the write, fail-loud, with
-  nothing inserted. The retrieval gate degrades per its ladder (section 6), fail-quiet.
+  never lose a write because a model was flaky. *(The one build-phase exception — a gist-escalation
+  call that fails twice hard-stopping the write — was **re-ruled 2026-07-22 to soft-degrade**: the
+  write lands with the base NLP-pass gist and `escalation_failed = true` (migration 005). No such
+  exception now stands.)* The retrieval gate degrades per its ladder (section 6), fail-quiet.
   Malformed-model-response cases live in the test suite.
 
 ## 3. Environment & stack

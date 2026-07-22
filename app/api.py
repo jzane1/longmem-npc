@@ -24,7 +24,6 @@ from app.ingest import (
     CorrectionConflictError,
     CorrectionEmbedFailedError,
     CorrectionNlpFailedError,
-    EscalationHardStopError,
     IngestService,
     UnknownAgentError,
     UnknownMemoryError,
@@ -88,10 +87,6 @@ async def observe(event: ObserveEvent) -> IngestResult:
         return await app.state.service.ingest_observation(event)
     except UnknownAgentError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except EscalationHardStopError as exc:
-        # Build-phase fail-loud stance (re-rule before the demo): nothing was
-        # inserted; the client may safely resend.
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @app.post("/v1/events/scene-boundary", response_model=SceneResult)
@@ -116,8 +111,9 @@ async def correct_memory(memory_id: UUID, body: CorrectionRequest) -> Correction
     the fact-level build): memory-scoped operator verb — /v1/events/* stays
     diegetic. Fail-loud: 404 unknown memory, 409 stale expected_detail_id,
     422 invalid content, 502 embed or NER failure with nothing written (the
-    all-or-nothing rulings, 2026-07-18 / 2026-07-19 — the
-    escalation-hard-stop precedent); nothing partial."""
+    all-or-nothing correction rulings, 2026-07-18 / 2026-07-19); nothing
+    partial. (The observe-path escalation call soft-degrades since 2026-07-22 —
+    it no longer hard-stops; these correction paths stay fail-loud.)"""
     try:
         return await app.state.service.correct(memory_id, body)
     except UnknownMemoryError as exc:

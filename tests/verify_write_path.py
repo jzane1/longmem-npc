@@ -33,7 +33,7 @@ from psycopg.types.json import Jsonb
 from app import api as api_module
 from app.config import Settings
 from app.db import build_pool
-from app.ingest import EscalationHardStopError, IngestService
+from app.ingest import IngestService
 from app.providers import (
     FailingEmbeddingProvider,
     FailingEscalationProvider,
@@ -387,42 +387,38 @@ async def main(database_uri: str) -> None:
     )
 
     # ------------------------------------------------------------------ #
-    print("\n[11] Escalation hard-stop: fail twice -> zero rows inserted")
+    print("\n[11] Escalation soft-degrade: fail twice -> write lands, flagged")
     failing_escalation = FailingEscalationProvider()
-    hard_service = fake_service(pool, settings, escalation=failing_escalation)
+    degrade_service = fake_service(pool, settings, escalation=failing_escalation)
     before = (
         await fetchrow(
             pool, "SELECT count(*) FROM memories WHERE agent_id = %s", agent_id
         )
     )[0]
-    before_comp = (
-        await fetchrow(
-            pool,
-            "SELECT count(*) FROM identity_components WHERE agent_id = %s",
-            agent_id,
-        )
-    )[0]
-    try:
-        await hard_service.ingest_observation(observe_event(agent_id=agent_id))
-        fail("escalation hard-stop", "no exception raised")
-    except EscalationHardStopError:
-        pass
+    degraded = await degrade_service.ingest_observation(
+        observe_event(agent_id=agent_id)
+    )
     check(failing_escalation.calls == 2, "escalation retried exactly once (2 calls)")
+    check(
+        degraded.escalation_failed is True,
+        "escalation_failed flagged on the result",
+    )
     after = (
         await fetchrow(
             pool, "SELECT count(*) FROM memories WHERE agent_id = %s", agent_id
         )
     )[0]
-    after_comp = (
+    check(after == before + 1, "the degraded write landed (one new memories row)")
+    row_flag = (
         await fetchrow(
             pool,
-            "SELECT count(*) FROM identity_components WHERE agent_id = %s",
-            agent_id,
+            "SELECT escalation_failed FROM memories WHERE memory_id = %s",
+            degraded.memory_id,
         )
     )[0]
     check(
-        before == after and before_comp == after_comp,
-        "no memories or identity_components rows from the aborted write",
+        row_flag is True,
+        "escalation_failed persisted to the memories column (migration 005)",
     )
 
     # ------------------------------------------------------------------ #

@@ -97,10 +97,6 @@ class CorrectionNlpFailedError(RuntimeError):
     and retries."""
 
 
-class EscalationHardStopError(RuntimeError):
-    """Escalation failed twice: the write was aborted, nothing was inserted."""
-
-
 def _ms(seconds: float) -> float:
     return round(seconds * 1000.0, 2)
 
@@ -249,18 +245,25 @@ class IngestService:
         new_components = list(nlp_result.novel_components)
         escalation_ms = 0.0
         esc_in = esc_out = 0
+        escalation_failed = False
         if triggers:
             t0 = time.perf_counter()
             escalation = await self._escalate_with_retry(
                 event, components, nlp_result, triggers
             )
             escalation_ms = _ms(time.perf_counter() - t0)
-            esc_in = escalation.input_tokens
-            esc_out = escalation.output_tokens
-            spans = _merge_spans(spans, escalation.spans)
-            new_components = _merge_components(
-                new_components, escalation.new_components
-            )
+            if escalation is None:
+                # Soft-degrade (ruled 2026-07-22): the gist-escalation call
+                # failed twice; proceed with the base NLP-pass spans/components
+                # (no merge) and flag it. A degraded gist is never a lost write.
+                escalation_failed = True
+            else:
+                esc_in = escalation.input_tokens
+                esc_out = escalation.output_tokens
+                spans = _merge_spans(spans, escalation.spans)
+                new_components = _merge_components(
+                    new_components, escalation.new_components
+                )
 
         # --- embedding (soft degradation: NULL embedding) -----------------
         t0 = time.perf_counter()
@@ -316,6 +319,7 @@ class IngestService:
                 valid_at=event.client_timestamp,
                 importance_raw=importance,
                 scoring_failed=scoring_failed,
+                escalation_failed=escalation_failed,
                 typology=typology,
                 typology_confidence=typology_confidence,
                 typology_source=typology_source,
@@ -353,6 +357,7 @@ class IngestService:
             decay_class=decay_class,
             decay_class_unknown=decay_class_unknown,
             scoring_failed=scoring_failed,
+            escalation_failed=escalation_failed,
             embedding_failed=embedding_failed,
             pinned=event.pinned,
             instrumentation=Instrumentation(
@@ -378,11 +383,12 @@ class IngestService:
         components: list[dict],
         nlp_result: nlp.NlpResult,
         triggers: list[str],
-    ) -> EscalationResult:
-        """Retry once; second failure hard-stops the write (build-phase stance:
-        gist is a write-time fact with no later revisiting pass — a silently
-        missed gist on a flagged event would be permanent data loss)."""
-        last_error: Exception | None = None
+    ) -> EscalationResult | None:
+        """Retry once; on a second failure return None so the write soft-degrades
+        to the base NLP-pass gist (ruled 2026-07-22 — the fail-loud hard-stop was
+        a temporary build-phase stance; a failed escalation must not halt a live
+        write). The degraded gist is flagged (escalation_failed) rather than
+        aborting the write."""
         for _attempt in (1, 2):
             try:
                 return await asyncio.to_thread(
@@ -393,11 +399,9 @@ class IngestService:
                     candidate_components=list(nlp_result.novel_components),
                     triggers=triggers,
                 )
-            except (ProviderCallError, MalformedOutputError) as exc:
-                last_error = exc
-        raise EscalationHardStopError(
-            f"escalation failed twice; write aborted, nothing inserted: {last_error}"
-        ) from last_error
+            except (ProviderCallError, MalformedOutputError):
+                continue
+        return None
 
     @staticmethod
     def _plan_spans(

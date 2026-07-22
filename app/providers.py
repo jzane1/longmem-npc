@@ -431,7 +431,8 @@ class FailingEmbeddingProvider:
 
 
 class FailingEscalationProvider:
-    """Escalation failure: retry once, then HARD-STOP the write (build-phase stance)."""
+    """Escalation failure: retry once, then the write soft-degrades to the base
+    NLP-pass gist with escalation_failed = true (ruled 2026-07-22)."""
 
     def __init__(self) -> None:
         self.calls = 0
