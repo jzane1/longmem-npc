@@ -14,11 +14,16 @@ stall `first_word_ms` is blind to; 0.0 when no chunk arrives); the **<1 s bar is
 it**; surfaced in the CLI debug line + a `perceived_first_word` driver series. Ruled at plan
 approval: the audit engineer's **thread-pool cap is deferred post-demo** (the build is exactly the
 queue item; dated `decisions.md` entry). No migration (ledger 001–005); no new knobs or roles.
-**Thirteen floors stand verified** — floor-verifier **pass** (CLI-harness walker 55 → 62; six
-walkers + every other `app\` file byte-identical to HEAD; suite 42 → 43 ×2 + keyless subset 36;
-migrate no-op; `longmem` pristine; live serve HTTP beat — perceived 22.87 ms vs first_word 0.42 ms
-on the smoke — + a standalone driver run). Next: **Unity project + reference scene + The Ledger**
-(immediate-queue item 2), then the pre-ship gates.
+**Fourteen floors stand verified** — floor-verifier **pass** twice today (CLI-harness walker 55 →
+62; suite 42 → 43 ×2 + keyless subset 36; migrate no-op; `longmem` pristine; live serve HTTP beat —
+perceived 22.87 ms vs first_word 0.42 ms on the smoke — + a standalone driver run). **Same-day
+follow-on: the escalation trigger-tuning open question is CLOSED** (measured, then ruled): the fire
+rate is productive (85% of escalations add real gist content), the defaults stand, and a sixth
+**thin_gist** span-floor trigger closes the measured zero-gist hole (16/80 observes had landed with
+no gist spans — reconstruction's fixed constraint empty on those rows); Engram-style deferred write
+cognition is queued to the ledger; write-path walker 42 → 46, suite 43 → 44, floor-verifier
+**pass**. Next: **Unity project + reference scene + The Ledger** (immediate-queue item 2), then the
+pre-ship gates.
 
 **Prior phase:** **external-persona audit landed — the pre-demo path is re-planned** (2026-07-22). A
 four-persona read-only agent-team audit (critique + solutions; `external-audit-2026-07-22.md` +
@@ -127,16 +132,19 @@ and the structured behavior output survive the interview. Research publication c
 
 | HTTP dialogue-turn route + perceived-TTFT v1 — the Unity/C# front door (audit-replan item 1): `POST /v1/dialogue/turn` (`app\api.py`; `DialogueService` joins the lifespan) drains `run_dialogue_turn`'s async generator to the terminal `DialogueTurnResult` — **stateless** (scene state caller-held on the request; runner bookkeeping stays client-side — the future C# `NpcSession` ports `_apply_turn_result`), non-streaming, `UnknownAgentError` → 404 / `UnknownIdentityVersionError` → 422 (the existing precedents), pass-through by ruling, `on_reconstruct=None` (no during-wait signal without SSE; the post-hoc fields carry it); a future SSE `/turn/stream` iterates the SAME generator + the honest latency metric `perceived_first_word_ms` (`app\schemas.py`; captured in `app\dialogue.py` at the same first-chunk instant as `first_word_ms`, clocked from `t_total` — retrieval-inclusive, sees the cold-reconstruction stall; 0.0 when no chunk arrives; the <1 s bar's field) surfaced in the CLI debug line (`app\cli.py`) + the `perceived_first_word` driver series (`app\load_driver.py`). Thread-pool cap ruled deferred post-demo. No migration; no new knobs or roles. | floor-verifier **pass** against all twelve prior floors (CLI-harness floor re-opened, re-verified): `tests\verify_cli_harness.py` **62** on fresh scratch (55 → 62 — new section [13]: route JSON == the drained seam result via ASGITransport + a capturing wrapper, 404 + 422; perceived > first_word > 0 in [1]; both-TTFT-zero on the pre-chunk-failure row in [9]; the driver series in [12]); six other walkers green on fresh scratch (48/51/42/42/34/34) and — with every other `app\` file, `conftest`, and the four other suite files — **byte-identical to HEAD by git-diff** (the floor-economy proof); full suite **43 ×2** + keyless subset **36** (the new unmarked Set D route-contract scenario); no-arg migrate → "Up to date: 5 migration(s) applied, 0 pending"; `longmem` pristine via the postgres MCP (ten product tables 0 rows, ledger 001–005, no scratch residue); independent code spot-checks (route adds/drops nothing; stateless — the sole persisted write of a turn remains the sanctioned `agents.reputation` UPDATE inside the seam; both TTFT fields one-instant captured from `t_prose` vs `t_total`; structural-only test additions); plus a live `python -m app.serve` HTTP beat (observe → turn with IDs + scores + both views + both TTFT fields → unknown-agent 404) and a standalone driver run emitting the `perceived_first_word` series. | 2026-07-23 |
 
+| Escalation thin_gist trigger v1 — the trigger-tuning ruling's build (same day as the turn route; the dated "Escalation trigger tuning" entry in `decisions.md` carries the full measurement): a **sixth escalation trigger `thin_gist`** (`app\nlp.py` `evaluate_triggers`, appended LAST — the biased-loose add-only contract preserved) fires when the base NLP pass yields fewer gist spans than `escalation_min_base_spans` (new `SERVICE_DEFAULTS` knob, default 1.0 = fire on a zero-span base pass; 0.0 disables; per-agent overridable, fetched with the other escalation knobs in `app\ingest.py`). Closes the measured **zero-gist hole** — 16/80 realistic observes otherwise landed with NO gist spans, leaving reconstruction's fixed constraint empty on those rows (75% → 95% fire on the corpus, ~+$0.03/100 observes). The five original triggers + thresholds stand unchanged by ruling. No migration; no new model roles. | floor-verifier **pass** against all thirteen prior floors (write-path floor re-opened, re-verified): `tests\verify_write_path.py` **46** on fresh scratch (42 → 46 — [11b]: thin_gist fires ALONE on a zero-span pass at production knobs, the 0.0 kill-switch, floor-compares-the-COUNT, and the measured sexton fixture escalating with thin_gist as the SOLE trigger at the service level); six other walkers green on fresh scratch (62/48/51/42/34/34) and — with every other `app\` file — byte-identical to HEAD by git accounting; full suite **44 ×2** + keyless subset **37** (the new pure `test_thin_gist_trigger_pure` asserts over production `SERVICE_DEFAULTS`, no DB/NLP — it rides the Stop-hook subset); no-arg migrate → "Up to date: 5 migration(s) applied, 0 pending"; `longmem` pristine via the postgres MCP (ten product tables 0 rows, ledger 001–005, no scratch residue); code spot-checks (trigger add-only and appended last, the knob's floor value lives only in `SERVICE_DEFAULTS`, the 2026-07-22 soft-degrade path untouched and re-proved live, no new writes/UPDATE/DELETE); the predicted fake-mode consequence verified, not assumed (stored fixture rows byte-identical — only escalated/escalated_by/timing moved; no foreign assertion touched). | 2026-07-23 |
+
 ## Open questions needing Jack's ruling
 
-- **Escalation trigger set / thresholds — the failure path is CLOSED.** The failure path was re-ruled
-  and **BUILT 2026-07-22**: a gist-escalation double failure now soft-degrades to the base NLP-pass
-  gist with `memories.escalation_failed` set — never a lost write (migration 005; the 2026-07-13
-  fail-loud hard-stop retired, floor-verifier pass). **Still open, separate and non-blocking:** the
-  trigger set and thresholds — escalation fires on **79% of realistic prose** (real haiku importance
-  p50 0.61 vs the 0.45 threshold; +1.4 s and ~$0.0021 per fire) vs 0% on synthetic driver prose, a
-  cost/latency question and latency lever **D**'s server half. Measure, then rule. (The reconstruction
-  flagged shapes were all confirmed 2026-07-17 — see the "Reconstruction flagged-shapes confirmations"
+- **Escalation trigger set / thresholds — CLOSED 2026-07-23 (measured, then ruled).** The failure
+  path closed 2026-07-22 (soft-degrade, migration 005). The trigger-set/threshold half closed
+  2026-07-23: a per-observe real-mode measurement showed the high fire rate is **productive** (85%
+  of fires add real gist content; ~$0.15/100 observes; latency off the dialogue path under async
+  observes) and surfaced the **zero-gist hole** (16/80 observes landed with no gist spans). Jack
+  ruled: defaults stand, a sixth **thin_gist** span-floor trigger added (built same day,
+  floor-verified), and Engram-style deferred write enrichment queued to the sequenced-later ledger.
+  See the dated "Escalation trigger tuning" entry in `decisions.md`. (The reconstruction flagged
+  shapes were all confirmed 2026-07-17 — see the "Reconstruction flagged-shapes confirmations"
   entry in `decisions.md`.)
 
 - **R7 — the self-referential drift budget (logged 2026-07-22 from the external-persona audit).** The
@@ -867,6 +875,33 @@ and the structured behavior output survive the interview. Research publication c
   the seam). The build target is now **immediate-queue item 2: Unity + reference scene + The
   Ledger**.
 
+- **2026-07-23** — **Escalation trigger tuning: measured, ruled, and the thin_gist trigger built +
+  floor-verified (second task of the day) — the last escalation open question is CLOSED.** The
+  "measure, then rule" item taken off the queue at Jack's direction before the Unity phase. A
+  report-only real-mode probe (scratch `longmem_esc`, the 2026-07-21 corpus construction reproduced
+  exactly, ~$0.25) recorded the per-observe RAW trigger inputs the old probe aggregated away. The
+  findings (full table in the dated "Escalation trigger tuning" `decisions.md` entry): the fire rate
+  reproduced (75% vs 79%) and is **productive, not runaway** — 85% of escalations add net gist
+  spans/components; the importance threshold is a weak lever (real scores cluster ≥0.60, and its p50
+  moved 0.61 → 0.47 between runs — decimal-tuning would be false precision); ~$0.15/100 observes,
+  latency off the dialogue path under async observes; and the **zero-gist hole** — 16/80 observes
+  landed with NO gist spans because no trigger fires on an empty base gist, leaving reconstruction's
+  fixed constraint empty on exactly those rows. Jack ruled three ways: **the shipped defaults
+  stand** (trims declined — gist capture is load-bearing for the thesis); **a sixth `thin_gist`
+  trigger** protects the gist floor directly (fire when base spans < `escalation_min_base_spans`,
+  new knob, default 1.0 = fire on zero, 0.0 disables — 75% → 95% on the corpus, +$0.03/100
+  observes, the zero-gist class eliminated); **Engram-style deferred write cognition → the
+  sequenced-later ledger** as its own spec target (viability assessed: the degradation flags are the
+  natural deferred-work queue; the async-observe contract covers the latency motivation; frozen
+  write-time facts + a new `write_cause` migration are the spec's real forks). Build: the trigger +
+  knob + knob-fetch across `app\nlp.py`/`app\config.py`/`app\ingest.py`; write-path walker 42 → 46;
+  suite 43 → 44 ×2 + keyless 36 → 37; six walkers byte-untouched and green; migrate no-op;
+  `longmem` pristine. floor-verifier **pass** (all eight criteria; the fake-mode
+  stored-rows-byte-identical prediction verified, not assumed). **Known nit left in place**
+  (verifier observation, pre-existing at HEAD): the `app\ingest.py:234` comment still says
+  "hard-stop on double failure" — stale since the 2026-07-22 soft-degrade, comment-only; fix when
+  that file next opens. Next: **Unity + reference scene + The Ledger (immediate-queue item 2)**.
+
 ## Immediate queue
 
 **Pre-demo build path — re-planned 2026-07-22 from the external-persona audit**
@@ -1028,7 +1063,14 @@ identity document is seed-prose-only); dissonance path + the diegetic suite pair
 endpoint (before the public flip — ruled 2026-07-14); prompt caching / prompt-head rebuild
 (revisit when a target needs it or demo latency demands — reframed 2026-07-17 from the ruled
 "only if demo latency demands" wording); habituation *(the encoding-context read term itself
-landed 2026-07-21 — Target A)*; reflection → parameter compiler; Unity Package Manager packaging; docs final + public flip
+landed 2026-07-21 — Target A)*; **Engram-style deferred write cognition** (own spec target,
+ruled onto the ledger 2026-07-23 — raw observe stored immediately, gist/enrichment at the
+service's own timing; the existing degradation flags are the natural deferred-work queue; forks:
+add-only gist annotation vs the frozen write-time facts, the un-enriched-window retrieval
+contract, a new `write_cause` = a migration; Engram 2606.09900 + the sleep-time-compute family —
+the async-observe client contract covers the latency motivation and the thin_gist trigger covers
+correctness inline, so this is a cost/throughput optimization); reflection → parameter compiler;
+Unity Package Manager packaging; docs final + public flip
 (Apache-2.0). *(Reconstruction — mechanism, drift budget, Set C scenarios — moved off this ledger
 into the immediate queue by the 2026-07-14 re-slating ruling.)* *(Split-brain topology with per-call
 weights — moved off this ledger into the immediate queue by the 2026-07-21 latency-slate

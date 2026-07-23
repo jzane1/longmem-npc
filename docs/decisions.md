@@ -1834,3 +1834,70 @@ row, the driver series); suite 42 → 43 (the unmarked route-contract scenario i
 subset 35 → 36); the six other walkers and every other `app\` file byte-identical to HEAD; live
 `python -m app.serve` HTTP beat (observe → turn → 404) + a standalone driver run. Independent
 floor-verifier re-verification: see the status.md session log + verified-floors table.
+
+## Escalation trigger tuning: measurement + rulings — 2026-07-23
+
+**Context.** The open trigger-set/threshold item (widened 2026-07-21 by the real-mode 79%-fire
+finding; "measure, then rule"). Jack ordered the measurement this session, ahead of the Unity phase.
+
+**The measurement** (report-only probe on scratch `longmem_esc`, real providers, the 2026-07-21
+realistic corpus construction reproduced exactly — 40 texts × 2, ford-keeper agent + the Mara
+component; per-observe RAW trigger inputs recorded, the piece the earlier probe aggregated away;
+~$0.25 spend; artifacts scratchpad-only):
+
+- Fire rate reproduced: **60/80 = 75%** (prior 79%; same trigger mix — importance 40, unresolved 29,
+  novel 11, low_confidence 9, identity_affect 4; an offline re-computation of `evaluate_triggers`
+  over the records matched the recorded fires with 0 mismatches).
+- **Escalation is productive, not runaway: 85% of fires added ≥1 net gist span or identity
+  component** after dedup (mean +2.17 spans, +1.30 components per fire).
+- **The importance threshold is a weak lever.** Real haiku scores cluster ≥0.60 — raising the
+  default 0.45 → 0.60 changes nothing on this corpus; 0.65 trims only 75% → 71%; with the trigger
+  effectively disabled the rate stays 57% on the overlapping triggers. Importance p50 also moved
+  0.61 → 0.47 between the two real runs — decimal-tuning it would be false precision.
+- Cost/latency: ~$0.0020 and ~1.3 s per fire ⇒ ~$0.15/100 observes at the current rate; the latency
+  leaves the dialogue path entirely under the ruled async-observe client contract (lever D).
+- Sole-cause attribution: importance 14 (all 14 value-adding), unresolved_reference 13 (12),
+  novel_entity 4 (4), low_confidence 0, identity_affect 0 (the last two only ever co-fire — free
+  riders on calls that fire anyway).
+- **The zero-gist hole: 16/80 observes landed with ZERO gist spans.** No trigger fires on "the base
+  gist is empty," so a low-importance, no-identity-hit observation stores no gist constraint at
+  all — reconstruction's fixed constraint is EMPTY for those rows (R7 at its widest) and they are
+  invisible to the coming gist-precision metric. Escalation rescued 16/16 zero-base observes to
+  ≥2 spans whenever it did fire.
+
+**Rulings (Jack):**
+
+1. **The shipped defaults stand** — the five original triggers and both thresholds (importance
+   0.45, affect 0.5) unchanged. Gist capture is load-bearing for the reconstruction thesis; the
+   measured rate is mostly productive; the trims save cents while losing value-adding escalations.
+   (Raise-to-0.65 and drop-unresolved options presented with the data and declined; Jack's stated
+   direction is toward MORE firing where gist preservation needs it, not less.)
+2. **A sixth trigger: `thin_gist` — the gist floor protected directly.** Fire when the base NLP
+   pass yields fewer spans than `escalation_min_base_spans` (new knob in `SERVICE_DEFAULTS`,
+   default 1.0 = fire on zero spans; 0.0 disables — span counts are never negative; per-agent
+   overridable like the other escalation knobs). On the measured corpus: 75% → 95% fire rate,
+   ~+$0.03/100 observes, the zero-gist class eliminated. (Always-escalate — shipping
+   `escalation_importance_threshold` 0.0 — was presented and not adopted as the default; it
+   remains available to any integrator as pure config.)
+3. **Engram-style deferred write cognition → the sequenced-later ledger** as its own spec target
+   (raw text stored immediately, enrichment at the service's own timing — Engram 2606.09900 +
+   the sleep-time-compute family already cited in the reflection dossier). Assessed viable and
+   partially present: the async-observe client contract already covers the latency motivation,
+   and the existing degradation flags (`scoring_failed`/`escalation_failed`/`embedding_failed`)
+   are the natural deferred-work queue. The spec's real forks: late gist-span/component adds are
+   add-only annotations, but importance/typology/entities are FROZEN write-time facts by explicit
+   rulings (2026-07-18 fact scope; 003 entities freeze) — late changes need fact-version-style
+   supersession or re-rules, and a new `write_cause` is a migration; plus the un-enriched-window
+   retrieval contract and pre-enrichment cached retellings. With thin_gist closing the correctness
+   case inline, the deferred worker is a cost/throughput optimization — pull-forward eligible.
+
+**Build (thin_gist).** `TRIGGER_THIN_GIST = "thin_gist"` + the floor check appended last in
+`nlp.evaluate_triggers`; the knob in `SERVICE_DEFAULTS` (`app\config.py`); the knob key added to the
+observe path's per-agent knob fetch (`app\ingest.py`). Fake-mode consequence stated: more fixture
+observes now escalate, but `FakeEscalationProvider` echoes the NLP-pass candidates unchanged, so
+stored rows are byte-identical — only `escalated`/`escalated_by`/timing/token fields move; no
+existing assertion broke. Walker `tests\verify_write_path.py` grown ([11b]: the pure-function
+contract — thin_gist fires alone on a zero-span pass, kill-switch at 0.0, floor-compares-the-COUNT —
+plus the measured sexton fixture escalating with thin_gist as the SOLE trigger at the service
+level); suite +1 pure keyless scenario (`test_thin_gist_trigger_pure` over production
+`SERVICE_DEFAULTS`; 43 → 44, subset 36 → 37). No migration — knob + trigger only.

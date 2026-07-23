@@ -204,6 +204,60 @@ def test_escalation_failure_soft_degrades(scene):
     run_structural(scene, scenario)
 
 
+def test_thin_gist_trigger_pure():
+    """The thin_gist span-floor trigger (ruled 2026-07-23): a base NLP pass
+    with fewer gist spans than escalation_min_base_spans escalates regardless
+    of importance — protecting reconstruction's fixed constraint (measured
+    2026-07-23: 16/80 realistic observes otherwise landed with ZERO gist
+    spans). Pure function over production SERVICE_DEFAULTS — no DB, no NLP
+    models, keyless."""
+    from app.config import SERVICE_DEFAULTS
+    from app.nlp import TRIGGER_THIN_GIST, NlpResult, evaluate_triggers
+    from app.providers import GistSpanCandidate
+
+    knobs = {
+        key: SERVICE_DEFAULTS[key]  # production values, deliberately unpinned
+        for key in (
+            "escalation_importance_threshold",
+            "escalation_affect_threshold",
+            "escalation_min_base_spans",
+            "nlp_confidence_threshold",
+        )
+    }
+    empty = NlpResult(
+        spans=[],
+        novel_components=[],
+        entities=[],
+        affect_valence=None,
+        affect_arousal=None,
+        affect_detail=None,
+    )
+    # zero spans + sub-threshold importance: thin_gist fires ALONE at the
+    # shipped defaults — the pre-ruling write path landed this observe with
+    # an empty gist and no escalation.
+    assert evaluate_triggers(empty, 0.1, knobs) == [TRIGGER_THIN_GIST]
+    # knob 0.0 is the kill-switch (span counts are never negative).
+    assert (
+        evaluate_triggers(empty, 0.1, {**knobs, "escalation_min_base_spans": 0.0}) == []
+    )
+    # the floor compares the span COUNT: one span is quiet at the shipped
+    # floor (1.0) and fires at a raised floor (2.0).
+    one = NlpResult(
+        spans=[GistSpanCandidate(start_char=0, end_char=4)],
+        novel_components=[],
+        entities=[],
+        affect_valence=None,
+        affect_arousal=None,
+        affect_detail=None,
+    )
+    assert evaluate_triggers(one, 0.1, knobs) == []
+    assert TRIGGER_THIN_GIST in evaluate_triggers(
+        one, 0.1, {**knobs, "escalation_min_base_spans": 2.0}
+    )
+    # the shipped default IS the gist floor (ruled 2026-07-23).
+    assert SERVICE_DEFAULTS["escalation_min_base_spans"] == 1.0
+
+
 def test_retrieval_fail_quiet_fallback(scene):
     """Query-embedding failure at read time (ruled ladder row): degraded
     flag + reason, every relevance null, score = recency x importance_norm,

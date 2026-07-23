@@ -81,6 +81,11 @@ SERVICE_DEFAULTS: dict[str, float] = {
     # Escalation trigger (2): identity/category hit co-occurring with
     # |valence| >= this.
     "escalation_affect_threshold": 0.5,
+    # Escalation trigger (6), thin_gist (ruled 2026-07-23): fire when the base
+    # NLP pass yields fewer gist spans than this floor — protects the gist
+    # (reconstruction's fixed constraint) directly; 16/80 realistic observes
+    # otherwise land with zero spans. 0.0 disables the trigger.
+    "escalation_min_base_spans": 1.0,
     # Escalation trigger (5) threshold — RESERVED, not consulted in v1: neither
     # fastcoref's predict API nor en_core_web_lg's greedy NER exposes per-span
     # confidence, so every coref-derived span counts as low-confidence outright

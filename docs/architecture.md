@@ -101,12 +101,15 @@ components table** (entries: canonical name + aliases + category, e.g. friend na
 category hit counts even without a named entity). Hits become gist spans; everything else is detail.
 
 An LLM escalation pass exists for hard cases, **biased loose** (over-call — a wasted call is cheap,
-a lost gist breaks the product). Five triggers, any one fires (ruled 2026-07-13; all
-integrator-tunable via `agents.config`, defaults in `app\config.py`): (1) importance above
-threshold; (2) an identity/category hit co-occurring with |valence| above threshold; (3) a **novel
-entity** — which is also how the identity components table grows; (4) an unresolved
+a lost gist breaks the product). Six triggers, any one fires (five ruled 2026-07-13, the sixth
+2026-07-23; all integrator-tunable via `agents.config`, defaults in `app\config.py`): (1) importance
+above threshold; (2) an identity/category hit co-occurring with |valence| above threshold; (3) a
+**novel entity** — which is also how the identity components table grows; (4) an unresolved
 pronoun/noun-chunk co-occurring with an identity/category hit; (5) low NLP confidence on an
-already-flagged span (confidence only ever *adds* calls, never suppresses one).
+already-flagged span (confidence only ever *adds* calls, never suppresses one); (6) **thin gist** —
+the base NLP pass yielded fewer spans than the `escalation_min_base_spans` floor (default 1: fire on
+zero), protecting the gist floor directly — measured 2026-07-23, 16/80 realistic observes otherwise
+landed with zero gist spans, leaving reconstruction's fixed constraint empty (0.0 disables).
 Cross-observation coreference misses are accepted as graceful failure (the detail just decays).
 
 ### 4.2 Decay

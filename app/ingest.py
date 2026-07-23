@@ -237,6 +237,7 @@ class IngestService:
             for key in (
                 "escalation_importance_threshold",
                 "escalation_affect_threshold",
+                "escalation_min_base_spans",
                 "nlp_confidence_threshold",
             )
         }

@@ -422,6 +422,73 @@ async def main(database_uri: str) -> None:
     )
 
     # ------------------------------------------------------------------ #
+    print("\n[11b] thin_gist span-floor trigger (ruled 2026-07-23)")
+    # Pure-function contract first (crafted NlpResult, fully deterministic):
+    # a base pass below the span floor escalates regardless of importance;
+    # knob 0.0 is the kill-switch; the floor compares against the span COUNT.
+    from app.nlp import (
+        TRIGGER_THIN_GIST,
+        NlpResult as _NlpResult,
+        evaluate_triggers as _evaluate,
+    )
+    from app.providers import GistSpanCandidate as _Span
+
+    _knobs = {
+        "escalation_importance_threshold": 0.45,
+        "escalation_affect_threshold": 0.5,
+        "escalation_min_base_spans": 1.0,
+        "nlp_confidence_threshold": 0.5,
+    }
+    _empty = _NlpResult(
+        spans=[],
+        novel_components=[],
+        entities=[],
+        affect_valence=None,
+        affect_arousal=None,
+        affect_detail=None,
+    )
+    check(
+        _evaluate(_empty, 0.1, _knobs) == [TRIGGER_THIN_GIST],
+        "zero base spans + low importance -> thin_gist fires ALONE",
+    )
+    check(
+        _evaluate(_empty, 0.1, {**_knobs, "escalation_min_base_spans": 0.0}) == [],
+        "escalation_min_base_spans = 0.0 disables the trigger (kill-switch)",
+    )
+    _one_span = _NlpResult(
+        spans=[_Span(start_char=0, end_char=4)],
+        novel_components=[],
+        entities=[],
+        affect_valence=None,
+        affect_arousal=None,
+        affect_detail=None,
+    )
+    check(
+        _evaluate(_one_span, 0.1, _knobs) == []
+        and TRIGGER_THIN_GIST
+        in _evaluate(_one_span, 0.1, {**_knobs, "escalation_min_base_spans": 2.0}),
+        "the floor compares the base span COUNT (1 span: quiet at 1.0, fires at 2.0)",
+    )
+    # Service-level beat: a text measured to produce ZERO base spans and no
+    # other trigger (no component mention, no unresolved ref, fake importance
+    # 0.3675 < 0.45) — pre-ruling this observe landed with an EMPTY gist; now
+    # it escalates with thin_gist as the sole cause.
+    thin = await service.ingest_observation(
+        observe_event(
+            agent_id=agent_id,
+            observation_text=(
+                "The sexton counted the silver twice by candlelight in the vestry."
+            ),
+        )
+    )
+    check(
+        thin.instrumentation.escalated
+        and thin.instrumentation.escalated_by == [TRIGGER_THIN_GIST],
+        "zero-base-span observe escalates with thin_gist as the SOLE trigger",
+        ",".join(thin.instrumentation.escalated_by),
+    )
+
+    # ------------------------------------------------------------------ #
     print("\n[12] Arousal populated from the VAD lexicon")
     affective = await service.ingest_observation(
         observe_event(

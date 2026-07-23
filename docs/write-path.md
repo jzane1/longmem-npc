@@ -205,7 +205,9 @@ The provider is selected by config; the ingest service is identical under either
   v1 — separate provider + `LONGMEM_MODEL_ESCALATION`; five triggers, any one fires, all
   integrator-tunable via `agents.config` with defaults in `app\config.py`; novel-entity growth in,
   spam gate still deferred. Failure path: soft-degrade to the base NLP-pass gist, flagged
-  `escalation_failed` — re-ruled 2026-07-22, see the degradation ladder.)*
+  `escalation_failed` — re-ruled 2026-07-22, see the degradation ladder. Grown 2026-07-23 by the
+  trigger-tuning measurement: a sixth **thin_gist** trigger fires when the base NLP pass yields
+  fewer spans than the `escalation_min_base_spans` floor — see the dated `decisions.md` entry.)*
 - **Idempotency** — **none in v1** (the frozen schema has no dedup column). A client `event_id` +
   dedup window would need schema this build forbids, so it is deferred to a future migration unless
   Jack rules otherwise; v1 accepts `event_id` but does not enforce it. *(Ruled 2026-07-13: as

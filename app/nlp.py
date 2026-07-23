@@ -15,7 +15,8 @@ Outputs:
   - affect: VADER compound -> valence; Warriner lemma lookup -> arousal
     (normalized 1-9 -> 0-1); dominance + raw breakdown -> affect_detail jsonb
     (the frozen schema has no dominance column — ruled 2026-07-13);
-  - escalation trigger evaluation (the five triggers ruled 2026-07-13),
+  - escalation trigger evaluation (five triggers ruled 2026-07-13 + the
+    thin_gist span-floor trigger ruled 2026-07-23),
     biased loose: confidence only ever ADDS calls.
 
 Confidence sources: fastcoref cluster spans carry no per-span probability in
@@ -61,6 +62,7 @@ TRIGGER_IDENTITY_AFFECT = "identity_affect"
 TRIGGER_NOVEL_ENTITY = "novel_entity"
 TRIGGER_UNRESOLVED_REFERENCE = "unresolved_reference"
 TRIGGER_LOW_CONFIDENCE = "low_confidence"
+TRIGGER_THIN_GIST = "thin_gist"  # base gist below the span floor (ruled 2026-07-23)
 
 
 @dataclass
@@ -385,12 +387,18 @@ def run_write_pass(observation_text: str, components: list[dict]) -> NlpResult:
 def evaluate_triggers(
     nlp_result: NlpResult, importance_raw: float, knobs: dict[str, float]
 ) -> list[str]:
-    """The five escalation triggers (ruled 2026-07-13). ANY one fires the call.
+    """The six escalation triggers (five ruled 2026-07-13; thin_gist added by
+    the 2026-07-23 trigger-tuning ruling). ANY one fires the call.
 
     Biased loose: (5) only ever adds a call for spans something else already
     flagged; nothing here suppresses. `importance_raw` is the effective value
     (a scoring-failed neutral importance can legitimately trip (1) — uncertain
-    importance escalating is loose in the right direction).
+    importance escalating is loose in the right direction). (6) thin_gist
+    protects the gist floor directly: a base NLP pass with fewer spans than
+    `escalation_min_base_spans` escalates regardless of importance — measured
+    2026-07-23, 16/80 realistic observes otherwise land with ZERO gist spans,
+    leaving reconstruction's fixed constraint empty. Knob 0.0 disables (span
+    counts are never negative).
     """
     triggers: list[str] = []
     if importance_raw >= knobs["escalation_importance_threshold"]:
@@ -404,4 +412,6 @@ def evaluate_triggers(
         triggers.append(TRIGGER_UNRESOLVED_REFERENCE)
     if nlp_result.has_low_confidence_span:
         triggers.append(TRIGGER_LOW_CONFIDENCE)
+    if len(nlp_result.spans) < knobs["escalation_min_base_spans"]:
+        triggers.append(TRIGGER_THIN_GIST)
     return triggers
