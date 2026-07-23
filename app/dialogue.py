@@ -1,11 +1,12 @@
 """dialogue.py — THE dialogue-turn service: the split-brain streaming seam.
 
-Both callers (the interactive REPL and the synthetic load driver, via the
-shared session-runner) sit on this module; neither duplicates the timing or
-token accounting recorded here (CLAUDE.md: instrument at the seam; specs:
+All callers — the interactive REPL and the synthetic load driver (via the
+shared session-runner), and the stateless HTTP route (`POST /v1/dialogue/turn`
+in app\\api.py, 2026-07-23) — sit on this module; none duplicates the timing
+or token accounting recorded here (CLAUDE.md: instrument at the seam; specs:
 docs\\cli-harness.md 2026-07-15, docs\\split-brain-streaming.md 2026-07-21).
-There is no HTTP route in this build — the streaming route rides with the
-Unity client surface.
+The streaming SSE route rides later with the Unity client surface and
+iterates this same generator.
 
 Split-brain pipeline per turn (split-brain-streaming.md, ruled topology):
   resolve agent + vocabulary -> retrieval ONCE (retrieve_dialogue_init, built)
@@ -504,12 +505,17 @@ class DialogueService:
         prose_result: ProseResult | None = None
         prose_error: Exception | None = None
         first_word_ms = 0.0
+        perceived_first_word_ms = 0.0
         t_prose = time.perf_counter()
         while True:
             kind, payload = await queue.get()
             if kind == "chunk":
                 if not content_parts:
-                    first_word_ms = _ms(time.perf_counter() - t_prose)
+                    now = time.perf_counter()
+                    first_word_ms = _ms(now - t_prose)
+                    # Perceived TTFT: same instant, clocked from turn start —
+                    # retrieval-inclusive (the honest metric, audit 2026-07-22).
+                    perceived_first_word_ms = _ms(now - t_total)
                 content_parts.append(payload)
                 yield payload
             elif kind == "done":
@@ -655,6 +661,7 @@ class DialogueService:
                 sonnet_input_tokens=prose_in,
                 sonnet_output_tokens=prose_out,
                 first_word_ms=first_word_ms,
+                perceived_first_word_ms=perceived_first_word_ms,
                 prose_stream_ms=prose_stream_ms,
                 behavior_ms=behavior_ms,
                 behavior_input_tokens=behavior_in,

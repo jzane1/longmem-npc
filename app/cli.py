@@ -157,6 +157,7 @@ def render_debug(result: DialogueTurnResult) -> str:
     )
     lines.append(
         f"  prose:     first_word={ins.first_word_ms}ms "
+        f"perceived={ins.perceived_first_word_ms}ms "
         f"stream={ins.prose_stream_ms}ms  tokens in={ins.sonnet_input_tokens} "
         f"out={ins.sonnet_output_tokens}"
     )

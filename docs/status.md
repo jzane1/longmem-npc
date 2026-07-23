@@ -1,7 +1,26 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-07-22
-**Phase:** **external-persona audit landed — the pre-demo path is re-planned** (2026-07-22). A
+**Last updated:** 2026-07-23
+**Phase:** **the HTTP dialogue-turn route is LIVE — Unity's front door exists** (2026-07-23,
+immediate-queue item 1, the audit's #1 blocker closed; plan-as-spec session). `POST
+/v1/dialogue/turn` (`app\api.py`; `DialogueService` joins the lifespan) drains the split-brain
+seam's async generator to the terminal `DialogueTurnResult` — **stateless** (all scene state rides
+the request; the runner bookkeeping is the CLIENT'S job — the future C# `NpcSession` ports
+`_apply_turn_result`), non-streaming, `UnknownAgentError` → 404 / `UnknownIdentityVersionError` →
+422, pass-through by ruling, `on_reconstruct=None`; a future SSE `/turn/stream` iterates the SAME
+generator — no rewrite. Beside it the **honest latency metric**: `perceived_first_word_ms` clocks
+the same first-chunk instant from TURN START (retrieval-inclusive — it sees the cold-reconstruction
+stall `first_word_ms` is blind to; 0.0 when no chunk arrives); the **<1 s bar is measured against
+it**; surfaced in the CLI debug line + a `perceived_first_word` driver series. Ruled at plan
+approval: the audit engineer's **thread-pool cap is deferred post-demo** (the build is exactly the
+queue item; dated `decisions.md` entry). No migration (ledger 001–005); no new knobs or roles.
+**Thirteen floors stand verified** — floor-verifier **pass** (CLI-harness walker 55 → 62; six
+walkers + every other `app\` file byte-identical to HEAD; suite 42 → 43 ×2 + keyless subset 36;
+migrate no-op; `longmem` pristine; live serve HTTP beat — perceived 22.87 ms vs first_word 0.42 ms
+on the smoke — + a standalone driver run). Next: **Unity project + reference scene + The Ledger**
+(immediate-queue item 2), then the pre-ship gates.
+
+**Prior phase:** **external-persona audit landed — the pre-demo path is re-planned** (2026-07-22). A
 four-persona read-only agent-team audit (critique + solutions; `external-audit-2026-07-22.md` +
 `external-audit-2026-07-22-solutions.md`; rulings in the dated `decisions.md` entry) surfaced the
 true blocker, confirmed against source: **`app\api.py` has no HTTP dialogue-turn route**, so Unity/C#
@@ -29,8 +48,8 @@ walker rename-only (51); write/reconstruction/authorial/fact walkers byte-untouc
 pending"; `longmem` pristine via the postgres MCP; live piped REPL streaming beat + a driver run
 with the `first_word` + `behavior` series and the behavior cost row. **Flagged (operator-owned
 `.env`, not fixed):** a malformed consolidated `LONGMEM_PRICE_DIALOGUE_IN=…` line crashes
-`load_settings` on any run that reads `.env` prices — Jack's to fix before real-mode demo runs.
-Next: **Unity project + reference scene** (immediate-queue item 1), then the pre-ship gates.
+`load_settings` on any run that reads `.env` prices — Jack's to fix before real-mode demo runs
+*(fixed and verified 2026-07-22 — queue item 0)*.
 
 **Prior phase:** **real mode is proven — pre-ship gates (b) and (c) are closed** (2026-07-21, the
 first-ever real-provider session, run with live ANTHROPIC + OPENAI keys). The smoke's
@@ -105,6 +124,8 @@ and the structured behavior output survive the interview. Research publication c
 | Split-brain streaming v1 — the dialogue seam re-shaped into two concurrent calls off one retrieval (`split-brain-streaming.md`, ruled topology; the reserved `WeightOverrides` slot goes live for the behavior view): the streaming **prose** call (`app\providers.py` `DialogueProvider.stream_prose` — a sync generator yielding chunks + a `ProseResult`; real streams raw text, no JSON) + the concurrent **behavior** call (`BehaviorProvider.decide` — directive + delta JSON, new `LONGMEM_MODEL_BEHAVIOR` role + `LONGMEM_PRICE_BEHAVIOR_IN/OUT`, hardened parse) + the async-generator seam (`app\dialogue.py` `run_dialogue_turn`: retrieval once → two views → concurrent legs via a worker-thread + `asyncio.Queue` bridge → validate/apply → terminal `DialogueTurnResult`; prompt split `assemble_prose_prompt`/`assemble_behavior_prompt` with a recent-actions block, prose prompt only; behavior view = `rank_behavior_view` exponent-form re-rank of the served set, `resolve_behavior_weights` clamp `[0,4]`) + caller-held recent-actions scene state + `stream_utterance`/`utterance` (`app\session.py`) + REPL live streaming + divergence debug view (`app\cli.py`) + `first_word`/`behavior` series + behavior cost row (`app\load_driver.py`) + wire deltas (`app\schemas.py`: `first_word_ms`/`prose_stream_ms`/`behavior_ms`/behavior tokens; `dialogue_view`/`behavior_view` `ScoredRef` divergence record; `RecentAction`; `weight_overrides` live on `DialogueTurnRequest`). No migration | verified inline this session against all eleven prior floors: **CLI-harness walker re-opened `tests\verify_cli_harness.py` (36 → 55 assertions** incl. concurrency proved with a slow behavior fake — first chunk 0.008 s vs behavior 300 ms; dialogue-view parity at 1.0 + exponent re-rank flip on crafted items; the divergence record; the recent-actions block appears iff scene actions and clears at `:scene`; all four degradation rows) on fresh scratch; read-path walker weight_overrides criterion re-scoped (48); gate walker `assemble_system_prompt` → `assemble_prose_prompt` rename-only (51); write/reconstruction/authorial/fact walkers **byte-identical to HEAD** and green (40/42/34/34); full suite **41 → 42 passed twice** (+ the split-brain divergence/parity scenario) + keyless subset 35; no-arg migrate → "Up to date: 4 migration(s) applied, 0 pending"; `longmem` pristine via the postgres MCP (ten product tables 0 rows, ledger 001–004, no scratch residue); live piped REPL streaming beat + a standalone driver run. **floor-verifier pass** (independent, fresh context — re-ran all ten done-when + all seven walkers on fresh scratch 55/48/51/40/42/34/34, full suite 42 ×2 + keyless subset 35, no-arg migrate "4 applied, 0 pending", `longmem` pristine via the postgres MCP, the ten untouched app files + four untouched walkers confirmed byte-identical to HEAD~1 by git-diff, no invariant violated — sole persisted write is the sanctioned `agents.reputation` UPDATE). | 2026-07-21 |
 
 | Escalation soft-degrade v1 — **migration 005** (`db\migrations\005_escalation_failed.sql`: `memories.escalation_failed boolean NOT NULL DEFAULT false`, mirroring `scoring_failed`) + the observe-path soft-degrade (`app\ingest.py` `_escalate_with_retry` returns `None` on double failure instead of raising; the write proceeds with the base NLP-pass gist and sets `escalation_failed`; `EscalationHardStopError` + its observe-route 502 removed) + the flag on `InsertPlan` → the new column and `IngestResult` (`app\db.py`, `app\schemas.py`) + the `app\cli.py` consumer removed (import + REPL `except`, build-surfaced by the floor-verifier). Retires the 2026-07-13 fail-loud hard-stop (ruled 2026-07-22); the correction verb's own fail-loud embed/NER → 502 paths untouched. The trigger-set/threshold tuning (79%-fire) stays a separate open item. | floor-verifier **pass** (write-path floor re-opened, re-verified): `tests\verify_write_path.py` **42** on fresh scratch with the flipped [11] soft-degrade (write lands + `escalation_failed` True on the result AND the column); the two build-surfaced breakages fixed and re-verified — `verify_cli_harness.py` **55** (`app\cli.py` import/except removed) and `verify_gate.py` **51** (mechanical ledger pin +005, the 004 precedent); read/reconstruction/authorial/fact walkers green (48/42/34/34); full suite **42** + keyless subset **35**; migration 005 applied 001→005 on fresh scratch + idempotent second run + column DDL `boolean NOT NULL DEFAULT false`; **applied to `longmem`** (no-arg migrate → "5 migration(s) applied, 0 pending"); `longmem` pristine via the postgres MCP (ten product tables 0 rows, ledger 001–005, no scratch residue); invariants intact (non-destructive proceed — a row lands flagged, never a lost write; no in-place content UPDATE; sole DELETE remains the correction cache eviction). | 2026-07-22 |
+
+| HTTP dialogue-turn route + perceived-TTFT v1 — the Unity/C# front door (audit-replan item 1): `POST /v1/dialogue/turn` (`app\api.py`; `DialogueService` joins the lifespan) drains `run_dialogue_turn`'s async generator to the terminal `DialogueTurnResult` — **stateless** (scene state caller-held on the request; runner bookkeeping stays client-side — the future C# `NpcSession` ports `_apply_turn_result`), non-streaming, `UnknownAgentError` → 404 / `UnknownIdentityVersionError` → 422 (the existing precedents), pass-through by ruling, `on_reconstruct=None` (no during-wait signal without SSE; the post-hoc fields carry it); a future SSE `/turn/stream` iterates the SAME generator + the honest latency metric `perceived_first_word_ms` (`app\schemas.py`; captured in `app\dialogue.py` at the same first-chunk instant as `first_word_ms`, clocked from `t_total` — retrieval-inclusive, sees the cold-reconstruction stall; 0.0 when no chunk arrives; the <1 s bar's field) surfaced in the CLI debug line (`app\cli.py`) + the `perceived_first_word` driver series (`app\load_driver.py`). Thread-pool cap ruled deferred post-demo. No migration; no new knobs or roles. | floor-verifier **pass** against all twelve prior floors (CLI-harness floor re-opened, re-verified): `tests\verify_cli_harness.py` **62** on fresh scratch (55 → 62 — new section [13]: route JSON == the drained seam result via ASGITransport + a capturing wrapper, 404 + 422; perceived > first_word > 0 in [1]; both-TTFT-zero on the pre-chunk-failure row in [9]; the driver series in [12]); six other walkers green on fresh scratch (48/51/42/42/34/34) and — with every other `app\` file, `conftest`, and the four other suite files — **byte-identical to HEAD by git-diff** (the floor-economy proof); full suite **43 ×2** + keyless subset **36** (the new unmarked Set D route-contract scenario); no-arg migrate → "Up to date: 5 migration(s) applied, 0 pending"; `longmem` pristine via the postgres MCP (ten product tables 0 rows, ledger 001–005, no scratch residue); independent code spot-checks (route adds/drops nothing; stateless — the sole persisted write of a turn remains the sanctioned `agents.reputation` UPDATE inside the seam; both TTFT fields one-instant captured from `t_prose` vs `t_total`; structural-only test additions); plus a live `python -m app.serve` HTTP beat (observe → turn with IDs + scores + both views + both TTFT fields → unknown-agent 404) and a standalone driver run emitting the `perceived_first_word` series. | 2026-07-23 |
 
 ## Open questions needing Jack's ruling
 
@@ -822,22 +843,48 @@ and the structured behavior output survive the interview. Research publication c
   keyless 35, migrate 005 idempotent, `longmem` pristine 001–005). Trigger-set/threshold tuning
   (79%-fire) stays a separate open item.
 
+- **2026-07-23** — **HTTP dialogue-turn route + perceived-TTFT metric built, floor-verified, and
+  committed — the audit's #1 blocker is closed; Unity has a front door.** Plan-as-spec session (the
+  design was pre-stated by the queue entry + the audit solutions doc's engineering spec — the
+  test-suite precedent); Jack ruled one fork via explicit question at plan approval: the
+  **thread-pool cap is deferred post-demo** (dated "HTTP turn route + perceived-TTFT build rulings"
+  entry in `decisions.md` records it + the build shapes). New: `POST /v1/dialogue/turn`
+  (`app\api.py` — `DialogueService` joins the lifespan; stateless non-streaming drain of the
+  async-generator seam to the terminal `DialogueTurnResult`; 404/422 per the existing precedents;
+  pass-through; a future SSE `/turn/stream` iterates the same generator) and
+  `perceived_first_word_ms` on `DialogueTurnInstrumentation` (captured at the same first-chunk
+  instant as `first_word_ms`, clocked from turn start — retrieval-inclusive; 0.0 when no chunk
+  arrives; the <1 s bar is measured against it), surfaced in the CLI debug line + the
+  `perceived_first_word` driver series. No migration; no new knobs or roles. Verification:
+  CLI-harness walker 55 → 62 on fresh scratch; six walkers byte-untouched and green
+  (48/51/42/42/34/34); suite 42 → 43 ×2 + keyless subset 35 → 36 (the new route-contract scenario
+  is unmarked, so it rides the Stop-hook subset); migrate no-op ("5 applied, 0 pending"); `longmem`
+  pristine via the postgres MCP; live serve HTTP beat (observe → turn → unknown-agent 404;
+  perceived 22.87 ms vs first_word 0.42 ms on the fake-mode smoke — the retrieval-inclusive gap
+  visible) + a standalone driver run. floor-verifier **pass** (independent re-run of all eight
+  done-when criteria + all seven walkers + the suite ×2 + the keyless subset; no invariant
+  concerns — the sole persisted write of a turn remains the sanctioned reputation UPDATE inside
+  the seam). The build target is now **immediate-queue item 2: Unity + reference scene + The
+  Ledger**.
+
 ## Immediate queue
 
 **Pre-demo build path — re-planned 2026-07-22 from the external-persona audit**
 (`external-audit-2026-07-22.md` + `external-audit-2026-07-22-solutions.md`; three rulings in the dated
 `decisions.md` entry). The audit's #1 finding, confirmed against source: **`app\api.py` has no HTTP
-dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over HTTP.
+dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over HTTP. *(CLOSED
+2026-07-23 — item 1 below is built and floor-verified; the route is live.)*
 
 0. **Unblock real mode — DONE (verified 2026-07-22).** Jack fixed the malformed `.env` price line and
    `LONGMEM_MODEL_BEHAVIOR` is present (prior thread); verified via `config.load_settings` (no values
    printed): all eleven `LONGMEM_PRICE_*` keys parse, provider mode `real`, `load_settings()` OK. The
    2026-07-21 flagged crash is resolved; real mode is unblocked for the real-providers-only demo.
-1. **HTTP dialogue-turn route + honest latency metric** (own spec/build session — the true blocker).
-   `POST /v1/dialogue/turn` (non-streaming) drains `run_dialogue_turn`'s async generator to the terminal
-   `DialogueTurnResult`; stateless (caller holds scene state); coherent at default weights. Add
-   `perceived_first_word_ms = now − t_total` (retrieval-inclusive) beside `first_word_ms`; measure the
-   <1 s bar against it. SSE `/turn/stream` iterates the SAME generator later — no rewrite.
+1. **HTTP dialogue-turn route + honest latency metric — DONE (built + floor-verified 2026-07-23).**
+   `POST /v1/dialogue/turn` is live (stateless, non-streaming, 404/422, pass-through), with
+   `perceived_first_word_ms` beside `first_word_ms` — the <1 s bar's field — surfaced in the CLI
+   debug line + the driver series. SSE `/turn/stream` still rides later on the SAME generator (no
+   rewrite). The thread-pool cap is ruled deferred post-demo. See the verified-floors table +
+   session log; the build target is now item 2.
 2. **Unity project + reference scene + The Ledger** — connect MCP for Unity first (`mcp-setup.md`);
    **Wk-2 Unity↔backend HTTP interop is the go/no-go gate** (zero `.cs` today). Minimal `NpcMemory` C#
    client + `NpcSession` (ports `_apply_turn_result`; directive + reputation callbacks). Gray-box scene
@@ -916,7 +963,9 @@ item are traced in `Research Papers\CHANGES-FROM-RESEARCH.md`.)*
    Whisper soft-steering hook + safe-default action fallback for the Unity C# API surface item
    (bounded-autonomy 2604.04703).
 
-*(Done 2026-07-21: **Split-brain streaming v1** — concurrent streaming-prose + behavior calls
+*(Done 2026-07-23: **HTTP dialogue-turn route + perceived-TTFT v1** — the Unity/C# front door +
+the honest retrieval-inclusive latency metric; see the verified-floors table and session log.
+Done 2026-07-21: **Split-brain streaming v1** — concurrent streaming-prose + behavior calls
 off one retrieval, two scored views + the divergence record, the new `behavior` model role;
 first word = prose TTFT. Also done 2026-07-21: **Encoding-context read term v1 +
 gate-calibration utility** and **Hybrid lexical retrieval channel v1 (migration 004)** — the

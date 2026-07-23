@@ -253,9 +253,15 @@ def _aggregate(
         "reconstruction": [
             t.instrumentation.retrieval.reconstruction_ms for t in turns
         ],
-        # The split-brain headline: prose TTFT at the seam (the <1s viability
-        # bar) + the concurrent behavior call, which overlaps the prose stream.
+        # The split-brain pair + the honest headline (turn-route build,
+        # 2026-07-23): `first_word` is prose TTFT at the seam (series
+        # continuity); `perceived_first_word` clocks from turn start —
+        # retrieval-inclusive, the field the <1s viability bar is measured
+        # against. `behavior` runs concurrently, overlapping the prose stream.
         "first_word": [t.instrumentation.first_word_ms for t in turns],
+        "perceived_first_word": [
+            t.instrumentation.perceived_first_word_ms for t in turns
+        ],
         "behavior": [t.instrumentation.behavior_ms for t in turns],
         "dialogue_total": [t.instrumentation.prose_stream_ms for t in turns],
         "turn_total": [t.instrumentation.total_ms for t in turns],

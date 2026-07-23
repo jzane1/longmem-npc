@@ -373,6 +373,85 @@ def test_split_brain_views_parity_and_rerank(scene):
     run_structural(scene, scenario)
 
 
+def test_dialogue_turn_route_contract(scene):
+    """The HTTP turn route (turn-route build, 2026-07-23): POST
+    /v1/dialogue/turn drains the split-brain seam to its terminal result —
+    response JSON == the seam result's serialization (the pass-through
+    ruling), scene state entirely caller-held on the request (stateless).
+    Both TTFT fields ride the wire, the perceived (retrieval-inclusive)
+    field strictly above the seam-clocked first_word. 404 unknown agent;
+    422 unknown identity_version (the init-route precedent)."""
+
+    async def scenario(ctx):
+        import json
+
+        import httpx
+
+        import app.api as api_module
+        from app.dialogue import DialogueService
+        from app.schemas import DialogueTurnRequest
+
+        config = {**V1_CONFIG, "action_vocabulary": ["greet", "warn"]}
+        agent = await ctx.make_agent("d-route", config)
+        await ctx.seed(agent, T_BRIDGE, NOW - timedelta(hours=1))
+        await ctx.seed(agent, T_STORM, NOW - timedelta(hours=2))
+        service = DialogueService(
+            ctx.pool, ctx.providers(), ctx.settings, ctx.retrieval()
+        )
+
+        class CapturingDialogue:
+            def __init__(self, inner):
+                self._inner = inner
+                self.last = None
+
+            async def run_dialogue_turn(self, req, *, on_reconstruct=None):
+                async for item in self._inner.run_dialogue_turn(
+                    req, on_reconstruct=on_reconstruct
+                ):
+                    if not isinstance(item, str):
+                        self.last = item
+                    yield item
+
+        capturing = CapturingDialogue(service)
+        api_module.app.state.dialogue = capturing
+        transport = httpx.ASGITransport(app=api_module.app)
+
+        def payload(**over):
+            base = dict(
+                agent_id=agent,
+                utterance="Tell me the news.",
+                reputation_snapshot=0.0,
+                as_of=NOW,
+            )
+            base.update(over)
+            return json.loads(DialogueTurnRequest(**base).model_dump_json())
+
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://suite"
+        ) as client:
+            ok = await client.post("/v1/dialogue/turn", json=payload())
+            assert ok.status_code == 200
+            assert ok.json() == json.loads(capturing.last.model_dump_json())
+            body = ok.json()
+            assert [i["memory_id"] for i in body["items"]]
+            assert all(i["score"] is not None for i in body["items"])
+            ins = body["instrumentation"]
+            assert ins["perceived_first_word_ms"] > ins["first_word_ms"] > 0.0
+
+            r404 = await client.post(
+                "/v1/dialogue/turn", json=payload(agent_id=uuid4())
+            )
+            assert r404.status_code == 404
+
+            r422 = await client.post(
+                "/v1/dialogue/turn",
+                json=payload(identity_version="no-such-version"),
+            )
+            assert r422.status_code == 422
+
+    run_structural(scene, scenario)
+
+
 @pytest.mark.nlp
 def test_entities_follow_correction(scene):
     """Migration 003's behavior pair through the real verb: the corrected

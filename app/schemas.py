@@ -548,6 +548,13 @@ class DialogueTurnInstrumentation(BaseModel):
     behavior_ms: float = 0.0
     behavior_input_tokens: int = 0
     behavior_output_tokens: int = 0
+    # Perceived TTFT (HTTP turn-route build, 2026-07-23 — the audit's honest
+    # latency metric): first-chunk time measured from TURN START (t_total),
+    # so it includes agent fetch + retrieval — everything `first_word_ms` is
+    # blind to (notably a cold reconstruction stall). The <1s viability bar
+    # is measured against THIS field; `first_word_ms` stays for series
+    # continuity. 0.0 when no chunk ever arrived (the first_word_ms precedent).
+    perceived_first_word_ms: float = 0.0
 
 
 class DialogueTurnResult(BaseModel):

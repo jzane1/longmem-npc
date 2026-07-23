@@ -1787,3 +1787,50 @@ separate, open item.
 Verification: migration 005 applied to `longmem` (idempotent — "5 migration(s) applied, 0 pending");
 full structural suite 42 passed. Independent floor-verifier re-verification of the re-opened write-path
 floor: see the status.md session log + verified-floors table.
+
+## HTTP turn route + perceived-TTFT build rulings — 2026-07-23
+
+**Context.** Immediate-queue item 1 from the 2026-07-22 audit replan — the audit's #1 confirmed
+finding was that `app\api.py` exposed no dialogue-turn route, so the cognition layer was reachable
+only in-process and Unity (C# over HTTP) could not reach a turn. The design was pre-stated by the
+queue entry and the audit solutions doc's engineering spec, so this was a plan-as-spec session (the
+test-suite precedent): orient → one explicit-question ruling → scoped build.
+
+**Ruling (Jack, via explicit question at plan approval): the thread-pool cap is deferred
+post-demo.** The audit engineer flagged that both model calls share Python's default thread pool —
+each turn holds a worker thread for the full prose stream, capping concurrent turns (~16 on this
+machine) once turns arrive over HTTP — and proposed a named, explicitly-sized executor in the API
+lifespan as the cheap correct fix. Ruled: the build stays exactly what the queue names (route +
+metric); the demo is one NPC, so the shared pool cannot bite before then. The cap rides with the
+post-demo async-native streaming work (which removes held threads entirely). Including it now
+(~10 lines, touching only files this build already re-opened) was presented and not adopted.
+
+**Build shapes (stated for the record):**
+
+- **Route = `POST /v1/dialogue/turn`, non-streaming, stateless.** `DialogueService` joins the API
+  lifespan beside the retrieval service; the handler drains `run_dialogue_turn`'s async generator
+  to the terminal `DialogueTurnResult` — the drain loop from `session.utterance` minus the runner
+  bookkeeping, which is deliberately the CLIENT'S job (the future C# `NpcSession` ports
+  `_apply_turn_result`; all scene state already rides the request). Error maps follow the existing
+  precedents: `UnknownAgentError` → 404, `UnknownIdentityVersionError` → 422. The pass-through
+  ruling (2026-07-13/14) holds: the response is exactly the seam result's serialization.
+  `on_reconstruct` stays `None` on this route — no during-wait signal without SSE, and the
+  result's post-hoc reconstruction fields carry it honestly. A future SSE `/v1/dialogue/turn/stream`
+  iterates the SAME generator (the async-generator seam ruling's payoff) — no rewrite.
+- **Metric = `perceived_first_word_ms`, captured at the same first-chunk instant as
+  `first_word_ms`.** One timestamp at the first yielded chunk, clocked two ways: from `t_prose`
+  (the existing `first_word_ms`, kept for series continuity) and from `t_total` (turn start —
+  agent fetch + retrieval included, so the field sees the cold-reconstruction stall the old metric
+  is blind to). 0.0 when no chunk ever arrives (the `first_word_ms` precedent). The <1 s viability
+  bar is measured against the NEW field. Surfaced beside the old one in the CLI debug line and as
+  a `perceived_first_word` load-driver series.
+- **No migration** — a fact of this target: an HTTP route over existing seams plus one
+  instrumentation field; nothing new is stored (ledger stays 001–005). No new knobs, no new model
+  roles.
+
+**Verification.** CLI-harness walker re-opened 55 → 62 (route pass-through via ASGITransport +
+capturing wrapper, 404/422, perceived > first_word > 0, both-TTFT-zero on the pre-chunk-failure
+row, the driver series); suite 42 → 43 (the unmarked route-contract scenario in Set D; keyless
+subset 35 → 36); the six other walkers and every other `app\` file byte-identical to HEAD; live
+`python -m app.serve` HTTP beat (observe → turn → 404) + a standalone driver run. Independent
+floor-verifier re-verification: see the status.md session log + verified-floors table.

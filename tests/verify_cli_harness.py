@@ -1,6 +1,7 @@
 """verify_cli_harness.py — structural done-when walker for the dialogue-turn
 seam (docs\\cli-harness.md 2026-07-15, RE-OPENED by the split-brain build
-docs\\split-brain-streaming.md 2026-07-21).
+docs\\split-brain-streaming.md 2026-07-21 and by the HTTP turn-route build
+2026-07-23).
 
 Since the split-brain build the seam is an ASYNC GENERATOR: `run_dialogue_turn`
 yields prose chunks, then the terminal DialogueTurnResult. Two concurrent calls
@@ -10,6 +11,9 @@ view = the same served set re-ranked with resolved weights). This walker
 asserts the ruled done-when: concurrency, first_word_ms, dialogue-view parity +
 behavior re-rank, the divergence record, the recent-actions block, and all four
 degradation rows — plus the unchanged reputation math and vocabulary contract.
+Since the turn-route build it also asserts the stateless `POST
+/v1/dialogue/turn` pass-through (section [13]) and the retrieval-inclusive
+`perceived_first_word_ms` beside `first_word_ms`.
 
 Structural-only per tests\\CLAUDE.md: assertions touch IDs, flags, score
 components, reputation math, byte-identity, and prompt block structure, never
@@ -308,6 +312,7 @@ async def main(database_uri: str) -> None:
         "sonnet_ms",
         "sonnet_first_token_ms",
         "first_word_ms",
+        "perceived_first_word_ms",
         "prose_stream_ms",
         "behavior_ms",
         "apply_ms",
@@ -319,6 +324,13 @@ async def main(database_uri: str) -> None:
         ins.first_word_ms == ins.sonnet_first_token_ms
         and ins.prose_stream_ms == ins.sonnet_ms,
         "first_word_ms == prose TTFT; prose_stream_ms == prose total",
+    )
+    # Turn-route build 2026-07-23: the honest metric clocks from turn start,
+    # so it strictly contains agent fetch + retrieval that first_word_ms skips.
+    check(
+        ins.perceived_first_word_ms > ins.first_word_ms > 0.0,
+        "perceived_first_word_ms is retrieval-inclusive: > first_word_ms > 0",
+        f"perceived={ins.perceived_first_word_ms} first_word={ins.first_word_ms}",
     )
     check(
         ins.retrieval.total_ms >= 0
@@ -665,6 +677,11 @@ async def main(database_uri: str) -> None:
         and r_pf.directive is not None,
         "prose fails pre-chunk: fallback line, but the behavior directive lands",
     )
+    check(
+        r_pf.instrumentation.first_word_ms == 0.0
+        and r_pf.instrumentation.perceived_first_word_ms == 0.0,
+        "no chunk ever arrived: both TTFT fields stay 0.0 (the honest zero)",
+    )
     # row 3: prose drops mid-stream -> keep the partial (ruled 2026-07-21).
     prose_md, r_md = await run_turn(
         service_with(dialogue=MidStreamDropProseProvider()).run_dialogue_turn(
@@ -762,6 +779,7 @@ async def main(database_uri: str) -> None:
         "retrieval_sql",
         "query_embed",
         "first_word",
+        "perceived_first_word",
         "behavior",
         "dialogue_total",
         "turn_total",
@@ -770,8 +788,8 @@ async def main(database_uri: str) -> None:
         if row is None or row["p50"] < 0 or row["p95"] < row["p50"]:
             fail("latency aggregates", f"{series}: {row}")
     ok(
-        "latency p50/p95 emitted for every §11 series incl. first_word + behavior "
-        "(the gate term is asserted in verify_gate.py)"
+        "latency p50/p95 emitted for every §11 series incl. first_word + "
+        "perceived_first_word + behavior (the gate term is in verify_gate.py)"
     )
     check(
         report["per_100_turns"]["dialogue"]["input_tokens_per_100_turns"] > 0
@@ -779,6 +797,79 @@ async def main(database_uri: str) -> None:
         and report["per_100_turns"]["dialogue"]["usd_per_100_turns"] is None
         and report["degraded_turns"] == 0,
         "per-100-turn table itemized incl. the behavior cost row; USD unpriced -> null",
+    )
+
+    # ------------------------------------------------------------------ #
+    print("\n[13] HTTP turn route: stateless pass-through (the Unity front door)")
+    # Turn-route build 2026-07-23: POST /v1/dialogue/turn drains the SAME
+    # async-generator seam to its terminal result — route JSON == the seam
+    # result's serialization (the pass-through ruling), scene state entirely
+    # caller-held on the request (stateless by construction).
+    import json
+
+    import httpx
+
+    import app.api as api_module
+
+    class CapturingDialogue:
+        def __init__(self, inner: DialogueService):
+            self._inner = inner
+            self.last: DialogueTurnResult | None = None
+            self.chunks = 0
+
+        async def run_dialogue_turn(self, req, *, on_reconstruct=None):
+            async for item in self._inner.run_dialogue_turn(
+                req, on_reconstruct=on_reconstruct
+            ):
+                if isinstance(item, DialogueTurnResult):
+                    self.last = item
+                else:
+                    self.chunks += 1
+                yield item
+
+    await execute(pool, "UPDATE agents SET reputation = 0 WHERE agent_id = %s", agent_a)
+    capturing = CapturingDialogue(dialogue)
+    api_module.app.state.dialogue = capturing
+    transport = httpx.ASGITransport(app=api_module.app)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://walker"
+    ) as client:
+        payload = json.loads(request(agent_a).model_dump_json())
+        response = await client.post("/v1/dialogue/turn", json=payload)
+        r_missing = await client.post(
+            "/v1/dialogue/turn",
+            json=json.loads(request(uuid4()).model_dump_json()),
+        )
+        r_badver = await client.post(
+            "/v1/dialogue/turn",
+            json=json.loads(
+                request(agent_a, identity_version="no-such-version").model_dump_json()
+            ),
+        )
+    check(response.status_code == 200, "route returned 200")
+    check(
+        capturing.chunks > 0
+        and response.json() == json.loads(capturing.last.model_dump_json()),
+        "route JSON is exactly the drained seam DialogueTurnResult (pass-through)",
+        f"{capturing.chunks} chunks drained server-side",
+    )
+    body = response.json()
+    check(
+        all(item["memory_id"] and item["score"] is not None for item in body["items"])
+        and body["dialogue_view"]
+        and body["behavior_view"]
+        and body["instrumentation"]["perceived_first_word_ms"]
+        > body["instrumentation"]["first_word_ms"]
+        > 0.0,
+        "wire contract: IDs + scores + both views + both TTFT fields over HTTP",
+    )
+    check(
+        r_missing.status_code == 404,
+        "unknown agent_id -> 404 over the route",
+    )
+    check(
+        r_badver.status_code == 422,
+        "unknown identity_version -> 422 over the route (the init-route precedent)",
     )
 
     await pool.close()

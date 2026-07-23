@@ -20,6 +20,7 @@ from fastapi import FastAPI, HTTPException
 
 from app.config import load_settings
 from app.db import build_pool
+from app.dialogue import DialogueService
 from app.ingest import (
     CorrectionConflictError,
     CorrectionEmbedFailedError,
@@ -36,6 +37,8 @@ from app.schemas import (
     CorrectionRequest,
     CorrectionResult,
     DialogueInitRequest,
+    DialogueTurnRequest,
+    DialogueTurnResult,
     IngestResult,
     ObserveEvent,
     PinRequest,
@@ -57,6 +60,7 @@ async def _lifespan(app: FastAPI):
     providers = build_providers(settings)
     app.state.service = IngestService(pool, providers, settings)
     app.state.retrieval = RetrievalService(pool, providers, settings)
+    app.state.dialogue = DialogueService(pool, providers, settings, app.state.retrieval)
     try:
         yield
     finally:
@@ -75,6 +79,34 @@ async def dialogue_init(request: DialogueInitRequest) -> RetrievalResult:
     contract, not a flaky model -> 422 (the unknown-agent 404 precedent)."""
     try:
         return await app.state.retrieval.retrieve_dialogue_init(request)
+    except UnknownAgentError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except UnknownIdentityVersionError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/v1/dialogue/turn", response_model=DialogueTurnResult)
+async def dialogue_turn(request: DialogueTurnRequest) -> DialogueTurnResult:
+    """One dialogue turn over HTTP (the audit's #1 gap, built 2026-07-23) —
+    the Unity/C# front door to the split-brain seam. STATELESS: all scene
+    state (reputation snapshot, identity version, scene basis, loaded set,
+    context, recent actions) rides on the request, and the runner bookkeeping
+    (`session._apply_turn_result`) is the CLIENT'S job — the future C#
+    NpcSession ports it. Non-streaming: drains `run_dialogue_turn`'s async
+    generator to the terminal result (first_word_ms/perceived_first_word_ms
+    ride in the instrumentation, so no chunk consumption is needed); a future
+    SSE `/v1/dialogue/turn/stream` iterates the SAME generator — no rewrite.
+    `on_reconstruct` stays None here (no during-wait signal without SSE; the
+    result's post-hoc reconstruction fields carry it). Pass-through by ruling:
+    the response is exactly the seam result's serialization."""
+    try:
+        result: DialogueTurnResult | None = None
+        async for item in app.state.dialogue.run_dialogue_turn(request):
+            if isinstance(item, DialogueTurnResult):
+                result = item
+        if result is None:  # the seam always yields a terminal result
+            raise RuntimeError("dialogue turn produced no result")
+        return result
     except UnknownAgentError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except UnknownIdentityVersionError as exc:
