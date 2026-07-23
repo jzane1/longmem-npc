@@ -108,14 +108,15 @@ and the structured behavior output survive the interview. Research publication c
 
 ## Open questions needing Jack's ruling
 
-- **Escalation failure path for production (owed before the demo publishes).** The v1 write path
-  hard-stops a write when the gist-escalation call fails twice (fail-loud, build-phase tuning
-  stance, ruled 2026-07-13). The production/demo behavior — hard-stop vs. some soft degradation —
-  must be re-ruled before the demo ships — and the 2026-07-21 real-mode data **widened the
-  re-rule to cover the trigger set/thresholds too** (79% fire rate on realistic prose;
-  importance p50 0.61 vs the 0.45 threshold; 0 hard-stops in 80 observes post-fix; latency
-  lever D's server half). Not blocking current work. (The reconstruction flagged shapes were all
-  confirmed 2026-07-17 — see the "Reconstruction flagged-shapes confirmations" entry in `decisions.md`.)
+- **Escalation trigger set / thresholds — the failure path is CLOSED.** The failure path was re-ruled
+  and **BUILT 2026-07-22**: a gist-escalation double failure now soft-degrades to the base NLP-pass
+  gist with `memories.escalation_failed` set — never a lost write (migration 005; the 2026-07-13
+  fail-loud hard-stop retired, floor-verifier pass). **Still open, separate and non-blocking:** the
+  trigger set and thresholds — escalation fires on **79% of realistic prose** (real haiku importance
+  p50 0.61 vs the 0.45 threshold; +1.4 s and ~$0.0021 per fire) vs 0% on synthetic driver prose, a
+  cost/latency question and latency lever **D**'s server half. Measure, then rule. (The reconstruction
+  flagged shapes were all confirmed 2026-07-17 — see the "Reconstruction flagged-shapes confirmations"
+  entry in `decisions.md`.)
 
 - **R7 — the self-referential drift budget (logged 2026-07-22 from the external-persona audit).** The
   reconstruction drift budget is cosine candidate-vs-anchor < 0.35; it cannot catch a retelling that

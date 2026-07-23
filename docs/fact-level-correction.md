@@ -281,8 +281,10 @@ in `decisions.md`; two via explicit questions, marked):
   embed_ms, embedding_tokens` (flat, the v1 `total_ms` style); `IngestResult += fact_version_id`.
 - REPL `:correct` debug-view rendering — **ruled:** both head swaps + embed ms/tokens in the
   printed line; the new error prints loudly (the hard-stop pattern).
-- Embed-failure status code — **ruled: 502** (`CorrectionEmbedFailedError`, the
-  escalation-hard-stop precedent at the observe route).
+- Embed-failure status code — **ruled: 502** (`CorrectionEmbedFailedError`, following the
+  escalation hard-stop then live at the observe route). *(That observe-route hard-stop was retired
+  2026-07-22 — escalation now soft-degrades; this correction path stays fail-loud on its own
+  all-or-nothing ruling.)*
 - Walker — **ruled:** `tests\verify_fact_correction.py` (32 assertions, scratch pattern);
   write-path walker 35 → 38 (incl. the one ruling-driven modification: the [14]
   degradation-signal query moved to the fact head), read-path 34 → 36 and authorial 31 → 33 by

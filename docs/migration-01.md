@@ -52,6 +52,8 @@ One row per observation. **`observation_text` is immutable after insert.**
 - `importance_raw` real — stored raw; normalized at read.
 - `scoring_failed` boolean NOT NULL default false — set true when the importance-scoring model
   fails; the write still lands with neutral importance (never lose a write). See architecture §2.
+  *(Migration 005 added the sibling `escalation_failed` boolean NOT NULL default false — the
+  gist-escalation soft-degrade flag, ruled 2026-07-22; ladder row in `write-path.md`.)*
 - `typology` text CHECK in (`observed`, `told`, `inferred`, `reflected`).
 - `typology_confidence` real CHECK 0–1.
 - `typology_source` text CHECK in (`declared`, `inferred`).
@@ -171,7 +173,9 @@ The entity/topic index: gist matching + entity-gate tripwire.
   fact-version chain — specced 2026-07-18, `fact-level-correction.md`; migration 003 — the
   entities fact-chain column — specced & built 2026-07-19, `mid-dialogue-gate.md`; migration
   004 — the hybrid lexical channel's partial FTS GIN over live fact heads — built 2026-07-20
-  with the research-adoption slate, annotated in `read-path.md`.)*
+  with the research-adoption slate, annotated in `read-path.md`; migration 005 — the
+  `memories.escalation_failed` soft-degrade flag — built 2026-07-22, annotated in
+  `write-path.md`.)*
 - Docker: `pgvector/pgvector` for Postgres 16; connection string from `.env`.
 
 ## Done when
