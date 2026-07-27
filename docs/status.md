@@ -30,8 +30,21 @@ mid-scene gate fire appending the unseen memory → warm-init then a pure cache-
 turn (write_backs 0, cache_hits 4) → both scored views. floor-verifier **pass** (independent
 re-run of the whole gate incl. server lifecycle; port fidelity verified side-by-side against
 `app\session.py`; `client\` has no SQL and no hardcoded config; the stage-0 floor byte-untouched
-— **sixteen floors stand verified**). Next: **stage 2 — the Unity adapter + gray-box set**, then
-the browser Ledger (stage 3).
+— **sixteen floors stand verified**). **And stage 2 is BUILT with its Play-mode gate GREEN**
+(fourth task of the day): the Unity project joins the repo (`unity\`, URP template; the embedded
+MCP bridge package gitignored — the manifest git URL re-resolves it) with the thin adapter
+(`Assets\Scripts\NpcMemoryNpc.cs` — one MonoBehaviour holding the flat client + `NpcSession`,
+inspector config, zero blocking) + the gray-box demo surface (`NpcDemoDriver.cs` — IMGUI
+dev-tool overlay, fork 7 settled at build; live streamed dialogue, directive flash,
+gate/reputation readouts) + the set (floor, walls, Keeper capsule, nameplate, framed camera;
+core DLL in `Assets\Plugins`, Newtonsoft via Unity's package). **Play-mode beats: 8/8 green** —
+provisioned over the API from in-engine, streamed chunks byte-identical AND rendered live,
+**chunk callbacks on the main thread (thread 1)**, session bookkeeping live in-engine, frames
+pumping. Two build-surfaced fixes, both caught by the Play gate: the core client dropped every
+`ConfigureAwait(false)` (continuations now honor the caller's SynchronizationContext — the
+Unity main-thread contract; blocking is banned so the library-deadlock hazard doesn't apply;
+console harness re-run 21/21 after the change) and the directive flash's re-entrancy color
+capture. Next: **stage 3 — the browser Ledger**, then demo choreography.
 
 **Prior phase:** **the HTTP dialogue-turn route is LIVE — Unity's front door exists** (2026-07-23,
 immediate-queue item 1, the audit's #1 blocker closed; plan-as-spec session). `POST
@@ -1004,6 +1017,35 @@ and the structured behavior output survive the interview. Research publication c
   re-ran identically). A NuGet source was absent on the fresh .NET SDK; nuget.org added
   (machine-level, one-time). **Sixteen floors stand verified.** Next: **stage 2 — the Unity
   adapter + gray-box set** (MCP for Unity already verified), then the browser Ledger (stage 3).
+
+- **2026-07-27** — **Unity-client stage 2 built — the adapter + gray-box set, Play-mode gate
+  GREEN (fourth task of the day).** The Unity 6 project (URP template, `unity\`) joins the repo
+  (79 files; the embedded third-party MCP bridge package + generated solution/caches
+  gitignored — the manifest git URL re-resolves the bridge on a fresh clone). New:
+  `Assets\Scripts\NpcMemoryNpc.cs` (the thin MonoBehaviour adapter — flat client + `NpcSession`,
+  inspector config incl. auto-provision agent fields and decay taus, thin async passthroughs,
+  directive/reputation events, zero blocking) and `NpcDemoDriver.cs` (the gray-box demo
+  surface — **fork 7 settled at build: an IMGUI dev-tool overlay**, the intended systems
+  aesthetic; live streamed dialogue, directive flash on the capsule, gate/reputation readouts,
+  a +46d time-jump button; `autoRun` plays scripted Play-mode verification beats with
+  `[npc-demo]` console receipts + `Application.runInBackground` so unattended runs keep
+  pumping). The set: floor + three walls + Keeper capsule + nameplate + framed camera, built
+  via MCP for Unity; the core DLL in `Assets\Plugins` (Release build), Newtonsoft via
+  `com.unity.nuget.newtonsoft-json` 3.2.2. **Play-mode gate 8/8**: in-engine provisioning,
+  injected-time observes, boundary freeze, loader turn, live streamed chunks byte-identical to
+  content, **chunk callbacks ON the main thread (thread 1)**, session bookkeeping live
+  in-engine, +9 frames pumped through both turns. **Two build-surfaced fixes, both caught by
+  the Play gate:** (1) the core client had `ConfigureAwait(false)` throughout (the standard
+  library idiom) — chunk callbacks landed on thread-pool thread 731; ALL removed so
+  continuations honor the caller's SynchronizationContext (blocking is banned by the adapter
+  contract, so the deadlock hazard the idiom guards against does not apply; documented in
+  `NpcMemoryClient`; the console harness re-ran **21/21** after the change); (2) overlapping
+  directive flashes captured each other's yellow as "original" — the true color is now
+  captured once. One environment fix en route: a PowerShell text edit mojibake'd the core
+  files' UTF-8 (ANSI round-trip); restored from git and re-edited UTF-8-safely. Receipts: the
+  `[npc-demo]` console transcript + `unity\Captures\graybox-stage2-receipt.png` (gitignored;
+  sent to Jack); scene saved with `autoRun` off; server torn down, `longmem_smoke` dropped,
+  port 8000 free, `longmem` pristine. Next: **stage 3 — the browser Ledger.**
 
 ## Immediate queue
 
