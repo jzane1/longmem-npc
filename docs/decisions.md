@@ -1901,3 +1901,65 @@ contract — thin_gist fires alone on a zero-span pass, kill-switch at 0.0, floo
 plus the measured sexton fixture escalating with thin_gist as the SOLE trigger at the service
 level); suite +1 pure keyless scenario (`test_thin_gist_trigger_pure` over production
 `SERVICE_DEFAULTS`; 43 → 44, subset 36 → 37). No migration — knob + trigger only.
+
+## Demo-vehicle ruling — Unity, not an established-game mod — 2026-07-27
+
+**Context.** At the state review before immediate-queue item 2 (Unity + reference scene + The
+Ledger), Jack re-opened the demo-vehicle question: build the custom Unity scene, or mod the NPC
+into an established game (Skyrim named) — his stated premise being that Unity scene-building has
+been a time-sink and occasional roadblock in past projects. A five-agent read-only panel was run —
+the four external-audit personas (`.claude\agents\audit-*.md`, the 2026-07-22 template) plus a
+web-research scout on the mid-2026 LLM-NPC modding landscape.
+
+**Panel findings (brief).**
+
+- The time-sink premise attaches to *game* scenes (art, animation, navmesh, feel) — costs the
+  gray-box aesthetic (adopted with the 2026-07-22 audit plan) already removed; the demo scene
+  is a set, not a game. The remaining
+  Unity cost is the C# client, which is the end-goal artifact itself, not a sink. The genuinely
+  risky Unity work is runtime plumbing: the null-vs-absent JSON contract (`loaded_memory_ids`
+  null = loader turn vs `[]` = an empty loaded set the gate still evaluates over — trivially
+  novel, so it fires; a serializer collapsing one into the other silently changes gate
+  behavior), async→main-thread marshaling, and Play-mode debugging (where MCP-for-Unity is
+  partly unavailable — scene-manipulation operations fail in Play mode, `mcp-setup.md` §2).
+- Skyrim is the worst instance of the mod path: Papyrus/SKSE shares zero code with the
+  `NpcMemory` package; the demo lands in the Mantella/Herika/CHIM comparison class (all market
+  "NPCs remember" via transcript-summary + vector recall — the differentiators have no analog
+  there but are invisible in dialogue); unvoiced generated text inside a fully-voiced game reads
+  as broken where gray-box reads as deliberate; the engine emits state deltas, not prose, so the
+  observe corpus is hand-authored either way; game RNG breaks paired ON/OFF ablation capture; a
+  published Mantella fork must be AGPL-3.0. Scout's estimate for the no-experience Mantella-fork
+  path: ~1–3 weeks on a famously brittle multi-process stack. (Bethesda's fan-video policy makes
+  the *video* IP-safe; the repo could never ship the mod.)
+- The Ledger is engine-independent and cheapest as a browser page over the existing HTTP API —
+  it would otherwise have been the single most expensive Unity UI in the plan.
+
+**Rulings (Jack):**
+
+1. **Demo vehicle = Unity gray-box, with three de-riskers.** (a) The C# client core is built
+   engine-agnostic first — plain .NET, HTTP + JSON + the `NpcSession`/`_apply_turn_result` port,
+   zero `UnityEngine` types, one flat client class (no abstraction ceremony) — driven by a
+   `dotnet run` console harness that plays every demo beat headless. This moves the recorded
+   Wk-2 Unity↔backend interop go/no-go into Wk-1, before Unity ever opens. (b) **The Ledger is
+   a browser page**, composited beside the game view in OBS — not Unity UI. (c)
+   **Established-game integration is deferred to a post-demo clip** (the split-brain
+   interview-clip template), targeting a C#-moddable game — Stardew Valley (SMAPI, days-scale)
+   or RimWorld (the richest observe stream the scout found: ~100 data points/interaction via
+   RimDialogue) — NOT Skyrim; the engine-agnostic core gets reused there instead of rewritten.
+2. **The week-3 fallback is deliberately not pre-ruled.** The skeptic proposed pre-deciding a
+   CLI + browser-Ledger recording as the fallback video; Jack declined — decide later only if
+   needed. (Recorded so the option isn't lost: the REPL already drives every beat today.)
+
+**Carried into the item-2 spec (to surface there, not resolved here):** SSE `/turn/stream`
+timing (the <1 s perceived-first-word beat cannot be recorded without it — real first-token
+2.2 s, B1/B2 unruled); an agent-provisioning route (`POST /v1/agents` does not exist — the demo
+agent is hand-SQL today); the C# serialization/packaging shape; the Ledger page stack + bound
+fields (bind the same `DialogueTurnResult` fields the eval harness scores); an early one-hour
+MCP-for-Unity verification (runbook-ready, never connected); and the demo-corpus register —
+authored in shipped-game dialogue style, with the held-out corpus arm noted for the judged eval
+(the construct-validity mitigation for the gray-box path's honest weakness: escalation fired
+79% on realistic prose vs 0% on synthetic driver prose in the 2026-07-21 pre-thin_gist
+measurement — ~95% on the corpus at current defaults since the 2026-07-23 thin_gist build; the
+prose-dependence point is what carries).
+
+**No code, no floors, no migration this session** — panel + rulings + docs propagation only.

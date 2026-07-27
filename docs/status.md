@@ -1,6 +1,6 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-07-23
+**Last updated:** 2026-07-27
 **Phase:** **the HTTP dialogue-turn route is LIVE — Unity's front door exists** (2026-07-23,
 immediate-queue item 1, the audit's #1 blocker closed; plan-as-spec session). `POST
 /v1/dialogue/turn` (`app\api.py`; `DialogueService` joins the lifespan) drains the split-brain
@@ -22,8 +22,11 @@ rate is productive (85% of escalations add real gist content), the defaults stan
 **thin_gist** span-floor trigger closes the measured zero-gist hole (16/80 observes had landed with
 no gist spans — reconstruction's fixed constraint empty on those rows); Engram-style deferred write
 cognition is queued to the ledger; write-path walker 42 → 46, suite 43 → 44, floor-verifier
-**pass**. Next: **Unity project + reference scene + The Ledger** (immediate-queue item 2), then the
-pre-ship gates.
+**pass**. Next: **Unity project + reference scene + The Ledger** (immediate-queue item 2) — **the
+demo vehicle is ruled 2026-07-27** (Unity gray-box, not an established-game mod; engine-agnostic
+`NpcMemory.Core` + a console harness first with the interop gate moved to Wk-1; the Ledger a
+browser page; the established-game clip deferred post-demo to a C# game — dated "Demo-vehicle
+ruling" entry in `decisions.md`, specced in `unity-client.md`) — then the pre-ship gates.
 
 **Prior phase:** **external-persona audit landed — the pre-demo path is re-planned** (2026-07-22). A
 four-persona read-only agent-team audit (critique + solutions; `external-audit-2026-07-22.md` +
@@ -902,6 +905,28 @@ and the structured behavior output survive the interview. Research publication c
   "hard-stop on double failure" — stale since the 2026-07-22 soft-degrade, comment-only; fix when
   that file next opens. Next: **Unity + reference scene + The Ledger (immediate-queue item 2)**.
 
+- **2026-07-27** — **Demo-vehicle fork weighed and ruled + item 2 specced (docs only — no code, no
+  floors, no migration).** At the state review, Jack re-opened the vehicle question: custom Unity
+  scene vs modding the NPC into an established game (Skyrim named), his premise being that Unity
+  scene-building has been a time-sink in past projects. A five-agent read-only panel — the four
+  audit personas + a web-research scout on the mid-2026 LLM-NPC modding landscape — weighed it;
+  findings + the ruling in the dated "Demo-vehicle ruling" `decisions.md` entry. **Ruled: Unity
+  gray-box with three de-riskers** — `NpcMemory.Core` built engine-agnostic first (plain .NET,
+  zero `UnityEngine` types, one flat client class; a `dotnet run` console harness plays every
+  demo beat headless, moving the interop go/no-go Wk-2 → Wk-1), **the Ledger as a browser page**
+  (not Unity UI), and the established-game integration deferred to a **post-demo clip on a
+  C#-moddable game** (not Skyrim: zero C# reuse, the Mantella comparison class, state-delta
+  observes, AGPL on a published fork); the week-3 fallback deliberately NOT pre-ruled.
+  **`unity-client.md` written** (the item-2 spec): mechanism per stage (core client + `NpcSession`
+  port + console harness + Unity adapter + gray-box set + browser Ledger + choreography hooks)
+  and seven open forks for Jack's rulings at plan approval — the headline three: SSE
+  `/turn/stream` scope (the <1 s perceived-first-word beat is unrecordable without it; recommended
+  in), an agent-provisioning route (`POST /v1/agents` does not exist — the demo agent is hand-SQL;
+  recommended in, small), and the Ledger's data source (direct read-only SQL vs a read-only
+  `GET /v1/memories/{id}/chain` route — the product-surface option recommended). Queue item 2
+  reshaped to the ruled sequence; the artifact-queue Unity entry annotated; the established-game
+  clip added to the sequenced-later ledger.
+
 ## Immediate queue
 
 **Pre-demo build path — re-planned 2026-07-22 from the external-persona audit**
@@ -920,19 +945,31 @@ dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over
    debug line + the driver series. SSE `/turn/stream` still rides later on the SAME generator (no
    rewrite). The thread-pool cap is ruled deferred post-demo. See the verified-floors table +
    session log; the build target is now item 2.
-2. **Unity project + reference scene + The Ledger** — connect MCP for Unity first (`mcp-setup.md`);
-   **Wk-2 Unity↔backend HTTP interop is the go/no-go gate** (zero `.cs` today). Minimal `NpcMemory` C#
-   client + `NpcSession` (ports `_apply_turn_result`; directive + reputation callbacks). Gray-box scene
-   shipped as the **intended** systems/dev-tool aesthetic (removes art-risk from the critical path).
-   **The Ledger** = the designer-facing ground-truth-vs-telling inspector: original vs current telling
-   side by side + `read_mode`/scores/IDs + superseded rows greyed-but-present + a real gist/detail number
-   on screen. **Off-camera cache warm-init** (fire `/v1/dialogue/init` at each scene basis during camera
-   cuts) removes the 9–16 s cold stall with zero pre-warm code. Beats: **lead with correction-override**,
-   then **reconstructive drift (constancy-first — gist flat, detail thinning)**; the split-brain
-   divergence is a **separate interview clip** (ruled 2026-07-22), not a main-video beat. The
-   game-authored action-observe beat + async observes (old pre-ship (d)) ride here. The REPL still drives
-   all beats today (`:as-of` jumps + scene boundaries + band crossings; `:correct` moves retrieval AND
-   entities; the gate debug line + `(reconstructing…)`).
+2. **Unity project + reference scene + The Ledger** — **demo vehicle ruled 2026-07-27** (dated
+   "Demo-vehicle ruling" entry in `decisions.md`: Unity gray-box over an established-game mod; the
+   five-agent panel — four audit personas + a modding-landscape scout — weighed it — Skyrim
+   declined on zero C# reuse, the
+   Mantella comparison class, state-delta observes, and AGPL). Spec: **`unity-client.md`**. The ruled
+   sequence: **(i) `NpcMemory.Core` first** — engine-agnostic C# client (plain .NET, HTTP + JSON, the
+   `NpcSession` port of `_apply_turn_result` with directive + reputation callbacks, zero `UnityEngine`
+   types, one flat client class), driven by a `dotnet run` **console harness playing every demo beat
+   headless — the Unity↔backend interop go/no-go moves to Wk-1** (was Wk-2; zero `.cs` today).
+   **(ii)** Unity = a thin MonoBehaviour adapter + the gray-box scene as the **intended**
+   systems/dev-tool aesthetic (a set, not a game — art-risk stays off the critical path); connect MCP
+   for Unity at this step (`mcp-setup.md`; verify the bridge early — scene-manipulation operations
+   fail during Play mode). **(iii) The Ledger = a browser page** over the existing HTTP API (not Unity UI), composited
+   in OBS: original vs current telling side by side + `read_mode`/scores/IDs + superseded rows
+   greyed-but-present + a real gist/detail number on screen — bound to the same `DialogueTurnResult`
+   fields the eval harness scores. **Off-camera cache warm-init** (fire `/v1/dialogue/init` at each
+   scene basis during camera cuts) removes the 9–16 s cold stall with zero pre-warm code. Beats:
+   **lead with correction-override**, then **reconstructive drift (constancy-first — gist flat,
+   detail thinning)**; the split-brain divergence is a **separate interview clip** (ruled
+   2026-07-22), not a main-video beat. The game-authored action-observe beat + async observes (old
+   pre-ship (d)) ride here. Carried spec forks: SSE `/turn/stream` timing (the <1 s bar is
+   unrecordable without it), the missing agent-provisioning route, the C# null-vs-absent
+   serialization contract, the demo-corpus register (shipped-game dialogue style + the held-out
+   eval arm). The REPL still drives all beats today (`:as-of` jumps + scene boundaries + band
+   crossings; `:correct` moves retrieval AND entities; the gate debug line + `(reconstructing…)`).
 
 **Pre-ship latency items** (2026-07-21 latency slate; **audit re-sequenced 2026-07-22** — the
    perceived-TTFT metric moved into item 1; pre-warm build proposed post-demo):
@@ -1044,6 +1081,8 @@ access.)*
 - Unity client C# API surface: send event, open dialogue, directive callback, reputation read,
   reconstructing-signal hook, scene-boundary emission. *(Grown by the 2026-07-21 split-brain
   spec: the SSE streaming route + the game-authored action-observe contract land here.)*
+  *(Shape ruled 2026-07-27: engine-agnostic `NpcMemory.Core` — zero `UnityEngine` types, one flat
+  client class — + a thin Unity adapter; consolidated into `unity-client.md`.)*
 - Demo choreography: injected-timestamp time travel; decay + correction-override + gate-recollect
   beats; the 60-day drift plot — a planned beat since the 2026-07-14 re-slating (reconstruction is
   pre-demo). *(Grown 2026-07-21: the game-authored action-observe beat —
@@ -1069,7 +1108,11 @@ service's own timing; the existing degradation flags are the natural deferred-wo
 add-only gist annotation vs the frozen write-time facts, the un-enriched-window retrieval
 contract, a new `write_cause` = a migration; Engram 2606.09900 + the sleep-time-compute family —
 the async-observe client contract covers the latency motivation and the thin_gist trigger covers
-correctness inline, so this is a cost/throughput optimization); reflection → parameter compiler;
+correctness inline, so this is a cost/throughput optimization); **the established-game
+integration clip** (ruled 2026-07-27 — post-demo, the split-brain interview-clip template: a
+C#-moddable game reusing `NpcMemory.Core` — Stardew/SMAPI days-scale or RimWorld's rich event
+stream — NOT Skyrim: zero C# reuse, the Mantella comparison class, AGPL on a published fork);
+reflection → parameter compiler;
 Unity Package Manager packaging; docs final + public flip
 (Apache-2.0). *(Reconstruction — mechanism, drift budget, Set C scenarios — moved off this ledger
 into the immediate queue by the 2026-07-14 re-slating ruling.)* *(Split-brain topology with per-call

@@ -1,0 +1,216 @@
+# Unity client + reference scene + The Ledger — build target (specced 2026-07-27)
+
+Immediate-queue item 2's spec session. Consolidates the artifact-queue "Unity client C# API
+surface" entry, architecture's environment section (Unity 6, flatscreen 3D, `NpcMemory` root
+namespace, `Assets\Scripts\` until packaging), the audit solutions doc's choreography + engineering
+spec (`external-audit-2026-07-22-solutions.md`), and the **2026-07-27 demo-vehicle ruling**
+(dated "Demo-vehicle ruling" entry in `decisions.md`) into one build target over the frozen
+schema (ledger 001–005 — **no migration is expected**; if a fork below rules in server work that
+needs one, it follows the numbered-migration rule as normal).
+
+## The ruled shape (2026-07-27)
+
+Jack ruled the demo vehicle after a five-agent panel — the four audit personas + a
+modding-landscape research scout — (the fork:
+custom Unity scene vs modding into an established game — Skyrim declined; full rationale in the
+register entry):
+
+1. **`NpcMemory.Core` first — engine-agnostic.** Plain .NET class library: HTTP + JSON + the
+   `NpcSession` port of the Python runner's `_apply_turn_result` bookkeeping. **Zero
+   `UnityEngine` types. One flat client class** — no abstraction ceremony, no interface layers
+   with a single implementation.
+2. **A `dotnet run` console harness drives the core through every demo beat headless** against
+   the live served API — this is the Unity↔backend interop go/no-go, **moved from Wk-2 to Wk-1**:
+   the wire contract is proven before Unity ever opens.
+3. **Unity is a thin adapter + a set, not a game.** A MonoBehaviour wrapper over the proven core,
+   plus the gray-box scene as the *intended* systems/dev-tool aesthetic (adopted with the
+   2026-07-22 audit plan): one
+   room, an NPC with a nameplate, dialogue text on screen, static camera positions. No navmesh,
+   no animation work, no art on the critical path.
+4. **The Ledger is a browser page, not Unity UI** — composited beside the game view in OBS.
+5. **Established-game integration is post-demo** (sequenced-later ledger: a C#-moddable game
+   reusing `NpcMemory.Core` — not Skyrim).
+
+## Principles this build honors
+
+- **The server is stateless; the client owns scene state.** All six scene-state groups ride the
+  request (`reputation_snapshot`, `identity_version` + `scene_started_at`, `loaded_memory_ids` +
+  `gate_fruitless_streak`, context fields, `recent_actions`, `as_of`); `NpcSession` is the one
+  place the bookkeeping lives, mirroring `app\session.py` exactly.
+- **Nothing integrator-configurable is hardcoded**: base URL, per-route timeouts, action
+  vocabulary, k, weight overrides — all constructor/config surface. No hardcoded model names or
+  pricing anywhere in C#.
+- **IDs + scores always surfaced.** The client exposes the full structured results (items with
+  memory IDs, scores, `read_mode`; both scored views; instrumentation) — never prose-only.
+- **Structural tests only.** C# tests assert structure (IDs, flags, state transitions), never
+  model prose — the suite discipline carried across the language boundary.
+- **Instrument at the seam.** The client records one client-side term per call
+  (`client_total_ms`, wall time around the HTTP call) beside the server's instrumentation, so
+  transport overhead is visible from day one.
+
+## Scope boundary — do NOT build
+
+- **Unity Package Manager packaging** (`com.jacksonzane.npc-memory`) — deferred post-demo
+  (architecture environment section). Scripts live under `Assets\Scripts\`.
+- **The established-game clip** — post-demo (2026-07-27 ruling; sequenced-later ledger).
+- **The judged eval harness** — immediate-queue item 3, its own target (the Ledger binds the
+  fields it will score, but builds no judge).
+- **The thread-pool cap** (ruled deferred post-demo 2026-07-23) and the **C1 pre-warm build**
+  (ruled post-demo 2026-07-22 — warm-init is choreography, below).
+- **No TTS/STT, no voice** — text is the demo surface.
+
+## Mechanism
+
+### NpcMemory.Core (the flat client)
+
+`NpcMemoryClient` — stateless verbs mirroring the six routes 1:1, pass-through both ways
+(request models serialize exactly what Pydantic accepts; response models deserialize every field
+the service returns — the route pass-through ruling carried to the client):
+
+| Verb | Route | Errors surfaced |
+|---|---|---|
+| `DialogueTurnAsync` | `POST /v1/dialogue/turn` | 404 unknown agent, 422 unknown identity version |
+| `DialogueInitAsync` | `POST /v1/dialogue/init` (the warm-init verb) | 404, 422 |
+| `ObserveAsync` | `POST /v1/events/observe` | 404 |
+| `SceneBoundaryAsync` | `POST /v1/events/scene-boundary` | 404 |
+| `SetPinAsync` | `PUT /v1/memories/{id}/pin` | 404 |
+| `CorrectAsync` | `POST /v1/memories/{id}/correction` | 404 / 409 CAS conflict / 422 / 502 fail-loud |
+
+HTTP errors map to typed exceptions (the Python service-error precedent — never swallowed,
+never retried silently). Timeouts are per-route config: `init` must tolerate the cold
+reconstruction pre-warm (measured 16.3 s real-mode), `turn` the full turn (~30 s ceiling),
+`observe` ~10 s; fire-and-forget observe is the session's job, not hidden retry logic here.
+
+**The null-vs-absent contract is load-bearing** (the panel's sharpest finding): on
+`DialogueTurnRequest`, `loaded_memory_ids = null` means **loader turn** and `[]` means **a
+loaded set that is empty** — a serializer that emits `null` for an empty list (or omits nulls
+wholesale) silently changes gate behavior. The C# DTOs must preserve the tri-state exactly
+(present-null / present-empty / value) for every `Optional[...]` field; this is a named
+done-when criterion, proven against the live route, not a code comment.
+
+### NpcSession (the ported runner)
+
+Stateful per-NPC session over the client, porting `app\session.py` field-for-field: the frozen
+snapshot refresh at boundaries, `_apply_turn_result` keyed on the SERVER's `gate.evaluated` /
+`fired` (loader → served IDs seed the loaded set; gated fire → gate-fetched IDs append, streak
+resets on productive fetch; closed → untouched), recent-actions append-on-resolved-directive
+with the per-agent cap, scene-boundary reset of loaded set + streak + context + recent actions,
+`as_of` time travel riding both retrieval and observe timestamps. Surface: `SayAsync(text)`,
+`ObserveAsync(text)`, `SceneBoundaryAsync()`, `CorrectAsync(...)`, plus `OnDirective` and
+`OnReputationChanged(prev, after)` callbacks. The `(reconstructing…)` during-wait hook exists
+only under SSE (fork 1); until then the session surfaces the result's post-hoc reconstruction
+fields — no faked signal.
+
+### Console harness (the Wk-1 gate)
+
+A `dotnet run` console app driving `NpcSession` against `python -m app.serve` through every
+demo beat headless: observe → loader turn (IDs + scores + `read_mode` printed) → `:correct`
+head-swap → the corrected memory's retrieval move visible in scores → `as_of` jump + scene
+boundary → reconstructed serve + call-free cache-hit reread → gate fire mid-scene →
+warm-init (`DialogueInitAsync` at a jumped basis, then the on-camera-equivalent read hitting
+cache) → a `weight_overrides` divergence turn. Debug output mirrors the REPL's debug view
+(IDs, scores, gate line, both TTFT fields, cost row). Passing this end-to-end IS the interop
+go/no-go.
+
+### Unity adapter + gray-box scene
+
+Thin `MonoBehaviour` wrapper under `Assets\Scripts\` (`NpcMemory` namespace): async calls
+marshaled back to the main thread (Unity's SynchronizationContext — awaits resume on the main
+thread; no blocking `.Result`/`.Wait()` anywhere), dialogue text to a world-space or overlay
+TMP field, directive callback driving a visible acknowledgment (nameplate flash / simple move),
+reputation callback to a debug readout, scene-boundary emission wired to the camera-cut /
+scene-change points. MCP for Unity connects at this step (`mcp-setup.md` §2) with an **early
+one-hour verification** (the bridge has never been connected; note that scene-manipulation
+operations fail during Play mode — `mcp-setup.md` §2 — so the Play-mode debug loop is partly
+stop/start).
+
+### The Ledger (browser page)
+
+The designer-facing ground-truth-vs-telling inspector, served beside the game and composited
+in OBS: original vs current telling side by side, superseded rows greyed-but-present,
+`read_mode` / scores / memory IDs per served item, and a real gist/detail number on screen.
+It binds the SAME `DialogueTurnResult` / `RetrievalResult` fields the eval harness (item 3)
+will score — the on-screen number and the paper number are one object. Data source is fork 3.
+
+### Demo choreography hooks (ride here, no new backend)
+
+Off-camera warm-init during camera cuts (one throwaway `DialogueInitAsync` per scene-basis
+jump — kills the cold stall with zero pre-warm code); the game-authored action-observe beat +
+async observes (the old pre-ship (d): the client fires observes without blocking dialogue);
+the demo corpus authored in **shipped-game dialogue register**, not driver prose (the
+construct-validity mitigation — escalation fired 79% on realistic prose vs 0% on synthetic in
+the 2026-07-21 pre-thin_gist measurement, ~95% on the corpus at current defaults; the
+held-out corpus arm rides item 3's eval build).
+
+## Open forks — Jack's to rule (surfaced, not resolved)
+
+1. **SSE `/v1/dialogue/turn/stream` — in scope now, or deferred?** Without it there is NO
+   on-screen streaming: the non-streaming route returns whole turns (~4 s real-mode), so the
+   **<1 s perceived-first-word beat is unrecordable** and the during-wait `(reconstructing…)`
+   hook has no carrier. The route is small by design — it iterates the SAME async generator
+   (`event: chunk` per str, `event: result` terminal; the 2026-07-23 build stated "no
+   rewrite"), plus the C# consumption side. The alternative — record latency numbers from the
+   CLI instead of the game view — weakens the headline beat. **Recommended: in scope.**
+2. **Agent provisioning — `POST /v1/agents`, or hand-SQL for the demo?** No route exists
+   today; the demo agent is provisioned by hand-SQL, which an integrator hits in minute one.
+   The architecturally correct option is a small create-agent route (name, seed identity,
+   config knobs — server-minted UUID per the stack constants); its real cost is one route +
+   wire models + walker/suite growth, no migration (`agents` exists). Deferring keeps the
+   demo unblocked but ships the gap into the public flip. **Recommended: in scope (small).**
+3. **The Ledger's data source.** The turn/init payloads carry served items + scores, but the
+   side-by-side needs each memory's telling CHAIN (original + superseded heads), which no
+   route serves. Options: **(a)** the Ledger's tiny server reads Postgres read-only directly —
+   fastest, demo-grade, adds no API surface, but the inspector then isn't part of the product
+   an integrator gets; **(b)** a read-only `GET /v1/memories/{id}/chain` (+ optionally a
+   per-agent memory list) — the architecturally correct product surface (the inspector data
+   becomes part of the API; IDs + scores discipline already governs read endpoints), costing
+   one route + wire models + walker growth, no migration. **Recommended: (b).**
+4. **C# JSON serializer.** Unity's `JsonUtility` cannot express the contract (no `Guid`, no
+   nullable value types, no dicts, no ISO-8601 offsets). Options: Newtonsoft everywhere (the
+   Unity-shipped `com.unity.nuget.newtonsoft-json` package; one serializer, one behavior in
+   both hosts) vs `System.Text.Json` (faster, but IL2CPP/AOT hazards in Unity). Tri-state
+   null-vs-absent handling must be explicit either way. **Suggested: Newtonsoft everywhere.**
+   `[SETTLE-AT-BUILD]`
+5. **Targets + repo layout.** Suggested: `client\NpcMemory.Core\` as **netstandard2.1** (the
+   Unity 6 compatibility profile), `client\NpcMemory.Harness\` as a net8.0 console app, the
+   Unity project under `unity\` with the adapter in `Assets\Scripts\`. `[SETTLE-AT-BUILD]`
+6. **Ledger page stack.** Suggested: a single static HTML page + vanilla JS polling the API
+   (or the fork-3 chain route), no framework, no build step — readable-as-documentation, the
+   CLI precedent. `[SETTLE-AT-BUILD]`
+7. **Unity dialogue-render shape** (world-space vs overlay text, how the directive is made
+   visible on camera). Demo-choreography detail. `[SETTLE-AT-BUILD]`
+
+## Done-when (the build's floor)
+
+1. `NpcMemory.Core` compiles with **zero `UnityEngine` references**; the public surface is the
+   flat client + `NpcSession` + DTOs, nothing else.
+2. **Wire-contract parity proven, tri-state included**: round-trip tests for every request DTO
+   against the live service — including `loaded_memory_ids` present-null (loader turn) vs
+   present-empty vs populated, each visibly changing gate behavior in the returned
+   instrumentation — and every response field of `DialogueTurnResult` / `IngestResult` /
+   `CorrectionResult` / `SceneResult` / `PinResult` / `RetrievalResult` deserialized without
+   loss.
+3. **`NpcSession` bookkeeping parity with `app\session.py`**: driven by the same fixture
+   sequence of turn results (loader / gated-fire productive / gated-fire fruitless / closed /
+   directive present / dropped), the C# scene state matches the Python runner's field-for-field,
+   including scene-boundary resets and the recent-actions cap.
+4. **The console harness completes every demo beat headless** against the served API (fake and
+   real mode), printing IDs + scores + `read_mode` + both TTFT fields + the cost row — the
+   Wk-1 interop go/no-go, recorded in the session log with receipts.
+5. **Unity Play mode**: a full turn from the gray-box scene with dialogue text on screen,
+   directive + reputation callbacks firing, and the main thread never blocked (no
+   `.Result`/`.Wait()`; interaction stays responsive during a turn).
+6. **Scene-boundary + warm-init choreography proven in-engine**: boundary emission at the
+   scene edge refreshes frozen state; an off-camera `DialogueInitAsync` at a jumped basis makes
+   the next on-camera read a call-free cache hit with byte-identical within-scene rereads.
+7. **The Ledger renders live**: side-by-side original vs current telling, superseded rows
+   greyed-but-present, `read_mode`/scores/IDs, and the gist/detail number — bound to the same
+   fields item 3 scores.
+8. **Degradation honesty**: dropped directives, degraded turns, and correction-verb failures
+   (409/502) surface in the harness output and Unity debug readout — never swallowed.
+9. **The Python floor is untouched or grown only as ruled**: walkers + suite green; no-arg
+   migrate still a no-op (unless a fork ruled a route in, in which case its walker/suite
+   growth and re-verification are named in the build plan); `longmem` pristine after
+   verification; no invariant violated (the client sends only the sanctioned verbs).
+10. Docs propagated (status.md, architecture markers, this spec's ruling annotations) and the
+    floor-verifier passes on the touched floors.
