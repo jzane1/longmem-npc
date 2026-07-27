@@ -54,6 +54,8 @@ from app.schemas import (
     AffectOut,
     CorrectionRequest,
     CorrectionResult,
+    CreateAgentRequest,
+    CreateAgentResult,
     IngestResult,
     Instrumentation,
     ObserveEvent,
@@ -460,6 +462,40 @@ class IngestService:
             total_ms=_ms(time.perf_counter() - t_total),
             identity_version=version,
             identity_document_new=created,
+        )
+
+    # ------------------------------------------------------------------ #
+    # agent provisioning (unity-client.md fork 2, ruled 2026-07-27)
+    # ------------------------------------------------------------------ #
+
+    async def create_agent(self, request: CreateAgentRequest) -> CreateAgentResult:
+        """Provision one agent over the API — the integrator's minute-one
+        verb. The UUID is minted server-side (stack constant); no model
+        calls, no identity-document compile (that stays the scene-boundary
+        handler's job, first boundary or session start), nothing hardcoded:
+        unsupplied knobs land NULL and resolve config → SERVICE_DEFAULTS at
+        read time exactly like a hand-provisioned row."""
+        t_total = time.perf_counter()
+        agent_id = await db.insert_agent(
+            self._pool,
+            name=request.name,
+            seed_identity=request.seed_identity,
+            reputation=request.reputation,
+            rigidity=request.rigidity,
+            reputation_sensitivity=request.reputation_sensitivity,
+            diagnosticity_goal=request.diagnosticity_goal,
+            config=request.config,
+        )
+        return CreateAgentResult(
+            agent_id=agent_id,
+            name=request.name,
+            seed_identity=request.seed_identity,
+            reputation=request.reputation,
+            rigidity=request.rigidity,
+            reputation_sensitivity=request.reputation_sensitivity,
+            diagnosticity_goal=request.diagnosticity_goal,
+            config=request.config or {},
+            total_ms=_ms(time.perf_counter() - t_total),
         )
 
     # ------------------------------------------------------------------ #

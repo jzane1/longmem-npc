@@ -1963,3 +1963,65 @@ measurement — ~95% on the corpus at current defaults since the 2026-07-23 thin
 prose-dependence point is what carries).
 
 **No code, no floors, no migration this session** — panel + rulings + docs propagation only.
+
+## Unity-client fork rulings + stage-0 build (three backend routes) — 2026-07-27
+
+**Context.** Same day as the demo-vehicle ruling: Jack completed the operator steps (Unity 6
+project created at `unity\` — settling the spec fork-5 project-location half; uv + .NET SDK
+verified) and MCP for Unity went live — **bridge verified** (read probe found the scene camera;
+mutation round-trip created and deleted `McpVerificationCube` in `SampleScene.unity`; console
+clean). Jack then ruled all seven `unity-client.md` open forks via explicit questions:
+
+1. **SSE `/v1/dialogue/turn/stream` — IN scope** (fork 1; without it the <1 s
+   perceived-first-word beat is unrecordable).
+2. **`POST /v1/agents` — IN scope** (fork 2; the integrator's minute-one gap).
+3. **The Ledger's data source = the chain read route** (fork 3; `GET /v1/memories/{id}/chain` +
+   `GET /v1/agents/{agent_id}/memories` — the inspector becomes product API surface, over
+   direct read-only SQL).
+4. **Serializer = Newtonsoft everywhere** (fork 4; Unity-shipped package + the same library in
+   the core — one serializer, one behavior in both hosts; over System.Text.Json's Unity
+   AOT hazards).
+5. **Targets/layout as proposed** (fork 5; netstandard2.1 `client\NpcMemory.Core`, net8.0
+   `client\NpcMemory.Harness`, adapter in `unity\Assets\Scripts`, core DLL into
+   `Assets\Plugins`).
+6. **Ledger stack = static HTML + vanilla JS** (fork 6; no framework, no build step; the
+   per-turn feed shape settles at build).
+7. **Unity render shape settles at build** (fork 7, as specced).
+
+**Stage-0 build (the three ruled-in routes; no migration — ledger stays 001–005; no new knobs
+or model roles).**
+
+- **SSE route** (`app\api.py`): iterates the SAME `run_dialogue_turn` async generator via a
+  pump task bridged through an `asyncio.Queue` (the pre-serve `on_reconstruct` callback fires
+  inside the awaited chain, so it enqueues a `reconstructing` event). Events: `chunk`
+  (JSON-encoded str), optional `reconstructing`, terminal `result` — the seam result's
+  serialization, byte-identical to the non-streaming route's body (pass-through). The FIRST
+  queue item is awaited before the response starts, so unknown-agent/version still map to
+  404/422; after streaming begins a failure becomes an `error` event (a 200 stream cannot
+  change status). A module-level task-reference set means a client disconnect never aborts the
+  turn server-side (the reputation apply stays atomic in the seam).
+- **Provisioning** (`db.insert_agent` + `IngestService.create_agent` + wire models): UUID
+  minted server-side; the row stores exactly the supplied fields; unsupplied knobs land NULL
+  and resolve config → `SERVICE_DEFAULTS` at read time exactly like a hand-provisioned row; no
+  model calls; the identity document still compiles at session start / scene boundary. The
+  agents INSERT is the build's only new write surface — an agents row, not memory content,
+  outside the non-destructive invariant's subject.
+- **Inspector reads** (`db.fetch_memory_chain`/`fetch_agent_memories` +
+  `RetrievalService.memory_chain`/`agent_memories` + wire models): read-only end to end.
+  **Explicitly ruled contract: these reads are UNSCORED** — no retrieval runs, no decay
+  evaluates, so no score fields exist; every row carries IDs + structured fields (the
+  read-payload discipline's intent — never naked prose). Superseded rows ride with
+  `valid_at`/`invalid_at` + `is_live` (greyed client-side, never dropped); the fact embedding
+  never rides the wire (`has_embedding` only); `memories.entities` deliberately not echoed
+  (frozen since the 003 freeze — the live fact head's entities are the current ones); the
+  index LEFT JOINs the live telling head so legacy-shaped rows stay reachable; `limit` is a
+  caller argument (1–1000, default 100), never a config knob.
+
+**Verification (floor-verifier pass, independent):** write-path walker 46 → **51** (section
+[15] provisioning), read-path 48 → **56** (section [14] inspector reads), CLI-harness 62 →
+**67** (section [14] SSE — chunk events byte-identical to the terminal content); the four
+untouched walkers green on fresh scratch (51/42/34/34) and byte-identical to HEAD; suite
+44 → **48** ×2 + keyless subset 37 → **41** (the four new route-contract scenarios are
+unmarked); migrate no-arg "5 applied, 0 pending"; `longmem` pristine (ledger 001–005, ten
+product tables 0 rows, no scratch residue); floor economy by git diff (exactly nine files
+touched). Next: stage 1 — `NpcMemory.Core` + the console harness (the Wk-1 interop gate).

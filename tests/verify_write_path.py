@@ -574,6 +574,60 @@ async def main(database_uri: str) -> None:
         "scene-boundary accepted + timed",
     )
 
+    # ------------------------------------------------------------------ #
+    print("\n[15] Agent provisioning: POST /v1/agents (unity-client stage 0)")
+    # unity-client.md fork 2 (ruled 2026-07-27): UUID minted server-side
+    # (stack constant), the row stores exactly the supplied fields,
+    # unsupplied knobs land NULL (resolving config -> SERVICE_DEFAULTS at
+    # read time), and the provisioned agent is immediately a working write
+    # target. Empty name -> 422 (the schema floor).
+    from uuid import UUID as _UUID
+
+    api_module.app.state.service = service
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=api_module.app), base_url="http://walker"
+    ) as client:
+        created = await client.post(
+            "/v1/agents",
+            json={
+                "name": "walker-provisioned",
+                "seed_identity": "I mind the mill ledger.",
+                "rigidity": 1.25,
+                "config": {"reputation_neutral": 0.0},
+            },
+        )
+        invalid = await client.post("/v1/agents", json={"name": ""})
+    check(created.status_code == 200, "provisioning route returned 200")
+    prov = created.json()
+    prov_id = _UUID(prov["agent_id"])
+    prow = await fetchrow(
+        pool,
+        "SELECT name, seed_identity, rigidity, reputation, config FROM agents "
+        "WHERE agent_id = %s",
+        prov_id,
+    )
+    check(
+        prow is not None
+        and prow[0] == "walker-provisioned"
+        and prow[1] == "I mind the mill ledger."
+        and float(prow[2]) == 1.25
+        and prow[3] is None
+        and prow[4] == {"reputation_neutral": 0.0},
+        "server-minted UUID; row stores exactly the supplied fields; knobs NULL",
+    )
+    check(
+        prov["config"] == {"reputation_neutral": 0.0} and prov["reputation"] is None,
+        "result echoes stored fields (pass-through)",
+    )
+    provisioned_write = await service.ingest_observation(
+        observe_event(agent_id=prov_id)
+    )
+    check(
+        provisioned_write.memory_id is not None,
+        "the provisioned agent is immediately a working write target",
+    )
+    check(invalid.status_code == 422, "empty name -> 422 (the schema floor)")
+
     await pool.close()
     print(f"\nALL CHECKS PASSED ({len(PASSED)} assertions)")
 

@@ -503,6 +503,296 @@ def test_entities_follow_correction(scene):
     run_structural(scene, scenario)
 
 
+# ---------------------------------------------------------------------------
+# unity-client stage-0 route contracts (ruled 2026-07-27): the SSE turn
+# stream, agent provisioning, and The Ledger's two inspector reads. All
+# unmarked — db-layer seeding + route-level asserts, no NLP pass.
+# ---------------------------------------------------------------------------
+
+
+def _parse_sse(body: str) -> list[tuple[str, str]]:
+    """(event, data) pairs from a text/event-stream body — framing only."""
+    events = []
+    for block in body.split("\n\n"):
+        if not block.strip():
+            continue
+        fields = dict(line.split(": ", 1) for line in block.split("\n") if ": " in line)
+        events.append((fields["event"], fields["data"]))
+    return events
+
+
+def test_turn_stream_route_contract(scene):
+    """The SSE turn route (unity-client.md fork 1, ruled 2026-07-27): POST
+    /v1/dialogue/turn/stream iterates the SAME split-brain seam — the chunk
+    events concatenate byte-identically to the terminal result's content,
+    the result event is exactly the seam result's serialization (the
+    pass-through ruling carried to the stream), and a pre-stream failure
+    still maps to a real status code (404 unknown agent — the
+    queue-priming design)."""
+
+    async def scenario(ctx):
+        import json
+
+        import httpx
+
+        import app.api as api_module
+        from app.dialogue import DialogueService
+        from app.schemas import DialogueTurnRequest
+
+        agent = await ctx.make_agent("d-stream", V1_CONFIG)
+        await ctx.seed(agent, T_BRIDGE, NOW - timedelta(hours=1))
+        service = DialogueService(
+            ctx.pool, ctx.providers(), ctx.settings, ctx.retrieval()
+        )
+
+        class CapturingDialogue:
+            def __init__(self, inner):
+                self._inner = inner
+                self.last = None
+
+            async def run_dialogue_turn(self, request, **kwargs):
+                async for item in self._inner.run_dialogue_turn(request, **kwargs):
+                    if not isinstance(item, str):
+                        self.last = item
+                    yield item
+
+        capturing = CapturingDialogue(service)
+        api_module.app.state.dialogue = capturing
+        transport = httpx.ASGITransport(app=api_module.app)
+
+        def payload(**over):
+            base = dict(
+                agent_id=agent,
+                utterance="What happened at the bridge?",
+                reputation_snapshot=0.0,
+                as_of=NOW,
+            )
+            base.update(over)
+            return json.loads(DialogueTurnRequest(**base).model_dump_json())
+
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://suite"
+        ) as client:
+            ok = await client.post("/v1/dialogue/turn/stream", json=payload())
+            assert ok.status_code == 200
+            assert ok.headers["content-type"].startswith("text/event-stream")
+            events = _parse_sse(ok.text)
+            assert events[-1][0] == "result"
+            chunks = [json.loads(d) for k, d in events if k == "chunk"]
+            assert chunks  # the fake prose provider streams
+            result = json.loads(events[-1][1])
+            assert "".join(chunks) == result["content"]  # byte-identity
+            assert result == json.loads(capturing.last.model_dump_json())
+            assert [i["memory_id"] for i in result["items"]]
+            ins = result["instrumentation"]
+            assert ins["perceived_first_word_ms"] > ins["first_word_ms"] > 0.0
+
+            r404 = await client.post(
+                "/v1/dialogue/turn/stream", json=payload(agent_id=uuid4())
+            )
+            assert r404.status_code == 404
+
+    run_structural(scene, scenario)
+
+
+def test_create_agent_route(scene):
+    """Agent provisioning (unity-client.md fork 2, ruled 2026-07-27): POST
+    /v1/agents mints the UUID server-side, stores exactly the supplied
+    fields (unsupplied knobs land NULL and resolve config →
+    SERVICE_DEFAULTS at read time), and the provisioned agent is
+    immediately a working agent — a dialogue turn completes through the
+    route. 422 on an empty name (the schema floor)."""
+
+    async def scenario(ctx):
+        import json
+        from uuid import UUID as UUIDType
+
+        import httpx
+
+        import app.api as api_module
+        from app.dialogue import DialogueService
+        from app.schemas import DialogueTurnRequest
+
+        api_module.app.state.service = ctx.ingest()
+        api_module.app.state.dialogue = DialogueService(
+            ctx.pool, ctx.providers(), ctx.settings, ctx.retrieval()
+        )
+        transport = httpx.ASGITransport(app=api_module.app)
+
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://suite"
+        ) as client:
+            minimal = await client.post("/v1/agents", json={"name": "prov-min"})
+            assert minimal.status_code == 200
+            body = minimal.json()
+            UUIDType(body["agent_id"])  # server-minted, parseable
+            assert body["config"] == {}
+            assert body["seed_identity"] is None
+
+            full = await client.post(
+                "/v1/agents",
+                json={
+                    "name": "prov-full",
+                    "seed_identity": "I keep the ford and remember who pays.",
+                    "reputation": 0.25,
+                    "rigidity": 1.5,
+                    "reputation_sensitivity": 0.8,
+                    "diagnosticity_goal": "what threatens the ford",
+                    "config": dict(V1_CONFIG),
+                },
+            )
+            assert full.status_code == 200
+            fb = full.json()
+            row = await ctx.fetchrow(
+                "SELECT name, seed_identity, reputation, rigidity, config "
+                "FROM agents WHERE agent_id = %s",
+                fb["agent_id"],
+            )
+            assert row[0] == "prov-full"
+            assert row[1] == "I keep the ford and remember who pays."
+            assert float(row[2]) == 0.25
+            assert float(row[3]) == 1.5
+            assert row[4] == dict(V1_CONFIG)  # config jsonb round-trip
+
+            turn = await client.post(
+                "/v1/dialogue/turn",
+                json=json.loads(
+                    DialogueTurnRequest(
+                        agent_id=fb["agent_id"],
+                        utterance="Do you know me?",
+                        reputation_snapshot=0.25,
+                        as_of=NOW,
+                    ).model_dump_json()
+                ),
+            )
+            assert turn.status_code == 200  # provisioned agent works end-to-end
+
+            invalid = await client.post("/v1/agents", json={"name": ""})
+            assert invalid.status_code == 422
+
+    run_structural(scene, scenario)
+
+
+def test_memory_chain_route_follows_correction(scene):
+    """The Ledger's chain read (unity-client.md fork 3, ruled 2026-07-27):
+    GET /v1/memories/{id}/chain returns the immutable observation beside
+    BOTH version chains with superseded rows PRESENT — after a correction
+    the original telling/fact rows ride invalidated (never dropped), the
+    corrected heads are live, the chain timeline is coherent, and gist
+    spans + fact entities are structural payload. 404 unknown memory."""
+
+    async def scenario(ctx):
+        import httpx
+        from conftest import embed_text
+
+        import app.api as api_module
+        from app import db
+
+        agent = await ctx.make_agent("d-chain", V1_CONFIG)
+        seeded = await ctx.seed(
+            agent,
+            T_CHAPEL,
+            NOW - timedelta(days=2),
+            entities=["Mara"],
+            spans=((0, 9),),
+        )
+        m = seeded.memory_id
+        corrected_text = "The sexton counted the silver once, not twice."
+        applied = await db.apply_authorial_correction(
+            ctx.pool,
+            memory_id=m,
+            content=corrected_text,
+            valid_at=NOW - timedelta(days=1),
+            embedding=embed_text(corrected_text),
+            entities=["the sexton"],
+        )
+        assert not isinstance(applied, str)
+
+        api_module.app.state.retrieval = ctx.retrieval()
+        transport = httpx.ASGITransport(app=api_module.app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://suite"
+        ) as client:
+            ok = await client.get(f"/v1/memories/{m}/chain")
+            assert ok.status_code == 200
+            body = ok.json()
+            assert body["memory_id"] == str(m)
+            assert body["observation_text"] == T_CHAPEL  # immutable
+            details = body["details"]
+            assert [d["write_cause"] for d in details] == [
+                "original",
+                "authorial_correction",
+            ]
+            assert [d["is_live"] for d in details] == [False, True]
+            assert details[1]["content"] == corrected_text
+            assert details[0]["invalid_at"] == details[1]["valid_at"]
+            facts = body["facts"]
+            assert [f["write_cause"] for f in facts] == [
+                "original",
+                "authorial_correction",
+            ]
+            assert [f["is_live"] for f in facts] == [False, True]
+            assert facts[1]["basis_text"] == corrected_text
+            assert all(f["has_embedding"] for f in facts)
+            assert facts[1]["entities"] == ["the sexton"]
+            spans = body["gist_spans"]
+            assert [(s["start_char"], s["end_char"]) for s in spans] == [(0, 9)]
+
+            r404 = await client.get(f"/v1/memories/{uuid4()}/chain")
+            assert r404.status_code == 404
+
+    run_structural(scene, scenario)
+
+
+def test_agent_memories_route(scene):
+    """The Ledger's index read (unity-client.md fork 3): newest valid_at
+    first with the memory_id tiebreak, each row beside its live telling
+    head; `limit` caps the page while total_count reports the full store.
+    404 unknown agent."""
+
+    async def scenario(ctx):
+        import httpx
+
+        import app.api as api_module
+
+        agent = await ctx.make_agent("d-index", V1_CONFIG)
+        older = await ctx.seed(agent, T_BRIDGE, NOW - timedelta(days=3))
+        newer = await ctx.seed(agent, T_STORM, NOW - timedelta(days=1))
+        middle = await ctx.seed(agent, T_QUARRY, NOW - timedelta(days=2))
+
+        api_module.app.state.retrieval = ctx.retrieval()
+        transport = httpx.ASGITransport(app=api_module.app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://suite"
+        ) as client:
+            ok = await client.get(f"/v1/agents/{agent}/memories")
+            assert ok.status_code == 200
+            body = ok.json()
+            assert body["total_count"] == 3
+            ids = [m["memory_id"] for m in body["memories"]]
+            assert ids == [
+                str(newer.memory_id),
+                str(middle.memory_id),
+                str(older.memory_id),
+            ]
+            head = body["memories"][0]
+            assert head["live_content"] == f"[suite seed] {T_STORM}"
+            assert head["live_write_cause"] == "original"
+            assert head["detail_count"] == 1
+
+            page = await client.get(f"/v1/agents/{agent}/memories?limit=1")
+            assert page.status_code == 200
+            pb = page.json()
+            assert pb["total_count"] == 3
+            assert len(pb["memories"]) == 1
+            assert pb["limit"] == 1
+
+            r404 = await client.get(f"/v1/agents/{uuid4()}/memories")
+            assert r404.status_code == 404
+
+    run_structural(scene, scenario)
+
+
 def test_context_term_applies_on_gated_turns(scene):
     """The encoding-context term (built 2026-07-20) rides the gated path
     too: on a closed gate the loaded set's scores carry the same exact

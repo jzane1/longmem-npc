@@ -691,6 +691,78 @@ async def main(database_uri: str) -> None:
         f"{len(response.json()['items'])} items",
     )
 
+    # ------------------------------------------------------------------ #
+    print("\n[14] Inspector reads: chain + per-agent index (unity-client stage 0)")
+    # unity-client.md fork 3 (ruled 2026-07-27): The Ledger's data source is
+    # a product surface — GET /v1/memories/{id}/chain returns the immutable
+    # observation beside BOTH version chains with superseded rows PRESENT
+    # (greyed client-side, never dropped); GET /v1/agents/{id}/memories is
+    # the index, newest valid_at first with the memory_id tiebreak.
+    # Read-only + unscored: no retrieval runs, so no score fields exist —
+    # IDs + structured fields on every row keep the payload discipline.
+    from uuid import uuid4 as _uuid4
+
+    agent_led = await make_agent(pool, "reader-ledger", AGENT_CONFIG)
+    led_old = await seed(ingest, agent_led, T_COIN, NOW - timedelta(days=40))
+    led_new = await seed(ingest, agent_led, T_FRESH, NOW - timedelta(days=1))
+    led_corrected = "The stranger paid in iron tokens, not foreign coin."
+    led_embed = FakeEmbeddingProvider().embed([led_corrected]).vectors[0]
+    applied = await db_module.apply_authorial_correction(
+        pool,
+        memory_id=led_old,
+        content=led_corrected,
+        valid_at=NOW - timedelta(hours=1),
+        embedding=led_embed,
+        entities=["the market"],
+    )
+    check(not isinstance(applied, str), "fixture correction applied")
+
+    api_module.app.state.retrieval = retrieval
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=api_module.app), base_url="http://walker"
+    ) as client:
+        chain_ok = await client.get(f"/v1/memories/{led_old}/chain")
+        chain_404 = await client.get(f"/v1/memories/{_uuid4()}/chain")
+        index_ok = await client.get(f"/v1/agents/{agent_led}/memories")
+        index_page = await client.get(f"/v1/agents/{agent_led}/memories?limit=1")
+        index_404 = await client.get(f"/v1/agents/{_uuid4()}/memories")
+    check(chain_ok.status_code == 200, "chain route returned 200")
+    cbody = chain_ok.json()
+    check(
+        cbody["observation_text"] == T_COIN
+        and [d["write_cause"] for d in cbody["details"]]
+        == ["original", "authorial_correction"]
+        and [d["is_live"] for d in cbody["details"]] == [False, True]
+        and cbody["details"][1]["content"] == led_corrected
+        and cbody["details"][0]["invalid_at"] == cbody["details"][1]["valid_at"],
+        "telling chain: superseded row PRESENT, corrected head live, coherent timeline",
+    )
+    check(
+        [f["is_live"] for f in cbody["facts"]] == [False, True]
+        and cbody["facts"][1]["basis_text"] == led_corrected
+        and all(f["has_embedding"] for f in cbody["facts"])
+        and cbody["facts"][1]["entities"] == ["the market"],
+        "fact chain beside the telling chain (embedding presence, never the vector)",
+    )
+    check(chain_404.status_code == 404, "unknown memory -> 404 on the chain route")
+    ibody = index_ok.json()
+    check(
+        index_ok.status_code == 200
+        and ibody["total_count"] == 2
+        and [m["memory_id"] for m in ibody["memories"]] == [str(led_new), str(led_old)]
+        and ibody["memories"][1]["live_content"] == led_corrected
+        and ibody["memories"][1]["detail_count"] == 2,
+        "index newest-first; each row beside its LIVE telling head",
+    )
+    pbody = index_page.json()
+    check(
+        pbody["total_count"] == 2
+        and len(pbody["memories"]) == 1
+        and pbody["limit"] == 1,
+        "limit caps the page while total_count reports the store",
+    )
+    check(index_404.status_code == 404, "unknown agent -> 404 on the index route")
+
     await pool.close()
     print(f"\nALL CHECKS PASSED ({len(PASSED)} assertions)")
 

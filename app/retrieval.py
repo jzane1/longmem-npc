@@ -68,17 +68,20 @@ import time
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import Callable
+from uuid import UUID
 
 from psycopg_pool import AsyncConnectionPool
 
 from app import db, decay, gate
 from app.config import Settings, agent_knob, text_search_config
-from app.ingest import UnknownAgentError
+from app.ingest import UnknownAgentError, UnknownMemoryError
 from app.providers import ProviderCallError, Providers
 from app.reconstruction import ReconstructionService, ServeOutcome
 from app.schemas import (
+    AgentMemoriesResult,
     DialogueInitRequest,
     GateInstrumentation,
+    MemoryChainResult,
     RetrievalInstrumentation,
     RetrievalResult,
 )
@@ -662,3 +665,36 @@ class RetrievalService:
         )
         candidate_count = len(loaded_rows) + len(fetched_rows)
         return sql_ms, score_ms, candidate_count, gate_inst, outcome
+
+    # ------------------------------------------------------------------ #
+    # inspector reads — The Ledger's data source (unity-client.md fork 3,
+    # ruled 2026-07-27). Read-only, unscored: no retrieval runs, no decay
+    # evaluates, nothing is written or reconstructed — the raw bi-temporal
+    # record made visible, superseded rows included.
+    # ------------------------------------------------------------------ #
+
+    async def memory_chain(self, memory_id: UUID) -> MemoryChainResult:
+        """One memory's full record: the immutable observation beside both
+        version chains (telling + fact) and the gist spans."""
+        t_total = time.perf_counter()
+        chain = await db.fetch_memory_chain(self._pool, memory_id)
+        if chain is None:
+            raise UnknownMemoryError(f"unknown memory_id {memory_id}")
+        return MemoryChainResult(**chain, total_ms=_ms(time.perf_counter() - t_total))
+
+    async def agent_memories(self, agent_id: UUID, limit: int) -> AgentMemoriesResult:
+        """The Ledger's per-agent index: each memory beside its live telling
+        head, newest valid_at first, capped at `limit` (a caller argument,
+        the k precedent — never a config knob)."""
+        t_total = time.perf_counter()
+        agent = await db.fetch_agent(self._pool, agent_id)
+        if agent is None:
+            raise UnknownAgentError(f"unknown agent_id {agent_id}")
+        total, rows = await db.fetch_agent_memories(self._pool, agent_id, limit)
+        return AgentMemoriesResult(
+            agent_id=agent_id,
+            memories=rows,
+            total_count=total,
+            limit=limit,
+            total_ms=_ms(time.perf_counter() - t_total),
+        )

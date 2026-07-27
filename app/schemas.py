@@ -589,3 +589,139 @@ class DialogueTurnResult(BaseModel):
     dialogue_view: list[ScoredRef] = Field(default_factory=list)
     behavior_view: list[ScoredRef] = Field(default_factory=list)
     instrumentation: DialogueTurnInstrumentation
+
+
+# ---------------------------------------------------------------------------
+# Agent provisioning + inspector reads (docs\unity-client.md, ruled
+# 2026-07-27 — forks 2 and 3: the integrator's minute-one route and The
+# Ledger's product-surface data source)
+# ---------------------------------------------------------------------------
+
+
+class CreateAgentRequest(BaseModel):
+    """Body of POST /v1/agents (unity-client.md fork 2). The UUID is minted
+    server-side (stack constant); every other column is optional — an agent
+    is viable with just a name, and knobs default through `agents.config` →
+    `SERVICE_DEFAULTS` exactly as for a hand-provisioned row. `rigidity`
+    bounds mirror the schema CHECK."""
+
+    name: str = Field(min_length=1)
+    seed_identity: str | None = None
+    reputation: float | None = None
+    rigidity: float | None = Field(default=None, ge=0.5, le=2.0)
+    reputation_sensitivity: float | None = None
+    diagnosticity_goal: str | None = None
+    config: dict | None = None
+
+
+class CreateAgentResult(BaseModel):
+    """Result of agent provisioning — the minted ID + the stored fields."""
+
+    agent_id: UUID
+    name: str
+    seed_identity: str | None
+    reputation: float | None
+    rigidity: float | None
+    reputation_sensitivity: float | None
+    diagnosticity_goal: str | None
+    config: dict
+    total_ms: float
+
+
+class DetailVersionOut(BaseModel):
+    """One row of a memory's telling chain (memory_details) — superseded
+    rows ride with `invalid_at` set; `is_live` = the at-most-one head."""
+
+    detail_id: UUID
+    content: str
+    write_cause: str | None
+    created_at: datetime
+    valid_at: datetime
+    invalid_at: datetime | None
+    is_live: bool
+
+
+class FactVersionOut(BaseModel):
+    """One row of a memory's fact chain (memory_fact_versions, migration
+    002/003). The vector itself never rides the wire — `has_embedding` is
+    the payload mirror of the embed-degradation signal on each row."""
+
+    fact_version_id: UUID
+    basis_text: str
+    write_cause: str | None
+    created_at: datetime
+    valid_at: datetime
+    invalid_at: datetime | None
+    is_live: bool
+    has_embedding: bool
+    entities: list[str] = Field(default_factory=list)
+
+
+class GistSpanOut(BaseModel):
+    """One gist span — offsets into the immutable observation_text; the
+    consumer slices the text itself (the spans ARE the gist floor The
+    Ledger's gist/detail number counts)."""
+
+    span_id: UUID
+    start_char: int
+    end_char: int
+    matched_category: str | None
+
+
+class MemoryChainResult(BaseModel):
+    """GET /v1/memories/{id}/chain — The Ledger's ground-truth-vs-telling
+    read (unity-client.md fork 3, ruled 2026-07-27): the immutable
+    observation beside BOTH version chains, superseded rows present (greyed
+    client-side, never dropped — the non-destructive record made visible).
+    An unscored inspector read: no retrieval ran, so there are no scores —
+    IDs and structured fields on every row keep the read-payload discipline.
+    `memories.entities` is deliberately NOT echoed (frozen at the 003
+    freeze; the live fact head's entities are the current ones)."""
+
+    memory_id: UUID
+    agent_id: UUID
+    observation_text: str
+    provenance: Provenance
+    typology: Typology | None
+    decay_class: str | None
+    pinned: bool
+    scoring_failed: bool
+    escalation_failed: bool
+    decay_class_unknown: bool
+    created_at: datetime
+    valid_at: datetime
+    invalid_at: datetime | None
+    location_name: str | None
+    event_time: datetime | None
+    details: list[DetailVersionOut]
+    facts: list[FactVersionOut]
+    gist_spans: list[GistSpanOut]
+    total_ms: float
+
+
+class MemorySummaryOut(BaseModel):
+    """One row of The Ledger's per-agent index: the immutable observation
+    beside the live telling head (`live_content` — None only for a
+    legacy-shaped row with no live head)."""
+
+    memory_id: UUID
+    observation_text: str
+    live_content: str | None
+    live_write_cause: str | None
+    detail_count: int
+    pinned: bool
+    valid_at: datetime
+    invalid_at: datetime | None
+
+
+class AgentMemoriesResult(BaseModel):
+    """GET /v1/agents/{agent_id}/memories — The Ledger's index read.
+    `total_count` is the agent's full memory count; `memories` carries at
+    most `limit` rows, newest valid_at first (memory_id tiebreak — the
+    deterministic-order precedent)."""
+
+    agent_id: UUID
+    memories: list[MemorySummaryOut]
+    total_count: int
+    limit: int
+    total_ms: float

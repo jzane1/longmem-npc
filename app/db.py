@@ -83,6 +83,40 @@ async def fetch_agent(pool: AsyncConnectionPool, agent_id: UUID) -> dict | None:
     }
 
 
+async def insert_agent(
+    pool: AsyncConnectionPool,
+    *,
+    name: str,
+    seed_identity: str | None,
+    reputation: float | None,
+    rigidity: float | None,
+    reputation_sensitivity: float | None,
+    diagnosticity_goal: str | None,
+    config: dict | None,
+) -> UUID:
+    """Provision one agent row (unity-client.md fork 2, ruled 2026-07-27).
+    The UUID is minted server-side by the column default (stack constant);
+    numeric knobs land NULL when unsupplied and resolve through config →
+    SERVICE_DEFAULTS at read time, exactly like a hand-provisioned row."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "INSERT INTO agents (name, seed_identity, reputation, rigidity, "
+            "reputation_sensitivity, diagnosticity_goal, config) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING agent_id",
+            (
+                name,
+                seed_identity,
+                reputation,
+                rigidity,
+                reputation_sensitivity,
+                diagnosticity_goal,
+                Jsonb(config) if config is not None else None,
+            ),
+        )
+        row = await cur.fetchone()
+    return row[0]
+
+
 async def fetch_live_components(
     pool: AsyncConnectionPool, agent_id: UUID
 ) -> list[dict]:
@@ -538,6 +572,140 @@ async def set_pinned(pool: AsyncConnectionPool, memory_id: UUID, pinned: bool) -
             "UPDATE memories SET pinned = %s WHERE memory_id = %s", (pinned, memory_id)
         )
         return cur.rowcount == 1
+
+
+async def fetch_memory_chain(pool: AsyncConnectionPool, memory_id: UUID) -> dict | None:
+    """The inspector read behind GET /v1/memories/{id}/chain (unity-client.md
+    fork 3, ruled 2026-07-27): the memories row + BOTH version chains + the
+    gist spans, read-only, superseded rows included. Chains are ordered
+    (valid_at, created_at) so supersession reads top-to-bottom; the fact
+    embedding never leaves the database — only its presence."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT memory_id, agent_id, observation_text, provenance, typology, "
+            "decay_class, pinned, scoring_failed, escalation_failed, "
+            "decay_class_unknown, created_at, valid_at, invalid_at, "
+            "location_name, event_time "
+            "FROM memories WHERE memory_id = %s",
+            (memory_id,),
+        )
+        mem = await cur.fetchone()
+        if mem is None:
+            return None
+        await cur.execute(
+            "SELECT detail_id, content, write_cause, created_at, valid_at, "
+            "invalid_at FROM memory_details WHERE memory_id = %s "
+            "ORDER BY valid_at, created_at",
+            (memory_id,),
+        )
+        details = await cur.fetchall()
+        await cur.execute(
+            "SELECT fact_version_id, basis_text, write_cause, created_at, "
+            "valid_at, invalid_at, embedding IS NOT NULL, entities "
+            "FROM memory_fact_versions WHERE memory_id = %s "
+            "ORDER BY valid_at, created_at",
+            (memory_id,),
+        )
+        facts = await cur.fetchall()
+        await cur.execute(
+            "SELECT span_id, start_char, end_char, matched_category "
+            "FROM memory_gist_spans WHERE memory_id = %s ORDER BY start_char",
+            (memory_id,),
+        )
+        spans = await cur.fetchall()
+    return {
+        "memory_id": mem[0],
+        "agent_id": mem[1],
+        "observation_text": mem[2],
+        "provenance": mem[3],
+        "typology": mem[4],
+        "decay_class": mem[5],
+        "pinned": mem[6],
+        "scoring_failed": mem[7],
+        "escalation_failed": mem[8],
+        "decay_class_unknown": mem[9],
+        "created_at": mem[10],
+        "valid_at": mem[11],
+        "invalid_at": mem[12],
+        "location_name": mem[13],
+        "event_time": mem[14],
+        "details": [
+            {
+                "detail_id": d[0],
+                "content": d[1],
+                "write_cause": d[2],
+                "created_at": d[3],
+                "valid_at": d[4],
+                "invalid_at": d[5],
+                "is_live": d[5] is None,
+            }
+            for d in details
+        ],
+        "facts": [
+            {
+                "fact_version_id": f[0],
+                "basis_text": f[1],
+                "write_cause": f[2],
+                "created_at": f[3],
+                "valid_at": f[4],
+                "invalid_at": f[5],
+                "is_live": f[5] is None,
+                "has_embedding": f[6],
+                "entities": f[7] or [],
+            }
+            for f in facts
+        ],
+        "gist_spans": [
+            {
+                "span_id": s[0],
+                "start_char": s[1],
+                "end_char": s[2],
+                "matched_category": s[3],
+            }
+            for s in spans
+        ],
+    }
+
+
+async def fetch_agent_memories(
+    pool: AsyncConnectionPool, agent_id: UUID, limit: int
+) -> tuple[int, list[dict]]:
+    """The Ledger's per-agent index read: each memories row beside its live
+    telling head (LEFT JOIN so a legacy-shaped row with no live head stays
+    reachable — the degraded-path precedent). Newest valid_at first with the
+    memory_id tiebreak (the deterministic-order precedent); returns
+    (total_count, rows)."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT count(*) FROM memories WHERE agent_id = %s", (agent_id,)
+        )
+        total = (await cur.fetchone())[0]
+        await cur.execute(
+            "SELECT m.memory_id, m.observation_text, m.pinned, m.valid_at, "
+            "m.invalid_at, d.content, d.write_cause, "
+            "(SELECT count(*) FROM memory_details dd "
+            " WHERE dd.memory_id = m.memory_id) "
+            "FROM memories m "
+            "LEFT JOIN memory_details d "
+            "ON d.memory_id = m.memory_id AND d.invalid_at IS NULL "
+            "WHERE m.agent_id = %s "
+            "ORDER BY m.valid_at DESC, m.memory_id LIMIT %s",
+            (agent_id, limit),
+        )
+        rows = await cur.fetchall()
+    return total, [
+        {
+            "memory_id": r[0],
+            "observation_text": r[1],
+            "pinned": r[2],
+            "valid_at": r[3],
+            "invalid_at": r[4],
+            "live_content": r[5],
+            "live_write_cause": r[6],
+            "detail_count": r[7],
+        }
+        for r in rows
+    ]
 
 
 @dataclass(frozen=True)

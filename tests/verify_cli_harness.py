@@ -13,7 +13,12 @@ behavior re-rank, the divergence record, the recent-actions block, and all four
 degradation rows — plus the unchanged reputation math and vocabulary contract.
 Since the turn-route build it also asserts the stateless `POST
 /v1/dialogue/turn` pass-through (section [13]) and the retrieval-inclusive
-`perceived_first_word_ms` beside `first_word_ms`.
+`perceived_first_word_ms` beside `first_word_ms`. Since the unity-client
+stage-0 build (docs\\unity-client.md fork 1, ruled 2026-07-27) it also
+asserts the SSE `POST /v1/dialogue/turn/stream` contract (section [14]):
+the same seam over text/event-stream — chunk events byte-identical to the
+terminal content, the result event the seam result's serialization,
+pre-stream errors still mapped to status codes.
 
 Structural-only per tests\\CLAUDE.md: assertions touch IDs, flags, score
 components, reputation math, byte-identity, and prompt block structure, never
@@ -870,6 +875,60 @@ async def main(database_uri: str) -> None:
     check(
         r_badver.status_code == 422,
         "unknown identity_version -> 422 over the route (the init-route precedent)",
+    )
+
+    # ------------------------------------------------------------------ #
+    print("\n[14] SSE turn stream: the same seam over text/event-stream")
+    # unity-client.md fork 1 (ruled 2026-07-27): POST /v1/dialogue/turn/stream
+    # iterates the SAME async generator via a queue-bridged pump task. The
+    # `reconstructing` event rides the same queue off the pre-serve callback;
+    # its firing condition (a blocked mid-scene retelling) is fixture-pinned
+    # off here (reconstruction_theta = 0) and proven at the reconstruction
+    # floor — this section proves the stream framing contract.
+    capturing_sse = CapturingDialogue(dialogue)
+    api_module.app.state.dialogue = capturing_sse
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=api_module.app), base_url="http://walker"
+    ) as client:
+        s_ok = await client.post(
+            "/v1/dialogue/turn/stream",
+            json=json.loads(request(agent_a).model_dump_json()),
+        )
+        s_missing = await client.post(
+            "/v1/dialogue/turn/stream",
+            json=json.loads(request(uuid4()).model_dump_json()),
+        )
+    check(
+        s_ok.status_code == 200
+        and s_ok.headers["content-type"].startswith("text/event-stream"),
+        "stream route returned 200 text/event-stream",
+    )
+    sse_events = []
+    for block in s_ok.text.split("\n\n"):
+        if block.strip():
+            fields = dict(
+                line.split(": ", 1) for line in block.split("\n") if ": " in line
+            )
+            sse_events.append((fields["event"], fields["data"]))
+    stream_chunks = [json.loads(d) for k, d in sse_events if k == "chunk"]
+    stream_result = json.loads(sse_events[-1][1])
+    check(
+        sse_events[-1][0] == "result"
+        and len(stream_chunks) == capturing_sse.chunks > 0,
+        "chunk events streamed (count == the seam's chunk count); result terminal",
+        f"{len(stream_chunks)} chunks over SSE",
+    )
+    check(
+        "".join(stream_chunks) == stream_result["content"],
+        "chunks concatenate byte-identically to the result's content",
+    )
+    check(
+        stream_result == json.loads(capturing_sse.last.model_dump_json()),
+        "result event JSON is exactly the seam result's serialization",
+    )
+    check(
+        s_missing.status_code == 404,
+        "unknown agent_id -> 404 on the stream route (pre-stream mapping)",
     )
 
     await pool.close()

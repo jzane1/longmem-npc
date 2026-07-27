@@ -13,10 +13,13 @@ event-loop constraint)
 
 from __future__ import annotations
 
+import asyncio
+import json
 from contextlib import asynccontextmanager
 from uuid import UUID
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from app.config import load_settings
 from app.db import build_pool
@@ -34,12 +37,16 @@ from app.providers import build_providers
 from app.reconstruction import UnknownIdentityVersionError
 from app.retrieval import RetrievalService
 from app.schemas import (
+    AgentMemoriesResult,
     CorrectionRequest,
     CorrectionResult,
+    CreateAgentRequest,
+    CreateAgentResult,
     DialogueInitRequest,
     DialogueTurnRequest,
     DialogueTurnResult,
     IngestResult,
+    MemoryChainResult,
     ObserveEvent,
     PinRequest,
     PinResult,
@@ -48,14 +55,17 @@ from app.schemas import (
     SceneResult,
 )
 
+# Running SSE pump tasks hold a reference here so a client disconnect can
+# never garbage-collect a mid-turn task — the turn always completes
+# server-side (the reputation apply is atomic inside the seam).
+_stream_tasks: set[asyncio.Task] = set()
+
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
     settings = load_settings()
     pool = build_pool(settings.database_uri)
     await pool.open()
-    import asyncio
-
     await asyncio.to_thread(warm_pipelines)  # model load is startup cost
     providers = build_providers(settings)
     app.state.service = IngestService(pool, providers, settings)
@@ -113,6 +123,79 @@ async def dialogue_turn(request: DialogueTurnRequest) -> DialogueTurnResult:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+@app.post("/v1/dialogue/turn/stream")
+async def dialogue_turn_stream(request: DialogueTurnRequest) -> StreamingResponse:
+    """The SSE turn route (unity-client.md fork 1, ruled 2026-07-27) — the
+    streaming twin of /v1/dialogue/turn, iterating the SAME async-generator
+    seam (the 2026-07-23 no-rewrite payoff). Wire shape, text/event-stream:
+    `event: chunk` per prose str (JSON-encoded so newlines survive SSE
+    framing), optional `event: reconstructing` fired at the pre-serve
+    callback DURING a blocking mid-scene retelling (the REPL's
+    "(reconstructing…)" over HTTP), then `event: result` carrying the
+    terminal DialogueTurnResult JSON — byte-identical serialization to the
+    non-streaming route's body (pass-through by ruling). The seam runs in a
+    pump task bridged through an asyncio.Queue because the callback fires
+    inside the awaited chain; the FIRST queue item is awaited before the
+    response starts, so UnknownAgentError → 404 / UnknownIdentityVersionError
+    → 422 still map to real status codes. After streaming begins a failure
+    becomes `event: error` (a 200 stream cannot change its status). A client
+    disconnect never aborts the turn server-side."""
+    queue: asyncio.Queue[tuple[str, object]] = asyncio.Queue()
+
+    async def _pump() -> None:
+        try:
+            async for item in app.state.dialogue.run_dialogue_turn(
+                request,
+                on_reconstruct=lambda: queue.put_nowait(("reconstructing", None)),
+            ):
+                if isinstance(item, DialogueTurnResult):
+                    queue.put_nowait(("result", item))
+                else:
+                    queue.put_nowait(("chunk", item))
+            queue.put_nowait(("done", None))
+        except Exception as exc:  # forwarded: mapped pre-stream, event after
+            queue.put_nowait(("error", exc))
+
+    task = asyncio.create_task(_pump())
+    _stream_tasks.add(task)
+    task.add_done_callback(_stream_tasks.discard)
+
+    first = await queue.get()
+    if first[0] == "error":
+        exc = first[1]
+        if isinstance(exc, UnknownAgentError):
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        if isinstance(exc, UnknownIdentityVersionError):
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        raise exc  # type: ignore[misc]  # a genuine 500
+
+    def _sse(name: str, data: str) -> str:
+        return f"event: {name}\ndata: {data}\n\n"
+
+    async def _events():
+        item = first
+        while True:
+            kind, payload = item
+            if kind == "chunk":
+                yield _sse("chunk", json.dumps(payload))
+            elif kind == "reconstructing":
+                yield _sse("reconstructing", "{}")
+            elif kind == "result":
+                yield _sse("result", payload.model_dump_json())
+            elif kind == "error":
+                yield _sse("error", json.dumps(str(payload)))
+                break
+            else:  # "done" — the terminal result already streamed
+                break
+            item = await queue.get()
+
+    return StreamingResponse(
+        _events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+
 @app.post("/v1/events/observe", response_model=IngestResult)
 async def observe(event: ObserveEvent) -> IngestResult:
     try:
@@ -158,3 +241,40 @@ async def correct_memory(memory_id: UUID, body: CorrectionRequest) -> Correction
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/v1/agents", response_model=CreateAgentResult)
+async def create_agent(request: CreateAgentRequest) -> CreateAgentResult:
+    """Agent provisioning (unity-client.md fork 2, ruled 2026-07-27) — the
+    integrator's minute-one verb; before this route the demo agent was
+    hand-SQL. UUID minted server-side (stack constant); no model calls; the
+    identity document compiles at the first scene boundary / session start
+    as before. Pass-through by ruling."""
+    return await app.state.service.create_agent(request)
+
+
+@app.get("/v1/memories/{memory_id}/chain", response_model=MemoryChainResult)
+async def memory_chain(memory_id: UUID) -> MemoryChainResult:
+    """The Ledger's ground-truth-vs-telling read (unity-client.md fork 3,
+    ruled 2026-07-27): the immutable observation beside BOTH version chains
+    (superseded rows present — greyed client-side, never dropped) + gist
+    spans. Read-only and unscored: no retrieval ran, so no scores exist;
+    IDs + structured fields on every row keep the read-payload discipline.
+    404 on unknown memory (the pin-route precedent)."""
+    try:
+        return await app.state.retrieval.memory_chain(memory_id)
+    except UnknownMemoryError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/v1/agents/{agent_id}/memories", response_model=AgentMemoriesResult)
+async def agent_memories(
+    agent_id: UUID, limit: int = Query(default=100, ge=1, le=1000)
+) -> AgentMemoriesResult:
+    """The Ledger's per-agent index (unity-client.md fork 3): each memory
+    beside its live telling head, newest valid_at first; `limit` is a caller
+    argument (the k precedent), never a config knob. 404 on unknown agent."""
+    try:
+        return await app.state.retrieval.agent_memories(agent_id, limit)
+    except UnknownAgentError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
