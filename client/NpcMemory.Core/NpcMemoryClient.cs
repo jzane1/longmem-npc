@@ -34,6 +34,14 @@ namespace NpcMemory
     /// hardcoded beyond overridable defaults): Init must tolerate the cold
     /// reconstruction pre-warm (16.3 s measured real-mode), Turn the full
     /// turn, Observe the synchronous write pass.
+    ///
+    /// Deliberately NO ConfigureAwait(false) anywhere: continuations honor
+    /// the caller's SynchronizationContext, so in Unity every await — and
+    /// every callback (chunks, directives, reputation) — resumes on the
+    /// main thread with no explicit marshaling. The classic library-deadlock
+    /// hazard needs a caller that BLOCKS on these tasks, and blocking
+    /// (.Result/.Wait) is banned by the adapter contract. Play-mode-proven:
+    /// the demo driver asserts chunk callbacks land on the main thread.
     /// </summary>
     public sealed class NpcMemoryClient : IDisposable
     {
@@ -136,15 +144,14 @@ namespace NpcMemory
                     NpcJson.Serialize(request), Encoding.UTF8, "application/json"),
             };
             using var response = await _http
-                .SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cts.Token)
-                .ConfigureAwait(false);
+                .SendAsync(message, HttpCompletionOption.ResponseHeadersRead, cts.Token);
             if (!response.IsSuccessStatusCode)
             {
-                var detail = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                var detail = await response.Content.ReadAsStringAsync();
                 throw new NpcMemoryApiException((int)response.StatusCode, detail);
             }
 
-            using var stream = await response.Content.ReadAsStreamAsync().ConfigureAwait(false);
+            using var stream = await response.Content.ReadAsStreamAsync();
             using var reader = new StreamReader(stream, Encoding.UTF8);
 
             DialogueTurnResult? result = null;
@@ -152,7 +159,7 @@ namespace NpcMemory
             string? data = null;
             while (!reader.EndOfStream)
             {
-                var line = await reader.ReadLineAsync().ConfigureAwait(false);
+                var line = await reader.ReadLineAsync();
                 if (line == null)
                 {
                     break;
@@ -201,9 +208,8 @@ namespace NpcMemory
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(DefaultTimeout);
             using var response = await _http
-                .GetAsync(_baseUrl + path, cts.Token)
-                .ConfigureAwait(false);
-            return await ReadAsync<T>(response).ConfigureAwait(false);
+                .GetAsync(_baseUrl + path, cts.Token);
+            return await ReadAsync<T>(response);
         }
 
         private async Task<T> SendAsync<T>(
@@ -217,13 +223,13 @@ namespace NpcMemory
                 Content = new StringContent(
                     NpcJson.Serialize(body), Encoding.UTF8, "application/json"),
             };
-            using var response = await _http.SendAsync(message, cts.Token).ConfigureAwait(false);
-            return await ReadAsync<T>(response).ConfigureAwait(false);
+            using var response = await _http.SendAsync(message, cts.Token);
+            return await ReadAsync<T>(response);
         }
 
         private static async Task<T> ReadAsync<T>(HttpResponseMessage response)
         {
-            var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            var text = await response.Content.ReadAsStringAsync();
             if (!response.IsSuccessStatusCode)
             {
                 throw new NpcMemoryApiException((int)response.StatusCode, text);

@@ -20,6 +20,12 @@ Thumbs.db
 UserSettings/
 *.csproj
 *.sln
+*.slnx
+unity/.vscode/
+unity/Captures/
+# Third-party editor bridge, embedded locally by its setup wizard; the
+# Packages/manifest.json git URL re-resolves it on a fresh clone.
+unity/Packages/com.coplaydev.unity-mcp/
 # ...but the hand-written client projects are source, not Unity-generated:
 !client/**/*.csproj
 

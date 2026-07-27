@@ -113,8 +113,7 @@ namespace NpcMemory
                 .DialogueTurnAsync(
                     BuildTurnRequest(
                         text, reputationDeltaOverride, actionVocabulary, k, weightOverrides),
-                    ct)
-                .ConfigureAwait(false);
+                    ct);
             ApplyTurnResult(result);
             return result;
         }
@@ -138,8 +137,7 @@ namespace NpcMemory
                         text, reputationDeltaOverride, actionVocabulary, k, weightOverrides),
                     onChunk,
                     onReconstructing,
-                    ct)
-                .ConfigureAwait(false);
+                    ct);
             ApplyTurnResult(result);
             return result;
         }
@@ -219,8 +217,7 @@ namespace NpcMemory
                         ClientTimestamp = Now(),
                         SceneType = sceneType,
                     },
-                    ct)
-                .ConfigureAwait(false);
+                    ct);
             if (_lastReputationAfter is double after)
             {
                 ReputationSnapshot = after; // the row value == the last apply
