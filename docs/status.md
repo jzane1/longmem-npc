@@ -17,9 +17,21 @@ caller arg). No migration (ledger 001–005); no new knobs or roles. **Fifteen f
 verified** — floor-verifier **pass** (walkers grown 46 → 51 / 48 → 56 / 62 → 67, four untouched
 walkers green + byte-identical; suite 44 → 48 ×2 + keyless 37 → 41; migrate no-op; `longmem`
 pristine; floor economy exactly nine files by git diff). The demo-vehicle ruling + the fork
-rulings are the two dated 2026-07-27 `decisions.md` entries. Next: **stage 1 —
-`NpcMemory.Core` + the console harness (the Wk-1 interop go/no-go)**, then the Unity adapter +
-gray-box set (stage 2) and the browser Ledger (stage 3).
+rulings are the two dated 2026-07-27 `decisions.md` entries. **Same-day follow-on: stage 1 is
+BUILT and the Wk-1 interop go/no-go is GREEN** (third task of the day) — `client\NpcMemory.Core`
+(netstandard2.1, zero `UnityEngine` types, Newtonsoft everywhere, the flat `NpcMemoryClient` +
+the `NpcSession` port of `_apply_turn_result`) + the `dotnet run` console harness passed **all
+21 checks** live against the served API (fake mode, scratch `longmem_smoke`): provisioning →
+time-travel observes → the **null-vs-`[]` tri-state proof on the wire** (null → loader;
+populated → evaluated; explicit `[]` → evaluated) → SSE chunks byte-identical to content
+(perceived > first_word > 0) → correction both-head swap + chain/index inspection → 46-day
+reconstruction (write_backs 3) with a byte-identical within-scene cache-hit reread → a
+mid-scene gate fire appending the unseen memory → warm-init then a pure cache-hit on-camera
+turn (write_backs 0, cache_hits 4) → both scored views. floor-verifier **pass** (independent
+re-run of the whole gate incl. server lifecycle; port fidelity verified side-by-side against
+`app\session.py`; `client\` has no SQL and no hardcoded config; the stage-0 floor byte-untouched
+— **sixteen floors stand verified**). Next: **stage 2 — the Unity adapter + gray-box set**, then
+the browser Ledger (stage 3).
 
 **Prior phase:** **the HTTP dialogue-turn route is LIVE — Unity's front door exists** (2026-07-23,
 immediate-queue item 1, the audit's #1 blocker closed; plan-as-spec session). `POST
@@ -158,6 +170,8 @@ and the structured behavior output survive the interview. Research publication c
 | Escalation thin_gist trigger v1 — the trigger-tuning ruling's build (same day as the turn route; the dated "Escalation trigger tuning" entry in `decisions.md` carries the full measurement): a **sixth escalation trigger `thin_gist`** (`app\nlp.py` `evaluate_triggers`, appended LAST — the biased-loose add-only contract preserved) fires when the base NLP pass yields fewer gist spans than `escalation_min_base_spans` (new `SERVICE_DEFAULTS` knob, default 1.0 = fire on a zero-span base pass; 0.0 disables; per-agent overridable, fetched with the other escalation knobs in `app\ingest.py`). Closes the measured **zero-gist hole** — 16/80 realistic observes otherwise landed with NO gist spans, leaving reconstruction's fixed constraint empty on those rows (75% → 95% fire on the corpus, ~+$0.03/100 observes). The five original triggers + thresholds stand unchanged by ruling. No migration; no new model roles. | floor-verifier **pass** against all thirteen prior floors (write-path floor re-opened, re-verified): `tests\verify_write_path.py` **46** on fresh scratch (42 → 46 — [11b]: thin_gist fires ALONE on a zero-span pass at production knobs, the 0.0 kill-switch, floor-compares-the-COUNT, and the measured sexton fixture escalating with thin_gist as the SOLE trigger at the service level); six other walkers green on fresh scratch (62/48/51/42/34/34) and — with every other `app\` file — byte-identical to HEAD by git accounting; full suite **44 ×2** + keyless subset **37** (the new pure `test_thin_gist_trigger_pure` asserts over production `SERVICE_DEFAULTS`, no DB/NLP — it rides the Stop-hook subset); no-arg migrate → "Up to date: 5 migration(s) applied, 0 pending"; `longmem` pristine via the postgres MCP (ten product tables 0 rows, ledger 001–005, no scratch residue); code spot-checks (trigger add-only and appended last, the knob's floor value lives only in `SERVICE_DEFAULTS`, the 2026-07-22 soft-degrade path untouched and re-proved live, no new writes/UPDATE/DELETE); the predicted fake-mode consequence verified, not assumed (stored fixture rows byte-identical — only escalated/escalated_by/timing moved; no foreign assertion touched). | 2026-07-23 |
 
 | Unity-client stage 0 v1 — the C# client's backend surface (unity-client.md forks 1–3, ruled 2026-07-27): **SSE `POST /v1/dialogue/turn/stream`** (`app\api.py` — iterates the SAME `run_dialogue_turn` async generator via a queue-bridged pump task; `chunk` events JSON-encoded, an optional `reconstructing` event off the pre-serve callback, terminal `result` = the seam result's serialization; the FIRST queue item awaited before the response starts so unknown-agent/version still map 404/422; in-stream failure → an `error` event; a task-reference set so a client disconnect never aborts the turn server-side) + **`POST /v1/agents`** (`db.insert_agent` + `IngestService.create_agent` + `CreateAgentRequest/Result` — server-minted UUID, exact-fields storage, NULL knobs resolve config → `SERVICE_DEFAULTS`; the build's only new write surface, an agents row outside the memory-content invariant's subject) + the **unscored inspector reads** (`GET /v1/memories/{id}/chain` + `GET /v1/agents/{id}/memories` — `db.fetch_memory_chain`/`fetch_agent_memories` + `RetrievalService.memory_chain`/`agent_memories` + chain/index wire models: both version chains ordered (valid_at, created_at) with superseded rows PRESENT, gist spans, `has_embedding` never the vector, `memories.entities` deliberately not echoed, the index LEFT JOINed to the live telling head, `limit` a caller arg 1–1000). No migration (ledger 001–005); no new knobs or model roles. | floor-verifier **pass** against all fourteen prior floors (write-path + read-path + CLI-harness floors re-opened, re-verified): `tests\verify_write_path.py` **51** on fresh scratch (46 → 51 — [15] provisioning: server-minted row with exact fields + NULL knobs, pass-through echo, the provisioned agent immediately a working write target, empty name 422); `tests\verify_read_path.py` **56** (48 → 56 — [14] inspector reads: superseded telling row PRESENT with coherent timeline after a db-layer correction, fact chain with `has_embedding` + entities, index newest-first beside the LIVE head, limit-vs-total_count, both 404s); `tests\verify_cli_harness.py` **67** (62 → 67 — [14] SSE: 200 text/event-stream, chunk-event count == the seam's, chunks concatenate BYTE-IDENTICALLY to the result's content, result event == the seam serialization, pre-stream 404); four untouched walkers green on fresh scratch (51/42/34/34) and byte-identical to HEAD by git diff; suite **48 ×2** + keyless subset **41** (four new unmarked route-contract scenarios in `test_set_d_gate.py`); no-arg migrate → "Up to date: 5 migration(s) applied, 0 pending"; `longmem` pristine via the postgres MCP (ledger 001–005, ten product tables 0 rows, no scratch residue); invariants (the only new write is the agents INSERT; inspector reads SELECT-only end to end; the turn's sole persisted write remains the sanctioned reputation UPDATE — `app\dialogue.py` byte-identical); floor economy exactly nine files. | 2026-07-27 |
+
+| Unity-client stage 1 v1 — `NpcMemory.Core` + the console harness, the Wk-1 interop go/no-go (unity-client.md ruled shape; the project's first C#): `client\NpcMemory.Core\` (**netstandard2.1** — the Unity 6 compatibility profile; sole dependency Newtonsoft.Json 13.0.3; **zero `UnityEngine` types** — the engine-agnostic ruling) holding `NpcJson` (ONE serializer config: SnakeCaseNamingStrategy + `NullValueHandling.Include` + `DateParseHandling.None`/`DateTimeOffset` end-to-end — the null-vs-`[]` tri-state contract is load-bearing and never collapsed), `Models.cs` (a field-for-field mirror of every `app\schemas.py` wire model), the flat `NpcMemoryClient` (all ten routes 1:1, per-route settable timeouts, typed loud `NpcMemoryApiException`, the SSE consumer with chunk/reconstructing/result dispatch), and `NpcSession` (the field-for-field `_apply_turn_result` port: loader-seeds/gated-append/closed-untouched keyed on the SERVER's gate record; recent-actions cap; boundary resets; `as_of` time travel; boundary snapshot refresh from the last `reputation_after` — the documented single-client HTTP equivalence) + `client\NpcMemory.Harness\` (net8.0 console playing every demo beat headless). | verified by the live interop gate + independent floor-verifier **pass**: `dotnet build` 0 warnings; the harness ran **21/21 checks green** against a live `python -m app.serve` (fake mode, scratch `longmem_smoke`, port confirmed then dropped): provisioning, time-travel observes, the tri-state proof (null → loader / populated → evaluated / **explicit `[]` → evaluated**), SSE 7 chunks concatenating byte-identically to content with perceived > first_word > 0, correction both-head swap + chain (superseded PRESENT, coherent timeline) + index (live head, detail_count 2), 46-day reconstruction (write_backs 3) + byte-identical within-scene cache-hit reread, mid-scene gate fire (novelty) appending the unseen memory, warm-init → on-camera pure cache hit (0 write-backs, 4 hits), both scored views over one served set; verifier side-by-side port-fidelity review vs `app\session.py`; no SQL and no DB driver in `client\` (dependency closure exactly Newtonsoft); nothing hardcoded beyond documented overridable defaults; `git diff` empty vs HEAD `b490867` (the stage-0 floor byte-untouched); keyless subset re-run 41; `longmem` pristine via the postgres MCP. | 2026-07-27 |
 
 ## Open questions needing Jack's ruling
 
@@ -969,6 +983,28 @@ and the structured behavior output survive the interview. Research publication c
   exactly nine files). Next: **stage 1 — `NpcMemory.Core` + console harness (the Wk-1 interop
   go/no-go)**.
 
+- **2026-07-27** — **Unity-client stage 1 built and the Wk-1 interop gate is GREEN (third task of
+  the day) — the project's first C# is live end-to-end.** `client\NpcMemory.Core\` (netstandard2.1,
+  sole dep Newtonsoft 13.0.3, zero `UnityEngine` types): `NpcJson` (the ONE serializer config —
+  snake_case naming, `NullValueHandling.Include`, `DateTimeOffset` end-to-end; the null-vs-`[]`
+  tri-state never collapsed), `Models.cs` (field-for-field mirror of every wire model), the flat
+  `NpcMemoryClient` (ten routes 1:1, per-route settable timeouts, loud typed errors, the SSE
+  consumer), `NpcSession` (the `_apply_turn_result` port keyed on the server's gate record;
+  boundary snapshot refresh from the last `reputation_after` — exact for a single-client session;
+  a multi-client integration would want an agent-state read route, noted in the artifact queue) +
+  `client\NpcMemory.Harness\` (net8.0). **The harness ran 21/21 checks green** against a live
+  served backend (fake mode, scratch `longmem_smoke`): provisioning → time-travel observes → the
+  tri-state wire proof → SSE byte-identity → correction/chain/index → 46-day drift + byte-identical
+  reread → gate fire → warm-init pure cache hit → both views; 9 directives resolved through the
+  callback path. One build-surfaced fixture fix: the harness config's episodic tau lengthened
+  (1 → 7 days) so the fresh-read beat sits inside theta — the first run honestly caught the
+  arithmetic (a 2-day-old memory on a 1-day tau serves reconstructed, as designed). floor-verifier
+  **pass** (independent full-gate re-run incl. server lifecycle + port-fidelity review;
+  interrupted once by a session limit and resumed to completion — the criterion-6d pristine query
+  re-ran identically). A NuGet source was absent on the fresh .NET SDK; nuget.org added
+  (machine-level, one-time). **Sixteen floors stand verified.** Next: **stage 2 — the Unity
+  adapter + gray-box set** (MCP for Unity already verified), then the browser Ledger (stage 3).
+
 ## Immediate queue
 
 **Pre-demo build path — re-planned 2026-07-22 from the external-persona audit**
@@ -1011,9 +1047,10 @@ dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over
    2026-07-27** (dated "Unity-client fork rulings + stage-0 build" register entry): SSE
    `/turn/stream`, `POST /v1/agents`, and the chain/index inspector reads are LIVE; Newtonsoft
    everywhere; netstandard2.1 core + net8 harness layout; static-HTML Ledger; MCP for Unity
-   verified. Remaining carried items: the C# null-vs-absent serialization proof (a stage-1
-   done-when) and the demo-corpus register (shipped-game dialogue style + the held-out eval
-   arm). The REPL still drives all beats today (`:as-of` jumps + scene boundaries + band
+   verified. **Stage 1 BUILT + the Wk-1 interop gate GREEN + floor-verified (same day)** —
+   `NpcMemory.Core` + the console harness; the C# null-vs-absent serialization proof landed (the
+   tri-state beat runs live in the gate). Remaining carried item: the demo-corpus register
+   (shipped-game dialogue style + the held-out eval arm). The REPL still drives all beats today (`:as-of` jumps + scene boundaries + band
    crossings; `:correct` moves retrieval AND entities; the gate debug line + `(reconstructing…)`).
 
 **Pre-ship latency items** (2026-07-21 latency slate; **audit re-sequenced 2026-07-22** — the
@@ -1128,6 +1165,9 @@ access.)*
   spec: the SSE streaming route + the game-authored action-observe contract land here.)*
   *(Shape ruled 2026-07-27: engine-agnostic `NpcMemory.Core` — zero `UnityEngine` types, one flat
   client class — + a thin Unity adapter; consolidated into `unity-client.md`.)*
+  *(Stage-1 observation 2026-07-27: no HTTP agent-state read exists — the C# session refreshes its
+  boundary reputation snapshot from the last turn's `reputation_after`, exact for a single-client
+  session; a multi-client integration wants a small read route. Future surface item.)*
 - Demo choreography: injected-timestamp time travel; decay + correction-override + gate-recollect
   beats; the 60-day drift plot — a planned beat since the 2026-07-14 re-slating (reconstruction is
   pre-demo). *(Grown 2026-07-21: the game-authored action-observe beat —
