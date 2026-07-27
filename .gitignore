@@ -20,6 +20,8 @@ Thumbs.db
 UserSettings/
 *.csproj
 *.sln
+# ...but the hand-written client projects are source, not Unity-generated:
+!client/**/*.csproj
 
 # Claude Code personal overrides
 CLAUDE.local.md

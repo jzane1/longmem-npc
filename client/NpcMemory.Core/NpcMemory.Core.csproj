@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Engine-agnostic core (unity-client.md, ruled 2026-07-27): netstandard2.1
+       is the Unity 6 compatibility profile, so this one DLL serves both the
+       dotnet console harness and the Unity adapter. Zero UnityEngine
+       references by ruling; Newtonsoft everywhere (fork 4) — the same
+       serializer Unity ships (com.unity.nuget.newtonsoft-json), one behavior
+       in both hosts. -->
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <RootNamespace>NpcMemory</RootNamespace>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+</Project>
