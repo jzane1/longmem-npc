@@ -18,8 +18,10 @@ import json
 from contextlib import asynccontextmanager
 from uuid import UUID
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 from app.config import load_settings
 from app.db import build_pool
@@ -265,6 +267,19 @@ async def memory_chain(memory_id: UUID) -> MemoryChainResult:
         return await app.state.retrieval.memory_chain(memory_id)
     except UnknownMemoryError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+_LEDGER_PATH = Path(__file__).resolve().parent.parent / "ledger" / "index.html"
+
+
+@app.get("/ledger", include_in_schema=False)
+async def ledger_page() -> FileResponse:
+    """The Ledger (unity-client.md stage 3, ruled 2026-07-27) — the static
+    designer-facing inspector page, served BY the API so it ships with the
+    service and shares the origin of the two read routes it polls (no CORS
+    surface, no second server). The page itself is `ledger\\index.html` —
+    vanilla JS, no build step (fork 6)."""
+    return FileResponse(_LEDGER_PATH, media_type="text/html")
 
 
 @app.get("/v1/agents/{agent_id}/memories", response_model=AgentMemoriesResult)

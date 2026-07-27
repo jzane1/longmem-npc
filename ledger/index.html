@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The Ledger — longmem-npc memory inspector</title>
+<!--
+  The Ledger (docs\unity-client.md stage 3, ruled 2026-07-27): the
+  designer-facing ground-truth-vs-telling inspector. One static file,
+  vanilla JS, no build step (fork 6) — served by the API itself at
+  GET /ledger (same origin, no CORS, no second server), reading only the
+  ruled inspector routes:
+
+    GET /v1/agents/{id}/memories   — the index (live telling heads)
+    GET /v1/memories/{id}/chain    — the full record (both chains + spans)
+
+  Superseded rows render greyed BUT PRESENT — the non-destructive record
+  made visible. The per-turn score panel (read_mode/scores/IDs + both
+  views) is fed by pasting/dropping a DialogueTurnResult JSON — the
+  turn-feed v1 shape settled at build; a live feed rides the demo
+  choreography. All text renders via textContent (never innerHTML).
+-->
+<style>
+  :root {
+    --bg: #14161a; --panel: #1c1f26; --edge: #2c313c; --ink: #d6dae2;
+    --dim: #7d8492; --dead: #555b66; --green: #71c98f; --amber: #d8a657;
+    --blue: #7aa2f7; --red: #e06c75; --mark: #3a4a2f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 13px/1.5 "Consolas", "Cascadia Mono", monospace;
+  }
+  header {
+    display: flex; align-items: baseline; gap: 16px;
+    padding: 10px 16px; border-bottom: 1px solid var(--edge);
+  }
+  header h1 { font-size: 15px; margin: 0; font-weight: 600; }
+  header .sub { color: var(--dim); }
+  main { display: grid; grid-template-columns: 380px 1fr; gap: 0; }
+  #indexPane { border-right: 1px solid var(--edge); min-height: calc(100vh - 46px); }
+  .pad { padding: 12px 16px; }
+  input[type=text] {
+    width: 100%; background: var(--panel); color: var(--ink);
+    border: 1px solid var(--edge); border-radius: 3px; padding: 6px 8px;
+    font: inherit;
+  }
+  button {
+    background: var(--panel); color: var(--ink); border: 1px solid var(--edge);
+    border-radius: 3px; padding: 6px 12px; font: inherit; cursor: pointer;
+  }
+  button:hover { border-color: var(--blue); }
+  .row { display: flex; gap: 8px; margin-top: 8px; }
+  #memList { list-style: none; margin: 0; padding: 0; }
+  #memList li {
+    padding: 10px 16px; border-bottom: 1px solid var(--edge); cursor: pointer;
+  }
+  #memList li:hover { background: var(--panel); }
+  #memList li.sel { background: var(--panel); border-left: 3px solid var(--blue); }
+  .obs { color: var(--dim); }
+  .live { margin-top: 2px; }
+  .meta { color: var(--dim); font-size: 11px; margin-top: 2px; }
+  .badge {
+    display: inline-block; padding: 0 6px; border-radius: 3px;
+    font-size: 11px; border: 1px solid var(--edge);
+  }
+  .badge.original { color: var(--green); }
+  .badge.authorial_correction { color: var(--amber); }
+  .badge.reconstruction { color: var(--blue); }
+  .badge.dead { color: var(--dead); }
+  .badge.pin { color: var(--amber); border-color: var(--amber); }
+  h2 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--dim); margin: 18px 0 8px;
+  }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--edge);
+    border-radius: 4px; padding: 10px 12px; white-space: pre-wrap;
+  }
+  .card .cap {
+    font-size: 11px; color: var(--dim); text-transform: uppercase;
+    letter-spacing: .08em; margin-bottom: 6px; white-space: normal;
+  }
+  mark { background: var(--mark); color: var(--green); border-radius: 2px; }
+  .chainrow {
+    border: 1px solid var(--edge); border-radius: 4px; padding: 8px 12px;
+    margin-bottom: 8px; background: var(--panel);
+  }
+  .chainrow.dead { opacity: .45; }  /* greyed BUT PRESENT */
+  .chainrow .txt { white-space: pre-wrap; margin-top: 4px; }
+  #numbers { display: flex; gap: 22px; flex-wrap: wrap; }
+  #numbers .num { text-align: center; }
+  #numbers .num b { display: block; font-size: 22px; color: var(--green); }
+  #numbers .num span { color: var(--dim); font-size: 11px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td {
+    text-align: left; padding: 4px 10px 4px 0; border-bottom: 1px solid var(--edge);
+    vertical-align: top;
+  }
+  th { color: var(--dim); font-weight: 400; font-size: 11px; text-transform: uppercase; }
+  td.id, .mono { color: var(--dim); font-size: 11px; }
+  .rm-verbatim { color: var(--green); }
+  .rm-reconstructed { color: var(--amber); }
+  #dropzone {
+    border: 1px dashed var(--edge); border-radius: 4px; padding: 10px;
+    color: var(--dim); margin-bottom: 10px;
+  }
+  #dropzone.hot { border-color: var(--blue); color: var(--blue); }
+  .err { color: var(--red); }
+  footer { padding: 10px 16px; color: var(--dead); font-size: 11px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>THE LEDGER</h1>
+  <span class="sub">longmem-npc — what the character actually remembers, and how</span>
+</header>
+<main>
+  <section id="indexPane">
+    <div class="pad">
+      <input id="agentId" type="text" placeholder="agent uuid" spellcheck="false">
+      <div class="row">
+        <button id="loadBtn">load agent</button>
+        <button id="pollBtn">poll: off</button>
+        <span id="indexMeta" class="meta"></span>
+      </div>
+      <div id="indexErr" class="err"></div>
+    </div>
+    <ul id="memList"></ul>
+  </section>
+  <section class="pad" id="detailPane">
+    <div id="numbers"></div>
+    <div id="chainWrap" hidden>
+      <h2>ground truth vs current telling</h2>
+      <div class="cols">
+        <div class="card"><div class="cap">the observation — immutable, gist marked</div><div id="obsText"></div></div>
+        <div class="card"><div class="cap" id="liveCap">current telling</div><div id="liveText"></div></div>
+      </div>
+      <h2>the telling chain — superseded rows greyed, never dropped</h2>
+      <div id="detailChain"></div>
+      <h2>the fact chain — what retrieval sees</h2>
+      <div id="factChain"></div>
+    </div>
+    <h2>last turn — read_mode / scores / IDs (paste or drop a DialogueTurnResult JSON)</h2>
+    <div id="dropzone">drop a turn-result .json here, or paste JSON into this box and press ctrl+enter</div>
+    <div id="turnErr" class="err"></div>
+    <div id="turnPanel"></div>
+  </section>
+</main>
+<footer>
+  read-only over GET /v1/agents/{id}/memories and GET /v1/memories/{id}/chain — unscored
+  inspector reads by ruled contract; the gist-precision / detail-recall metrics bind here when
+  the judged-eval harness (immediate-queue item 3) lands.
+</footer>
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+let selectedMemory = null;
+let pollTimer = null;
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+
+function fmtTime(iso) {
+  return iso ? iso.replace("T", " ").replace(/\+00:00$/, "Z").slice(0, 20) : "—";
+}
+
+async function fetchJson(path) {
+  const resp = await fetch(path);
+  if (!resp.ok) throw new Error(`${resp.status}: ${await resp.text()}`);
+  return resp.json();
+}
+
+// ---- the index ----------------------------------------------------------
+
+async function loadIndex() {
+  const agent = $("agentId").value.trim();
+  if (!agent) return;
+  $("indexErr").textContent = "";
+  try {
+    const data = await fetchJson(`/v1/agents/${agent}/memories?limit=200`);
+    $("indexMeta").textContent =
+      `${data.memories.length}/${data.total_count} memories`;
+    const list = $("memList");
+    list.replaceChildren();
+    for (const m of data.memories) {
+      const li = el("li");
+      li.dataset.memoryId = m.memory_id;
+      if (m.memory_id === selectedMemory) li.classList.add("sel");
+      const head = el("div");
+      head.append(el("span", "badge " + (m.live_write_cause || "dead"),
+        m.live_write_cause || "no live head"));
+      if (m.pinned) head.append(" ", el("span", "badge pin", "pinned"));
+      if (m.detail_count > 1) {
+        head.append(" ", el("span", "meta", `${m.detail_count} versions`));
+      }
+      li.append(head);
+      li.append(el("div", "obs", truncate(m.observation_text, 110)));
+      li.append(el("div", "live", truncate(m.live_content || "", 110)));
+      li.append(el("div", "meta",
+        `${fmtTime(m.valid_at)}  ·  ${m.memory_id.slice(0, 8)}…`));
+      li.addEventListener("click", () => loadChain(m.memory_id));
+      list.append(li);
+    }
+  } catch (e) {
+    $("indexErr").textContent = String(e);
+  }
+}
+
+function truncate(s, n) {
+  return s.length > n ? s.slice(0, n - 1) + "…" : s;
+}
+
+// ---- the chain ----------------------------------------------------------
+
+async function loadChain(memoryId) {
+  selectedMemory = memoryId;
+  for (const li of $("memList").children) {
+    li.classList.toggle("sel", li.dataset.memoryId === memoryId);
+  }
+  const c = await fetchJson(`/v1/memories/${memoryId}/chain`);
+  $("chainWrap").hidden = false;
+
+  // Numbers: the record's own honest counts (item 3's metrics bind later).
+  const supersededTellings = c.details.filter((d) => !d.is_live).length;
+  const live = c.details.find((d) => d.is_live);
+  const nums = $("numbers");
+  nums.replaceChildren();
+  addNum(nums, c.gist_spans.length, "gist spans (the fixed constraint)");
+  addNum(nums, c.details.length, "telling versions");
+  addNum(nums, supersededTellings, "superseded — kept, never deleted");
+  addNum(nums, c.facts.length, "fact versions");
+
+  // Ground truth with gist spans marked (offsets into the immutable text).
+  const obs = $("obsText");
+  obs.replaceChildren();
+  let cursor = 0;
+  const spans = [...c.gist_spans].sort((a, b) => a.start_char - b.start_char);
+  for (const s of spans) {
+    if (s.start_char > cursor) {
+      obs.append(document.createTextNode(c.observation_text.slice(cursor, s.start_char)));
+    }
+    const m = el("mark", null, c.observation_text.slice(s.start_char, s.end_char));
+    obs.append(m);
+    cursor = Math.max(cursor, s.end_char);
+  }
+  obs.append(document.createTextNode(c.observation_text.slice(cursor)));
+
+  $("liveCap").textContent = live
+    ? `current telling — ${live.write_cause} @ ${fmtTime(live.valid_at)}`
+    : "current telling — NO LIVE HEAD";
+  $("liveText").textContent = live ? live.content : "";
+
+  renderChain($("detailChain"), c.details.map((d) => ({
+    dead: !d.is_live,
+    badge: d.write_cause || "?",
+    span: `${fmtTime(d.valid_at)} → ${d.invalid_at ? fmtTime(d.invalid_at) : "live"}`,
+    id: d.detail_id,
+    text: d.content,
+    extra: "",
+  })));
+  renderChain($("factChain"), c.facts.map((f) => ({
+    dead: !f.is_live,
+    badge: f.write_cause || "?",
+    span: `${fmtTime(f.valid_at)} → ${f.invalid_at ? fmtTime(f.invalid_at) : "live"}`,
+    id: f.fact_version_id,
+    text: f.basis_text,
+    extra: (f.has_embedding ? "embedded" : "NO EMBEDDING (degraded)")
+      + (f.entities.length ? `  ·  entities: ${f.entities.join(", ")}` : ""),
+  })));
+}
+
+function addNum(host, value, label) {
+  const d = el("div", "num");
+  d.append(el("b", null, String(value)));
+  d.append(el("span", null, label));
+  host.append(d);
+}
+
+function renderChain(host, rows) {
+  host.replaceChildren();
+  for (const r of rows) {
+    const div = el("div", "chainrow" + (r.dead ? " dead" : ""));
+    const head = el("div");
+    head.append(el("span", "badge " + r.badge, r.badge));
+    head.append(" ", el("span", "meta", r.span));
+    head.append(" ", el("span", "id mono", `  ${r.id}`));
+    if (r.extra) head.append(" ", el("span", "meta", `  ${r.extra}`));
+    div.append(head);
+    div.append(el("div", "txt", r.text));
+    host.append(div);
+  }
+}
+
+// ---- the turn panel (feed v1: paste/drop a DialogueTurnResult) ----------
+
+function renderTurn(result) {
+  $("turnErr").textContent = "";
+  const host = $("turnPanel");
+  host.replaceChildren();
+  if (!result || !Array.isArray(result.items)) {
+    throw new Error("not a DialogueTurnResult (no items array)");
+  }
+  const table = el("table");
+  const thead = el("thead");
+  const hr = el("tr");
+  for (const h of ["memory", "read_mode", "score", "rel", "rec", "imp", "gate"]) {
+    hr.append(el("th", null, h));
+  }
+  thead.append(hr);
+  table.append(thead);
+  const tbody = el("tbody");
+  for (const item of result.items) {
+    const tr = el("tr");
+    tr.append(el("td", "id", item.memory_id.slice(0, 8) + "…"));
+    tr.append(el("td", "rm-" + item.read_mode, item.read_mode));
+    tr.append(el("td", null, item.score.toFixed(4)));
+    tr.append(el("td", null, item.relevance == null ? "null" : item.relevance.toFixed(3)));
+    tr.append(el("td", null, item.recency.toFixed(3)));
+    tr.append(el("td", null, item.importance_norm.toFixed(3)));
+    tr.append(el("td", null, item.gate_fetched ? "fetched" : ""));
+    tr.addEventListener("click", () => loadChain(item.memory_id));
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  host.append(table);
+
+  const views = el("div", "cols");
+  for (const [name, view] of [["dialogue view", result.dialogue_view],
+                              ["behavior view", result.behavior_view]]) {
+    const card = el("div", "card");
+    card.append(el("div", "cap", name));
+    (view || []).forEach((v, i) => {
+      card.append(el("div", "mono",
+        `${i + 1}. ${v.memory_id.slice(0, 8)}…  ${v.score.toFixed(4)}`));
+    });
+    views.append(card);
+  }
+  views.style.marginTop = "12px";
+  host.append(views);
+
+  const ins = result.instrumentation || {};
+  host.append(el("div", "meta",
+    `perceived_first_word ${ins.perceived_first_word_ms} ms · first_word `
+    + `${ins.first_word_ms} ms · gate ${JSON.stringify(
+        (ins.retrieval || {}).gate ? ins.retrieval.gate.signals_fired : [])} `
+    + `· reputation ${result.reputation_prev} → ${result.reputation_after}`));
+}
+
+function tryLoadTurn(text) {
+  try {
+    renderTurn(JSON.parse(text));
+  } catch (e) {
+    $("turnErr").textContent = String(e);
+  }
+}
+
+// ---- wiring -------------------------------------------------------------
+
+$("loadBtn").addEventListener("click", loadIndex);
+$("agentId").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") loadIndex();
+});
+$("pollBtn").addEventListener("click", () => {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+    $("pollBtn").textContent = "poll: off";
+  } else {
+    pollTimer = setInterval(() => {
+      loadIndex();
+      if (selectedMemory) loadChain(selectedMemory);
+    }, 2000);
+    $("pollBtn").textContent = "poll: 2s";
+  }
+});
+const dz = $("dropzone");
+dz.addEventListener("dragover", (e) => { e.preventDefault(); dz.classList.add("hot"); });
+dz.addEventListener("dragleave", () => dz.classList.remove("hot"));
+dz.addEventListener("drop", async (e) => {
+  e.preventDefault();
+  dz.classList.remove("hot");
+  const f = e.dataTransfer.files[0];
+  if (f) tryLoadTurn(await f.text());
+});
+document.addEventListener("paste", (e) => {
+  const text = e.clipboardData.getData("text");
+  if (text.trim().startsWith("{")) tryLoadTurn(text);
+});
+const params = new URLSearchParams(location.search);
+if (params.get("agent")) {
+  $("agentId").value = params.get("agent");
+  loadIndex();
+}
+</script>
+</body>
+</html>

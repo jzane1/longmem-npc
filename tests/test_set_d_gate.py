@@ -793,6 +793,32 @@ def test_agent_memories_route(scene):
     run_structural(scene, scenario)
 
 
+def test_ledger_page_served(scene):
+    """The Ledger ships WITH the service (unity-client.md stage 3, ruled
+    2026-07-27): GET /ledger serves the static inspector page from
+    ledger\\index.html — same origin as the two read routes it polls, so no
+    CORS surface exists. Structural: status, content type, and the page's
+    own route bindings present as text."""
+
+    async def scenario(ctx):
+        import httpx
+
+        import app.api as api_module
+
+        transport = httpx.ASGITransport(app=api_module.app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://suite"
+        ) as client:
+            page = await client.get("/ledger")
+            assert page.status_code == 200
+            assert page.headers["content-type"].startswith("text/html")
+            assert "THE LEDGER" in page.text
+            assert "/v1/agents/" in page.text  # polls the index route
+            assert "/v1/memories/" in page.text  # polls the chain route
+
+    run_structural(scene, scenario)
+
+
 def test_context_term_applies_on_gated_turns(scene):
     """The encoding-context term (built 2026-07-20) rides the gated path
     too: on a closed gate the loaded set's scores carry the same exact

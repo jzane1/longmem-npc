@@ -1047,6 +1047,29 @@ and the structured behavior output survive the interview. Research publication c
   sent to Jack); scene saved with `autoRun` off; server torn down, `longmem_smoke` dropped,
   port 8000 free, `longmem` pristine. Next: **stage 3 — the browser Ledger.**
 
+- **2026-07-27** — **Unity-client stage 3 built — The Ledger is live (fifth task of the day;
+  item 2's build stages are COMPLETE).** `ledger\index.html` — one static file, vanilla JS, no
+  build step (fork 6 as ruled), dev-tool dark aesthetic — **served BY the API at `GET /ledger`**
+  (a build-settled shape: same origin as the two inspector routes it polls, so no CORS surface
+  and no second server; the inspector ships WITH the service, completing fork 3's
+  product-surface logic). Renders: the per-agent index (newest-first, live telling head +
+  version count + pinned badges), and per memory the full record — the immutable observation
+  with **gist spans marked from the stored offsets**, the current telling, the telling chain
+  with **superseded rows greyed-but-present**, the fact chain with embedded/degraded badges +
+  entities, and the honest counts (gist spans / telling versions / superseded-kept / fact
+  versions; item 3's gist-precision & detail-recall bind here later, stated in the page
+  footer). **Turn-feed v1 settled at build:** paste/drop a `DialogueTurnResult` JSON renders
+  read_mode/scores/IDs per served item + both scored views + the TTFT line; a live feed rides
+  the demo choreography. All text renders via textContent (no injection surface). Verification:
+  suite 48 → **49** ×(full) + keyless 41 → **42** (the `/ledger` route contract); a live beat —
+  server on scratch `longmem_smoke`, the console harness populated a real fixture agent
+  (21/21), then the Ledger in a real browser rendered 4/4 memories and the corrected memory's
+  chain read **original (greyed) → authorial_correction (greyed) → reconstruction (live)** —
+  the 46-day retelling visibly built ON the corrected content, the record's whole story on one
+  screen; the crafted turn-JSON drop rendered the score table + views. Teardown clean (port
+  free, smoke dropped, `longmem` pristine). Next: **demo choreography + the pre-ship latency
+  items (B1/B2 measure-then-rule) + the judged eval harness (item 3).**
+
 ## Immediate queue
 
 **Pre-demo build path — re-planned 2026-07-22 from the external-persona audit**
