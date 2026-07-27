@@ -44,7 +44,13 @@ pumping. Two build-surfaced fixes, both caught by the Play gate: the core client
 `ConfigureAwait(false)` (continuations now honor the caller's SynchronizationContext — the
 Unity main-thread contract; blocking is banned so the library-deadlock hazard doesn't apply;
 console harness re-run 21/21 after the change) and the directive flash's re-entrancy color
-capture. Next: **stage 3 — the browser Ledger**, then demo choreography.
+capture. **And stage 3 is BUILT and live-verified (fifth task)** — The Ledger (`ledger\index.html`,
+served by the API at `GET /ledger`; suite 48 → 49) rendered a real fixture agent's corrected
+chain in the browser: original greyed → correction greyed → reconstruction live. **Item 2's
+build stages are COMPLETE**; remaining before recording: demo choreography + the demo corpus,
+the B1/B2 latency experiments, and the judged eval harness (item 3). Note: stages 2–3 carry
+live receipts (Play-mode console transcript, browser beat, suite growth) — an independent
+floor-verifier pass over their re-runnable halves is the next session's opening step.
 
 **Prior phase:** **the HTTP dialogue-turn route is LIVE — Unity's front door exists** (2026-07-23,
 immediate-queue item 1, the audit's #1 blocker closed; plan-as-spec session). `POST
