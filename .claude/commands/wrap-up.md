@@ -9,9 +9,12 @@ disable-model-invocation: true
 - Last commits: !`git log --oneline -5`
 
 ## Close out this session
-1. Update docs/status.md: Last-updated date; one session-log line saying what actually happened
-   (landed, blocked, or abandoned — be honest); the verified-floors table if a layer was
-   verified this session; queue changes (remove finished items, add discovered work).
+1. Update the living record — three files since the 2026-07-28 split:
+   - **docs/status.md** — Last-updated date; the phase header if the phase moved; queue changes
+     (remove finished items, add discovered work). LIVE STATE ONLY — history goes below.
+   - **docs/session-log.md** — append one entry at the END saying what actually happened
+     (landed, blocked, or abandoned — be honest).
+   - **docs/floors.md** — append a row only if a layer was floor-verified **pass** this session.
 2. Decision sweep: scan this session for any ruling Jack made that is not yet in
    docs/decisions.md. If found, record it following the /log-decision rules and say so.
 3. If any [SETTLE-AT-BUILD] tag was resolved this session, confirm the resolution is reflected

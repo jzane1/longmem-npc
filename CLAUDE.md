@@ -7,9 +7,16 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
 @docs/status.md
 
 ## Read before building
+- docs/README.md — the index: what every file in docs\ is for, and the reading order.
 - docs/architecture.md — design truth. Read the relevant sections before touching any layer.
 - docs/decisions.md — append-only decision register with rationale. Never edit old entries.
-- docs/migration-01.md — first build target. docs/test-suite.md — test discipline.
+- docs/migration-01.md — the FOUNDATIONAL schema (001). Migrations 002–005 live in
+  db\migrations\ and are not restated there. docs/test-suite.md — test discipline.
+- docs/floors.md — the verified-floors table (evidence per layer). Not auto-loaded; read it
+  when you need to know what a floor actually proved.
+- docs/session-log.md — append-only narrative history. Not auto-loaded; read it for context on
+  why something is the way it is.
+- docs/SETUP.md — clone-to-running, for a fresh machine.
 
 ## Environment — hard rules
 - Windows 11. ALWAYS PowerShell syntax and backslash paths in commands, scripts, and anything
@@ -73,7 +80,12 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
   same task.
 
 ## End of every task
-1. Update docs/status.md: Last-updated date, a session-log line, the verified-floors table if a
-   layer landed, and any queue changes.
+1. Update the living record (split three ways 2026-07-28 so status.md stays cheap to auto-load):
+   - **docs/status.md** — Last-updated date, the phase header if the phase moved, and any queue
+     changes. Keep it live state only; do not let history accumulate here again.
+   - **docs/session-log.md** — append ONE entry for the session, honest about what landed, what
+     was blocked, and what was abandoned.
+   - **docs/floors.md** — append a row ONLY if a layer landed and the floor-verifier returned
+     pass. Add the TOC line in docs/decisions.md if you appended an entry there.
 2. If Jack ruled on a decision during the task, append a dated entry to docs/decisions.md.
 3. Commit with a descriptive message. Never push unless asked.

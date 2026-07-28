@@ -1,6 +1,6 @@
 ---
 name: floor-verifier
-description: Independent verification of a completed layer against its done-when criteria and the known-good floor beneath it. Use after any build task finishes, before the verified-floors table in docs/status.md is updated. Re-runs all checks itself.
+description: Independent verification of a completed layer against its done-when criteria and the known-good floor beneath it. Use after any build task finishes, before a row is appended to docs/floors.md. Re-runs all checks itself.
 tools: Read, Grep, Glob, Bash, mcp__postgres, mcp__UnityMCP
 mcpServers: postgres, UnityMCP
 ---

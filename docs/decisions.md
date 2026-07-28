@@ -1844,7 +1844,7 @@ separate, open item.
 
 Verification: migration 005 applied to `longmem` (idempotent — "5 migration(s) applied, 0 pending");
 full structural suite 42 passed. Independent floor-verifier re-verification of the re-opened write-path
-floor: see the status.md session log + verified-floors table.
+floor: see `session-log.md` + `floors.md`.
 
 ## HTTP turn route + perceived-TTFT build rulings — 2026-07-23
 
@@ -1891,7 +1891,7 @@ capturing wrapper, 404/422, perceived > first_word > 0, both-TTFT-zero on the pr
 row, the driver series); suite 42 → 43 (the unmarked route-contract scenario in Set D; keyless
 subset 35 → 36); the six other walkers and every other `app\` file byte-identical to HEAD; live
 `python -m app.serve` HTTP beat (observe → turn → 404) + a standalone driver run. Independent
-floor-verifier re-verification: see the status.md session log + verified-floors table.
+floor-verifier re-verification: see `session-log.md` + `floors.md`.
 
 ## Escalation trigger tuning: measurement + rulings — 2026-07-23
 

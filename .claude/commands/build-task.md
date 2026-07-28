@@ -11,7 +11,7 @@ content of the plan; Jack's approval of it exits plan mode into Phase 2.
 
 ## Phase 1 — Orient (no file changes)
 1. If the task names or implies a spec in docs\ (e.g. migration-01), read that file in full. Read
-   the sections of docs/architecture.md this task touches. status.md is already loaded.
+   the sections of docs/architecture.md this task touches. status.md is already loaded (live state only since the 2026-07-28 split; docs/floors.md holds the evidence table and docs/session-log.md the history — read either when the task needs it). Read docs/decisions.md for any ruling that governs this layer.
 2. Present, in this order:
    - **Assumptions** — what layer this builds on, the known-good floor beneath it, and your
      reading of the task in two sentences.
@@ -40,6 +40,6 @@ content of the plan; Jack's approval of it exits plan mode into Phase 2.
   for each.
 - Staged verification: state what floor this layer was verified against and how. Then dispatch
   the floor-verifier subagent (foreground) with the layer name, the done-when list, and the
-  floor. Do not update the verified-floors table in docs/status.md until its verdict is pass.
+  floor. Do not append a row to docs/floors.md until its verdict is pass.
 - Execute the end-of-task protocol from CLAUDE.md (status.md update; decisions.md if Jack ruled
   on anything; commit, never push).
