@@ -277,15 +277,12 @@ detail row and stamps the prior one superseded — **versioned confabulation ove
 record**. Chain rows carry a `write_cause` enum:
 `original | reconstruction | rationalization | update_with_resentment | authorial_correction`.
 
-**Serving:** Haiku-class *(**⚠ CONTRADICTED — open, surfaced 2026-07-28.** §3 above, `.env.example`,
-and the real-mode runs all say **Sonnet-class**: on 2026-07-21 Jack ruled
-`LONGMEM_MODEL_RECONSTRUCTION = claude-sonnet-5` when the var was found missing from `.env`, and
-every real-mode measurement since — including the 16.3 s cold-reconstruction figure — was taken
-against sonnet-5. That ruling was never propagated here, to `reconstruction.md`, to
-`app\config.py`'s docstring, or to the "Reconstruction serving: batched Haiku" downstream entry in
-`decisions.md`, so the register still says Haiku and the shipped config says Sonnet. **Not resolved
-here — it is Jack's call whether the ruling was "for that run" or "the role's class", and the
-answer changes the cost table.** Logged in `status.md`'s open questions.)*; **one structured call
+**Serving:** Haiku-class *(**re-confirmed 2026-07-28.** The doc audit surfaced that the shipped
+config had been running `claude-sonnet-5` since 2026-07-21 — a stopgap when the env var was found
+missing from `.env`, never a class ruling, and it silently contradicted the register for a week.
+Haiku stands; `.env.example` corrected. **Consequence: the real-mode reconstruction numbers taken
+in that window — the 16.3 s cold figure and the cost table's reconstruction rows — were measured
+against sonnet-5 and must be re-measured before they are quoted again.**)*; **one structured call
 batching all k cache misses per retrieval**;
 pre-warm at dialogue init; on a mid-scene miss, **block and expose a "reconstructing" signal**
 (latency becomes characterization). Async serve-verbatim-then-cache is **not** the design — if

@@ -76,7 +76,7 @@ re-openable: re-verifying one is a step, never an argument against a design impr
 
 ## Open questions needing Jack's ruling
 
-*Two open. Closed items move to the "Recently closed" note below rather than staying at the top
+*One open. Closed items move to the "Recently closed" note below rather than staying at the top
 of this list (tidied 2026-07-28: the escalation item had led this section since it closed on
 2026-07-23).*
 
@@ -87,19 +87,14 @@ of this list (tidied 2026-07-28: the escalation item had led this section since 
   phase (ruled 2026-07-22)** — not acted on now; the fixed-gist-constraint ON/OFF ablation (in the
   pre-demo judged-eval work) produces the deciding data, and any metric/threshold change waits on it.
 
-- **Reconstruction's model class — Haiku or Sonnet? (surfaced 2026-07-28 by the doc audit.)** The
-  register and the specs say **Haiku-class** ("Reconstruction serving: batched Haiku" in
-  `decisions.md`; `architecture.md` §7; `reconstruction.md`; `app\config.py`'s docstring). The
-  shipped configuration says **Sonnet-class**: on 2026-07-21, with `LONGMEM_MODEL_RECONSTRUCTION`
-  missing from `.env`, Jack ruled it `claude-sonnet-5` — and every real-mode measurement since,
-  including the 16.3 s cold-reconstruction figure and the $0.44/100-turn cost table, was taken
-  against sonnet-5. That ruling never reached the register. **The question is whether it was a
-  one-run choice or the role's class.** It matters twice over: the cost table's reconstruction
-  rows assume one class, and reconstruction is the thesis mechanism, so its quality/latency
-  trade-off is a demo-visible decision. Cheap either way — one `.env` line and a doc sweep — but
-  it should be ruled, not inherited by accident. Both sides are annotated in place.
-
 **Recently closed** (kept as pointers so the trail is short, not gone):
+
+- **Reconstruction's model class — CLOSED 2026-07-28: Haiku-class stands.** Surfaced by the doc
+  audit (the register and three specs said Haiku; the shipped config had been sonnet-5 since
+  2026-07-21, a stopgap when the env var was found missing, never a class ruling). Jack confirmed
+  Haiku. `.env.example` corrected; the annotations in `architecture.md` §7 and `reconstruction.md`
+  became resolution notes. **Live consequence — see the queue: the real-mode reconstruction
+  measurements taken in that window were against sonnet-5 and need re-measuring.**
 
 - **Escalation failure path + trigger set / thresholds — CLOSED 2026-07-22 / 2026-07-23.** The
   failure path became a soft-degrade (migration 005). The trigger half was measured, then ruled:
@@ -184,6 +179,17 @@ dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over
    - **(b) B1/B2 dialogue-latency experiments** against the <1 s first-word bar:
      haiku-dialogue A/B is a zero-code env swap; thinking-off variants on the sonnet-5 calls
      are one-liners needing a ruling. Measure, then rule.
+   - **(b2) Re-measure reconstruction on Haiku — NEW 2026-07-28, from the model-class ruling.**
+     Every real-mode reconstruction number on record was taken while the role was misconfigured
+     as sonnet-5 (2026-07-21 → 2026-07-28): the **16.3 s cold-reconstruction figure**, the
+     `$0.44/100-turn` cost table's reconstruction rows, and the pre-warm/warm-init timings that
+     hang off them. They are stale in the conservative direction — Haiku should be faster and
+     cheaper — so nothing built on them is *unsafe*, but they must not be quoted in the demo or
+     the interview until re-run. Zero code: correct `.env`, then re-run the real-mode profiling
+     pass. Cheapest done alongside (b), same session, same harness. **Also re-check drift
+     quality** — the drift-refusal rate was measured on sonnet-5 retellings, and a smaller model
+     may sit differently against the 0.35 budget; that is the one place this could be a real
+     regression rather than a bookkeeping fix.
    - **(c) C1 scene-boundary reconstruction pre-warm BUILD → CONFIRMED POST-demo (ruled 2026-07-22).**
      The demo's 9–16 s cold stall is removed by off-camera warm-init choreography (fire
      `/v1/dialogue/init` at each scene basis during a camera cut; within-scene byte-stability ⇒ identical

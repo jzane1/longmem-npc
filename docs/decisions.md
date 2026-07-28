@@ -7,7 +7,7 @@ file records what was chosen, what it beat, and why (where the rationale was rec
 
 ## Index
 
-*43 dated sections. Regenerated 2026-07-28 — the first hand-written pass mixed two
+*44 dated sections. Regenerated 2026-07-28 — the first hand-written pass mixed two
 slug conventions and miscounted. Anchors follow GitHub's slugger: the em dash is dropped and
 its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as `#name--2026-07-28`.*
 
@@ -56,6 +56,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Unity-client fork rulings + stage-0 build (three backend routes) — 2026-07-27](#unity-client-fork-rulings--stage-0-build-three-backend-routes--2026-07-27)
 - [Unity-client stages 1-3 — build record — 2026-07-27](#unity-client-stages-1-3--build-record--2026-07-27)
 - [Full-repo audit rulings — 2026-07-28](#full-repo-audit-rulings--2026-07-28)
+- [Reconstruction model class + migration immutability — 2026-07-28](#reconstruction-model-class--migration-immutability--2026-07-28)
 
 ## Primary decisions
 
@@ -2216,3 +2217,55 @@ in source. Same rule as the ConfigureAwait removal, one more instance.
   nine roles each independently upgradable: importance/render/typology must name the same model
   (one write call serves all three; `load_settings` raises rather than picking), and
   reputation-delta emission has no role — it rides `behavior`.
+
+## Reconstruction model class + migration immutability — 2026-07-28
+
+Two rulings from the close of the full-repo audit session, both on findings that pass surfaced.
+
+### 1. Reconstruction stays Haiku-class
+
+**Decided:** `LONGMEM_MODEL_RECONSTRUCTION` is **Haiku-class**. The register was right; the
+shipped configuration had drifted.
+
+**What happened:** on 2026-07-21 the var was found missing from `.env` mid-session and set to
+`claude-sonnet-5` to unblock a real-mode run. That was a stopgap, not a class decision, but it
+was never revisited and never reached the register — so for a week `decisions.md`
+("Reconstruction serving: batched Haiku"), `architecture.md` §7, `reconstruction.md` and
+`app\config.py`'s docstring all said Haiku while the service ran Sonnet. The 2026-07-28 doc audit
+caught the split; Jack confirmed Haiku.
+
+**Rejected:** promoting the stopgap to the role's class. Batched retelling of already-selected,
+gist-constrained material is a Haiku job — the quality argument for Sonnet was never made, only
+inherited by accident.
+
+**Consequence to propagate — and the reason this entry matters more than a one-line config fix:**
+**every real-mode reconstruction measurement on record was taken against sonnet-5.** That includes
+the **16.3 s cold-reconstruction figure** (quoted in `unity-client.md`'s timeout rationale and in
+the warm-init choreography), the reconstruction rows of the `$0.44/100-turn` cost table, and the
+drift-refusal rate. They are stale in the *conservative* direction — Haiku should be faster and
+cheaper — so nothing built on them is unsafe, but **they must not be quoted in the demo or the
+interview until re-measured.** Queued as pre-ship item **(b2)**, alongside the B1/B2 latency
+experiments since it is the same harness and the same session. The one place this could be a real
+regression rather than bookkeeping is drift quality: the 0.35 budget's refusal rate was measured
+on Sonnet retellings, and a smaller model may sit differently against it.
+
+*(`.env.example` corrected here. The operator's own `.env` is the one thing this repo cannot fix
+for itself — that edit is Jack's, and until it lands the running service is still on sonnet-5.)*
+
+### 2. Applied migrations are immutable
+
+**Decided:** once a migration has been applied and recorded in `schema_migrations`, its file is
+**immutable — including comments.** A correction goes in a new numbered migration, or in the docs
+that reference it, never by editing the applied file.
+
+**Why it came up:** the audit's own path rewrite edited the header comment of
+`db\migrations\004_lexical_index.sql`, a file already applied. The floor-verifier flagged it:
+`db\migrate.py` has no checksum, so nothing would ever detect a silent rewrite of an applied
+migration, and the ledger's attestation is only as good as the bytes it attested to. The file was
+restored byte-identical before this ruling was taken.
+
+**Consequence:** the rule is now stated in `CLAUDE.md` beside the numbered-migration rule it
+extends. The stale path in 004's comment stays stale on purpose, explained in
+`docs\research\README.md`. Enforcement is convention, not machinery — a checksum column in
+`schema_migrations` would make it mechanical, and is deliberately **not** built here: it is a
+schema change to the ledger itself, which wants its own scoped task rather than riding an audit.

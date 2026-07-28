@@ -33,6 +33,10 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
   the schema docs, and the floor re-verifies (migrate idempotency + walkers). "No new migration"
   may appear in a spec only as a per-target scope fact Jack explicitly ruled — never as an
   inherited default.
+- **An APPLIED migration is immutable — including its comments** (ruled 2026-07-28). Once a file
+  is recorded in `schema_migrations`, the ledger attests to those exact bytes and `migrate.py`
+  has no checksum to catch a rewrite. Corrections go in a new numbered migration or in the docs
+  that reference it. A stale path inside an applied migration's comment stays stale on purpose.
 - Model roles are env vars, never hardcoded. **Seven exist today** (`LONGMEM_MODEL_` + IMPORTANCE,
   RENDER, TYPOLOGY, ESCALATION, DIALOGUE, RECONSTRUCTION, BEHAVIOR), all seven required in real
   mode. Two documented limits: v1's single write call serves importance+render+typology, so those
