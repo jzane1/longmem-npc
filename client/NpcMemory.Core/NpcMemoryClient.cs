@@ -263,14 +263,15 @@ namespace NpcMemory
 
         private void Measure(string path, long started)
         {
-            var handler = OnCallMeasured;
-            if (handler == null)
-            {
-                return;
-            }
+            // ALWAYS record, then notify. Gating the measurement on a
+            // subscriber (the first shape of this, 2026-07-28) left
+            // ClientTotalMs sitting at 0 for any caller that reads the
+            // property without also subscribing — a plausible-looking zero
+            // instead of a real number, which is the exact failure
+            // "instrument at the seam" exists to prevent.
             var ms = (Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency;
             ClientTotalMs = ms;
-            handler(path, ms);
+            OnCallMeasured?.Invoke(path, ms);
         }
 
         private static async Task<T> ReadAsync<T>(HttpResponseMessage response)

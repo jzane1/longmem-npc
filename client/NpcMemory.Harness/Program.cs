@@ -264,6 +264,28 @@ namespace NpcMemory.Harness
                 "both scored views ride the result over the same served set",
                 $"dialogue[{overridden.DialogueView.Count}] behavior[{overridden.BehaviorView.Count}]");
 
+            // -- [11] client-side instrumentation --------------------------
+            // ClientTotalMs must be a REAL number after any call, whether or
+            // not anything subscribed to OnCallMeasured. Its first shape only
+            // wrote the property when a handler existed, so a caller that read
+            // it without subscribing got a plausible-looking 0 (found by the
+            // floor-verifier, 2026-07-28).
+            Console.WriteLine("\n[11] Client-side timing (instrument at the seam)");
+            using (var unsubscribed = new NpcMemoryClient(baseUrl))
+            {
+                await unsubscribed.AgentMemoriesAsync(created.AgentId, 1);
+                Check(unsubscribed.ClientTotalMs > 0.0,
+                    "ClientTotalMs is recorded with NO subscriber attached",
+                    $"{unsubscribed.ClientTotalMs:F2} ms");
+            }
+            var measured = new List<string>();
+            client.OnCallMeasured += (path, ms) => measured.Add(path);
+            await client.AgentMemoriesAsync(created.AgentId, 1);
+            Check(measured.Count == 1 && measured[0].StartsWith("/v1/agents/")
+                    && client.ClientTotalMs > 0.0,
+                "OnCallMeasured fires once per call with the route path",
+                $"{measured[0]} @ {client.ClientTotalMs:F2} ms");
+
             // -- wrap-up ---------------------------------------------------
             Check(reputationEvents.Count > 0, "reputation callbacks fired",
                 $"{reputationEvents.Count} turns, last after={reputationEvents.Last().After:F3}");

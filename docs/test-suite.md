@@ -1,11 +1,11 @@
 # longmem-npc — Test suite spec
 
-**BUILT 2026-07-20 — 53 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation; the
-Set A diegetic pair still lands with the dissonance mechanism). Count as of 2026-07-28: Set A 8,
-Set B 7, Set C 7, Set D 20, degradation 11 — grown from the 38 built on 2026-07-20 by the
-route-contract scenarios that arrived with each later route, and by four gap-closing scenarios
-from the full-repo audit. **Seven carry the `nlp` marker**, so the turn-end subset runs 46.
-Build rulings 2026-07-20
+**BUILT 2026-07-20 — 55 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation +
+hygiene; the Set A diegetic pair still lands with the dissonance mechanism). Count as of
+2026-07-28: Set A 8, Set B 7, Set C 7, Set D 20, degradation 11, **hygiene 2** — grown from the 38
+built on 2026-07-20 by the route-contract scenarios that arrived with each later route, and by the
+gap-closing and guard scenarios from the full-repo audit. **Seven carry the `nlp` marker**, so the
+turn-end subset runs **48**. Build rulings 2026-07-20
 (dated `decisions.md` entry): the suite-gate Stop hook runs the `-m "not nlp"` subset (the 7
 `nlp`-marked scenarios call the write pass at the service level and pay the lazy
 spaCy+fastcoref load; the full suite runs on demand + at floor verification); Postgres
@@ -102,9 +102,9 @@ moves scores, not rows; detail-hiding assertions land with reconstruction.)*
 ## Set E — split-brain turn topology *(specced **and BUILT** 2026-07-21,
 `split-brain-streaming.md`)*
 
-*Landed as scenarios inside `test_set_d_gate.py` and `test_degradation.py` rather than a sixth
-file — the concurrency and divergence claims share Set D's fixtures. The 51-assertion CLI-harness
-walker (now 67) carries the seam-level proofs.*
+*Landed as scenarios inside `test_set_d_gate.py` and `test_degradation.py` rather than a file of
+its own — the concurrency and divergence claims share Set D's fixtures. The CLI-harness walker
+(now 67 assertions) carries the seam-level proofs.*
 
 - **Concurrency proof:** a deliberately slow behavior fake never delays the first prose chunk
   (first word = prose TTFT at the seam, structurally timed).
@@ -118,11 +118,33 @@ walker (now 67) carries the seam-level proofs.*
   prose-fail pre-token -> fallback line; mid-stream drop -> as ruled at build; both-fail ->
   never-blank holds.
 
+## Set F — repo hygiene *(added 2026-07-28 with the full-repo audit)*
+
+Two pure scenarios in `tests\test_repo_hygiene.py` — no database, no NLP, ~0.1 s, so they ride the
+turn-end subset. Each makes an already-written rule mechanically enforceable, and each exists
+because the rule had already been broken once:
+
+- **`test_no_version_gated_syntax_rewrites`** — no file under `app\`, `db\` or `tests\` uses
+  syntax newer than the grammar floor. The canary: ruff's formatter applies PEP 758 when
+  `target-version` is py314 and silently rewrites `except (A, B):` across the tree.
+  `ruff.toml` leaves `target-version` unset to prevent exactly that — and on 2026-07-28 that
+  comment was committed alongside a file the hazard had already rewritten. Neither `ruff check`
+  nor `ruff format --check` flags it.
+- **`test_no_sql_outside_the_db_module`** — `app\db.py` is the only module in `app\` containing
+  SQL (a stack constant, and what keeps the injection surface auditable in one file).
+  `app\load_driver.py` had violated it with a hand-rolled INSERT.
+
 ## Route contracts *(added as each route shipped; consolidated here 2026-07-28)*
 
-Every route in `app\api.py` has an HTTP-level scenario asserting its success payload and its
-mapped error statuses — the C# client depends on both. Live in `tests\test_set_d_gate.py` via
-`httpx.ASGITransport`, plus the walkers' route sections.
+Every route in `app\api.py` has at least one HTTP-level scenario asserting its success payload,
+and most also assert their mapped error statuses — the C# client depends on both. They live
+wherever their fixtures do: mostly `tests\test_set_d_gate.py` (via `httpx.ASGITransport`), with
+init in `test_set_b_decay.py`, correction in `test_set_a_correction.py`, the NER-502 row in
+`test_degradation.py`, and the walkers' own route sections.
+
+**Known gap:** `POST /v1/dialogue/init`'s 404 / 422 mappings are the one pair asserted nowhere —
+its HTTP coverage is the byte-identity read pair and the walker's pass-through check. Listed here
+rather than quietly implied by "every route", because that is what this section is for.
 
 - `POST /v1/dialogue/init` · `POST /v1/dialogue/turn` (route JSON == the drained seam result;
   404/422) · `POST /v1/dialogue/turn/stream` (200 `text/event-stream`; chunk events concatenate

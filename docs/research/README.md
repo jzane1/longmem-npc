@@ -25,6 +25,16 @@ first place). Only the writing moved.
   system as it stood at the sweep. A dated snapshot, **not** current design truth — for that, read
   `..\architecture.md`.
 
+## Inbound references
+
+`db\migrations\004_lexical_index.sql`'s header comment still cites
+`Research Papers\CHANGES-FROM-RESEARCH.md` — the pre-move path. That is deliberate: **an applied
+migration is immutable.** The file was edited during the 2026-07-28 move and then restored
+byte-identical to its applied state, because a migration's bytes are what the `schema_migrations`
+ledger attests to, and `db\migrate.py` has no checksum to catch a silent rewrite. The provenance
+it points at is here. *(Whether applied migrations may ever be comment-edited is worth an explicit
+ruling — flagged, not assumed.)*
+
 ## A note on the links inside these files
 
 The reader agents wrote **forward references** to specs that did not exist and mostly still do

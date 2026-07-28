@@ -2,8 +2,10 @@
 
 **Purpose.** When the README (and any research write-up) gets written, this file is the lookup:
 every change that landed from the 2026-07-20 research sweep, and every queued item, mapped to the
-papers it came from. Gitignored with the rest of `Research Papers\` — working material, not repo
-history (that lives in `docs\decisions.md` + `docs\status.md`).
+papers it came from. *(Tracked since 2026-07-28 under `docs\research\`; it was gitignored with
+the rest of `Research Papers\` until then, which is why the line below used to call it working
+material. The source PDFs stay out of the tree.)* Settled history lives in `docs\decisions.md`;
+current state in `docs\status.md`.
 
 **Corpus:** 45 papers — 31 curated + 14 arXiv-discovered (`_discovered\`). Consolidated analysis:
 [FINDINGS.md](FINDINGS.md). Per-paper detail with quotes + page refs: `_findings\<slug>.md`.

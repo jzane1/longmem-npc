@@ -22,5 +22,6 @@ similarity checks. A model's wording is not a test surface.
 
 ## When blocked
 If an assertion seems to require checking prose, stop and report. The gap is usually in the
-endpoint contract (IDs + scores in payloads) — that is a design conversation, not a test
-workaround.
+endpoint contract — IDs + scores for endpoints that RUN RETRIEVAL, IDs + structured fields for the
+two unscored inspector reads (`/chain`, `/agents/{id}/memories`, ruled 2026-07-27). That is a
+design conversation, not a test workaround.

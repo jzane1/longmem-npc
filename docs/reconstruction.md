@@ -143,7 +143,9 @@ existing version is a no-op) → return the version in the scene-boundary respon
 
 **One structured call batches all k cache misses per retrieval** (pre-warm at dialogue init —
 settled, register: *Reconstruction serving*). Model role `LONGMEM_MODEL_RECONSTRUCTION`
-(Haiku-class), following the provider triad exactly (`app\providers.py`): a Protocol, a real
+(Haiku-class — *⚠ contradicted by the shipped config, which is sonnet-5; see the flagged note in
+`architecture.md` §7 and the open question in `status.md`. Surfaced 2026-07-28, not resolved*),
+following the provider triad exactly (`app\providers.py`): a Protocol, a real
 implementation, and a **deterministic fake** (stable rendering per input, so cache/byte-identity
 assertions run offline) plus failure-injection fakes for the ladder.
 

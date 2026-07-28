@@ -3,10 +3,12 @@
 > **BUILT 2026-07-27 — all four stages, same day.** Stage 0 (the three ruled-in routes) and
 > stage 1 (`NpcMemory.Core` + console harness, the interop gate 21/21) are floor-verified;
 > stages 2 (Unity adapter + gray-box set, Play-mode gate 8/8) and 3 (The Ledger, live browser
-> beat + suite 49) carry live receipts with the independent verifier pass over their
-> re-runnable halves queued as the next session's opening step. Fork rulings + build record:
+> beat + suite 49) carry live receipts. *(2026-07-28: stage 3's re-runnable half — the `/ledger`
+> route contract — plus stage 1's build and interop gate were independently re-verified during the
+> full-repo audit. The **stage-2 Play-mode gate remains the one outstanding verification**; see
+> `status.md`, which is the authority on what is still owed.)* Fork rulings + build record:
 > the two dated 2026-07-27 entries in `decisions.md` and the five 2026-07-27 session-log
-> entries in `status.md`.
+> entries in `session-log.md` (they lived in `status.md` until the 2026-07-28 split).
 
 Immediate-queue item 2's spec session. Consolidates the artifact-queue "Unity client C# API
 surface" entry, architecture's environment section (Unity 6, flatscreen 3D, `NpcMemory` root

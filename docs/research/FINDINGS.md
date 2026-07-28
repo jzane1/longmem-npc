@@ -1,9 +1,10 @@
 # longmem-npc — literature sweep: consolidated findings
 
-**Date:** 2026-07-20 · **Corpus:** 31 curated PDFs (`Research Papers\`) + 14 discovered via arXiv
+**Date:** 2026-07-20 · **Corpus:** 31 curated PDFs (`Research Papers\`, still out of the tree) + 14 discovered via arXiv
 (`Research Papers\_discovered\`) = 45 papers (10 first-wave + a 4-paper second wave de-risking the
-graph-memory recommendation). Per-paper detail: `Research Papers\_findings\<slug>.md`.
-Yardstick: `Research Papers\_baseline\current-architecture.md`.
+graph-memory recommendation). Per-paper detail: `docs\research\_findings\<slug>.md` *(tracked 2026-07-28; was
+`Research Papers\_findings\`)*.
+Yardstick: `docs\research\_baseline-current-architecture.md` *(same move)*.
 
 **Scope of this doc.** Search-and-report only. Nothing in `docs\`, `app\`, `db\`, `tests\` was
 touched. Every claim below is traceable to a per-paper findings file (which carries the section/page

@@ -535,7 +535,8 @@ a dated correction note. The living state — current phase, queues, open questi
 - **2026-07-20 → 21** — **Research sweep + adoption slate: Target A (encoding-context term)
   built, floor-verified, and committed.** A 45-paper literature sweep (31 curated + 14
   arXiv-discovered; map-reduce reader agents against a baseline brief; consolidated in
-  `docs\research\FINDINGS.md` — the folder is gitignored working material) found the two
+  `docs\research\FINDINGS.md` — *at the time, gitignored working material under
+  `Research Papers\`; tracked and moved 2026-07-28*) found the two
   biggest gaps already on our radar (no judged eval harness; no graph/associative retrieval)
   and one strictly-better mechanism with a slot already reserved: RaMem-style encoding-context
   re-ranking. Jack ruled the adoption slate via four explicit questions (dated
@@ -569,8 +570,8 @@ a dated correction note. The living state — current phase, queues, open questi
   0 pending", idempotent); floor-verifier **pass**; live k=1/overfetch-1.0 REPL beat (the
   pinned rare-name row served via lexical-only reach, `lex=2 candidates=2 k=1`). Session end:
   the research queue items slated (immediate queue 3–6), and
-  `docs\research\CHANGES-FROM-RESEARCH.md` written (gitignored) tracing every landed and
-  queued change to its source papers for the future README.
+  `docs\research\CHANGES-FROM-RESEARCH.md` written (*gitignored then; tracked 2026-07-28*)
+  tracing every landed and queued change to its source papers for the future README.
 - **2026-07-21** — **Real-mode testing session: pre-ship gates (b) and (c) closed — real mode
   proven end-to-end, after a build-surfaced parse fix (the first session ever to construct
   the real providers).** Env preflight: real mode requires all six model vars —

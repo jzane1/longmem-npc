@@ -24,7 +24,8 @@ Reading list (read these first; use Grep/Glob to navigate — do not try to read
 1. `CLAUDE.md`, `docs/status.md`, `docs/architecture.md` — the shared core.
 2. `docs/read-path.md`, `docs/mid-dialogue-gate.md`, `docs/split-brain-streaming.md`,
    `docs/reconstruction.md` — the latency/robustness-critical layers.
-3. Spot-check the instrumentation/latency numbers recorded in `docs/status.md` (real-mode profiling).
+3. Spot-check the instrumentation/latency numbers recorded in `docs/session-log.md` (the 2026-07-21
+   real-mode profiling entries; they moved out of `status.md` in the 2026-07-28 split).
 
 Protocol (3 rounds, coordinated through the shared task list and mailbox):
 - **Round 1 — Position:** post a ≤1-page position — top strengths, top risks, and the single

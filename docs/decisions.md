@@ -7,51 +7,54 @@ file records what was chosen, what it beat, and why (where the rationale was rec
 
 ## Index
 
-*Generated 2026-07-28 (full-repo audit): 42 sections across ~2,100 lines had no index.*
-*Append-only — when you add an entry at the end, add its line here too.*
+*43 dated sections. Regenerated 2026-07-28 — the first hand-written pass mixed two
+slug conventions and miscounted. Anchors follow GitHub's slugger: the em dash is dropped and
+its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as `#name--2026-07-28`.*
+
+*Append-only: when you add an entry at the end, add its line here too.*
 
 - [Primary decisions](#primary-decisions)
 - [Downstream decisions](#downstream-decisions)
 - [Audit rulings](#audit-rulings)
 - [Tension log (summary)](#tension-log-summary)
-- [Decay & gist session — 2026-07-12 (latest word; refines the migration spec)](#decay-gist-session-2026-07-12-latest-word-refines-the-migration-spec)
-- [Authorial-correction ruling — 2026-07-12](#authorial-correction-ruling-2026-07-12)
-- [Schema-gap rulings — 2026-07-12](#schema-gap-rulings-2026-07-12)
-- [Local DB + MCP infra — 2026-07-13](#local-db-mcp-infra-2026-07-13)
-- [Migration 01 build — fork rulings & schema deltas — 2026-07-13](#migration-01-build-fork-rulings-schema-deltas-2026-07-13)
-- [Write-path spec scope rulings — 2026-07-13](#write-path-spec-scope-rulings-2026-07-13)
-- [Write-path build — fork rulings & build notes — 2026-07-13](#write-path-build-fork-rulings-build-notes-2026-07-13)
-- [Re-slating ruling — reconstruction moves pre-demo — 2026-07-14](#re-slating-ruling-reconstruction-moves-pre-demo-2026-07-14)
-- [Read-path spec scope rulings — 2026-07-14](#read-path-spec-scope-rulings-2026-07-14)
-- [Read-path build rulings — 2026-07-14](#read-path-build-rulings-2026-07-14)
-- [CLI-harness spec scope rulings — 2026-07-14](#cli-harness-spec-scope-rulings-2026-07-14)
-- [CLI-harness build rulings — 2026-07-15](#cli-harness-build-rulings-2026-07-15)
-- [Full-project audit rulings — 2026-07-16](#full-project-audit-rulings-2026-07-16)
-- [Reconstruction spec scope rulings — 2026-07-17](#reconstruction-spec-scope-rulings-2026-07-17)
-- [Reconstruction build rulings — 2026-07-17](#reconstruction-build-rulings-2026-07-17)
-- [Reconstruction flagged-shapes confirmations — 2026-07-17](#reconstruction-flagged-shapes-confirmations-2026-07-17)
-- [Scope-limiter reframing — 2026-07-17](#scope-limiter-reframing-2026-07-17)
-- [Authorial-correction spec scope rulings — 2026-07-17](#authorial-correction-spec-scope-rulings-2026-07-17)
-- [Authorial-correction build rulings — 2026-07-18](#authorial-correction-build-rulings-2026-07-18)
-- [Fact-level correction spec scope rulings — 2026-07-18](#fact-level-correction-spec-scope-rulings-2026-07-18)
-- [Fact-level correction build rulings — 2026-07-18](#fact-level-correction-build-rulings-2026-07-18)
-- [Mid-dialogue gate spec scope rulings — 2026-07-19](#mid-dialogue-gate-spec-scope-rulings-2026-07-19)
-- [Mid-dialogue gate build rulings — 2026-07-19](#mid-dialogue-gate-build-rulings-2026-07-19)
-- [Test-suite build rulings — 2026-07-20](#test-suite-build-rulings-2026-07-20)
-- [Latency-fix + suite-concurrency rulings — 2026-07-20](#latency-fix-suite-concurrency-rulings-2026-07-20)
-- [Research-adoption slate + encoding-context build rulings — 2026-07-20](#research-adoption-slate-encoding-context-build-rulings-2026-07-20)
-- [Hybrid lexical channel build rulings — 2026-07-20](#hybrid-lexical-channel-build-rulings-2026-07-20)
-- [Real-mode parse hardening ruling — 2026-07-21](#real-mode-parse-hardening-ruling-2026-07-21)
-- [Latency slate + split-brain pull-forward rulings — 2026-07-21](#latency-slate-split-brain-pull-forward-rulings-2026-07-21)
-- [Split-brain streaming build rulings — 2026-07-21](#split-brain-streaming-build-rulings-2026-07-21)
-- [External-persona audit + pre-demo replan rulings — 2026-07-22](#external-persona-audit-pre-demo-replan-rulings-2026-07-22)
-- [Escalation failure-path + pre-warm + R7 rulings — 2026-07-22](#escalation-failure-path-pre-warm-r7-rulings-2026-07-22)
-- [Escalation soft-degrade build — 2026-07-22](#escalation-soft-degrade-build-2026-07-22)
-- [HTTP turn route + perceived-TTFT build rulings — 2026-07-23](#http-turn-route-perceived-ttft-build-rulings-2026-07-23)
-- [Escalation trigger tuning: measurement + rulings — 2026-07-23](#escalation-trigger-tuning-measurement-rulings-2026-07-23)
-- [Demo-vehicle ruling — Unity, not an established-game mod — 2026-07-27](#demo-vehicle-ruling-unity-not-an-established-game-mod-2026-07-27)
-- [Unity-client fork rulings + stage-0 build (three backend routes) — 2026-07-27](#unity-client-fork-rulings-stage-0-build-three-backend-routes-2026-07-27)
-- [Unity-client stages 1-3 — build record — 2026-07-27](#unity-client-stages-1-3-build-record-2026-07-27)
+- [Decay & gist session — 2026-07-12 (latest word; refines the migration spec)](#decay--gist-session--2026-07-12-latest-word-refines-the-migration-spec)
+- [Authorial-correction ruling — 2026-07-12](#authorial-correction-ruling--2026-07-12)
+- [Schema-gap rulings — 2026-07-12](#schema-gap-rulings--2026-07-12)
+- [Local DB + MCP infra — 2026-07-13](#local-db--mcp-infra--2026-07-13)
+- [Migration 01 build — fork rulings & schema deltas — 2026-07-13](#migration-01-build--fork-rulings--schema-deltas--2026-07-13)
+- [Write-path spec scope rulings — 2026-07-13](#write-path-spec-scope-rulings--2026-07-13)
+- [Write-path build — fork rulings & build notes — 2026-07-13](#write-path-build--fork-rulings--build-notes--2026-07-13)
+- [Re-slating ruling — reconstruction moves pre-demo — 2026-07-14](#re-slating-ruling--reconstruction-moves-pre-demo--2026-07-14)
+- [Read-path spec scope rulings — 2026-07-14](#read-path-spec-scope-rulings--2026-07-14)
+- [Read-path build rulings — 2026-07-14](#read-path-build-rulings--2026-07-14)
+- [CLI-harness spec scope rulings — 2026-07-14](#cli-harness-spec-scope-rulings--2026-07-14)
+- [CLI-harness build rulings — 2026-07-15](#cli-harness-build-rulings--2026-07-15)
+- [Full-project audit rulings — 2026-07-16](#full-project-audit-rulings--2026-07-16)
+- [Reconstruction spec scope rulings — 2026-07-17](#reconstruction-spec-scope-rulings--2026-07-17)
+- [Reconstruction build rulings — 2026-07-17](#reconstruction-build-rulings--2026-07-17)
+- [Reconstruction flagged-shapes confirmations — 2026-07-17](#reconstruction-flagged-shapes-confirmations--2026-07-17)
+- [Scope-limiter reframing — 2026-07-17](#scope-limiter-reframing--2026-07-17)
+- [Authorial-correction spec scope rulings — 2026-07-17](#authorial-correction-spec-scope-rulings--2026-07-17)
+- [Authorial-correction build rulings — 2026-07-18](#authorial-correction-build-rulings--2026-07-18)
+- [Fact-level correction spec scope rulings — 2026-07-18](#fact-level-correction-spec-scope-rulings--2026-07-18)
+- [Fact-level correction build rulings — 2026-07-18](#fact-level-correction-build-rulings--2026-07-18)
+- [Mid-dialogue gate spec scope rulings — 2026-07-19](#mid-dialogue-gate-spec-scope-rulings--2026-07-19)
+- [Mid-dialogue gate build rulings — 2026-07-19](#mid-dialogue-gate-build-rulings--2026-07-19)
+- [Test-suite build rulings — 2026-07-20](#test-suite-build-rulings--2026-07-20)
+- [Latency-fix + suite-concurrency rulings — 2026-07-20](#latency-fix--suite-concurrency-rulings--2026-07-20)
+- [Research-adoption slate + encoding-context build rulings — 2026-07-20](#research-adoption-slate--encoding-context-build-rulings--2026-07-20)
+- [Hybrid lexical channel build rulings — 2026-07-20](#hybrid-lexical-channel-build-rulings--2026-07-20)
+- [Real-mode parse hardening ruling — 2026-07-21](#real-mode-parse-hardening-ruling--2026-07-21)
+- [Latency slate + split-brain pull-forward rulings — 2026-07-21](#latency-slate--split-brain-pull-forward-rulings--2026-07-21)
+- [Split-brain streaming build rulings — 2026-07-21](#split-brain-streaming-build-rulings--2026-07-21)
+- [External-persona audit + pre-demo replan rulings — 2026-07-22](#external-persona-audit--pre-demo-replan-rulings--2026-07-22)
+- [Escalation failure-path + pre-warm + R7 rulings — 2026-07-22](#escalation-failure-path--pre-warm--r7-rulings--2026-07-22)
+- [Escalation soft-degrade build — 2026-07-22](#escalation-soft-degrade-build--2026-07-22)
+- [HTTP turn route + perceived-TTFT build rulings — 2026-07-23](#http-turn-route--perceived-ttft-build-rulings--2026-07-23)
+- [Escalation trigger tuning: measurement + rulings — 2026-07-23](#escalation-trigger-tuning-measurement--rulings--2026-07-23)
+- [Demo-vehicle ruling — Unity, not an established-game mod — 2026-07-27](#demo-vehicle-ruling--unity-not-an-established-game-mod--2026-07-27)
+- [Unity-client fork rulings + stage-0 build (three backend routes) — 2026-07-27](#unity-client-fork-rulings--stage-0-build-three-backend-routes--2026-07-27)
+- [Unity-client stages 1-3 — build record — 2026-07-27](#unity-client-stages-1-3--build-record--2026-07-27)
 - [Full-repo audit rulings — 2026-07-28](#full-repo-audit-rulings--2026-07-28)
 
 ## Primary decisions
@@ -2090,7 +2093,7 @@ touched). Next: stage 1 — `NpcMemory.Core` + the console harness (the Wk-1 int
 *(Entry written 2026-07-28 during the full-repo audit, which found the register stopped at stage 0
 while three further same-day build sessions had settled shapes — including a shipped route and a
 standing C# contract. Recorded here at its true date; the five 2026-07-27 session-log entries in
-`status.md` carry the narrative.)*
+`session-log.md` carry the narrative (they lived in `status.md` until the 2026-07-28 split).)*
 
 **Stage 1 — `NpcMemory.Core` + the console harness (the Wk-1 interop go/no-go).** Shapes settled at
 build, all consistent with the ruled engine-agnostic design:

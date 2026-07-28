@@ -15,6 +15,8 @@ Rules:
    `*Superseded <date> — see <new entry name>.*` That is the only permitted touch to old entries.
 4. Search docs\ (and code, once any exists) for statements of the old position. List every spot
    needing propagation with its exact current wording. Ask before editing any of them.
-5. Add a session-log line to docs/status.md.
+5. Append a session-log entry to docs/session-log.md (NOT status.md — the two were split
+   2026-07-28 and status.md is live state only). If you appended a decisions.md entry, add its
+   line to that file's Index as well.
 6. If the ruling is ambiguous, or seems to conflict with an invariant in CLAUDE.md, stop and ask
    before writing anything.

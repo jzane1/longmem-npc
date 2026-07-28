@@ -25,7 +25,7 @@ one real defect and a systematic layer of drift:
   passed 8/8 with it present.
 - **Verification gaps closed:** `PUT /pin` and `POST /events/scene-boundary` had no HTTP test at
   all; the SSE `reconstructing` and `error` events had none; `CorrectionNlpFailedError` → 502 was
-  ruled and built with neither a test nor a spec row. Suite 49 → 53, keyless subset 46.
+  ruled and built with neither a test nor a spec row. Suite 49 → 55, keyless subset 48.
 - **Gates now match the rules that claim them:** `ruff` was unpinned (the one mechanically-enforced
   tool — and already drifted), `ruff check` had never run as a gate, the `.env` deny covered one
   tool, and floor-verifier's allowlist excluded the Unity MCP.
@@ -33,9 +33,12 @@ one real defect and a systematic layer of drift:
   the IDs-and-scores invariant was false as written for the two unscored inspector reads; the
   register still called a closed decision open. This file was split three ways (below).
 
-Remaining before recording: an independent floor-verifier pass over stages 2–3's re-runnable
-halves, demo choreography + the demo corpus, the B1/B2 latency experiments, and the judged eval
-harness (item 3).
+Remaining before recording: the **stage-2 Unity Play-mode gate** (the one verification not re-run
+in the audit pass — its MCP tools were unreachable from that session, and the plugin DLL was
+rebuilt twice that day), demo choreography + the demo corpus, the B1/B2 latency experiments, and
+the judged eval harness (item 3). Stages 1 and 3's re-runnable halves — the C# build, the console
+interop gate, wire parity, and the `/ledger` route contract — were independently re-verified
+during the audit pass.
 
 **Prior phases:** the stacked phase blocks moved to `docs\session-log.md` ("Archived phase headers") on 2026-07-28 — they are era summaries, not live state.
 
@@ -73,7 +76,7 @@ re-openable: re-verifying one is a step, never an argument against a design impr
 
 ## Open questions needing Jack's ruling
 
-*One open. Closed items move to the "Recently closed" note below rather than staying at the top
+*Two open. Closed items move to the "Recently closed" note below rather than staying at the top
 of this list (tidied 2026-07-28: the escalation item had led this section since it closed on
 2026-07-23).*
 
@@ -83,6 +86,18 @@ of this list (tidied 2026-07-28: the escalation item had led this section since 
   detail. Challenges the 2026-07-17 drift-metric/threshold ruling. **Deferred to the Unity/eval build
   phase (ruled 2026-07-22)** — not acted on now; the fixed-gist-constraint ON/OFF ablation (in the
   pre-demo judged-eval work) produces the deciding data, and any metric/threshold change waits on it.
+
+- **Reconstruction's model class — Haiku or Sonnet? (surfaced 2026-07-28 by the doc audit.)** The
+  register and the specs say **Haiku-class** ("Reconstruction serving: batched Haiku" in
+  `decisions.md`; `architecture.md` §7; `reconstruction.md`; `app\config.py`'s docstring). The
+  shipped configuration says **Sonnet-class**: on 2026-07-21, with `LONGMEM_MODEL_RECONSTRUCTION`
+  missing from `.env`, Jack ruled it `claude-sonnet-5` — and every real-mode measurement since,
+  including the 16.3 s cold-reconstruction figure and the $0.44/100-turn cost table, was taken
+  against sonnet-5. That ruling never reached the register. **The question is whether it was a
+  one-run choice or the role's class.** It matters twice over: the cost table's reconstruction
+  rows assume one class, and reconstruction is the thesis mechanism, so its quality/latency
+  trade-off is a demo-visible decision. Cheap either way — one `.env` line and a doc sweep — but
+  it should be ruled, not inherited by accident. Both sides are annotated in place.
 
 **Recently closed** (kept as pointers so the trail is short, not gone):
 
@@ -235,7 +250,7 @@ applied; see `floors.md` and `session-log.md`. Also done 2026-07-18:
 **Authorial-correction endpoint v1** — the correction-override beat is live;
 see `floors.md` and `session-log.md`. Done 2026-07-17: **Reconstruction v1** — the
 thesis mechanism is live; see the verified-floors
-table and session log. Done 2026-07-15: **CLI harness v1 + synthetic load driver** — the vertical
+table and session log (now `floors.md` and `session-log.md`). Done 2026-07-15: **CLI harness v1 + synthetic load driver** — the vertical
 slice completed. Done 2026-07-14: **Read path v1**. Done 2026-07-13: **Write path v1**; earlier
 same day: **Migration 01 foundational schema**; connect the Postgres MCP + floor-verifier MCP
 access.)*
@@ -335,8 +350,8 @@ third-party inventory; psycopg is the one copyleft dependency, LGPL-3.0-only, no
   Giving them the suite's pid-scoped mechanism plus a `tests\run-walkers.ps1` runner is the right
   fix; it is a medium refactor of the verification apparatus itself, so it wants its own scoped
   task rather than riding an audit.
-- **The API has no authentication or rate limiting**, and two of its eleven routes spend the
-  operator's model credits per request. Defensible today — the default bind is loopback and every
+- **The API has no authentication or rate limiting**, and five of its eleven routes spend the
+  operator's model credits per request (observe, init, turn, turn/stream, correction). Defensible today — the default bind is loopback and every
   client hardcodes 127.0.0.1 — but nothing in the docs acknowledges it. A "what this is not"
   paragraph belongs in the integrator surface before the flip.
 - **The Unity MCP bridge is pinned to a moving `#main` git ref** and the tracked manifest and

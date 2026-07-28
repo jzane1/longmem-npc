@@ -89,6 +89,10 @@ do not report them as stale.
 - **`external-audit-2026-07-22.md`** — a four-persona read-only critique (competitor CEO, runtime
   engineer, memory researcher, skeptic).
 - **`external-audit-2026-07-22-solutions.md`** — the solutions round from the same team.
+- **`research\`** — the July 2026 literature sweep: `FINDINGS.md` (45 papers consolidated),
+  `CHANGES-FROM-RESEARCH.md` (the provenance trace: every landed and queued change mapped to its
+  source paper), and the per-paper reader notes behind them. Start at `research\README.md`. The
+  source PDFs deliberately stay out of the tree.
 
 ---
 
