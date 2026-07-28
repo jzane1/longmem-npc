@@ -35,10 +35,10 @@ one real defect and a systematic layer of drift:
 
 Remaining before recording: the **stage-2 Unity Play-mode gate** (the one verification not re-run
 in the audit pass — its MCP tools were unreachable from that session, and the plugin DLL was
-rebuilt twice that day), demo choreography + the demo corpus, the B1/B2 latency experiments, and
-the judged eval harness (item 3). Stages 1 and 3's re-runnable halves — the C# build, the console
-interop gate, wire parity, and the `/ledger` route contract — were independently re-verified
-during the audit pass.
+rebuilt three times across 2026-07-27/28), demo choreography + the demo corpus, the B1/B2 latency
+experiments, and the judged eval harness (item 3). Stages 1 and 3's re-runnable halves — the C#
+build, the console interop gate (**now 23/23**, grown by the client-timing assertions), wire
+parity, and the `/ledger` route contract — were independently re-verified during the audit pass.
 
 **Prior phases:** the stacked phase blocks moved to `docs\session-log.md` ("Archived phase headers") on 2026-07-28 — they are era summaries, not live state.
 
@@ -163,7 +163,7 @@ dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over
    *(2026-07-28: stage 1's re-runnable half — build, console interop gate, wire parity — was
    independently re-verified twice during the audit pass. **The stage-2 Unity Play-mode gate was
    NOT re-run and is the one outstanding verification**; its MCP tools were not reachable from the
-   audit session. It matters more than usual because the plugin DLL was rebuilt twice that day —
+   audit session. It matters more than usual because the plugin DLL was rebuilt three times across 2026-07-27/28 —
    once for the SSE main-thread fix, once for the client timing term — so run it before recording:
    open the scene, enable `autoRun`, expect 8/8 with chunk callbacks on thread 1.)*
 

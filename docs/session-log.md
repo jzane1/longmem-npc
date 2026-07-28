@@ -952,6 +952,47 @@ a dated correction note. The living state — current phase, queues, open questi
   - **Not claimed:** the Unity **Play-mode gate** was not re-run — its MCP tools were not exposed
     to this session, so it is an operator step and is reported blocked, not passed. It matters
     more than usual here because the DLL Unity loads was rebuilt twice.
+  - **Independent verification, second round: floor-verifier PASS.** Seven walkers on fresh
+    scratch, suite 55 twice, keyless 48, ruff clean, migrate no-op, `longmem` pristine, interop
+    gate 21/21, all 220 tracked text blobs LF with no lone CR, and the docs split proven lossless
+    by extraction against `49a635b` (18/18 floor rows, 851/851 session-log lines byte-identical at
+    the split commit). It also mutated a temp copy to prove the new hygiene guard is *capable* of
+    failing, and diffed the committed Unity DLL against a fresh build down to the five
+    build-identity fields (COFF timestamp, PDB GUID, MVID, checksums) — 0 differing bytes
+    outside them, so the shipped binary really is current source.
+  - **It found one more defect, in my own phase-4 work.** `ClientTotalMs` was subscriber-gated:
+    `Measure()` returned early when nothing was subscribed to `OnCallMeasured`, so the property sat
+    at 0 while its own doc comment claimed it held the last call's wall time. A Unity adapter or
+    eval script reading it without subscribing would have gotten a plausible-looking zero — exactly
+    the failure "instrument at the seam" exists to prevent. Fixed to always record then notify, and
+    the harness now asserts both halves (a client with NO subscriber reports a real number; the
+    event fires once per call with the route path). **Interop gate 21 → 23.**
+  - **doc-auditor: six contradictions, fourteen stale items — all actioned.** The sharpest was
+    `log-decision.md` still instructing the next session to append session-log lines to
+    `status.md`, which would have silently undone the split. Also: suite counts stale *again*
+    (I updated the docs before adding the hygiene tests), `test-suite.md` claiming "every route"
+    asserts its error statuses when `POST /v1/dialogue/init`'s 404/422 are asserted nowhere (now
+    stated as a known gap rather than implied away), `tests\CLAUDE.md` still carrying the
+    un-amended invariant wording, two files still locating the session log inside `status.md`,
+    and `decisions.md`'s index mixing two slug conventions — regenerated, 44 entries, every anchor
+    verified to resolve.
+  - **And I made the `\r`-in-a-non-raw-string mistake a third time**, in the same session, on the
+    same path. Caught only because I had kept the repair script from the second time. That is the
+    honest lesson of this session's mechanical work: batch text rewrites through a file, never a
+    shell heredoc.
+  - **Two rulings from Jack at close.** (i) **Reconstruction is Haiku-class** — the register was
+    right and the shipped config had drifted to sonnet-5 since 2026-07-21 (a stopgap for a missing
+    env var, never a class decision). Jack corrected `.env`; verified live — all seven roles
+    resolve, reconstruction Haiku-class, prices on the Haiku tier, `load_settings()` OK in real
+    mode. **Live consequence: every real-mode reconstruction number on record — the 16.3 s cold
+    figure, the cost table's reconstruction rows, the drift-refusal rate — was measured against
+    sonnet-5 and needs re-running (new pre-ship item (b2)).** (ii) **Applied migrations are
+    immutable, comments included** — the audit's own path rewrite had edited an applied migration's
+    header; restored byte-identical, and `db\migrations\` is now byte-for-byte what it was
+    pre-audit. Both in `decisions.md`. Jack also confirmed the LICENSE attribution
+    (`Copyright 2026 Jackson Zane`) as written.
+  - **Final state:** twelve commits, nothing pushed. Walkers 53/56/67/51/42/34/34, suite 55,
+    keyless 48, interop gate 23/23, ruff clean, ledger 001–005, `longmem` pristine, tree clean.
 
 
 ---
