@@ -233,14 +233,16 @@ class IngestService:
                 config, "typology_confidence_default", self._settings
             )
 
-        # --- escalation (biased loose; hard-stop on double failure) ------
+        # --- escalation (biased loose; SOFT-DEGRADES on double failure:
+        # the write lands with the base NLP-pass gist and sets
+        # escalation_failed — the 2026-07-13 hard-stop was retired
+        # 2026-07-22, migration 005) --------------------------------------
         knobs = {
             key: agent_knob(config, key, self._settings)
             for key in (
                 "escalation_importance_threshold",
                 "escalation_affect_threshold",
                 "escalation_min_base_spans",
-                "nlp_confidence_threshold",
             )
         }
         triggers = nlp.evaluate_triggers(nlp_result, importance, knobs)

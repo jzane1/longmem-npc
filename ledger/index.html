@@ -142,7 +142,7 @@
       <div id="factChain"></div>
     </div>
     <h2>last turn — read_mode / scores / IDs (paste or drop a DialogueTurnResult JSON)</h2>
-    <div id="dropzone">drop a turn-result .json here, or paste JSON into this box and press ctrl+enter</div>
+    <div id="dropzone">drop a turn-result .json here, or paste a DialogueTurnResult JSON anywhere on this page</div>
     <div id="turnErr" class="err"></div>
     <div id="turnPanel"></div>
   </section>
@@ -222,7 +222,19 @@ async function loadChain(memoryId) {
   for (const li of $("memList").children) {
     li.classList.toggle("sel", li.dataset.memoryId === memoryId);
   }
+  try {
+    await renderChainFor(memoryId);
+  } catch (e) {
+    // HIDE the pane rather than leave the previous memory's chain on
+    // screen: a stale record that looks live is worse than no record.
+    $("chainWrap").hidden = true;
+    $("indexErr").textContent = `chain ${memoryId.slice(0, 8)}…: ${e}`;
+  }
+}
+
+async function renderChainFor(memoryId) {
   const c = await fetchJson(`/v1/memories/${memoryId}/chain`);
+  $("indexErr").textContent = "";
   $("chainWrap").hidden = false;
 
   // Numbers: the record's own honest counts (item 3's metrics bind later).

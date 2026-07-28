@@ -345,7 +345,6 @@ class RetrievalService:
         )
         loaded_rows: list[db.GateRow] = []
         components: list[dict] = []
-        gate_ms = 0.0
         if gate_active:
             t_gate = time.perf_counter()
             try:

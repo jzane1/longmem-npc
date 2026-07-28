@@ -23,12 +23,15 @@ import json
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlsplit
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests\ helpers
 
 from psycopg.types.json import Jsonb
+
+from scratch_uri import scratch_uri
 
 from app import api as api_module
 from app.config import Settings
@@ -41,6 +44,7 @@ from app.providers import (
     FakeEmbeddingProvider,
     FakeEscalationProvider,
     FakeWriteProvider,
+    MalformedWriteProvider,
     Providers,
 )
 from app.schemas import IngestResult, ObserveEvent, SceneBoundaryEvent
@@ -74,8 +78,7 @@ def check(condition: bool, criterion: str, detail: str = "") -> None:
 def scratch_uri_from_env() -> str:
     from app.config import load_env
 
-    parts = urlsplit(load_env()["DATABASE_URI"])
-    return urlunsplit(parts._replace(path="/longmem_test"))
+    return scratch_uri(load_env()["DATABASE_URI"], "longmem_test")
 
 
 def observe_event(**overrides) -> ObserveEvent:
@@ -364,6 +367,32 @@ async def main(database_uri: str) -> None:
         "write landed with neutral importance and scoring_failed = true",
     )
 
+    # The ladder's OTHER write-call row (test-suite.md "malformed model
+    # responses"): the call SUCCEEDS but its structured output is
+    # unparseable. Same neutral/flagged landing as an outright failure —
+    # and, unlike a raised ProviderCallError, the tokens the call really
+    # spent must still reach the instrumentation.
+    malformed_service = fake_service(pool, settings, write=MalformedWriteProvider())
+    malformed = await malformed_service.ingest_observation(
+        observe_event(agent_id=agent_id)
+    )
+    row4b = await fetchrow(
+        pool,
+        "SELECT importance_raw, scoring_failed FROM memories WHERE memory_id = %s",
+        malformed.memory_id,
+    )
+    check(
+        row4b is not None and abs(row4b[0] - 0.5) < 1e-6 and row4b[1] is True,
+        "malformed write output also lands neutral + scoring_failed = true",
+    )
+    check(
+        malformed.instrumentation.haiku_input_tokens >= 7
+        and malformed.instrumentation.haiku_output_tokens >= 3,
+        "the malformed call's spend is still accounted",
+        f"in={malformed.instrumentation.haiku_input_tokens} "
+        f"out={malformed.instrumentation.haiku_output_tokens}",
+    )
+
     # ------------------------------------------------------------------ #
     print("\n[14] Embedding degradation: write lands, embedding IS NULL")
     embed_fail_service = fake_service(
@@ -437,7 +466,6 @@ async def main(database_uri: str) -> None:
         "escalation_importance_threshold": 0.45,
         "escalation_affect_threshold": 0.5,
         "escalation_min_base_spans": 1.0,
-        "nlp_confidence_threshold": 0.5,
     }
     _empty = _NlpResult(
         spans=[],

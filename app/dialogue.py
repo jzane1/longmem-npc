@@ -5,8 +5,8 @@ shared session-runner), and the stateless HTTP route (`POST /v1/dialogue/turn`
 in app\\api.py, 2026-07-23) — sit on this module; none duplicates the timing
 or token accounting recorded here (CLAUDE.md: instrument at the seam; specs:
 docs\\cli-harness.md 2026-07-15, docs\\split-brain-streaming.md 2026-07-21).
-The streaming SSE route rides later with the Unity client surface and
-iterates this same generator.
+The streaming SSE route (`POST /v1/dialogue/turn/stream`, 2026-07-27)
+iterates this SAME generator — the no-rewrite payoff of the generator shape.
 
 Split-brain pipeline per turn (split-brain-streaming.md, ruled topology):
   resolve agent + vocabulary -> retrieval ONCE (retrieve_dialogue_init, built)

@@ -46,6 +46,10 @@ namespace NpcMemory
         public DateTimeOffset? ContextEventTime { get; set; }
         public List<RecentAction> RecentActions { get; } = new List<RecentAction>();
 
+        /// <summary>Mirrors the Python runner's `debug` flag on every turn
+        /// request (app\session.py) — the server widens its debug payload.</summary>
+        public bool Debug { get; set; }
+
         /// <summary>Fires when a turn resolves a directive (never on dropped).</summary>
         public event Action<ActionDirective>? OnDirective;
 
@@ -98,6 +102,7 @@ namespace NpcMemory
                 GateFruitlessStreak = GateFruitlessStreak,
                 WeightOverrides = weightOverrides,
                 RecentActions = new List<RecentAction>(RecentActions),
+                Debug = Debug,
             };
 
         /// <summary>One dialogue turn, drained (POST /v1/dialogue/turn).</summary>

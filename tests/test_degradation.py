@@ -221,7 +221,6 @@ def test_thin_gist_trigger_pure():
             "escalation_importance_threshold",
             "escalation_affect_threshold",
             "escalation_min_base_spans",
-            "nlp_confidence_threshold",
         )
     }
     empty = NlpResult(

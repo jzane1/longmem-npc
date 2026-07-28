@@ -47,8 +47,7 @@ from dataclasses import replace
 from pathlib import Path
 from uuid import UUID
 
-from psycopg.types.json import Jsonb
-
+from app import db
 from app.config import Settings, load_settings
 from app.db import build_pool
 from app.gate import GATE_SIGNAL_ENTITY, GATE_SIGNAL_NOVELTY
@@ -115,19 +114,19 @@ def percentile(values: list[float], q: float) -> float:
 
 
 async def _create_driver_agent(pool) -> UUID:
-    async with pool.connection() as conn, conn.cursor() as cur:
-        await cur.execute(
-            "INSERT INTO agents (name, seed_identity, reputation, rigidity, "
-            "reputation_sensitivity, diagnosticity_goal, config) "
-            "VALUES (%s, %s, 0, 1.0, 1.0, %s, %s) RETURNING agent_id",
-            (
-                "load-driver",
-                "A synthetic NPC standing in for load measurement.",
-                "what matters to a load test",
-                Jsonb(DRIVER_AGENT_CONFIG),
-            ),
-        )
-        return (await cur.fetchone())[0]
+    """The driver's fixture agent, provisioned through the shared db verb —
+    the same statement `POST /v1/agents` uses, so the driver measures the
+    real provisioning path and no SQL lives outside app\\db.py."""
+    return await db.insert_agent(
+        pool,
+        name="load-driver",
+        seed_identity="A synthetic NPC standing in for load measurement.",
+        reputation=0.0,
+        rigidity=1.0,
+        reputation_sensitivity=1.0,
+        diagnosticity_goal="what matters to a load test",
+        config=DRIVER_AGENT_CONFIG,
+    )
 
 
 async def run_driver(

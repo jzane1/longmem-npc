@@ -757,8 +757,10 @@ async def apply_reputation_delta(
         reputation = clamp(COALESCE(reputation, neutral) + addend, min, max)
 
     `addend` is sensitivity x delta, computed by the seam. An in-place UPDATE
-    of an agent-row runtime scalar — deliberately outside the memory-content
-    non-destructive invariant (same class as `set_pinned`). Returns
+    of a runtime scalar — deliberately outside the memory-content
+    non-destructive invariant (the two sanctioned scalars are `agents.reputation`
+    here and `memories.pinned` in `set_pinned`; reworded 2026-07-16 because
+    `pinned` lives on a memory row, not an agent row). Returns
     (prev_effective, after) as floats, or None when the agent is unknown.
     The clamp lives in SQL so the value can never leave the scale, even under
     concurrent turns.

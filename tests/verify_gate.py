@@ -32,13 +32,16 @@ import asyncio
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlsplit
 from uuid import uuid4
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests\ helpers
 
 from psycopg.types.json import Jsonb
+
+from scratch_uri import scratch_uri
 
 from app import db
 from app.dialogue import (
@@ -140,8 +143,7 @@ def check(condition: bool, criterion: str, detail: str = "") -> None:
 def scratch_uri_from_env() -> str:
     from app.config import load_env
 
-    parts = urlsplit(load_env()["DATABASE_URI"])
-    return urlunsplit(parts._replace(path="/longmem_test"))
+    return scratch_uri(load_env()["DATABASE_URI"], "longmem_test")
 
 
 def fake_providers(embedding=None) -> Providers:

@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import csv
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
@@ -80,7 +80,6 @@ class NlpResult:
     has_unresolved_reference: bool = False
     has_low_confidence_span: bool = False
     coref_span_count: int = 0
-    span_sources: list[str] = field(default_factory=list)
 
 
 @lru_cache(maxsize=1)
@@ -221,7 +220,6 @@ def run_write_pass(observation_text: str, components: list[dict]) -> NlpResult:
 
     # --- 1. direct identity matches: canonical + aliases ------------------
     spans: list[GistSpanCandidate] = []
-    sources: list[str] = []
     matched_component_char_ranges: list[tuple[int, int, str]] = []
     for comp in components:
         terms = [comp["canonical"], *(comp.get("aliases") or [])]
@@ -235,7 +233,6 @@ def run_write_pass(observation_text: str, components: list[dict]) -> NlpResult:
                         matched_category=comp.get("category"),
                     )
                 )
-                sources.append("match")
                 matched_component_char_ranges.append(
                     (start, end, str(comp["component_id"]))
                 )
@@ -258,7 +255,6 @@ def run_write_pass(observation_text: str, components: list[dict]) -> NlpResult:
                     matched_category=category,
                 )
             )
-            sources.append("category")
 
     # --- 3. intra-observation coreference ----------------------------------
     # A pronoun/mention coreferent with a matched component mention becomes a
@@ -295,7 +291,6 @@ def run_write_pass(observation_text: str, components: list[dict]) -> NlpResult:
                         matched_category=None,
                     )
                 )
-                sources.append("coref")
                 coref_span_count += 1
 
     spans = _dedupe_overlapping(spans)
@@ -380,7 +375,6 @@ def run_write_pass(observation_text: str, components: list[dict]) -> NlpResult:
         has_unresolved_reference=has_unresolved,
         has_low_confidence_span=coref_span_count > 0,
         coref_span_count=coref_span_count,
-        span_sources=sources,
     )
 
 

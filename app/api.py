@@ -106,8 +106,8 @@ async def dialogue_turn(request: DialogueTurnRequest) -> DialogueTurnResult:
     (`session._apply_turn_result`) is the CLIENT'S job — the future C#
     NpcSession ports it. Non-streaming: drains `run_dialogue_turn`'s async
     generator to the terminal result (first_word_ms/perceived_first_word_ms
-    ride in the instrumentation, so no chunk consumption is needed); a future
-    SSE `/v1/dialogue/turn/stream` iterates the SAME generator — no rewrite.
+    ride in the instrumentation, so no chunk consumption is needed); the SSE
+    route below iterates the SAME generator — no rewrite, as designed.
     `on_reconstruct` stays None here (no during-wait signal without SSE; the
     result's post-hoc reconstruction fields carry it). Pass-through by ruling:
     the response is exactly the seam result's serialization."""

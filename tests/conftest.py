@@ -38,7 +38,6 @@ import warnings
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
 
 import psycopg
@@ -46,8 +45,10 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # tests\ helpers
 
 from psycopg.types.json import Jsonb
+from scratch_uri import scratch_uri
 
 from app import db
 from app.config import Settings
@@ -98,8 +99,10 @@ def embed_text(text: str) -> list[float]:
 
 
 def _swap_db(uri: str, name: str) -> str:
-    parts = urlsplit(uri)
-    return urlunsplit(parts._replace(path=f"/{name}"))
+    """Delegates to the shared, verified rewrite — see tests\\scratch_uri.py
+    for why a path-only swap is not safe enough to sit in front of a
+    per-test TRUNCATE."""
+    return scratch_uri(uri, name)
 
 
 def _base_uri() -> str | None:

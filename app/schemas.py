@@ -415,9 +415,11 @@ class RetrievalResult(BaseModel):
 
 # ---------------------------------------------------------------------------
 # Dialogue turn — the CLI-harness seam (docs\cli-harness.md, build rulings
-# 2026-07-15). No HTTP route consumes these in v1 — the REPL and the load
-# driver call the seam in-process; Pydantic by ruling, mirroring the
-# write/read payloads (the Unity route will reuse them).
+# 2026-07-15). Four consumers today: the REPL and the load driver call the
+# seam in-process, and both HTTP routes serve these models — `POST
+# /v1/dialogue/turn` (2026-07-23) and its SSE twin `POST
+# /v1/dialogue/turn/stream` (2026-07-27), which the C# client mirrors
+# field-for-field. Pydantic by ruling, mirroring the write/read payloads.
 # ---------------------------------------------------------------------------
 
 

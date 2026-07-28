@@ -157,7 +157,13 @@ namespace NpcMemory
             DialogueTurnResult? result = null;
             string? eventName = null;
             string? data = null;
-            while (!reader.EndOfStream)
+            // Driven purely off the async read's null sentinel. `EndOfStream`
+            // would be a SYNCHRONOUS read whenever the buffer is empty — on a
+            // live SSE stream that blocks the caller until the server sends
+            // the next byte, i.e. it stalls Unity's main thread between
+            // chunks (this type deliberately has no ConfigureAwait(false), so
+            // every continuation resumes there). Never reintroduce it.
+            while (true)
             {
                 var line = await reader.ReadLineAsync();
                 if (line == null)
