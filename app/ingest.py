@@ -408,7 +408,7 @@ class IngestService:
                     candidate_components=list(nlp_result.novel_components),
                     triggers=triggers,
                 )
-            except ProviderCallError, MalformedOutputError:
+            except (ProviderCallError, MalformedOutputError):
                 continue
         return None
 
