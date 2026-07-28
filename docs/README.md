@@ -1,0 +1,111 @@
+# docs\ — index and reading order
+
+Written 2026-07-28 (full-repo audit). Seventeen files had accumulated here with no index; five
+were reachable only by already knowing they existed. Add new files to the right group below.
+
+---
+
+## Start here
+
+| If you want to… | Read |
+|---|---|
+| get it running | **`SETUP.md`** — clone to running system, PowerShell throughout |
+| understand what it *is* | **`architecture.md`** — the design truth |
+| know where the project stands today | **`status.md`** — live state + queues (auto-loaded into every session) |
+| know why something is the way it is | **`decisions.md`** — append-only ruling register, with an index |
+| know what has actually been proven | **`floors.md`** — the verified-floors table |
+
+---
+
+## The four registers
+
+These are the living record. They have different jobs and different rules.
+
+- **`status.md`** — *live state only.* Current phase, open questions, the four queues. Small on
+  purpose: `CLAUDE.md` auto-loads it into every session, so anything that is not current state
+  costs tokens forever. Update at the end of every session.
+- **`session-log.md`** — *append-only narrative.* One entry per session: what landed, what was
+  blocked, what was abandoned. Also holds the archived phase headers. Never edit a past entry.
+- **`floors.md`** — *append-only evidence.* One row per verified layer, recording what was
+  actually re-run. A row lands only after an independent floor-verifier pass returns **pass**.
+- **`decisions.md`** — *append-only rulings.* What was decided, what it beat, and why. Never edit
+  an old entry except to add a dated *superseded* note. Has its own index.
+
+*(The first three were one 1,294-line file until 2026-07-28. It was split because ~36k tokens
+rode into every session and the file had grown too large to hand-maintain accurately.)*
+
+---
+
+## Design truth
+
+- **`architecture.md`** — the whole system in thirteen numbered sections: principles, data model,
+  write path, read path, reconstruction, correction verbs, turn topology, instrumentation,
+  integrator surface, positioning. Read the sections your task touches *before* touching a layer.
+  Changes only when the design changes.
+
+---
+
+## Build-target specs
+
+One per layer, in build order. Each consolidates the relevant architecture sections into a
+buildable target with Gherkin done-when criteria, then carries a **dated BUILT banner** recording
+that it shipped and was floor-verified. They are history plus contract: the banner tells you the
+spec is no longer a plan.
+
+| Spec | Layer | Migration |
+|---|---|---|
+| `migration-01.md` | the foundational schema — 9 tables, CHECKs, indexes | 001 |
+| `write-path.md` | ingest seam, NLP pass, escalation, atomic insert | — |
+| `read-path.md` | retrieval seam, decay math, scoring | — |
+| `cli-harness.md` | the dialogue-turn seam, REPL, load driver | — |
+| `reconstruction.md` | the thesis mechanism: identity-conditioned retelling | — |
+| `authorial-correction.md` | the operator correction verb | — |
+| `fact-level-correction.md` | the fact-version chain — retrieval follows the fix | 002 |
+| `mid-dialogue-gate.md` | conditional retrieval mid-scene | 003 |
+| `split-brain-streaming.md` | concurrent prose stream + behavior call | — |
+| `unity-client.md` | SSE + provisioning + inspector reads, C# client, Unity, Ledger | — |
+
+**Note on `migration-01.md`:** it documents migration **001 only**. Migrations 002–005 (fact
+versions, fact entities, the lexical index, `escalation_failed`) are specced in the targets above
+and live in `db\migrations\`. For the current schema, read the SQL.
+
+---
+
+## Discipline and runbooks
+
+- **`test-suite.md`** — what the tests must and must not assert. The one rule: structural only,
+  never generated prose. Also the degradation-ladder and route-contract inventories.
+- **`SETUP.md`** — bring-up, tests, C# build, DLL refresh, Unity, teardown.
+- **`mcp-setup.md`** — reproduction runbook for the read-only Postgres MCP and the Unity bridge.
+  Both live; neither is required by the service.
+
+---
+
+## Archival
+
+Point-in-time records. They describe what was true on their date and are **not** kept current —
+do not report them as stale.
+
+- **`external-audit-2026-07-22.md`** — a four-persona read-only critique (competitor CEO, runtime
+  engineer, memory researcher, skeptic).
+- **`external-audit-2026-07-22-solutions.md`** — the solutions round from the same team.
+
+---
+
+## Vocabulary
+
+Two words appear constantly and are defined nowhere else:
+
+- **walker** — one of the seven `tests\verify_*.py` scripts. Each walks a single layer's
+  done-when criteria end to end against a scratch database and prints
+  `ALL CHECKS PASSED (N assertions)`. Run by hand and at floor verification; they are the
+  *evidence* behind a row in `floors.md`.
+- **suite** — the pytest scenarios in `tests\test_*.py`. Self-managing scratch DB, offline,
+  keyless, deterministic; the turn-end hook runs the `-m "not nlp"` subset after every session
+  turn. This is the *regression net*.
+
+They overlap deliberately: a walker proves a layer once, thoroughly, at build time; the suite
+keeps it proven forever, cheaply.
+
+- **floor** — a layer that has been independently verified and can be built on. Floors are
+  **re-openable**: re-verifying one is a normal step, never an argument against a change.
