@@ -177,7 +177,7 @@ dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over
 
 *(Research-adoption queue — slated 2026-07-21 with the landed slate, each its own
 spec/build session; ordering after the Unity/pre-ship items is Jack's to re-slate. Papers per
-item are traced in `docsesearch\CHANGES-FROM-RESEARCH.md`.)*
+item are traced in `docs\research\CHANGES-FROM-RESEARCH.md`.)*
 
 3. **Judged eval harness v1 — PULLED PRE-DEMO (ruled 2026-07-22 with the Ledger scope).** Judge
    model role/env var + LLM-judged categories (judged signal real-mode-only — sequenced with that).

@@ -19,7 +19,7 @@ it are in [decisions.md](decisions.md); the schema it reads is frozen in
 > below held; retrieval and scoring were untouched by the swap, as drawn).
 >
 > **Encoding-context term BUILT 2026-07-20** (ruled with the research-adoption slate; RaMem,
-> arXiv 2606.22844, is the mechanism source — see `docsesearch\FINDINGS.md`): the three
+> arXiv 2606.22844, is the mechanism source — see `docs\research\FINDINGS.md`): the three
 > formerly-reserved request fields (`location_name`/`entities[]`/`event_time`) are now
 > **consumed** as client-supplied scene context — a soft multiplicative score nudge,
 > `score ×= 1 + Σ w_i·match_i` over the components the request supplies (entity coverage of the
@@ -35,7 +35,7 @@ it are in [decisions.md](decisions.md); the schema it reads is frozen in
 >
 > **Hybrid lexical channel BUILT 2026-07-20 (migration 004)** (Target B of the same ruled slate;
 > mechanism sources: the lexical/semantic complementarity line in the Memory-in-the-LLM-Era
-> survey arXiv 2604.01707 §7 and Engram arXiv 2606.09900 — see `docsesearch\FINDINGS.md`):
+> survey arXiv 2604.01707 §7 and Engram arXiv 2606.09900 — see `docs\research\FINDINGS.md`):
 > a **token-OR lexical candidate fetch** (`to_tsquery` over casefolded ≥3-letter word tokens,
 > deduped, capped 16 — OR deliberately, since an utterance never full-AND-matches a memory)
 > against a **partial GIN full-text index over live fact heads**

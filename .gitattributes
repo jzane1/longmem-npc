@@ -1,0 +1,34 @@
+# Line-ending policy. Added 2026-07-28 (full-repo audit).
+#
+# Why: the repo had none, so normalization depended entirely on each machine's
+# `core.autocrlf`. It drifted — a docs commit stored CRLF where its parent had
+# stored LF, and git rendered a two-line edit as a 971-line rewrite. Churn like
+# that does not corrupt anything, but it destroys the reviewability of history,
+# which for a project whose registers ARE the deliverable is a real cost.
+#
+# `text=auto eol=lf`: git decides text-vs-binary, normalizes every text file to
+# LF in the repository, and checks out LF in the working tree. Windows tools
+# here (PowerShell, Python, .NET, Unity) all read LF fine, and pinning eol
+# makes the result identical on every machine instead of per-config.
+* text=auto eol=lf
+
+# Explicitly binary — never touch these bytes, never try to diff them as text.
+*.png    binary
+*.jpg    binary
+*.gif    binary
+*.pdf    binary
+*.dll    binary
+*.so     binary
+*.dylib  binary
+*.zip    binary
+
+# PowerShell hooks are invoked by powershell.exe, which handles LF fine.
+# Left under the global rule deliberately — no exception needed.
+
+# Unity asset/meta files are text (YAML) and must normalize with everything
+# else, or Unity rewrites them on import and every clone diverges.
+*.meta          text eol=lf
+*.asset         text eol=lf
+*.unity         text eol=lf
+*.prefab        text eol=lf
+*.inputactions  text eol=lf

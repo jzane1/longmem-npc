@@ -1455,10 +1455,10 @@ trigger thresholds before the real run.
 
 ## Research-adoption slate + encoding-context build rulings — 2026-07-20
 
-**Context.** The research sweep (45 papers; consolidated in `docsesearch\FINDINGS.md`, a
+**Context.** The research sweep (45 papers; consolidated in `docs\research\FINDINGS.md`, a
 gitignored working folder) produced a prioritized shortlist. Jack ruled the adoption slate at
 plan approval, then the encoding-context term (Target A) was built and floor-verified the same
-session. Source papers per change are traced in `docsesearch\CHANGES-FROM-RESEARCH.md`.
+session. Source papers per change are traced in `docs\research\CHANGES-FROM-RESEARCH.md`.
 
 **Slate rulings (Jack, at plan approval — four explicit questions):**
 
@@ -1525,7 +1525,7 @@ session. Source papers per change are traced in `docsesearch\CHANGES-FROM-RESEA
 
 **Paper provenance (Target A):** RaMem (arXiv 2606.22844) — the mechanism; Position: Episodic
 Memory (2502.06975) — context as a defining episodic property; TARG (2511.09803 §3.4) — the
-budget-calibration recipe. Full trace: `docsesearch\CHANGES-FROM-RESEARCH.md`.
+budget-calibration recipe. Full trace: `docs\research\CHANGES-FROM-RESEARCH.md`.
 
 ## Hybrid lexical channel build rulings — 2026-07-20
 
@@ -1533,7 +1533,7 @@ budget-calibration recipe. Full trace: `docsesearch\CHANGES-FROM-RESEARCH.md`.
 Built & floor-verified the same session as Target A. Mechanism sources: the lexical/semantic
 complementarity finding (Memory in the LLM Era survey, arXiv 2604.01707 §7) and Engram's
 dense+lexical fusion evidence (arXiv 2606.09900); trace in
-`docsesearch\CHANGES-FROM-RESEARCH.md`.
+`docs\research\CHANGES-FROM-RESEARCH.md`.
 
 **Build shapes (approved with the plan; one design correction surfaced at build):**
 
