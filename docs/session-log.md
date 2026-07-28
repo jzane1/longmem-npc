@@ -877,6 +877,82 @@ a dated correction note. The living state — current phase, queues, open questi
   free, smoke dropped, `longmem` pristine). Next: **demo choreography + the pre-ship latency
   items (B1/B2 measure-then-rule) + the judged eval harness (item 3).**
 
+- **2026-07-28** — **Full-repo audit + remediation (Jack's request: audit everything, plan, then
+  implement on approval).** Seven read-only dimension auditors, each dimension's findings then
+  handed to an adversarial verifier told to refute them: 107 raw findings, 4 refuted, ~20
+  downgraded, 64 surviving. Two refutations were because the "problem" was an existing dated
+  ruling (CI-later; the gate's cosine import) — the register defending itself. **The audit's
+  verdict on the codebase was that it is sound**: zero prose assertions across suite and walkers,
+  every UPDATE/DELETE sanctioned, `.env` never in any git ref, all thirty C# wire models
+  field-for-field with the tri-state intact, all SQL parameterized. Four rulings and the full
+  finding set: the dated "Full-repo audit rulings" entry in `decisions.md`. Eight commits:
+  - **Phase 1 — code defects.** The one real defect: `NpcMemoryClient` drove its SSE loop off
+    `StreamReader.EndOfStream`, a **synchronous** read, on a client deliberately built without
+    `ConfigureAwait(false)` — so it stalled the **Unity main thread** between chunks, on the path
+    the <1 s perceived-first-word beat runs on. *The Play-mode gate had passed 8/8 with it
+    present* (fake-mode streaming masks the stall), and the verifier later confirmed the blocking
+    call was compiled into the shipped DLL. Also: `tests\scratch_uri.py` (one shared, verified URI
+    rewrite — the old path-only swap let a `?dbname=` query parameter survive and point the
+    suite's TRUNCATE at the product database, proven with libpq's own parser); three dead symbols
+    removed (`span_sources` was not merely unread — it was built parallel to `spans` and never
+    deduped alongside them, so it was already misaligned); `MalformedWriteProvider` **wired into**
+    the write walker rather than deleted, closing the ladder's malformed-output row (51 → 53);
+    `load_driver`'s hand-written agents INSERT replaced by `db.insert_agent`; stale comments
+    describing the retired escalation hard-stop and the "future" SSE route.
+  - **Phase 2 — the mechanical gates.** CLAUDE.md says formatting is "enforced mechanically"; only
+    `ruff format` was, `ruff check` had never run as a gate, and **`ruff` was not pinned at all**
+    (already drifted — one test file had been out of format since `edf9820`). Pinned; `ruff.toml`
+    added with the walkers' deliberate E402 ignored so the two real findings stop drowning in 65;
+    `ruff check` joined the edit hook. floor-verifier's allowlist gained the Unity MCP (its
+    absence would have reproduced the exact 2026-07-13 incident its own runbook documents);
+    doc-auditor's reading list named 5 of 17 docs, omitting every build spec; the `.env` deny
+    covered one tool; the Unity `.gitignore` block was unanchored at repo root (the hazard that
+    already forced rescue commit `ae54af8`).
+  - **Phase 3 — coverage.** Enumerating every route against every test found `PUT /pin` and
+    `POST /events/scene-boundary` with **no HTTP test anywhere**, the SSE `reconstructing` and
+    `error` events untested, and `CorrectionNlpFailedError` → 502 ruled and built with neither a
+    test nor a spec row. Writing the SSE test surfaced a design fact worth recording: the
+    pre-serve callback rides **gated turns only** (the signal that earns a spinner is a pause
+    appearing mid-scene, not a scene's first read) — the first draft used a loader turn and
+    correctly failed. Suite 49 → 53.
+  - **Phase 4 — propagation.** The four 2026-07-27 build sessions had propagated into `status.md`
+    only. `architecture.md` — self-declared design truth — knew nothing of the five routes shipped
+    that day; the IDs-and-scores invariant was **false as written** for the two unscored inspector
+    reads, in three files including auto-loaded CLAUDE.md; the model-role claim was wrong in two
+    ways (seven vars, not nine roles; three cannot diverge); the register still called the
+    escalation hard-stop an open decision owed before the demo, and stopped at stage 0. Fixed,
+    plus a 42-entry index for `decisions.md`. `client_total_ms` was **built** rather than struck —
+    `unity-client.md` asserted the client recorded it and no C# file did.
+  - **Phase 5 — the split** (ruled). `status.md` 1294 → 319 lines, 145,787 → 24,728 chars: roughly
+    **30k tokens off every future session's baseline**, history moved not lost.
+  - **Phase 6 — onboarding.** LICENSE (canonical text, not recalled), NOTICE (licences read from
+    installed metadata — psycopg is LGPL-3.0-only and was unremarked anywhere), `.env.example`,
+    `docs\SETUP.md` (the clone-to-running path, including the DLL refresh procedure that existed
+    nowhere), `docs\README.md` (the index, and the first definition of "walker" vs "suite" vs
+    "floor" — vocabulary used 150+ times and defined nowhere).
+  - **Phase 7 — research writing into version control** (ruled), and the stage-2 Play-mode receipt
+    PNG un-ignored: `session-log.md` cited it as verification evidence while `.gitignore` excluded
+    it.
+  - **`.gitattributes` + a self-inflicted repair.** My own phase-7 path rewrite used
+    `docs\research\` in a non-raw Python string, so `\r` became a literal CR in six docs. That
+    stray CR also made git decline to normalize those files, which is how a two-line edit rendered
+    as a 971-line rewrite. Repaired at the byte level; `.gitattributes` now pins `* text=auto
+    eol=lf` so it cannot recur. Found by checking the diff rather than trusting it — and the
+    grep primitive I first reached for was itself lying (same count for a pure-LF control as for
+    CRLF), which is why the first look seemed fine.
+  - **floor-verifier: FAIL, then fixed.** The first pass returned **fail** on one real point: a
+    `ruff format` run with `target-version` briefly set had stripped the parentheses from
+    `except (A, B):` in `app\ingest.py` — the exact hazard `ruff.toml`'s own comment describes,
+    shipped in the same commit as the comment. Behaviour on 3.14 was unchanged (the forms are
+    AST-identical, which is why every test passed and an AST-level diff showed nothing); the
+    verifier found it with a token-stream diff. Restored, and `tests\test_repo_hygiene.py` now
+    guards it plus the SQL-only-in-db.py stack constant — both pure, both on the turn-end subset.
+    Suite 53 → **55**, keyless **48**. Walkers unchanged at 53/56/67/51/42/34/34.
+  - **Not claimed:** the Unity **Play-mode gate** was not re-run — its MCP tools were not exposed
+    to this session, so it is an operator step and is reported blocked, not passed. It matters
+    more than usual here because the DLL Unity loads was rebuilt twice.
+
+
 ---
 
 ## Archived phase headers

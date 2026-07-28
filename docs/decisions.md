@@ -52,6 +52,7 @@ file records what was chosen, what it beat, and why (where the rationale was rec
 - [Demo-vehicle ruling — Unity, not an established-game mod — 2026-07-27](#demo-vehicle-ruling-unity-not-an-established-game-mod-2026-07-27)
 - [Unity-client fork rulings + stage-0 build (three backend routes) — 2026-07-27](#unity-client-fork-rulings-stage-0-build-three-backend-routes-2026-07-27)
 - [Unity-client stages 1-3 — build record — 2026-07-27](#unity-client-stages-1-3-build-record-2026-07-27)
+- [Full-repo audit rulings — 2026-07-28](#full-repo-audit-rulings--2026-07-28)
 
 ## Primary decisions
 
@@ -2127,3 +2128,88 @@ polls, so there is no CORS surface and no second server, and the inspector ships
 This completes fork 3's product-surface logic (the chain route, not direct SQL). One static file,
 vanilla JS, no build step (fork 6). All server text reaches the DOM via `textContent` — no
 innerHTML anywhere, so operator- and model-authored prose carries no injection surface.
+
+## Full-repo audit rulings — 2026-07-28
+
+Jack asked for a comprehensive audit of the whole repo — organization, documentation, workflows,
+hygiene — then a plan, then implementation on approval. Method: seven read-only dimension
+auditors (docs consistency, Python backend, tests, C#/Unity/Ledger, tooling and workflows,
+organization, security and ops), each dimension's findings then handed to an adversarial verifier
+instructed to refute them. 107 raw findings, 4 refuted outright, ~20 downgraded, 64 surviving
+after deduplication. **Two of the four refutations were because the "problem" was an existing
+dated ruling** — the absence of CI ("CI-ready now, workflow later", 2026-07-20) and the gate's
+cosine import from the reconstruction module (approved with the 2026-07-19 gate build). Recorded
+because it is the register working as intended: a ruling, once written down, defends itself.
+
+**The audit's verdict on the codebase was that it is sound.** Zero assertions on generated prose
+across the suite and all seven walkers; every in-place UPDATE and DELETE one of the sanctioned
+exceptions; `.env` never added in any git ref; all thirty C# wire models mirroring `app\schemas.py`
+field-for-field with the null-vs-`[]` tri-state intact; all SQL parameterized or composed from
+module constants. Nothing found contradicted the floor claims.
+
+### The four rulings
+
+1. **`status.md` splits three ways.** Measured: 145,787 chars ≈ 36.4k tokens auto-loaded into
+   every session, 77% of it append-only history. Ruled: `status.md` keeps live state and stays
+   auto-loaded; the session log moves to `session-log.md`; the verified-floors table moves to
+   `floors.md`. Both new files append-only, both moved verbatim. **Beat:** splitting the session
+   log alone (keeps the 8.7k-token floors table riding into every session), and fixing in place
+   (leaves the context cost). Result: ~30k tokens off every future session's baseline, no history
+   lost. The counting convention is now stated in `floors.md` — its absence is what let "sixteen
+   floors" stand against eighteen rows.
+
+2. **Fix the code defects in this pass and re-verify, rather than queueing them.** Ruled with the
+   cost stated: touching `app\` and `client\` re-opens verified floors and requires a
+   floor-verifier pass. **Beat:** docs-only (recording the defects as queue items), and
+   SSE-fix-only. The consequence was real — the verifier returned **fail** on the first pass and
+   the pass was re-run after the fix, which is the discipline working, not a cost overrun.
+
+3. **Cheap flip-prep now; the README rewrite deferred.** LICENSE, NOTICE, `.env.example`,
+   `docs\SETUP.md`, and `docs\README.md` land now; README.md gets a minimal honest update naming
+   `client\`, `unity\`, `ledger\` and pointing at the new index. **Beat:** doing the full README
+   rewrite now — declined because the artifacts that would carry it (demo footage, the real-mode
+   instrumentation table) do not exist yet, and a README written without them would be rewritten
+   again at the flip. README.md says so in its own last line.
+
+4. **The research writing moves into `docs\research\`.** `Research Papers\` was gitignored
+   wholesale for its 45 source PDFs (~117 MB), which also excluded 58 KB of project work product —
+   `FINDINGS.md`, `CHANGES-FROM-RESEARCH.md` (the provenance trace `status.md` calls material "for
+   the future README"), the 46 per-paper reader notes, and the baseline brief — all on one machine
+   and cited by eight tracked files. **Beat:** negating the two files in place inside the ignored
+   folder, and leaving them untracked. The PDFs stay out of the tree.
+
+### The defect the audit existed to find
+
+`client\NpcMemory.Core\NpcMemoryClient.cs` drove its SSE loop off `StreamReader.EndOfStream` — a
+**synchronous** read whenever the buffer is empty. This client deliberately carries no
+`ConfigureAwait(false)` (the 2026-07-27 stage-2 contract) precisely so continuations resume on
+Unity's `SynchronizationContext`, which means the blocking read happened **on the Unity main
+thread**, between SSE chunks, on exactly the path the sub-1s perceived-first-word beat runs on. It
+contradicted the "blocking is banned by the adapter contract" line in its own file header.
+
+Worth recording for the pattern rather than the bug: **the Play-mode gate passed 8/8 with it
+present.** A local fake-mode server streams fast enough to mask a main-thread stall, so the gate
+that was designed to catch exactly this class of problem could not see it. The floor-verifier later
+confirmed the blocking call was compiled into the shipped `NpcMemory.Core.dll`, not merely present
+in source. Same rule as the ConfigureAwait removal, one more instance.
+
+### Standing consequences
+
+- **`ruff` is pinned** (`ruff==0.15.21`) and `ruff check` now gates on every edit alongside
+  `ruff format`. Rules live in `ruff.toml`, deliberately at ruff's default set — widening it would
+  be a style ruling, and style rulings are Jack's. `target-version` is deliberately **unset**: at
+  py314 the formatter applies PEP 758 and strips the parentheses from `except (A, B):`, which is
+  valid on 3.14, a syntax error before it, and an unrequested rewrite of floor-verified files.
+  That hazard fired during this very pass and shipped one file before the floor-verifier caught
+  it; `tests\test_repo_hygiene.py` now guards it mechanically, because neither `ruff check` nor
+  `ruff format --check` flags it.
+- **`.gitattributes` now pins line endings** (`* text=auto eol=lf`). The repo had none, so
+  normalization depended on each machine's `core.autocrlf`, and a two-line docs edit rendered as a
+  971-line rewrite.
+- **The IDs-and-scores invariant is scoped, not weakened.** It now reads "read endpoints **that
+  run retrieval**", with the two unscored inspector reads named as the ruled carve-out. It had
+  been false as written since 2026-07-27 in three files, one of them auto-loaded `CLAUDE.md`.
+- **The model-role claim is corrected in both CLAUDE.md and architecture.md.** Seven env vars, not
+  nine roles each independently upgradable: importance/render/typology must name the same model
+  (one write call serves all three; `load_settings` raises rather than picking), and
+  reputation-delta emission has no role — it rides `behavior`.

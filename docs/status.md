@@ -146,11 +146,16 @@ dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over
    verified. **ALL FOUR BUILD STAGES LANDED 2026-07-27**: stage 1 (`NpcMemory.Core` + console
    harness — the Wk-1 interop gate 21/21, floor-verified; the C# null-vs-absent proof runs live
    in the gate), stage 2 (Unity adapter + gray-box set — Play-mode gate 8/8), stage 3 (The
-   Ledger at `GET /ledger` — live browser beat, suite 49). Remaining for this item: the
-   independent verifier pass over stages 2–3's re-runnable halves (next session's opener), then
+   Ledger at `GET /ledger` — live browser beat, suite 49). Remaining for this item:
    **demo choreography + the demo-corpus register** (shipped-game dialogue style + the held-out
    eval arm). The REPL still drives all beats today (`:as-of` jumps + scene boundaries + band
    crossings; `:correct` moves retrieval AND entities; the gate debug line + `(reconstructing…)`).
+   *(2026-07-28: stage 1's re-runnable half — build, console interop gate, wire parity — was
+   independently re-verified twice during the audit pass. **The stage-2 Unity Play-mode gate was
+   NOT re-run and is the one outstanding verification**; its MCP tools were not reachable from the
+   audit session. It matters more than usual because the plugin DLL was rebuilt twice that day —
+   once for the SSE main-thread fix, once for the client timing term — so run it before recording:
+   open the scene, enable `autoRun`, expect 8/8 with chunk callbacks on thread 1.)*
 
 **Pre-ship latency items** (2026-07-21 latency slate; **audit re-sequenced 2026-07-22** — the
    perceived-TTFT metric moved into item 1; pre-warm build proposed post-demo):
@@ -316,4 +321,26 @@ collides with the locked 1536 dimension).
 ## Repo conventions
 
 Private GitHub; commit at least weekly; public flip is an end-of-project sprint. Secrets in `.env`
-only. Always PowerShell, backslash paths.
+only (`.env.example` is the tracked template). Always PowerShell, backslash paths.
+
+Mechanically enforced since 2026-07-28: `ruff format` **and** `ruff check` on every edit (pinned
+version, rules in `ruff.toml`); the `-m "not nlp"` suite subset at every turn end; `.gitattributes`
+normalizing line endings to LF. Licensing is settled — `LICENSE` (Apache-2.0) and `NOTICE` (the
+third-party inventory; psycopg is the one copyleft dependency, LGPL-3.0-only, not vendored).
+
+**Carried, not fixed** — surfaced by the 2026-07-28 audit, deliberately left for a ruling:
+
+- **The seven walkers share a fixed-name scratch DB** (`longmem_test`) they neither create,
+  migrate, nor drop, and three assertions in `verify_fact_correction.py` are DB-global counts.
+  Giving them the suite's pid-scoped mechanism plus a `tests\run-walkers.ps1` runner is the right
+  fix; it is a medium refactor of the verification apparatus itself, so it wants its own scoped
+  task rather than riding an audit.
+- **The API has no authentication or rate limiting**, and two of its eleven routes spend the
+  operator's model credits per request. Defensible today — the default bind is loopback and every
+  client hardcodes 127.0.0.1 — but nothing in the docs acknowledges it. A "what this is not"
+  paragraph belongs in the integrator surface before the flip.
+- **The Unity MCP bridge is pinned to a moving `#main` git ref** and the tracked manifest and
+  lockfile disagree about it (`file:` embedded vs git URL), so package resolution is not
+  reproducible from a clean clone.
+- **The committed plugin DLL has no staleness check.** `docs\SETUP.md` documents the rebuild, but
+  nothing detects source/binary drift — and it drifted twice on 2026-07-27 alone.

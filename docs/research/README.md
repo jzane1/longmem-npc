@@ -25,6 +25,15 @@ first place). Only the writing moved.
   system as it stood at the sweep. A dated snapshot, **not** current design truth — for that, read
   `..\architecture.md`.
 
+## A note on the links inside these files
+
+The reader agents wrote **forward references** to specs that did not exist and mostly still do
+not — `docs\eval-harness.md`, `docs\reflection.md`, `docs\graph-retrieval.md`,
+`docs\memory-graph.md`. They read as citations but are proposals: "this belongs in a doc we have
+not written." Sixteen such references were checked and left as written, because editing archival
+notes to hide the fact that the work is queued would be worse than the dangling link. The queued
+items themselves are tracked in `..\status.md`, which is the authority.
+
 ## Status
 
 Point-in-time, like the external audits: these describe the literature as read in July 2026 and
