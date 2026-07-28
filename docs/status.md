@@ -1118,10 +1118,13 @@ dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over
    2026-07-27** (dated "Unity-client fork rulings + stage-0 build" register entry): SSE
    `/turn/stream`, `POST /v1/agents`, and the chain/index inspector reads are LIVE; Newtonsoft
    everywhere; netstandard2.1 core + net8 harness layout; static-HTML Ledger; MCP for Unity
-   verified. **Stage 1 BUILT + the Wk-1 interop gate GREEN + floor-verified (same day)** —
-   `NpcMemory.Core` + the console harness; the C# null-vs-absent serialization proof landed (the
-   tri-state beat runs live in the gate). Remaining carried item: the demo-corpus register
-   (shipped-game dialogue style + the held-out eval arm). The REPL still drives all beats today (`:as-of` jumps + scene boundaries + band
+   verified. **ALL FOUR BUILD STAGES LANDED 2026-07-27**: stage 1 (`NpcMemory.Core` + console
+   harness — the Wk-1 interop gate 21/21, floor-verified; the C# null-vs-absent proof runs live
+   in the gate), stage 2 (Unity adapter + gray-box set — Play-mode gate 8/8), stage 3 (The
+   Ledger at `GET /ledger` — live browser beat, suite 49). Remaining for this item: the
+   independent verifier pass over stages 2–3's re-runnable halves (next session's opener), then
+   **demo choreography + the demo-corpus register** (shipped-game dialogue style + the held-out
+   eval arm). The REPL still drives all beats today (`:as-of` jumps + scene boundaries + band
    crossings; `:correct` moves retrieval AND entities; the gate debug line + `(reconstructing…)`).
 
 **Pre-ship latency items** (2026-07-21 latency slate; **audit re-sequenced 2026-07-22** — the

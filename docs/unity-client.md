@@ -1,5 +1,13 @@
 # Unity client + reference scene + The Ledger — build target (specced 2026-07-27)
 
+> **BUILT 2026-07-27 — all four stages, same day.** Stage 0 (the three ruled-in routes) and
+> stage 1 (`NpcMemory.Core` + console harness, the interop gate 21/21) are floor-verified;
+> stages 2 (Unity adapter + gray-box set, Play-mode gate 8/8) and 3 (The Ledger, live browser
+> beat + suite 49) carry live receipts with the independent verifier pass over their
+> re-runnable halves queued as the next session's opening step. Fork rulings + build record:
+> the two dated 2026-07-27 entries in `decisions.md` and the five 2026-07-27 session-log
+> entries in `status.md`.
+
 Immediate-queue item 2's spec session. Consolidates the artifact-queue "Unity client C# API
 surface" entry, architecture's environment section (Unity 6, flatscreen 3D, `NpcMemory` root
 namespace, `Assets\Scripts\` until packaging), the audit solutions doc's choreography + engineering
@@ -142,7 +150,16 @@ construct-validity mitigation — escalation fired 79% on realistic prose vs 0% 
 the 2026-07-21 pre-thin_gist measurement, ~95% on the corpus at current defaults; the
 held-out corpus arm rides item 3's eval build).
 
-## Open forks — Jack's to rule (surfaced, not resolved)
+## Open forks — RESOLVED (ruled by Jack at plan approval 2026-07-27, forks 1–6; fork 7 + the
+## sub-shapes settled at build as authorized)
+
+> 1 SSE **in** (built, stage 0) · 2 `POST /v1/agents` **in** (built, stage 0) · 3 Ledger data =
+> **the chain read route** (built, stage 0) · 4 **Newtonsoft everywhere** · 5 **targets/layout
+> as proposed** (`unity\` settled by Jack's project creation) · 6 **static HTML + vanilla JS**
+> — build-settled sub-shapes: the page is served BY the API at `GET /ledger` (same origin, no
+> CORS, ships with the service) and the turn feed v1 is paste/drop of a `DialogueTurnResult`
+> JSON (a live feed rides the demo choreography) · 7 **IMGUI dev-tool overlay** + primitive
+> set with nameplate (settled at build). The original fork text below stands as specced.
 
 1. **SSE `/v1/dialogue/turn/stream` — in scope now, or deferred?** Without it there is NO
    on-screen streaming: the non-streaming route returns whole turns (~4 s real-mode), so the
