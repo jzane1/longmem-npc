@@ -4,7 +4,11 @@
 # per turn so this can never loop forever.
 # Deliberately dormant (exit 0) when: no test files exist yet, or python/pytest missing.
 
-Set-Location (Split-Path (Split-Path $PSScriptRoot))
+if ($env:CLAUDE_PROJECT_DIR) {
+    Set-Location $env:CLAUDE_PROJECT_DIR
+} else {
+    Set-Location (Split-Path (Split-Path $PSScriptRoot))
+}
 
 $raw = [Console]::In.ReadToEnd()
 try {

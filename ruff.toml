@@ -1,0 +1,26 @@
+# ruff configuration — the repo's mechanically-enforced formatter and linter.
+#
+# CLAUDE.md: "Python formatting: ruff, enforced mechanically by a PostToolUse
+# hook. Don't hand-format." Until 2026-07-28 only `ruff format` was enforced;
+# `ruff check` had never run as a gate, and it was hiding one real defect (a
+# dead local in a floor-verified file) under 65 deliberate E402s. This file
+# makes `check` usable so the hook can gate on it too.
+#
+# Rule set is ruff's default (E4/E7/E9 + F) — deliberately not widened. A
+# larger rule set would be a style ruling, and style rulings are Jack's.
+
+line-length = 88
+
+# `target-version` is deliberately UNSET. Setting it to py314 (this repo's
+# Python) makes the formatter apply PEP 758 and strip the parentheses from
+# `except (A, B):` — valid on 3.14, a syntax error on 3.13 and earlier, and a
+# gratuitous rewrite of floor-verified files. Leaving it unset keeps ruff's
+# default, which is what every committed file was formatted with.
+
+[lint.per-file-ignores]
+# The walkers and conftest MUST insert the repo root on sys.path before they
+# can import `app.*` at all — they run as scripts from tests\, not as an
+# installed package. That makes every subsequent import E402 by construction,
+# and it is the intended shape, not drift.
+"tests/conftest.py" = ["E402"]
+"tests/verify_*.py" = ["E402"]

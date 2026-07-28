@@ -282,9 +282,7 @@ def test_lexical_channel_reach_and_kill_switch(scene):
         off = await ctx.make_agent(
             "b-lexical-off", {**lex_config, "lexical_fetch_k": 0.0}
         )
-        miller_off = (
-            await ctx.seed(off, T_MILLER, NOW - timedelta(days=14))
-        ).memory_id
+        miller_off = (await ctx.seed(off, T_MILLER, NOW - timedelta(days=14))).memory_id
         await ctx.seed(off, T_ZEPH, NOW - timedelta(days=14), pinned=True)
         r_off = await retrieval.retrieve_dialogue_init(
             request(off, query_text=Q_LEX, k=1)

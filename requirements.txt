@@ -12,6 +12,13 @@
 psycopg[binary,pool]==3.3.4
 pgvector==0.5.0
 
+# tooling: ruff is the mechanically-enforced formatter AND linter (CLAUDE.md;
+# .claude\hooks\format-on-edit.ps1 runs `format` then `check` on every edit).
+# PINNED 2026-07-28: it was unpinned, and ruff's formatter output moves between
+# releases — tests\test_set_b_decay.py silently fell out of format because of
+# exactly that. The one tool the repo enforces mechanically must not drift.
+ruff==0.15.21
+
 # structural test suite (tests\test_*.py; walkers need only httpx) — ruled 2026-07-20
 pytest==9.1.1
 # httpx: ASGITransport vehicle for four walkers + the suite (pin closes the

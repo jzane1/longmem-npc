@@ -1,7 +1,21 @@
 {
   "permissions": {
     "defaultMode": "plan",
-    "deny": ["Read(./.env)"]
+    "deny": [
+      "Read(./.env)",
+      "Read(.env)",
+      "Read(./.env.*)",
+      "Grep(./.env)",
+      "Grep(.env)",
+      "Bash(cat .env*)",
+      "Bash(type .env*)",
+      "Bash(head .env*)",
+      "Bash(tail .env*)",
+      "Bash(more .env*)",
+      "Bash(Get-Content*.env*)",
+      "Bash(gc .env*)",
+      "Bash(Select-String*.env*)"
+    ]
   },
   "hooks": {
     "PostToolUse": [

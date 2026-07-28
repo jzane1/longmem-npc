@@ -18,10 +18,12 @@ Degradation ladder (write):
       (embedding_failed in the payload; the queryable signal moved to the
       fact head with the 2026-07-18 freeze ruling — observe no longer writes
       memories.embedding at all).
-  hard — build-phase stance, re-rule before the demo (2026-07-13):
-    - escalation failure: retry once, then HARD-STOP with nothing inserted
-      (the insert happens after escalation, so no rows exist to roll back;
-      a client resend is safe pre-idempotency).
+    - escalation failure: retry once, then SOFT-DEGRADE — the write lands
+      with the base NLP-pass gist and escalation_failed = true (the payload
+      and the dedicated column, migration 005). Ruled 2026-07-22, retiring
+      the 2026-07-13 build-phase hard-stop: a failed gist enrichment must
+      never cost a write.
+  (The observe path has NO hard rung. Every failure above lands the row.)
 
 The authorial correction (fact-following since the fact-level build,
 fact-level-correction.md) is the deliberate CONTRAST: all-or-nothing,
@@ -87,8 +89,10 @@ class CorrectionConflictError(RuntimeError):
 class CorrectionEmbedFailedError(RuntimeError):
     """The correction's embed call failed: nothing was written on either
     chain (all-or-nothing, ruled 2026-07-18 — the embed runs BEFORE the
-    transaction opens). 502 at the route, the escalation-hard-stop precedent;
-    the operator retries."""
+    transaction opens). 502 at the route; the operator retries. (It took its
+    502 shape from the then-current escalation hard-stop, which was itself
+    retired 2026-07-22 — the operator surface keeps the fail-loud stance the
+    observe path gave up.)"""
 
 
 class CorrectionNlpFailedError(RuntimeError):
@@ -404,7 +408,7 @@ class IngestService:
                     candidate_components=list(nlp_result.novel_components),
                     triggers=triggers,
                 )
-            except (ProviderCallError, MalformedOutputError):
+            except ProviderCallError, MalformedOutputError:
                 continue
         return None
 

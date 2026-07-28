@@ -1,6 +1,6 @@
 ---
 description: End-of-session close-out — status update, decision sweep, commit (never push)
-allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git add:*), Bash(git commit:*)
+allowed-tools: Read, Edit, Write, Grep, Glob, Bash(git status:*), Bash(git diff:*), Bash(git log:*), Bash(git add:*), Bash(git commit:*)
 disable-model-invocation: true
 ---
 

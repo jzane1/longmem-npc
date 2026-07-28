@@ -291,15 +291,18 @@ async def main(database_uri: str) -> None:
         "no item appears or disappears under a later as_of",
     )
     for mid, b in base_map.items():
-        l = later_map[mid]
-        if b.content != l.content:
+        later_item = later_map[mid]
+        if b.content != later_item.content:
             fail("decay vs rows", f"{mid}: content changed")
-        if b.relevance != l.relevance or b.importance_norm != l.importance_norm:
+        if (
+            b.relevance != later_item.relevance
+            or b.importance_norm != later_item.importance_norm
+        ):
             fail("decay vs rows", f"{mid}: non-recency component moved")
         if b.pinned:
-            if not (b.recency == 1.0 and l.recency == 1.0):
+            if not (b.recency == 1.0 and later_item.recency == 1.0):
                 fail("decay vs rows", f"{mid}: pinned recency != 1.0")
-        elif not l.recency < b.recency:
+        elif not later_item.recency < b.recency:
             fail("decay vs rows", f"{mid}: recency did not strictly drop")
     ok("older effective age lowers recency components only; text byte-identical")
 

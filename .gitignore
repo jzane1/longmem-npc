@@ -13,24 +13,37 @@ __pycache__/
 Thumbs.db
 .DS_Store
 
-# Unity (for when the client package lands; harmless now)
-[Ll]ibrary/
-[Tt]emp/
-[Ll]ogs/
-UserSettings/
-*.csproj
-*.sln
-*.slnx
+# Unity — Editor-generated output only. ANCHORED to unity\ (2026-07-28): these
+# rules used to be unanchored at repo root, so `*.csproj` swallowed the
+# hand-written client projects and needed a rescue commit (ae54af8) to
+# un-ignore them. Anchoring means source outside unity\ is simply source.
+unity/[Ll]ibrary/
+unity/[Tt]emp/
+unity/[Ll]ogs/
+unity/[Bb]uild/
+unity/[Bb]uilds/
+unity/[Oo]bj/
+unity/UserSettings/
+unity/*.csproj
+unity/*.sln
+unity/*.slnx
+unity/.vs/
 unity/.vscode/
 unity/Captures/
+unity/Assets/Plugins/**/*.pdb
 # Third-party editor bridge, embedded locally by its setup wizard; the
 # Packages/manifest.json git URL re-resolves it on a fresh clone.
 unity/Packages/com.coplaydev.unity-mcp/
-# ...but the hand-written client projects are source, not Unity-generated:
+
+# .NET build output (client\ has its own .gitignore for bin/ and obj/)
+[Bb]in/
+[Oo]bj/
 !client/**/*.csproj
+!client/**/*.sln
 
 # Claude Code personal overrides
 CLAUDE.local.md
+.claude/settings.local.json
 
 #Ignoring research folder, since it's just a big, unecessary upload.
 Research Papers/
