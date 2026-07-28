@@ -542,3 +542,71 @@ def test_reconstruction_fail_quiet(scene):
         assert len(await ctx.chain(old.memory_id)) == 1
 
     run_structural(scene, scenario)
+
+
+def test_correction_nlp_failure_all_or_nothing(scene, monkeypatch):
+    """NER failure during an authorial correction: ALL-OR-NOTHING fail-loud
+    (ruled 2026-07-19 with the gate build, taking the embed precedent's
+    shape) — nothing written on either chain, cache intact,
+    CorrectionNlpFailedError, and the route maps it to 502.
+
+    Added 2026-07-28 (audit): this was a ruled degradation path with no test
+    anywhere and no row in the spec's degradation list, while its sibling
+    CorrectionEmbedFailedError had both. The failure it models is a
+    broken or missing spaCy install, so it is injected at
+    `nlp.extract_entities` — the correction verb's only NLP call.
+
+    Deliberately UNMARKED: seeding is db-layer and the NER call is patched
+    out, so the loaders never load and this rides the Stop-hook subset —
+    which previously carried no correction-failure coverage at all."""
+
+    async def scenario(ctx):
+        import httpx
+
+        import app.api as api_module
+        from app import db, nlp
+        from app.ingest import CorrectionNlpFailedError
+        from app.schemas import CorrectionRequest
+
+        agent = await ctx.make_agent("g-correct-ner", V1_CONFIG)
+        seeded = await ctx.seed(agent, T_OBS, NOW - timedelta(hours=1))
+        m = seeded.memory_id
+        await db.insert_cache_row(ctx.pool, m, "vhash|b1", "cached")
+        chain_before = await ctx.chain(m)
+        facts_before = await ctx.fact_chain(m)
+
+        def _broken(_text: str):
+            raise RuntimeError("injected NER failure (broken spaCy install)")
+
+        monkeypatch.setattr(nlp, "extract_entities", _broken)
+
+        request = CorrectionRequest(
+            content="A corrected telling that must not land.",
+            client_timestamp=NOW + timedelta(hours=1),
+        )
+        with pytest.raises(CorrectionNlpFailedError):
+            await ctx.ingest().correct(m, request)
+
+        # Nothing written on EITHER chain, and the cache is untouched — the
+        # NER runs before the embed, before the transaction ever opens.
+        assert await ctx.chain(m) == chain_before
+        assert await ctx.fact_chain(m) == facts_before
+        assert await ctx.cache_rows(m) == {"vhash|b1": "cached"}
+
+        # The route half: 502, the embed-failure precedent.
+        api_module.app.state.service = ctx.ingest()
+        transport = httpx.ASGITransport(app=api_module.app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://suite"
+        ) as client:
+            resp = await client.post(
+                f"/v1/memories/{m}/correction",
+                json={
+                    "content": "A corrected telling that must not land.",
+                    "client_timestamp": (NOW + timedelta(hours=1)).isoformat(),
+                },
+            )
+        assert resp.status_code == 502
+        assert await ctx.chain(m) == chain_before  # still nothing written
+
+    run_structural(scene, scenario)

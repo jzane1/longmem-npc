@@ -120,6 +120,11 @@ scenario contract stubbed here, mechanics settle at build)*
 - Embedding-call failure during an **authorial correction** → **all-or-nothing**: nothing written
   on either chain, cache intact, loud error (ruled 2026-07-18 — the deliberate contrast with the
   observe path's land-with-NULL degradation; `fact-level-correction.md`).
+- **NER failure during an authorial correction** → **all-or-nothing**, same shape: the NER runs
+  before the embed and before the transaction, so nothing lands on either chain and the cache is
+  untouched; `CorrectionNlpFailedError` → **502** (ruled 2026-07-19 with the gate build, taking
+  the embed precedent's shape). *(Row added 2026-07-28: the path was ruled and built but had no
+  spec row and no test — closed by `test_correction_nlp_failure_all_or_nothing`.)*
 - Escalation call fails twice → **SOFT-DEGRADE**: the write lands with the base NLP-pass gist and
   `escalation_failed = true` (result + the dedicated column, migration 005) — structurally assertable
   as a row present + the flag set (re-ruled 2026-07-22, retiring the 2026-07-13 hard-stop).

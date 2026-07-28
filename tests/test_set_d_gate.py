@@ -862,3 +862,201 @@ def test_context_term_applies_on_gated_turns(scene):
         assert c[other.memory_id].score == p[other.memory_id].score
 
     run_structural(scene, scenario)
+
+
+# --------------------------------------------------------------------------
+# Route contracts closed by the 2026-07-28 audit: two routes had NO HTTP-level
+# exercise anywhere in the repo, and two of the SSE stream's event kinds were
+# emitted by the server and consumed by the C# client but asserted by nothing.
+# --------------------------------------------------------------------------
+
+
+def test_pin_route_contract(scene):
+    """PUT /v1/memories/{memory_id}/pin — the operator pin toggle over HTTP.
+
+    The service method `set_pin` was exercised by two walkers, but the ROUTE
+    had no test, so its 404 mapping was unproven. `memories.pinned` is one of
+    the two sanctioned in-place runtime scalars, so this asserts the DB row
+    actually moved (both directions) and the payload mirrors it."""
+
+    async def scenario(ctx):
+        import httpx
+
+        import app.api as api_module
+
+        agent = await ctx.make_agent("d-pin-route", V1_CONFIG)
+        seeded = await ctx.seed(agent, T_BRIDGE, NOW - timedelta(hours=1))
+
+        api_module.app.state.service = ctx.ingest()
+        transport = httpx.ASGITransport(app=api_module.app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://suite"
+        ) as client:
+            for wanted in (True, False, True):
+                resp = await client.put(
+                    f"/v1/memories/{seeded.memory_id}/pin", json={"pinned": wanted}
+                )
+                assert resp.status_code == 200
+                body = resp.json()
+                assert body["pinned"] is wanted
+                assert body["memory_id"] == str(seeded.memory_id)
+                row = await ctx.fetchrow(
+                    "SELECT pinned FROM memories WHERE memory_id = %s",
+                    seeded.memory_id,
+                )
+                assert row[0] is wanted
+
+            missing = await client.put(
+                f"/v1/memories/{uuid4()}/pin", json={"pinned": True}
+            )
+            assert missing.status_code == 404
+
+    run_structural(scene, scenario)
+
+
+def test_scene_boundary_route_contract(scene):
+    """POST /v1/events/scene-boundary — the boundary verb over HTTP.
+
+    Tested at the service level only, never through the route. The boundary
+    is the identity-recompile seam the C# NpcSession calls at every scene
+    change, so the route payload it freezes (accepted + identity_version) and
+    the unknown-agent 404 are both load-bearing for the client."""
+
+    async def scenario(ctx):
+        import httpx
+
+        import app.api as api_module
+        from app.schemas import SceneBoundaryEvent
+
+        agent = await ctx.make_agent("d-boundary-route", V1_CONFIG)
+        api_module.app.state.service = ctx.ingest()
+        transport = httpx.ASGITransport(app=api_module.app)
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://suite"
+        ) as client:
+            body = {
+                "agent_id": str(agent),
+                "client_timestamp": NOW.isoformat(),
+                "scene_type": "tavern",
+            }
+            ok = await client.post("/v1/events/scene-boundary", json=body)
+            assert ok.status_code == 200
+            payload = ok.json()
+            assert payload["accepted"] is True
+            assert payload["identity_version"]  # the caller freezes this
+            assert payload["total_ms"] >= 0
+
+            # Pass-through by ruling: the route adds and drops nothing. A
+            # stable identity recompiles to the SAME version.
+            direct = await ctx.ingest().scene_boundary(
+                SceneBoundaryEvent(agent_id=agent, client_timestamp=NOW)
+            )
+            assert direct.identity_version == payload["identity_version"]
+
+            missing = await client.post(
+                "/v1/events/scene-boundary", json={**body, "agent_id": str(uuid4())}
+            )
+            assert missing.status_code == 404
+
+    run_structural(scene, scenario)
+
+
+def test_turn_stream_reconstructing_and_error_events(scene):
+    """The SSE stream's two previously-unasserted event kinds.
+
+    `reconstructing` is the HTTP form of the REPL's "(reconstructing…)":
+    fired from the pre-serve callback while a blocking mid-scene retelling
+    runs, so a client can show the pause instead of appearing hung. It is
+    the demo's latency-as-characterization beat, and the C# client consumes
+    it. Note the deliberate scoping (mid-dialogue-gate.md fork 5, ruled
+    2026-07-19): the callback rides GATED turns only — `app\\retrieval.py`
+    passes it to `serve` on the gated branch and not on the loader branch,
+    because the signal that earns a spinner is a pause appearing MID-scene,
+    not the expected cost of a scene's first read. So this scenario needs an
+    agent with the gate live AND reconstruction live (neither knob pinned)
+    and a request carrying a loaded set.
+
+    `error` is the ROUTE's contract, not the seam's. The seam absorbs every
+    provider failure into its degradation ladder, but once the first queue
+    item has been awaited the response is already a 200 — and a 200 stream
+    cannot change its status, so anything raised afterwards must arrive as
+    an `error` EVENT rather than a silently truncated stream. Injected at
+    the route boundary, which is exactly where that contract lives."""
+
+    async def scenario(ctx):
+        import json
+
+        import httpx
+
+        import app.api as api_module
+        from conftest import BASE_CONFIG
+
+        from app.dialogue import DialogueService
+        from app.schemas import DialogueTurnRequest, SceneBoundaryEvent
+
+        # BASE_CONFIG pins NEITHER knob: reconstruction at production theta
+        # 0.5 and the gate live — both are required for the callback to
+        # reach the route. A past-theta `semantic` row (10 days against a
+        # 7-day tau) forces a real blocking retelling (the Set C fixture
+        # math), and passing it as the loaded set makes the turn gated.
+        agent = await ctx.make_agent("d-stream-recon", BASE_CONFIG)
+        seeded = await ctx.seed(
+            agent, T_QUARRY, NOW - timedelta(days=10), decay_class="semantic"
+        )
+        boundary = await ctx.ingest().scene_boundary(
+            SceneBoundaryEvent(agent_id=agent, client_timestamp=NOW)
+        )
+
+        api_module.app.state.dialogue = DialogueService(
+            ctx.pool, ctx.providers(), ctx.settings, ctx.retrieval()
+        )
+        transport = httpx.ASGITransport(app=api_module.app)
+        body = json.loads(
+            DialogueTurnRequest(
+                agent_id=agent,
+                utterance="What happened at the quarry?",
+                reputation_snapshot=0.0,
+                as_of=NOW,
+                scene_started_at=NOW,
+                identity_version=boundary.identity_version,
+                loaded_memory_ids=[seeded.memory_id],  # gated => callback rides
+            ).model_dump_json()
+        )
+
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://suite"
+        ) as client:
+            resp = await client.post("/v1/dialogue/turn/stream", json=body)
+            assert resp.status_code == 200
+            kinds = [k for k, _ in _parse_sse(resp.text)]
+            assert "reconstructing" in kinds
+            # Fired ONCE, and before any prose chunk: the pause it announces
+            # happens during retrieval, ahead of the first token.
+            assert kinds.count("reconstructing") == 1
+            assert kinds.index("reconstructing") < kinds.index("chunk")
+            assert kinds[-1] == "result"
+            result = json.loads(_parse_sse(resp.text)[-1][1])
+            retrieval_inst = result["instrumentation"]["retrieval"]
+            # A real retelling really ran — the event is not cosmetic.
+            assert retrieval_inst["write_backs"] >= 1
+            assert retrieval_inst["gate"]["evaluated"] is True
+
+        # -- the error event: a failure AFTER the stream has begun --------
+        class ExplodesMidStream:
+            async def run_dialogue_turn(self, request, **kwargs):
+                yield "first "
+                raise RuntimeError("injected post-first-chunk failure")
+
+        api_module.app.state.dialogue = ExplodesMidStream()
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://suite"
+        ) as client:
+            resp = await client.post("/v1/dialogue/turn/stream", json=body)
+            # Already committed to 200 before it failed — that IS the
+            # contract; the failure surfaces as an event, not a status.
+            assert resp.status_code == 200
+            events = _parse_sse(resp.text)
+            assert [k for k, _ in events] == ["chunk", "error"]
+            assert "injected post-first-chunk failure" in json.loads(events[-1][1])
+
+    run_structural(scene, scenario)
