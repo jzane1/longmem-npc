@@ -5,6 +5,54 @@ reopen without cause. If a newer decision conflicts with an older one, the newer
 entry gets a *superseded* note — never delete entries. Mechanics live in `architecture.md`; this
 file records what was chosen, what it beat, and why (where the rationale was recorded).
 
+## Index
+
+*Generated 2026-07-28 (full-repo audit): 42 sections across ~2,100 lines had no index.*
+*Append-only — when you add an entry at the end, add its line here too.*
+
+- [Primary decisions](#primary-decisions)
+- [Downstream decisions](#downstream-decisions)
+- [Audit rulings](#audit-rulings)
+- [Tension log (summary)](#tension-log-summary)
+- [Decay & gist session — 2026-07-12 (latest word; refines the migration spec)](#decay-gist-session-2026-07-12-latest-word-refines-the-migration-spec)
+- [Authorial-correction ruling — 2026-07-12](#authorial-correction-ruling-2026-07-12)
+- [Schema-gap rulings — 2026-07-12](#schema-gap-rulings-2026-07-12)
+- [Local DB + MCP infra — 2026-07-13](#local-db-mcp-infra-2026-07-13)
+- [Migration 01 build — fork rulings & schema deltas — 2026-07-13](#migration-01-build-fork-rulings-schema-deltas-2026-07-13)
+- [Write-path spec scope rulings — 2026-07-13](#write-path-spec-scope-rulings-2026-07-13)
+- [Write-path build — fork rulings & build notes — 2026-07-13](#write-path-build-fork-rulings-build-notes-2026-07-13)
+- [Re-slating ruling — reconstruction moves pre-demo — 2026-07-14](#re-slating-ruling-reconstruction-moves-pre-demo-2026-07-14)
+- [Read-path spec scope rulings — 2026-07-14](#read-path-spec-scope-rulings-2026-07-14)
+- [Read-path build rulings — 2026-07-14](#read-path-build-rulings-2026-07-14)
+- [CLI-harness spec scope rulings — 2026-07-14](#cli-harness-spec-scope-rulings-2026-07-14)
+- [CLI-harness build rulings — 2026-07-15](#cli-harness-build-rulings-2026-07-15)
+- [Full-project audit rulings — 2026-07-16](#full-project-audit-rulings-2026-07-16)
+- [Reconstruction spec scope rulings — 2026-07-17](#reconstruction-spec-scope-rulings-2026-07-17)
+- [Reconstruction build rulings — 2026-07-17](#reconstruction-build-rulings-2026-07-17)
+- [Reconstruction flagged-shapes confirmations — 2026-07-17](#reconstruction-flagged-shapes-confirmations-2026-07-17)
+- [Scope-limiter reframing — 2026-07-17](#scope-limiter-reframing-2026-07-17)
+- [Authorial-correction spec scope rulings — 2026-07-17](#authorial-correction-spec-scope-rulings-2026-07-17)
+- [Authorial-correction build rulings — 2026-07-18](#authorial-correction-build-rulings-2026-07-18)
+- [Fact-level correction spec scope rulings — 2026-07-18](#fact-level-correction-spec-scope-rulings-2026-07-18)
+- [Fact-level correction build rulings — 2026-07-18](#fact-level-correction-build-rulings-2026-07-18)
+- [Mid-dialogue gate spec scope rulings — 2026-07-19](#mid-dialogue-gate-spec-scope-rulings-2026-07-19)
+- [Mid-dialogue gate build rulings — 2026-07-19](#mid-dialogue-gate-build-rulings-2026-07-19)
+- [Test-suite build rulings — 2026-07-20](#test-suite-build-rulings-2026-07-20)
+- [Latency-fix + suite-concurrency rulings — 2026-07-20](#latency-fix-suite-concurrency-rulings-2026-07-20)
+- [Research-adoption slate + encoding-context build rulings — 2026-07-20](#research-adoption-slate-encoding-context-build-rulings-2026-07-20)
+- [Hybrid lexical channel build rulings — 2026-07-20](#hybrid-lexical-channel-build-rulings-2026-07-20)
+- [Real-mode parse hardening ruling — 2026-07-21](#real-mode-parse-hardening-ruling-2026-07-21)
+- [Latency slate + split-brain pull-forward rulings — 2026-07-21](#latency-slate-split-brain-pull-forward-rulings-2026-07-21)
+- [Split-brain streaming build rulings — 2026-07-21](#split-brain-streaming-build-rulings-2026-07-21)
+- [External-persona audit + pre-demo replan rulings — 2026-07-22](#external-persona-audit-pre-demo-replan-rulings-2026-07-22)
+- [Escalation failure-path + pre-warm + R7 rulings — 2026-07-22](#escalation-failure-path-pre-warm-r7-rulings-2026-07-22)
+- [Escalation soft-degrade build — 2026-07-22](#escalation-soft-degrade-build-2026-07-22)
+- [HTTP turn route + perceived-TTFT build rulings — 2026-07-23](#http-turn-route-perceived-ttft-build-rulings-2026-07-23)
+- [Escalation trigger tuning: measurement + rulings — 2026-07-23](#escalation-trigger-tuning-measurement-rulings-2026-07-23)
+- [Demo-vehicle ruling — Unity, not an established-game mod — 2026-07-27](#demo-vehicle-ruling-unity-not-an-established-game-mod-2026-07-27)
+- [Unity-client fork rulings + stage-0 build (three backend routes) — 2026-07-27](#unity-client-fork-rulings-stage-0-build-three-backend-routes-2026-07-27)
+- [Unity-client stages 1-3 — build record — 2026-07-27](#unity-client-stages-1-3-build-record-2026-07-27)
+
 ## Primary decisions
 
 **Schema now, mechanism later.** All write-time schema and population ship day one, even where the
@@ -334,6 +382,14 @@ with the build plan.
    client resend is safe pre-idempotency). This is deliberately not a production posture; the
    production/demo failure behavior for escalation is an **open decision** owed before the demo
    video ships.
+   *(Superseded 2026-07-22 — see "Escalation failure-path + pre-warm + R7 rulings" and
+   "Escalation soft-degrade build". The hard-stop is RETIRED: a double failure now proceeds with
+   the base NLP-pass gist and sets `memories.escalation_failed` (migration 005);
+   `EscalationHardStopError` and its 502 are gone. The owed open decision is CLOSED. Annotation
+   added 2026-07-28 — the register's own convention had not been applied here.)*
+   *(Trigger set grown 2026-07-23 — see "Escalation trigger tuning": a sixth trigger,
+   `thin_gist`, fires when the base pass yields fewer gist spans than
+   `escalation_min_base_spans`. The five above stand unchanged.)*
 5. **Minor shapes (approved with the plan):** wire shape `POST /v1/events/observe`,
    `POST /v1/events/scene-boundary`, `PUT /v1/memories/{memory_id}/pin`; idempotency stays
    accept-not-enforce (spec default; needs schema); `phase_tag` and `event_id` are accepted but
@@ -345,6 +401,8 @@ with the build plan.
    `longmem_test` created/dropped around the walker via the new `db\migrate.py --database-uri`
    flag (floor re-verified: no-arg run on `longmem` still a clean no-op); no agent-creation
    endpoint in v1 — fixtures insert agents via SQL.
+   *(Superseded 2026-07-27 — `POST /v1/agents` shipped with unity-client stage 0; provisioning is
+   a real verb and fixtures no longer need hand-SQL. Annotation added 2026-07-28.)*
 
 ## Re-slating ruling — reconstruction moves pre-demo — 2026-07-14
 
@@ -2025,3 +2083,47 @@ untouched walkers green on fresh scratch (51/42/34/34) and byte-identical to HEA
 unmarked); migrate no-arg "5 applied, 0 pending"; `longmem` pristine (ledger 001–005, ten
 product tables 0 rows, no scratch residue); floor economy by git diff (exactly nine files
 touched). Next: stage 1 — `NpcMemory.Core` + the console harness (the Wk-1 interop gate).
+
+## Unity-client stages 1-3 — build record — 2026-07-27
+
+*(Entry written 2026-07-28 during the full-repo audit, which found the register stopped at stage 0
+while three further same-day build sessions had settled shapes — including a shipped route and a
+standing C# contract. Recorded here at its true date; the five 2026-07-27 session-log entries in
+`status.md` carry the narrative.)*
+
+**Stage 1 — `NpcMemory.Core` + the console harness (the Wk-1 interop go/no-go).** Shapes settled at
+build, all consistent with the ruled engine-agnostic design:
+
+- **One serializer configuration** (`NpcJson`): SnakeCaseNamingStrategy + `NullValueHandling.Include`
+  + `DateParseHandling.None` with `DateTimeOffset` end to end. `Include` is load-bearing, not a
+  default: the wire contract is a **tri-state** — a *null* `loaded_memory_ids` means "loader turn",
+  an *empty list* means "gated turn with nothing loaded", and collapsing null to absent would
+  silently change gate behavior. The harness proves all three on the wire.
+- **A flat client, no interface layer** (the ruled "no abstraction ceremony"), all ten routes 1:1,
+  per-route settable timeouts, typed loud `NpcMemoryApiException`.
+- **`NpcSession` ports `_apply_turn_result` field-for-field**, keyed on the SERVER's gate record
+  rather than any client-side inference: loader turns seed the loaded set, gated turns append,
+  closed turns leave it untouched. Boundary resets, recent-actions cap, `as_of` time travel.
+- **Boundary reputation snapshot refreshes from the last turn's `reputation_after`** — exact for a
+  single-client session, and noted in the artifact queue as the reason a multi-client integration
+  would want a small agent-state read route (no such route exists).
+
+**Stage 2 — the Unity adapter + gray-box set.** Fork 7 settled at build: the demo surface is an
+**IMGUI dev-tool overlay**, the intended systems aesthetic rather than a game UI. Two fixes the
+Play-mode gate surfaced:
+
+- **Every `ConfigureAwait(false)` removed from the core** — a standing C# contract, not a tweak.
+  The library idiom exists to prevent deadlock when a caller BLOCKS on a task; the adapter contract
+  bans blocking, so the hazard does not apply, while the idiom's cost does: continuations must
+  resume on Unity's `SynchronizationContext` so chunk/directive/reputation callbacks land on the
+  main thread with no marshaling. Play-mode-proven (callbacks on thread 1).
+  *(2026-07-28: the same contract retired `StreamReader.EndOfStream` from the SSE loop — a
+  synchronous read that stalled the main thread between chunks. Same rule, one more instance.)*
+- Directive-flash re-entrancy: overlapping flashes captured each other's colour as "original".
+
+**Stage 3 — The Ledger.** Settled at build: the page is **served BY the API at `GET /ledger`**
+rather than opened from disk or hosted separately — same origin as the two inspector routes it
+polls, so there is no CORS surface and no second server, and the inspector ships WITH the service.
+This completes fork 3's product-surface logic (the chain route, not direct SQL). One static file,
+vanilla JS, no build step (fork 6). All server text reaches the DOM via `textContent` — no
+innerHTML anywhere, so operator- and model-authored prose carries no injection surface.

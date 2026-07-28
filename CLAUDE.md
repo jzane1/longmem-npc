@@ -26,10 +26,14 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
   the schema docs, and the floor re-verifies (migrate idempotency + walkers). "No new migration"
   may appear in a spec only as a per-target scope fact Jack explicitly ruled — never as an
   inherited default.
-- Every model role (importance, render, typology, escalation, reconstruction, reputation,
-  reflection, dialogue, behavior) has its own env var. The retrieval gate is non-LLM — there is
-  no gate model. (`dialogue` streams pure prose; `behavior` — the split-brain build, 2026-07-21 —
-  is the concurrent call emitting the action directive + reputation delta.)
+- Model roles are env vars, never hardcoded. **Seven exist today** (`LONGMEM_MODEL_` + IMPORTANCE,
+  RENDER, TYPOLOGY, ESCALATION, DIALOGUE, RECONSTRUCTION, BEHAVIOR), all seven required in real
+  mode. Two documented limits: v1's single write call serves importance+render+typology, so those
+  three vars must name the SAME model (`load_settings` errors if they diverge — never a silent
+  pick); and reputation-delta emission has no role of its own — it rides the `behavior` call.
+  Reflection's role arrives with reflection. The retrieval gate is non-LLM — there is no gate
+  model. (`dialogue` streams pure prose; `behavior` — the split-brain build, 2026-07-21 — is the
+  concurrent call emitting the action directive + reputation delta.)
 - Python formatting: ruff, enforced mechanically by a PostToolUse hook. Don't hand-format.
 
 ## Invariants — never violate, regardless of how a task is worded
@@ -40,8 +44,11 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
   memories.pinned (pin toggle) and agents.reputation (the dialogue turn's clamped delta apply,
   ruled 2026-07-15) — are deliberately updated in place and sit outside it.
 - Recency decay and bi-temporal invalidation are distinct mechanisms. Never conflate them.
-- Read endpoints always return memory IDs and scores alongside prose. The test suite dies
-  without this.
+- Read endpoints **that run retrieval** always return memory IDs and scores alongside prose. The
+  test suite dies without this. Carve-out (ruled 2026-07-27, propagated 2026-07-28): the two
+  inspector reads — `GET /v1/memories/{id}/chain` and `GET /v1/agents/{id}/memories` — run no
+  retrieval, so no scores exist to return; they carry IDs and structured fields on every row and
+  are unscored *by contract*, not by omission.
 - Nothing integrator-configurable is ever hardcoded: vocabularies, thresholds, model roles, knobs.
 - Within a scene, absent a diegetic event or an authorial correction on a memory, repeated reads
   return byte-identical text (correction added by the 2026-07-17 authorial-correction ruling).

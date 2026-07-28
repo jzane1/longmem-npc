@@ -54,7 +54,10 @@ register entry):
   model prose — the suite discipline carried across the language boundary.
 - **Instrument at the seam.** The client records one client-side term per call
   (`client_total_ms`, wall time around the HTTP call) beside the server's instrumentation, so
-  transport overhead is visible from day one.
+  transport overhead is visible from day one. *(Built 2026-07-28 — the audit found this bullet
+  asserting a term no C# file carried. Now `NpcMemoryClient.ClientTotalMs` plus an
+  `OnCallMeasured(path, ms)` event, covering the nine request/response verbs and the SSE stream's
+  whole envelope. Client-side only — it never rides the wire.)*
 
 ## Scope boundary — do NOT build
 
@@ -71,18 +74,25 @@ register entry):
 
 ### NpcMemory.Core (the flat client)
 
-`NpcMemoryClient` — stateless verbs mirroring the six routes 1:1, pass-through both ways
+`NpcMemoryClient` — stateless verbs mirroring the routes 1:1, pass-through both ways
 (request models serialize exactly what Pydantic accepts; response models deserialize every field
-the service returns — the route pass-through ruling carried to the client):
+the service returns — the route pass-through ruling carried to the client).
+
+**Ten verbs as built** *(table corrected 2026-07-28: it was written before the forks were ruled
+and still said "six routes" — forks 1–3 added four more, all of which shipped in stage 0)*:
 
 | Verb | Route | Errors surfaced |
 |---|---|---|
 | `DialogueTurnAsync` | `POST /v1/dialogue/turn` | 404 unknown agent, 422 unknown identity version |
+| `DialogueTurnStreamAsync` | `POST /v1/dialogue/turn/stream` (SSE, fork 1) | 404 / 422 pre-stream; after the stream opens, an `error` **event** |
 | `DialogueInitAsync` | `POST /v1/dialogue/init` (the warm-init verb) | 404, 422 |
 | `ObserveAsync` | `POST /v1/events/observe` | 404 |
 | `SceneBoundaryAsync` | `POST /v1/events/scene-boundary` | 404 |
 | `SetPinAsync` | `PUT /v1/memories/{id}/pin` | 404 |
 | `CorrectAsync` | `POST /v1/memories/{id}/correction` | 404 / 409 CAS conflict / 422 / 502 fail-loud |
+| `CreateAgentAsync` | `POST /v1/agents` (provisioning, fork 2) | 422 on an empty name |
+| `MemoryChainAsync` | `GET /v1/memories/{id}/chain` (fork 3, unscored) | 404 |
+| `AgentMemoriesAsync` | `GET /v1/agents/{id}/memories` (fork 3, unscored) | 404 |
 
 HTTP errors map to typed exceptions (the Python service-error precedent — never swallowed,
 never retried silently). Timeouts are per-route config: `init` must tolerate the cold

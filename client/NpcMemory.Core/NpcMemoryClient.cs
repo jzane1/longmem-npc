@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Text;
@@ -48,6 +49,19 @@ namespace NpcMemory
         private readonly HttpClient _http;
         private readonly bool _ownsHttp;
         private readonly string _baseUrl;
+
+        /// <summary>Wall time in ms around the LAST completed HTTP call —
+        /// the client's half of "instrument at the seam" (CLAUDE.md). The
+        /// server reports its own decomposition inside the payload; the gap
+        /// between that and this is transport, visible from day one. Built
+        /// 2026-07-28 (unity-client.md asserted this term before it
+        /// existed). Not on the wire: purely client-side.</summary>
+        public double ClientTotalMs { get; private set; }
+
+        /// <summary>Per-call (route path, wall ms) as each call completes.
+        /// Fires on the caller's SynchronizationContext, like every other
+        /// callback here — safe to touch Unity objects from.</summary>
+        public event Action<string, double>? OnCallMeasured;
 
         public TimeSpan InitTimeout { get; set; } = TimeSpan.FromSeconds(60);
         public TimeSpan TurnTimeout { get; set; } = TimeSpan.FromSeconds(60);
@@ -135,6 +149,7 @@ namespace NpcMemory
             Action? onReconstructing = null,
             CancellationToken ct = default)
         {
+            var started = Stopwatch.GetTimestamp();
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(TurnTimeout);
             using var message = new HttpRequestMessage(
@@ -199,8 +214,15 @@ namespace NpcMemory
                     data = null;
                 }
             }
-            return result
-                ?? throw new NpcMemoryApiException(0, "stream ended without a result event");
+            if (result == null)
+            {
+                throw new NpcMemoryApiException(0, "stream ended without a result event");
+            }
+            // Whole-stream wall time: first byte to terminal result. The
+            // server's first_word_ms / perceived_first_word_ms ride inside
+            // the payload; this is the transport envelope around them.
+            Measure("/v1/dialogue/turn/stream", started);
+            return result;
         }
 
         // -- transport ---------------------------------------------------
@@ -211,17 +233,21 @@ namespace NpcMemory
 
         private async Task<T> GetAsync<T>(string path, CancellationToken ct)
         {
+            var started = Stopwatch.GetTimestamp();
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(DefaultTimeout);
             using var response = await _http
                 .GetAsync(_baseUrl + path, cts.Token);
-            return await ReadAsync<T>(response);
+            var result = await ReadAsync<T>(response);
+            Measure(path, started);
+            return result;
         }
 
         private async Task<T> SendAsync<T>(
             HttpMethod method, string path, object body, TimeSpan timeout,
             CancellationToken ct)
         {
+            var started = Stopwatch.GetTimestamp();
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(timeout);
             using var message = new HttpRequestMessage(method, _baseUrl + path)
@@ -230,7 +256,21 @@ namespace NpcMemory
                     NpcJson.Serialize(body), Encoding.UTF8, "application/json"),
             };
             using var response = await _http.SendAsync(message, cts.Token);
-            return await ReadAsync<T>(response);
+            var result = await ReadAsync<T>(response);
+            Measure(path, started);
+            return result;
+        }
+
+        private void Measure(string path, long started)
+        {
+            var handler = OnCallMeasured;
+            if (handler == null)
+            {
+                return;
+            }
+            var ms = (Stopwatch.GetTimestamp() - started) * 1000.0 / Stopwatch.Frequency;
+            ClientTotalMs = ms;
+            handler(path, ms);
         }
 
         private static async Task<T> ReadAsync<T>(HttpResponseMessage response)

@@ -65,7 +65,8 @@ memory can drift and be defended, while the ground-truth record underneath never
 ## 3. Environment & stack
 
 **Environment.** Windows 11 (25H2). Always PowerShell syntax and backslash paths — never bash.
-Project root: `C:\Users\jacks\Projects\longmem-npc`. Unity 6, flatscreen 3D
+Paths in these docs are written relative to the repo root (`docs\`, `app\`, `unity\`) — no absolute
+developer path is recorded anywhere, so a clone works from any location. Unity 6, flatscreen 3D
 (CharacterController + mouse-look, raycast-plus-key interactables); Unity's external script editor
 is VS Code. Global Python 3.14.3 on PATH. Secrets live in `.env` at repo root, never in docs.
 C# root namespace `NpcMemory`; Unity scripts under `Assets\Scripts\` until the package layout
@@ -77,10 +78,17 @@ PostgreSQL 16 + pgvector in Docker (the `pgvector/pgvector` image); UUID primary
 server-side; HNSW vector index (a cheaply reversible choice).
 
 **Models.** Haiku-class for importance scoring, description rendering, typology classification,
-gist escalation, reconstruction, reputation-delta emission, and reflection. Sonnet-class for
-dialogue. Every model role is an integrator knob with its own env var, so each upgrades
-independently (the escalation role's var is `LONGMEM_MODEL_ESCALATION`, ruled 2026-07-13). The
-retrieval gate is **non-LLM** — there is no gate model and no gate env var.
+gist escalation, the behavior call, and reflection. Sonnet-class for streaming dialogue prose and
+for reconstruction. Every model role is an integrator knob with its own env var — nothing is
+hardcoded. **Seven vars exist today** and real mode requires all seven: `LONGMEM_MODEL_` +
+`IMPORTANCE`, `RENDER`, `TYPOLOGY`, `ESCALATION`, `DIALOGUE`, `RECONSTRUCTION`, `BEHAVIOR`.
+
+Two honest limits on "each upgrades independently" *(corrected 2026-07-28 — the sentence
+previously over-claimed)*: v1 serves importance + render + typology from **one** write call, so
+those three vars must name the same model (`load_settings` raises rather than silently picking one
+— a documented v1 limitation, not a design position); and **reputation-delta emission has no role
+of its own** — it rides the `behavior` call (split-brain, 2026-07-21). Reflection's var arrives
+with reflection. The retrieval gate is **non-LLM** — there is no gate model and no gate env var.
 
 **Embeddings.** OpenAI `text-embedding-3-small` at 1536 dimensions; the column dimension is locked.
 The same model embeds location names/descriptions and gate-time utterances.
@@ -176,8 +184,18 @@ write-time facts from day one.
 
 ## 6. Read path
 
-**Dialogue initialization:** top-k retrieval. Endpoints return **memory IDs and scores alongside
-prose** — this is load-bearing; it is what makes the test suite assertable.
+**Dialogue initialization:** top-k retrieval. Endpoints that run retrieval return **memory IDs and
+scores alongside prose** — this is load-bearing; it is what makes the test suite assertable.
+*(Carve-out, ruled 2026-07-27: the two **inspector reads** below run no retrieval and are unscored
+by contract — IDs and structured fields on every row, no scores, because none were computed.)*
+
+**Inspector reads** (unity-client.md fork 3, **built & floor-verified 2026-07-27**) — the record
+made legible, and the Ledger's data source: `GET /v1/memories/{id}/chain` returns the immutable
+observation beside BOTH version chains with superseded rows **present** (greyed client-side, never
+dropped) plus gist spans and a `has_embedding` flag that never exposes the vector;
+`GET /v1/agents/{id}/memories` is the per-agent index, newest `valid_at` first, each memory beside
+its live telling head, `limit` a caller argument (the `k` precedent) and never a config knob.
+SELECT-only end to end; 404 on unknown memory/agent.
 
 **Retrieval scoring** (built & floor-verified 2026-07-14, `read-path.md`; shapes ruled in the
 dated `decisions.md` entry): `relevance × recency(decay class) × importance_norm`; pin exemption;
@@ -327,7 +345,12 @@ grows from.)*
 2026-07-21 — `split-brain-streaming.md`, specced **and BUILT 2026-07-21**: the async-generator
 seam streams pure prose concurrently with the behavior call off one retrieval; two scored views;
 `first_word_ms` the headline. Dated "Latency slate + split-brain pull-forward rulings" and
-"Split-brain streaming build rulings" entries in `decisions.md`)*. A behavior call (Haiku-class, with its own
+"Split-brain streaming build rulings" entries in `decisions.md`. **Over HTTP since 2026-07-23 /
+2026-07-27:** `POST /v1/dialogue/turn` drains this generator to the terminal result, and the SSE
+twin `POST /v1/dialogue/turn/stream` **iterates the same generator** — the no-rewrite payoff of
+choosing a generator seam. `perceived_first_word_ms` rides beside `first_word_ms`, clocked from
+turn start rather than from the prose call, so it SEES the cold-reconstruction stall the latter is
+blind to — the honest metric the <1 s bar is measured against)*. A behavior call (Haiku-class, with its own
 retrieval weights) chooses the action; the dialogue call sees **past actions as observed world
 facts — never "you decided to."** *(Amended: never the current turn's action — the two calls
 run **concurrently** within a turn, so prose streams from its first token; the current action
@@ -381,6 +404,21 @@ invalidation doubles as compiler-cache eviction.
   gate block; `mid-dialogue-gate.md`) — and the itemized per-100-turn token/USD table.)*
 
 ## 12. Integrator surface requirements
+
+**The shipped HTTP surface** *(eleven routes; the last five landed 2026-07-23 and 2026-07-27 —
+`unity-client.md`)*: `POST /v1/events/observe`, `POST /v1/events/scene-boundary`,
+`PUT /v1/memories/{id}/pin`, `POST /v1/memories/{id}/correction`, `POST /v1/dialogue/init`,
+**`POST /v1/dialogue/turn`** (stateless — all scene state rides the request; the runner bookkeeping
+is the client's job), **`POST /v1/dialogue/turn/stream`** (its SSE twin, iterating the SAME
+async-generator seam — `chunk` / `reconstructing` / `result` / `error` events), **`POST /v1/agents`**
+(provisioning; UUID minted server-side), the two **inspector reads** (§6), and **`GET /ledger`**
+(the static browser inspector, served BY the API so it shares the origin of the routes it polls —
+no CORS surface, no second server).
+
+**The client package** *(built 2026-07-27)*: `client\NpcMemory.Core` — netstandard2.1,
+engine-agnostic (**zero `UnityEngine` types** by ruling), one flat `NpcMemoryClient` covering all
+ten verbs 1:1, plus `NpcSession`, the C# port of the Python runner's turn bookkeeping. Unity gets a
+thin MonoBehaviour adapter over it; a `dotnet run` console harness plays every demo beat headless.
 
 Docs are written as though a **hostile integrator** is reading them, answering ownership questions
 before they're asked: Whose Postgres is this? What happens on schema migration? What is the

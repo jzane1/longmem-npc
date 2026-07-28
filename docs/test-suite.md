@@ -1,7 +1,11 @@
 # longmem-npc — Test suite spec
 
-**BUILT 2026-07-20** — 38 pytest scenarios in `tests\test_*.py` (Sets A–D + degradation; the
-Set A diegetic pair still lands with the dissonance mechanism). Build rulings 2026-07-20
+**BUILT 2026-07-20 — 53 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation; the
+Set A diegetic pair still lands with the dissonance mechanism). Count as of 2026-07-28: Set A 8,
+Set B 7, Set C 7, Set D 20, degradation 11 — grown from the 38 built on 2026-07-20 by the
+route-contract scenarios that arrived with each later route, and by four gap-closing scenarios
+from the full-repo audit. **Seven carry the `nlp` marker**, so the turn-end subset runs 46.
+Build rulings 2026-07-20
 (dated `decisions.md` entry): the suite-gate Stop hook runs the `-m "not nlp"` subset (the 7
 `nlp`-marked scenarios call the write pass at the service level and pay the lazy
 spaCy+fastcoref load; the full suite runs on demand + at floor verification); Postgres
@@ -19,8 +23,11 @@ shape, cache state, timestamps, and byte-identity of returned text — **never o
 A model's wording is not a test surface. Judged evals (drift-toward-identity, Bartlett-style
 distortion operators) belong to the eval story and the paper ablations, not this suite.
 
-Corollary that makes this possible: read endpoints return memory IDs and scores alongside prose.
-That contract is load-bearing; if an endpoint stops returning IDs, the suite is dead.
+Corollary that makes this possible: read endpoints that run retrieval return memory IDs and scores
+alongside prose. That contract is load-bearing; if an endpoint stops returning IDs, the suite is
+dead. *(The two inspector reads — `/chain` and `/agents/{id}/memories`, ruled 2026-07-27 — run no
+retrieval and are unscored by contract; they still carry IDs and structured fields on every row,
+which is what their scenarios assert.)*
 
 ## Set A — correction-override (~15 scenarios)
 
@@ -92,8 +99,12 @@ moves scores, not rows; detail-hiding assertions land with reconstruction.)*
   entities (NER + optional operator field, merged); windowed SQL re-derives entity liveness at
   any instant; superseded fact rows keep their entities.
 
-## Set E — split-brain turn topology *(specced 2026-07-21, `split-brain-streaming.md`;
-scenario contract stubbed here, mechanics settle at build)*
+## Set E — split-brain turn topology *(specced **and BUILT** 2026-07-21,
+`split-brain-streaming.md`)*
+
+*Landed as scenarios inside `test_set_d_gate.py` and `test_degradation.py` rather than a sixth
+file — the concurrency and divergence claims share Set D's fixtures. The 51-assertion CLI-harness
+walker (now 67) carries the seam-level proofs.*
 
 - **Concurrency proof:** a deliberately slow behavior fake never delays the first prose chunk
   (first word = prose TTFT at the seam, structurally timed).
@@ -106,6 +117,24 @@ scenario contract stubbed here, mechanics settle at build)*
 - **Degradation rows:** behavior-fail -> no directive + zero delta + flag, prose unaffected;
   prose-fail pre-token -> fallback line; mid-stream drop -> as ruled at build; both-fail ->
   never-blank holds.
+
+## Route contracts *(added as each route shipped; consolidated here 2026-07-28)*
+
+Every route in `app\api.py` has an HTTP-level scenario asserting its success payload and its
+mapped error statuses — the C# client depends on both. Live in `tests\test_set_d_gate.py` via
+`httpx.ASGITransport`, plus the walkers' route sections.
+
+- `POST /v1/dialogue/init` · `POST /v1/dialogue/turn` (route JSON == the drained seam result;
+  404/422) · `POST /v1/dialogue/turn/stream` (200 `text/event-stream`; chunk events concatenate
+  **byte-identically** to the result's content; `reconstructing` fires once before any chunk on a
+  gated turn with a blocking retelling; a post-first-chunk failure arrives as an `error` EVENT,
+  since a 200 stream cannot change status; pre-stream 404)
+- `POST /v1/events/observe` · `POST /v1/events/scene-boundary` (accepted + identity_version; 404)
+- `PUT /v1/memories/{id}/pin` (row moves both directions; 404) ·
+  `POST /v1/memories/{id}/correction` (404/409/422/502)
+- `POST /v1/agents` (server-minted UUID, NULL knobs resolve; 422 on empty name)
+- `GET /v1/memories/{id}/chain` · `GET /v1/agents/{id}/memories` (unscored by contract; superseded
+  rows present; 404) · `GET /ledger`
 
 ## Degradation cases
 

@@ -9,8 +9,14 @@ Scopes: `claude mcp add` defaults to **local** scope (private to this machine + 
 committed — right for anything holding credentials). `--scope project` writes a committed
 `.mcp.json` (never put credentials in it). `--scope user` applies across all projects.
 
-Both servers below are **staged**: each has a go-live moment tied to the build order. Do not set
-them up early — there is nothing to connect to.
+> **Both servers are LIVE** *(status corrected 2026-07-28 — this runbook still read as forward-
+> looking after both had gone live)*. Postgres went live 2026-07-13 with the migration-01
+> container; MCP for Unity went live 2026-07-27 with the Unity project (verified by a read probe
+> plus a cube round-trip). `claude mcp list` should show both `✓ Connected`. What follows is now
+> a **reproduction runbook** — for a fresh machine, or when a connection breaks — not a schedule.
+
+Each section records the go-live moment it was tied to in the build order, which is why the
+prerequisites read the way they do.
 
 ---
 
@@ -44,7 +50,12 @@ claude mcp add postgres --env DATABASE_URI=postgresql://USER:PASSWORD@localhost:
 
 Restart Claude Code, then verify with `/mcp` (postgres should show connected) and a live prompt:
 *"Using the postgres MCP tools, list the tables and describe the memories table"* — the answer
-should match docs/migration-01.md column for column.
+should match `docs\migration-01.md` column for column, **plus everything migrations 002–005 added
+on top of it** *(pointer corrected 2026-07-28: migration-01.md documents only the foundational
+schema, so it is no longer the whole truth — `memory_fact_versions` and its indexes came with 002,
+`memory_fact_versions.entities` with 003, the lexical FTS GIN with 004, and
+`memories.escalation_failed` with 005. Read `db\migrations\*.sql` for the current shape;
+`schema_migrations` should list exactly 001–005.)*
 
 **Tools exposed:** schema listing (`list_schemas`, `list_objects`), object detail
 (`get_object_details` — columns, constraints, indexes), read-only `execute_sql`, `explain_query`,
