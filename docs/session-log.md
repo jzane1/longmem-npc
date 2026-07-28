@@ -535,7 +535,7 @@ a dated correction note. The living state — current phase, queues, open questi
 - **2026-07-20 → 21** — **Research sweep + adoption slate: Target A (encoding-context term)
   built, floor-verified, and committed.** A 45-paper literature sweep (31 curated + 14
   arXiv-discovered; map-reduce reader agents against a baseline brief; consolidated in
-  `Research Papers\FINDINGS.md` — the folder is gitignored working material) found the two
+  `docsesearch\FINDINGS.md` — the folder is gitignored working material) found the two
   biggest gaps already on our radar (no judged eval harness; no graph/associative retrieval)
   and one strictly-better mechanism with a slot already reserved: RaMem-style encoding-context
   re-ranking. Jack ruled the adoption slate via four explicit questions (dated
@@ -569,7 +569,7 @@ a dated correction note. The living state — current phase, queues, open questi
   0 pending", idempotent); floor-verifier **pass**; live k=1/overfetch-1.0 REPL beat (the
   pinned rare-name row served via lexical-only reach, `lex=2 candidates=2 k=1`). Session end:
   the research queue items slated (immediate queue 3–6), and
-  `Research Papers\CHANGES-FROM-RESEARCH.md` written (gitignored) tracing every landed and
+  `docsesearch\CHANGES-FROM-RESEARCH.md` written (gitignored) tracing every landed and
   queued change to its source papers for the future README.
 - **2026-07-21** — **Real-mode testing session: pre-ship gates (b) and (c) closed — real mode
   proven end-to-end, after a build-surfaced parse fix (the first session ever to construct
@@ -849,8 +849,9 @@ a dated correction note. The living state — current phase, queues, open questi
   directive flashes captured each other's yellow as "original" — the true color is now
   captured once. One environment fix en route: a PowerShell text edit mojibake'd the core
   files' UTF-8 (ANSI round-trip); restored from git and re-edited UTF-8-safely. Receipts: the
-  `[npc-demo]` console transcript + `unity\Captures\graybox-stage2-receipt.png` (gitignored;
-  sent to Jack); scene saved with `autoRun` off; server torn down, `longmem_smoke` dropped,
+  `[npc-demo]` console transcript + `unity\Captures\graybox-stage2-receipt.png` (*tracked since
+  2026-07-28 — it was cited as evidence while gitignored, so the citation pointed at nothing on
+  any other machine*); scene saved with `autoRun` off; server torn down, `longmem_smoke` dropped,
   port 8000 free, `longmem` pristine. Next: **stage 3 — the browser Ledger.**
 
 - **2026-07-27** — **Unity-client stage 3 built — The Ledger is live (fifth task of the day;
@@ -963,7 +964,7 @@ realistic prose); the 0.35 drift budget is well-placed (max observed accepted dr
 the lexical channel's ts_rank cost is a linear-in-matches watch-item (the 004 GIN is proven
 by EXPLAIN). **Prior phase:** the research-adoption slate landed 2026-07-21 (Target A
 encoding-context term + Target B hybrid lexical channel, migration 004);
-`Research Papers\CHANGES-FROM-RESEARCH.md` traces provenance. **One open decision owed before
+`docsesearch\CHANGES-FROM-RESEARCH.md` traces provenance. **One open decision owed before
 the demo ships:** the escalation failure-path re-rule — now widened by the data to cover the
 trigger set/threshold too. **Same-day follow-on: the latency slate is ruled and the split-brain
 topology is pulled forward + specced** (`split-brain-streaming.md`; viability bar **first word <

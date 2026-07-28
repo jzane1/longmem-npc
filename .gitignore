@@ -29,7 +29,12 @@ unity/*.sln
 unity/*.slnx
 unity/.vs/
 unity/.vscode/
-unity/Captures/
+# Captures are scratch by default, but a capture cited as VERIFICATION EVIDENCE
+# has to exist in the repo or the citation is empty (2026-07-28). Note the
+# trailing /* — a directory-level ignore cannot be undone by a negation inside
+# it, so the contents are excluded rather than the directory.
+unity/Captures/*
+!unity/Captures/graybox-stage2-receipt.png
 unity/Assets/Plugins/**/*.pdb
 # Third-party editor bridge, embedded locally by its setup wizard; the
 # Packages/manifest.json git URL re-resolves it on a fresh clone.
@@ -45,5 +50,9 @@ unity/Packages/com.coplaydev.unity-mcp/
 CLAUDE.local.md
 .claude/settings.local.json
 
-#Ignoring research folder, since it's just a big, unecessary upload.
+# The research folder is a ~117 MB store of 45 source PDFs — too big to upload,
+# and not ours to redistribute. The WRITING that came out of it (FINDINGS.md,
+# CHANGES-FROM-RESEARCH.md, the per-paper notes) moved into docs\research\ on
+# 2026-07-28 and IS tracked: it is project work product, it is cited by eight
+# other files, and it existed on exactly one machine until then.
 Research Papers/

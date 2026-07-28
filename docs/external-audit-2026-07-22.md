@@ -1,7 +1,7 @@
 # External-persona audit — 2026-07-22
 
 **Method.** Four read-only external-lens personas (simulated, not real individuals) explored the repo,
-docs, and `Research Papers/` and debated over a 3-round protocol — independent Round 1 positions,
+docs, and `docs/research/` and debated over a 3-round protocol — independent Round 1 positions,
 Round 2 adversarial cross-examination, Round 3 lead synthesis (this note). The personas ran with
 `tools: Read, Grep, Glob` only (no write access); the lead orchestrated the debate and is the sole
 author of this file. Personas:

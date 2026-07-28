@@ -22,7 +22,7 @@ buyer would pay for; where effort is going that a customer will never see.
 
 Reading list (read these first, in order; use Grep/Glob to navigate — do not try to read everything):
 1. `CLAUDE.md`, `docs/status.md`, `docs/architecture.md` — the shared core.
-2. `Research Papers/FINDINGS.md` and `Research Papers/CHANGES-FROM-RESEARCH.md` — what's differentiated.
+2. `docs/research/FINDINGS.md` and `docs/research/CHANGES-FROM-RESEARCH.md` — what's differentiated.
 3. In `docs/status.md`: the "Deadline & framing" section and the immediate/research queues.
 
 Protocol (3 rounds, coordinated through the shared task list and mailbox):

@@ -23,7 +23,7 @@ ablation to run.
 
 Reading list (read these first; use Grep/Glob to navigate — do not try to read everything):
 1. `CLAUDE.md`, `docs/status.md`, `docs/architecture.md` — the shared core.
-2. `Research Papers/FINDINGS.md`, then selected `Research Papers/_findings/*.md` most relevant to the
+2. `docs/research/FINDINGS.md`, then selected `docs/research/_findings/*.md` most relevant to the
    thesis (reconstructive/episodic memory, evals, confabulation/false-memory) — sample, don't read all.
 3. `docs/reconstruction.md`; skim `docs/decisions.md` for the research-adoption rulings.
 

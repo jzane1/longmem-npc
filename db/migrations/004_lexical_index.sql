@@ -1,7 +1,7 @@
 -- 004_lexical_index.sql — the hybrid lexical retrieval channel's index
 -- (research-adoption slate Target B, ruled 2026-07-20; docs\read-path.md
 -- carries the annotated contract; provenance in
--- Research Papers\CHANGES-FROM-RESEARCH.md).
+-- docsesearch\CHANGES-FROM-RESEARCH.md).
 --
 -- A partial GIN full-text index over LIVE fact heads (the 002/003
 -- partial-index precedent — `invalid_at IS NULL` stated verbatim so the
