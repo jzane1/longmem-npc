@@ -19,6 +19,7 @@
       "Bash(Select-String*-Path .env)"
     ]
   },
+  "skipWorkflowUsageWarning": false,
   "hooks": {
     "PostToolUse": [
       {
