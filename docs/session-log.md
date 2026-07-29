@@ -1189,8 +1189,16 @@ now stand.
     `status.md` (new dated block, remaining-before-recording, floor counts, queue item 2); the dated
     **"Stage-2 Play-mode gate verification + real-mode corroboration"** register entry + TOC line; this
     entry. Docs-only commit (zero app/db/client/tests/scene changes). Still surfaced for a ruling, not
-    fixed here: the `~\.claude.json` duplicate-key cleanup (the empty backslash key is the latent
-    re-trigger of this exact blocker) and a DLL staleness guard.
+    fixed here: a DLL staleness guard.
+  - **Follow-on (same session): the `~\.claude.json` empty backslash project key was removed
+    in-session** — surgical single-span deletion (backup first, hard safety assertions, a verify
+    pass), the live forward-slash key with postgres+UnityMCP untouched. **Caveat — likely
+    non-durable:** `.claude.json` is Claude Code's own live state file and the running process
+    rewrites it from an in-memory model that still holds the key (it rewrote the file mid-task —
+    `tengu_*` flags changed between the backup and the edit), so the deletion will probably be
+    re-added on the next config flush / session exit. The durable fix is to run the removal with
+    Claude Code fully CLOSED, so the next session starts from a clean file; the verified removal
+    script lives in the session scratchpad. Not a repo change (`.claude.json` is outside the repo).
 
 
 ---
