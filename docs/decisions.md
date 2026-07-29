@@ -58,6 +58,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Full-repo audit rulings — 2026-07-28](#full-repo-audit-rulings--2026-07-28)
 - [Reconstruction model class + migration immutability — 2026-07-28](#reconstruction-model-class--migration-immutability--2026-07-28)
 - [Floors-register append-only scope — 2026-07-29](#floors-register-append-only-scope--2026-07-29)
+- [Haiku dialogue + quote-embargo lift — 2026-07-29](#haiku-dialogue--quote-embargo-lift--2026-07-29)
 
 ## Primary decisions
 
@@ -2289,3 +2290,37 @@ the re-audit continuation (status.md queue item 0.5), not this wrap-up.
 **Consequences to propagate:** nothing states the old position as policy; the fix targets when
 the continuation lands are `docs\floors.md` (the 21/21 figure in the re-verification note) and
 `docs\SETUP.md:192` (the same stale 21).
+
+## Haiku dialogue + quote-embargo lift — 2026-07-29
+
+**Decided (three rulings, one measurement session):**
+
+1. **The dialogue role ships Haiku-class for now** (`LONGMEM_MODEL_DIALOGUE=
+   claude-haiku-4-5-20251001`, priced 1.00/5.00). Basis: the B1 A/B — product driver, 6×10
+   turns, seed 7, same-day arms — put `perceived_first_word` (the <1 s bar's field) at p50/p95
+   951/1701 ms on haiku vs 1201/2775 on sonnet-5: haiku meets the bar at p50, sonnet-5 does
+   not, at $0.109 vs $0.415 dialogue cost per 100 turns.
+2. **The quote embargo on real-mode reconstruction numbers is lifted.** The (b2) re-measure
+   replaced every stale sonnet-5 figure with Haiku-measured ones (cold batch 8.1 s headline,
+   3.3–8.6 s across the cold snaps; drift p50 0.107 / max 0.192, zero over the 0.35 budget,
+   zero refusals in 32 attempts). These are the quotable demo/interview numbers.
+3. **Sonnet-5 dialogue and the B2 thinking-off variants are deferred to the judged-eval
+   harness** (immediate-queue item 3): re-assess both once prose quality can actually be
+   scored. B2 stays unmeasured by design until then. The model-decision task is CLOSED for now.
+
+**Rejected:** ruling on prose quality from latency/cost numbers alone (the A/B deliberately
+measured no quality — the eval harness is that instrument); measuring B2 now (moot while the
+bar is already met and prose can't be judged).
+
+**Context:** the 2026-07-29 measurement session (session log). One analysis caveat rides with
+the A/B: the USD gap compounds the 3× rate difference with a ~1.36× tokenizer difference —
+sonnet-5 tokenizes the same prompts higher — so token columns are never comparable across
+models; compare USD computed from each model's own counts at its own rates.
+
+**Consequences to propagate:** `.env` (switched live, booleans-only script) and `.env.example`
+(dated comment) — done with this entry; the `architecture.md` roles line — which was ALSO still
+claiming Sonnet-class for reconstruction, a 2026-07-28 propagation miss — now dated and fixed,
+plus its §7 embargo sentence resolved; `unity-client.md`'s init-timeout annotation re-pointed
+at the Haiku numbers; `status.md` rows (b)/(b2). Deliberately NOT changed: the v1 `sonnet_*`
+wire-instrumentation names (`app\schemas.py` keeps them by an in-line kept-names note; the C#
+client mirrors them field-for-field) — renaming that contract would be its own scoped task.

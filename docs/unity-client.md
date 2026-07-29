@@ -98,9 +98,9 @@ and still said "six routes" — forks 1–3 added four more, all of which shippe
 
 HTTP errors map to typed exceptions (the Python service-error precedent — never swallowed,
 never retried silently). Timeouts are per-route config: `init` must tolerate the cold
-reconstruction pre-warm (measured 16.3 s real-mode — *against sonnet-5, before the 2026-07-28
-Haiku ruling; stale in the conservative direction, so the timeout is still safe. Re-measure before
-quoting: pre-ship item (b2)*), `turn` the full turn (~30 s ceiling),
+reconstruction pre-warm (16.3 s real-mode against the sonnet-5 stopgap; *re-measured 2026-07-29
+on the ruled Haiku class — 8.1 s headline, 3.3–8.6 s across the cold snaps; (b2) done, the quote
+embargo is lifted, and the generous timeout stays safe*), `turn` the full turn (~30 s ceiling),
 `observe` ~10 s; fire-and-forget observe is the session's job, not hidden retry logic here.
 
 **The null-vs-absent contract is load-bearing** (the panel's sharpest finding): on

@@ -78,9 +78,12 @@ PostgreSQL 16 + pgvector in Docker (the `pgvector/pgvector` image); UUID primary
 server-side; HNSW vector index (a cheaply reversible choice).
 
 **Models.** Haiku-class for importance scoring, description rendering, typology classification,
-gist escalation, the behavior call, and reflection. Sonnet-class for streaming dialogue prose and
-for reconstruction. Every model role is an integrator knob with its own env var — nothing is
-hardcoded. **Seven vars exist today** and real mode requires all seven: `LONGMEM_MODEL_` +
+gist escalation, the behavior call, reflection, reconstruction *(re-confirmed 2026-07-28 — this
+line still said Sonnet-class for reconstruction until 2026-07-29, a propagation miss; §7 carries
+the resolution note)*, and — **ruled 2026-07-29 off the B1 A/B** — streaming dialogue prose
+(sonnet-5 held the dialogue role from the 2026-07-15 slice until then; it and the thinking-off
+variants are re-assessed once the judged-eval harness can score prose). Every model role is an
+integrator knob with its own env var — nothing is hardcoded. **Seven vars exist today** and real mode requires all seven: `LONGMEM_MODEL_` +
 `IMPORTANCE`, `RENDER`, `TYPOLOGY`, `ESCALATION`, `DIALOGUE`, `RECONSTRUCTION`, `BEHAVIOR`.
 
 Two honest limits on "each upgrades independently" *(corrected 2026-07-28 — the sentence
@@ -282,7 +285,10 @@ config had been running `claude-sonnet-5` since 2026-07-21 — a stopgap when th
 missing from `.env`, never a class ruling, and it silently contradicted the register for a week.
 Haiku stands; `.env.example` corrected. **Consequence: the real-mode reconstruction numbers taken
 in that window — the 16.3 s cold figure and the cost table's reconstruction rows — were measured
-against sonnet-5 and must be re-measured before they are quoted again.**)*; **one structured call
+against sonnet-5 and must be re-measured before they are quoted again.** *Resolved 2026-07-29:
+re-measured on Haiku — 8.1 s headline cold batch, 3.3–8.6 s across the cold snaps, ~4× cheaper,
+drift strictly better — and the quote embargo is lifted by ruling; the session log carries the
+quotable numbers.*)*; **one structured call
 batching all k cache misses per retrieval**;
 pre-warm at dialogue init; on a mid-scene miss, **block and expose a "reconstructing" signal**
 (latency becomes characterization). Async serve-verbatim-then-cache is **not** the design — if

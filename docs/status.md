@@ -50,9 +50,10 @@ short twice by usage limits (3/20 finders done, none refereed); the exhaustive r
 
 Remaining before recording: the **stage-2 Unity Play-mode gate** (the one verification not re-run
 in the audit pass — its MCP tools were unreachable from that session, and the plugin DLL was
-rebuilt three times across 2026-07-27/28), demo choreography + the demo corpus, the **B2
-thinking-off ruling** (B1 and the Haiku reconstruction re-measure landed 2026-07-29 — see the
-session log), and the judged eval harness (item 3). Stages 1 and 3's re-runnable halves — the C#
+rebuilt three times across 2026-07-27/28), demo choreography + the demo corpus, and the judged
+eval harness (item 3). *(The 2026-07-29 measurement rulings closed the model slate: haiku ships
+as the dialogue role, the reconstruction quote embargo is lifted, and sonnet-5 + the B2
+thinking-off variants are re-assessed after the eval harness exists.)* Stages 1 and 3's re-runnable halves — the C#
 build, the console interop gate (**now 23/23**, grown by the client-timing assertions), wire
 parity, and the `/ledger` route contract — were independently re-verified during the audit pass.
 
@@ -205,13 +206,14 @@ dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over
      trigger-set/threshold tuning — escalation fires on **79% of realistic prose** (importance p50 0.61
      vs the 0.45 threshold; +1.4 s + ~$0.0021 per fire), a cost/latency item and latency lever **D**'s
      server half.
-   - **(b) B1 haiku-dialogue A/B — MEASURED 2026-07-29 (rule on it).** Same-day arms, product
-     driver, 6×10 turns, seed 7: `perceived_first_word` p50/p95 **951/1701 ms on the haiku arm**
-     vs 1201/2775 on sonnet-5 — haiku meets the <1 s bar at p50, sonnet does not; dialogue cost
-     $0.109 vs $0.415/100 turns (~3× rate × ~1.36× tokenizer difference). Prose QUALITY
-     deliberately unassessed — that is item 3's judged-eval territory. **B2 thinking-off
-     variants** on the sonnet-5 calls remain one-liners needing a ruling — unmeasured by design.
-     Receipts: session log.
+   - **(b) B1 haiku-dialogue A/B — MEASURED + RULED 2026-07-29: haiku ships as the dialogue
+     role.** Same-day arms, product driver, 6×10 turns, seed 7: `perceived_first_word` p50/p95
+     **951/1701 ms on the haiku arm** vs 1201/2775 on sonnet-5 — haiku meets the <1 s bar at
+     p50, sonnet does not; dialogue cost $0.109 vs $0.415/100 turns (~3× rate × ~1.36×
+     tokenizer difference). `.env`/`.env.example` switched; dated register entry. Prose QUALITY
+     deliberately unassessed — sonnet-5 and the **B2 thinking-off variants** are deferred to
+     the judged-eval harness (item 3), re-assessed once prose can be scored. Receipts: session
+     log.
    - **(b2) Re-measure reconstruction on Haiku — DONE 2026-07-29.** The stale sonnet-5 figures
      are retired: cold batched retelling **16.3 s → 8.1 s** on the headline snap (3.3–8.6 s
      across the four cold snaps), ~4× cheaper per batch, cache-hit path still call-free. The
@@ -220,7 +222,8 @@ dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over
      in 32 attempts (sonnet 1/32). `.env` was found already corrected (model + both price rows)
      by the ruling session. The 2026-07-21 instrument no longer runs against current source; a
      fresh probe was staged and fake-mode-verified first — receipts + method in the session log.
-     Quote-ability of the new numbers in demo/interview awaits Jack's explicit OK.
+     The quote embargo is LIFTED (ruled 2026-07-29): the Haiku-measured numbers are the
+     quotable ones.
    - **(c) C1 scene-boundary reconstruction pre-warm BUILD → CONFIRMED POST-demo (ruled 2026-07-22).**
      The demo's cold stall (9–16 s on the stale sonnet-5 numbers; re-measured 2026-07-29 at
      ~3.3–8.6 s on the ruled Haiku class) is removed by off-camera warm-init choreography (fire

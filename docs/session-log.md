@@ -1133,6 +1133,18 @@ app/db/client/tests changes.
     `run_ab_driver.py`, `b2_report.real.json` (16 raw drift records with texts),
     `driver_report_A/B.json`, driver stdout tees. Docs touched: two queue rows + the (c) stall
     figure in `status.md`, and this entry.
+  - **Continuation (same session): all three rulings landed; the model-decision task is
+    CLOSED.** Jack lifted the quote embargo, ruled the dialogue role **Haiku as-is for now**,
+    and deferred sonnet-5 + the B2 thinking-off variants to the judged-eval harness (re-assess
+    when prose can actually be scored). Propagated: `.env` switched live (booleans-only script;
+    `load_settings` ok) + `.env.example` with a dated comment and haiku price placeholders; the
+    `architecture.md` roles line — found ALSO still claiming Sonnet-class for reconstruction, a
+    2026-07-28 propagation miss, fixed with dated notes — and its §7 embargo sentence resolved;
+    `unity-client.md`'s init-timeout annotation re-pointed at the Haiku numbers; `status.md`
+    rows (b)/(b2) + the remaining-before-recording list; the dated **"Haiku dialogue +
+    quote-embargo lift"** register entry + TOC line. Deliberately untouched: the v1 `sonnet_*`
+    wire-instrumentation names (kept by an in-line note in `app\schemas.py`; mirrored
+    field-for-field by the C# client) — renaming that contract would be its own scoped task.
 
 
 ---
