@@ -994,6 +994,72 @@ a dated correction note. The living state — current phase, queues, open questi
   - **Final state:** twelve commits, nothing pushed. Walkers 53/56/67/51/42/34/34, suite 55,
     keyless 48, interop gate 23/23, ruff clean, ledger 001–005, `longmem` pristine, tree clean.
 
+- **2026-07-28/29** — **Re-audit of the two Opus 5 sessions (Fable 5; cut short by usage
+  limits — continuation queued as status.md item 0.5).** Jack's request: both 2026-07-28
+  sessions ran on the newly released Opus 5, which he found unreliable mid-work-session;
+  stress-test everything it touched (the 13 unreverted audit commits `49a635b..91b1ad6` above
+  all) and stand as a reliable audit in its own right.
+  - **Forensics on the aborted work session landed (full 733-message transcript sweep):** the
+    revert was total — tree clean at `91b1ad6`, no commits, product DB untouched, the walker
+    scratch self-dropped. Its walker-run "failure" was a wrapper bug (PowerShell turned
+    fastcoref stderr INFO lines into `NativeCommandError` via `2>&1`), NOT a walker
+    regression — proven by this session's clean run. Survivals: an inert plan file, an inert
+    temp script, and `origin/main` force-rewound to `49a635b` at Jack's direction — local is
+    ahead 13 and the `docs\research\` corpus is single-machine again. **Jack ruled:
+    fast-forward push (`git push origin main`, never force) once the audit completes; a
+    blocked Unity gate does not block it.**
+  - **Every mechanical gate re-run fresh — all green, and every 7/28-recorded number
+    reproduces except one:** baseline (HEAD/tree clean/migrate no-arg "5 applied, 0 pending"/
+    `longmem` pristine — ten product tables 0 rows, ledger exactly 001–005); ruff 0.15.21
+    format 35/35 + check clean; suite **55 ×2** (determinism) + keyless **48**; both C# builds
+    0 warnings; console interop gate **23/23** (9 directives) live on scratch `longmem_smoke`;
+    `GET /ledger` 200 with all markers; **all seven walkers on fresh scratch
+    53/56/67/51/42/34/34**; no lone CR in any tracked blob (Python byte-count, not grep). The
+    one non-reproducing number: the floors.md re-verification note's "interop gate 21/21" —
+    fresh measurement and source both say 23 (the [11] client-timing checks landed mid-audit;
+    `docs\SETUP.md:192` carries the same stale 21). Correction queued, not applied (the
+    append-only-scope ruling below governs how).
+  - **DLL provenance proven stronger than the audit claimed:** the committed
+    `unity\Assets\Plugins\NpcMemory\NpcMemory.Core.dll` is byte-identical to a fresh Release
+    build of current source except 146 bytes, ALL build-identity: COFF stamp, MVID, PDB GUID,
+    and the SDK-embedded `1.0.0+<HEAD-sha>` strings — the committed DLL embeds `ae967cf`,
+    exactly consistent with its rebuild-then-commit in `750a9dd`. No source/binary drift.
+  - **Blocked: the stage-2 Unity Play-mode gate — still the one outstanding verification.**
+    Attempted per Jack's ruling: Editor open, bridge listening on 8080, fake-mode server
+    live — but zero `mcp__UnityMCP__*` tools reach a session (or its subagents) that started
+    before the Editor opened; the floor-verifier dispatched anyway and returned an honest
+    **blocked** (nothing simulated). Root cause is session-start ordering, NOT the
+    `~\.claude.json` duplicate repo keys (confirmed real — the forward-slash key carries
+    UnityMCP+postgres, the backslash key is empty — but this session resolved the good key).
+    **Needs attention: open Unity BEFORE launching the Claude Code session; clean the
+    duplicate keys.** Jack declined the manual-run fallback and ruled it recorded blocked.
+  - **Abandoned mid-flight (usage limits, twice): the 20-finder + refuter fan-out.**
+    Completed and journal-preserved (3/20): (i) **check-8 coverage gap CONFIRMED** —
+    `NpcDemoDriver.cs` check 8's frame window spans both turns so it cannot see an
+    inter-chunk SSE stall, and NO automated test anywhere covers the SSE main-thread-stall
+    regression (harness [11] measures a plain GET; harness [5] asserts only concatenation);
+    (ii) **the (b2) "Zero code" adjudication came back PARTIAL** — the aborted session's
+    premises are true (the driver handles only observe/utterance/scene; only the CLI sets
+    `as_of`) but its conclusion overreached: theta-crossing needs no `as_of` (wall-clock decay
+    + per-agent `reconstruction_theta`/tau knobs + the driver's `--agent`/`--database-uri`
+    re-targeting reach it), and the 16.3 s figure came from the REPL/scratchpad probe, not the
+    driver series — the probe's instruments were scratchpad-only, so "re-staged, not
+    one-command" is the surviving grain; (iii) the Ledger score panel is paste-only and the
+    REPL has no warm-init verb (verdict complete, in the journal). **NONE of the three are
+    adversarially refereed — treat all as unverified.** Never ran (17): the seven diff
+    reviewers (app/client/tests/gates/docs-split/docs-claims/misc), register reconciliation,
+    CRLF classification, and all eight dimension audits (incl. field-for-field wire parity).
+  - **Continuation pointers (lose nothing):** the plan file
+    `~\.claude\plans\the-two-most-recent-giggly-newell.md` (full phase design + Jack's seven
+    rulings); the workflow script
+    `~\.claude\projects\C--Users-jacks-Projects-longmem-npc\7d10cda7-b3cc-4055-ab65-b730d405e572\workflows\scripts\opus5-stress-audit-wf_5810df26-b8a.js`
+    and journal `...\subagents\workflows\wf_5810df26-b8a\journal.jsonl` beside it (run id
+    `wf_5810df26-b8a`; in-session resume only — a future session re-runs the 17 or harvests
+    the journal). Remaining work is enumerated in status.md queue item 0.5.
+  - **Final state:** one commit (this wrap-up — docs and registers only), nothing pushed; no
+    app/db/client/tests changes; scratch DBs dropped (`longmem_smoke`, `longmem_test`), port
+    8000 free, `longmem` pristine.
+
 
 ---
 

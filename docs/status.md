@@ -1,6 +1,6 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-07-28
+**Last updated:** 2026-07-29
 **Phase:** **immediate-queue item 2 is BUILT end to end — backend, C# client, Unity scene, and
 The Ledger all stand.** Stages 0–3 landed 2026-07-27 across four sessions: the three ruled-in
 routes (SSE `POST /v1/dialogue/turn/stream` over the SAME async-generator seam, `POST /v1/agents`
@@ -32,6 +32,19 @@ one real defect and a systematic layer of drift:
 - **Propagation caught up:** `architecture.md` knew nothing of the five routes shipped 2026-07-27;
   the IDs-and-scores invariant was false as written for the two unscored inspector reads; the
   register still called a closed decision open. This file was split three ways (below).
+
+**2026-07-29 — re-audit of the Opus 5 sessions (Fable 5): all gates reproduce; continuation
+queued.** Both 2026-07-28 sessions ran on Opus 5, so everything they touched was re-verified
+fresh: suite 55 ×2 + keyless 48, all seven walkers 53/56/67/51/42/34/34, ruff clean at the pin,
+both C# builds 0 warnings, interop gate **23/23** live, `/ledger` 200, migrate no-op, `longmem`
+pristine, no lone CR — and the committed Unity DLL proven byte-identical to a fresh build of
+current source (build-identity bytes only). The aborted work session's revert is verified total
+(full transcript sweep); its one standing consequence: `origin/main` sits at `49a635b` (local
+ahead 13) — **push ruled: fast-forward once the audit completes, not blocked by the Unity
+gate**. The stage-2 Play-mode gate was attempted and remains blocked (session-start ordering —
+open Unity BEFORE launching the session; see the session log). The finding fan-out was cut
+short twice by usage limits (3/20 finders done, none refereed) — **the continuation is queue
+item 0.5**.
 
 Remaining before recording: the **stage-2 Unity Play-mode gate** (the one verification not re-run
 in the audit pass — its MCP tools were unreachable from that session, and the plugin DLL was
@@ -123,6 +136,20 @@ dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over
    `LONGMEM_MODEL_BEHAVIOR` is present (prior thread); verified via `config.load_settings` (no values
    printed): all eleven `LONGMEM_PRICE_*` keys parse, provider mode `real`, `load_settings()` OK. The
    2026-07-21 flagged crash is resolved; real mode is unblocked for the real-providers-only demo.
+0.5. **Re-audit continuation (from 2026-07-29 — usage limits cut the session short).** Standing:
+   every mechanical gate re-verified green (phase header above; evidence + exact artifact paths
+   in the session log's 2026-07-28/29 entry). Remaining: (i) run the **17 never-run finders** +
+   adversarial refutation over ALL findings (workflow script + journal preserved — paths in the
+   session log; the 3 completed finder verdicts are unrefereed); (ii) triage the three completed
+   verdicts (check-8/SSE-stall coverage gap CONFIRMED-unrefereed; (b2) "Zero code" PARTIAL —
+   see the session log for the surviving grain; Ledger score panel paste-only + no REPL
+   warm-init verb); (iii) **Series B register corrections already measurement-confirmed:**
+   `docs\SETUP.md:192` "21 checks" → 23, floors.md re-verification prose "21/21" → 23/23
+   (edit-in-place per the 2026-07-29 append-only-scope ruling), "30 wire models" → 31 where
+   stated; (iv) surfaced ruling-worthy items: check-8 teeth (Fork F3), Ledger live feed +
+   warm-init verb, CRLF working-tree renormalization (16 files; blobs are LF), `~\.claude.json`
+   duplicate repo keys, the Unity-gate session-ordering procedure; (v) the ruled **fast-forward
+   push** once (i)–(ii) complete.
 1. **HTTP dialogue-turn route + honest latency metric — DONE (built + floor-verified 2026-07-23).**
    `POST /v1/dialogue/turn` is live (stateless, non-streaming, 404/422, pass-through), with
    `perceived_first_word_ms` beside `first_word_ms` — the <1 s bar's field — surfaced in the CLI

@@ -57,6 +57,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Unity-client stages 1-3 — build record — 2026-07-27](#unity-client-stages-1-3--build-record--2026-07-27)
 - [Full-repo audit rulings — 2026-07-28](#full-repo-audit-rulings--2026-07-28)
 - [Reconstruction model class + migration immutability — 2026-07-28](#reconstruction-model-class--migration-immutability--2026-07-28)
+- [Floors-register append-only scope — 2026-07-29](#floors-register-append-only-scope--2026-07-29)
 
 ## Primary decisions
 
@@ -2269,3 +2270,22 @@ extends. The stale path in 004's comment stays stale on purpose, explained in
 `docs\research\README.md`. Enforcement is convention, not machinery — a checksum column in
 `schema_migrations` would make it mechanical, and is deliberately **not** built here: it is a
 schema change to the ledger itself, which wants its own scoped task rather than riding an audit.
+
+## Floors-register append-only scope — 2026-07-29
+
+**Decided:** `docs\floors.md`'s append-only rule protects the **table rows** — a landed floor
+row is never edited except a dated supersede note. Prose elsewhere in the file, including the
+"Re-verification passes" notes, is a living record: a confirmed error there is corrected **in
+place**, dated by the correcting session.
+
+**Rejected:** dated-correction-note-only (append a note, leave the wrong figure standing) and
+leave-as-is (session-log-only).
+
+**Context:** the 2026-07-28 re-verification note records the console interop gate at 21/21;
+source has 23 deterministic checks and a fresh 2026-07-29 live run measured **23/23** (the [11]
+client-timing checks landed mid-audit, after that note's gate run). The correction itself rides
+the re-audit continuation (status.md queue item 0.5), not this wrap-up.
+
+**Consequences to propagate:** nothing states the old position as policy; the fix targets when
+the continuation lands are `docs\floors.md` (the 21/21 figure in the re-verification note) and
+`docs\SETUP.md:192` (the same stale 21).
