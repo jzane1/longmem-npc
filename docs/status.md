@@ -50,8 +50,9 @@ short twice by usage limits (3/20 finders done, none refereed); the exhaustive r
 
 Remaining before recording: the **stage-2 Unity Play-mode gate** (the one verification not re-run
 in the audit pass — its MCP tools were unreachable from that session, and the plugin DLL was
-rebuilt three times across 2026-07-27/28), demo choreography + the demo corpus, the B1/B2 latency
-experiments, and the judged eval harness (item 3). Stages 1 and 3's re-runnable halves — the C#
+rebuilt three times across 2026-07-27/28), demo choreography + the demo corpus, the **B2
+thinking-off ruling** (B1 and the Haiku reconstruction re-measure landed 2026-07-29 — see the
+session log), and the judged eval harness (item 3). Stages 1 and 3's re-runnable halves — the C#
 build, the console interop gate (**now 23/23**, grown by the client-timing assertions), wire
 parity, and the `/ledger` route contract — were independently re-verified during the audit pass.
 
@@ -204,22 +205,25 @@ dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over
      trigger-set/threshold tuning — escalation fires on **79% of realistic prose** (importance p50 0.61
      vs the 0.45 threshold; +1.4 s + ~$0.0021 per fire), a cost/latency item and latency lever **D**'s
      server half.
-   - **(b) B1/B2 dialogue-latency experiments** against the <1 s first-word bar:
-     haiku-dialogue A/B is a zero-code env swap; thinking-off variants on the sonnet-5 calls
-     are one-liners needing a ruling. Measure, then rule.
-   - **(b2) Re-measure reconstruction on Haiku — NEW 2026-07-28, from the model-class ruling.**
-     Every real-mode reconstruction number on record was taken while the role was misconfigured
-     as sonnet-5 (2026-07-21 → 2026-07-28): the **16.3 s cold-reconstruction figure**, the
-     `$0.44/100-turn` cost table's reconstruction rows, and the pre-warm/warm-init timings that
-     hang off them. They are stale in the conservative direction — Haiku should be faster and
-     cheaper — so nothing built on them is *unsafe*, but they must not be quoted in the demo or
-     the interview until re-run. Zero code: correct `.env`, then re-run the real-mode profiling
-     pass. Cheapest done alongside (b), same session, same harness. **Also re-check drift
-     quality** — the drift-refusal rate was measured on sonnet-5 retellings, and a smaller model
-     may sit differently against the 0.35 budget; that is the one place this could be a real
-     regression rather than a bookkeeping fix.
+   - **(b) B1 haiku-dialogue A/B — MEASURED 2026-07-29 (rule on it).** Same-day arms, product
+     driver, 6×10 turns, seed 7: `perceived_first_word` p50/p95 **951/1701 ms on the haiku arm**
+     vs 1201/2775 on sonnet-5 — haiku meets the <1 s bar at p50, sonnet does not; dialogue cost
+     $0.109 vs $0.415/100 turns (~3× rate × ~1.36× tokenizer difference). Prose QUALITY
+     deliberately unassessed — that is item 3's judged-eval territory. **B2 thinking-off
+     variants** on the sonnet-5 calls remain one-liners needing a ruling — unmeasured by design.
+     Receipts: session log.
+   - **(b2) Re-measure reconstruction on Haiku — DONE 2026-07-29.** The stale sonnet-5 figures
+     are retired: cold batched retelling **16.3 s → 8.1 s** on the headline snap (3.3–8.6 s
+     across the four cold snaps), ~4× cheaper per batch, cache-hit path still call-free. The
+     drift re-check — the one feared real regression — came back **better** on Haiku: distances
+     p50 0.107 / max 0.192 vs sonnet's 0.157 / 0.244, zero over the 0.35 budget, zero refusals
+     in 32 attempts (sonnet 1/32). `.env` was found already corrected (model + both price rows)
+     by the ruling session. The 2026-07-21 instrument no longer runs against current source; a
+     fresh probe was staged and fake-mode-verified first — receipts + method in the session log.
+     Quote-ability of the new numbers in demo/interview awaits Jack's explicit OK.
    - **(c) C1 scene-boundary reconstruction pre-warm BUILD → CONFIRMED POST-demo (ruled 2026-07-22).**
-     The demo's 9–16 s cold stall is removed by off-camera warm-init choreography (fire
+     The demo's cold stall (9–16 s on the stale sonnet-5 numbers; re-measured 2026-07-29 at
+     ~3.3–8.6 s on the ruled Haiku class) is removed by off-camera warm-init choreography (fire
      `/v1/dialogue/init` at each scene basis during a camera cut; within-scene byte-stability ⇒ identical
      on-camera bytes), so the full pre-warm build is not demo-blocking. This relaxes the latency slate's
      "all pre-demo" wording for C1. (The scene-frozen cache key still supports the full background build

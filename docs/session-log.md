@@ -1086,6 +1086,54 @@ a dated correction note. The living state — current phase, queues, open questi
     **pushed to `origin/main` (fast-forward) per the ruling — the off-machine backup is
     restored.**
 
+**2026-07-29 — measurement session (Fable 5): (b2) Haiku reconstruction re-measure + B1
+dialogue A/B — all green; rulings queued.** Began as a state-observation request; the approved
+next action was queue items (b)+(b2), env-swap arms only (B2 thinking-off variants deliberately
+untouched — they need Jack's ruling). All runs real-mode on scratch DBs (`longmem_b2`,
+`longmem_driver` — created, migrated 001–005, dropped); product `longmem` untouched; zero
+app/db/client/tests changes.
+
+  - **`.env` was already correct.** The (b2) prerequisite ("correct `.env`, then re-run") was
+    pre-satisfied: the reconstruction role already named `claude-haiku-4-5-20251001` and both
+    reconstruction price rows already carried 1.00/5.00 — verified by a boolean-only line check
+    (no values echoed; `load_settings` ok; provider mode real). The ruling session evidently
+    fixed the live file alongside `.env.example`.
+  - **Re-staged, as the audit's PARTIAL verdict predicted.** The 2026-07-21 `probe_real.py` no
+    longer runs against current source: it imports the removed `EscalationHardStopError`, awaits
+    `run_dialogue_turn` as a coroutine (pre-split-brain), and builds a five-field `Providers`.
+    A focused rebuild (`probe_b2_haiku.py`: the a1 seed subset + the five stage-d recon snaps +
+    the drift addendum inline, corpora/labels/request shapes byte-matched to the baseline) went
+    through a keyless fake-mode dry run first, then ran real.
+  - **(b2) — Haiku is faster, ~4× cheaper, and drifts LESS than the stale sonnet-5 numbers.**
+    Cold batched retellings (8 rows/batch): 16257→8071 ms (the 16.3 s headline), 14938→5112,
+    9211→3307, 8838→7997; cache-hit reread stays call-free (13 ms). Whole probe $0.0157 at
+    Haiku list rates (~$0.0039/batch vs ~$0.0158 sonnet). The drift re-check — the one feared
+    real regression — came back better: distances p50 0.1074 / p95 0.1627 / max 0.1924 (sonnet
+    0.1571/0.239/0.2437), 0 over the 0.35 budget, 0 refusals in 32 attempts (sonnet 1/32).
+    Qualitatively the 16 raw tellings keep gist near-verbatim and add first-person identity
+    color; the max-distance telling reframes the keep-well fact as hearsay. Demo consequence:
+    the cold stall is ~3.3–8.6 s pre-warm-init (was 9–16 s).
+  - **B1 haiku-dialogue A/B (product driver, 6×10 turns, seed 7, gate-budget 0.3, same-day
+    arms):** `perceived_first_word` — the <1 s bar's field — p50/p95 **951/1701 ms (haiku)** vs
+    1201/2775 (sonnet-5): haiku meets the bar at p50; sonnet misses. `first_word` p50 657 vs
+    900; `dialogue_total` p50 1751 vs 2559; 60 turns, 0 degraded, both arms. Dialogue cost
+    $0.109 vs $0.415/100 turns — the 3× rate gap × a ~1.36× tokenizer difference (sonnet-5
+    counts the same prompts higher: 85.5k vs 62.8k in/100 turns; write/embedding rows identical
+    across arms, which pins the artifact). Prose quality deliberately unassessed — that is item
+    3's judged-eval territory.
+  - Side notes, report-only: gate novelty efficacy 1.0 both arms (0.857 on 07-21); the
+    calibration block recommends ~0.38–0.39 for a 0.3 target (0.33 then). Sonnet-5 currently
+    has intro API pricing ($2/$10 through 2026-08-31); the cost table used list 3/15 — if the
+    billed rate is the intro one, the sonnet arm's USD shrinks ~33% and the latency verdict is
+    unchanged.
+  - **Queued for rulings (measure-then-rule):** (i) lift the quote embargo on the reconstruction
+    numbers (now Haiku-measured); (ii) dialogue model for the demo — haiku wins the bar and the
+    cost, prose quality unjudged; (iii) B2 thinking-off one-liners — measure or drop.
+  - Artifacts scratchpad-only per precedent (session `85779bb1-…`): `probe_b2_haiku.py`,
+    `run_ab_driver.py`, `b2_report.real.json` (16 raw drift records with texts),
+    `driver_report_A/B.json`, driver stdout tees. Docs touched: two queue rows + the (c) stall
+    figure in `status.md`, and this entry.
+
 
 ---
 
