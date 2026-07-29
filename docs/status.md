@@ -8,7 +8,7 @@ provisioning, and the two unscored inspector reads), then `client\NpcMemory.Core
 harness (**interop gate 21/21**), then the Unity adapter + gray-box set (**Play-mode gate 8/8**,
 chunk callbacks on the main thread), then The Ledger at `GET /ledger`, which rendered a real
 corrected chain in the browser — original greyed → correction greyed → reconstruction live.
-Schema frozen at migrations 001–005 throughout. **Eighteen floors stand verified**
+Schema frozen at migrations 001–005 throughout. **Nineteen floors stand verified**
 (`docs\floors.md`).
 
 **2026-07-28 — full-repo audit + remediation.** Seven read-only dimension auditors plus an
@@ -41,21 +41,37 @@ pristine, no lone CR — and the committed Unity DLL proven byte-identical to a 
 current source (build-identity bytes only). The aborted work session's revert is verified total
 (full transcript sweep); its one standing consequence: `origin/main` sits at `49a635b` (local
 ahead 13) — **push ruled: fast-forward once the audit completes, not blocked by the Unity
-gate**. The stage-2 Play-mode gate was attempted and remains blocked (session-start ordering —
-open Unity BEFORE launching the session; see the session log). The finding fan-out was cut
+gate**. The stage-2 Play-mode gate was attempted and blocked in that pass (session-start ordering —
+open Unity BEFORE launching the session). **It has since LANDED (2026-07-29, Unity opened first) —
+see the dated block below.** The finding fan-out was cut
 short twice by usage limits (3/20 finders done, none refereed); the exhaustive re-run was then
 **descoped by ruling** in favor of a main-loop verification tail — all green — and the audit is
 **complete** (details in queue item 0.5, now DONE). The ruled fast-forward push is executed;
 `origin/main` matches local again.
 
-Remaining before recording: the **stage-2 Unity Play-mode gate** (the one verification not re-run
-in the audit pass — its MCP tools were unreachable from that session, and the plugin DLL was
-rebuilt three times across 2026-07-27/28), demo choreography + the demo corpus, and the judged
-eval harness (item 3). *(The 2026-07-29 measurement rulings closed the model slate: haiku ships
+Remaining before recording: demo choreography + the demo corpus, and the judged
+eval harness (item 3). *(The **stage-2 Unity Play-mode gate** — long the one outstanding
+verification — LANDED 2026-07-29: fake 8/8 + an independent floor-verifier re-run + a real-mode 8/8
+corroboration; floor row 19.)* *(The 2026-07-29 measurement rulings closed the model slate: haiku ships
 as the dialogue role, the reconstruction quote embargo is lifted, and sonnet-5 + the B2
 thinking-off variants are re-assessed after the eval harness exists.)* Stages 1 and 3's re-runnable halves — the C#
 build, the console interop gate (**now 23/23**, grown by the client-timing assertions), wire
 parity, and the `/ledger` route contract — were independently re-verified during the audit pass.
+
+**2026-07-29 — stage-2 Unity Play-mode gate LANDED as a floor (Opus 4.8).** The last verification
+outstanding before recording is done. Unity was opened before the session, clearing the
+session-ordering block — the MCP bridge reached both the main loop and the floor-verifier subagent
+(the read-only bridge check ran first, as required: instance up, `ready_for_tools`, right project,
+`read_console` round-trip; no diagnosing session needed). The gate ran **8/8 in fake mode** (the
+gate-of-record, scratch DB `longmem_smoke`, `autoRun` toggled via MCP before Play); an independent
+**floor-verifier re-ran it 8/8 live** (fresh agent, +12 frames, 0 console errors) and re-proved DLL
+build-identity provenance (150 build-identity bytes vs a fresh HEAD build, fresh sha == `5bec081`,
+no source/binary drift). A **real-mode pass** (Haiku dialogue, Jack ruled it in) also went **8/8** —
+check #8 read **+1061 frames** through the real streamed turn (vs +11/+12 fake), the regression test
+the fake path cannot be for the SSE main-thread fix. `autoRun` restored (scene unsaved — committed
+`autoRun: 0` preserved), `longmem_smoke` dropped, `longmem` pristine, port free. **Nineteen floors**
+now stand (`docs\floors.md` row 19). Dated register entry: **"Stage-2 Play-mode gate verification +
+real-mode corroboration."**
 
 **Prior phases:** the stacked phase blocks moved to `docs\session-log.md` ("Archived phase headers") on 2026-07-28 — they are era summaries, not live state.
 
@@ -84,7 +100,7 @@ and the structured behavior output survive the interview. Research publication c
 
 ## Verified floors
 
-**Eighteen floors stand verified.** The full table — layer, what it was verified against, and
+**Nineteen floors stand verified.** The full table — layer, what it was verified against, and
 the date — moved to **`docs\floors.md`** on 2026-07-28 so this living file stays small enough
 to auto-load. That file states the counting convention; cite it rather than a number in prose.
 
@@ -191,11 +207,10 @@ dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over
    eval arm). The REPL still drives all beats today (`:as-of` jumps + scene boundaries + band
    crossings; `:correct` moves retrieval AND entities; the gate debug line + `(reconstructing…)`).
    *(2026-07-28: stage 1's re-runnable half — build, console interop gate, wire parity — was
-   independently re-verified twice during the audit pass. **The stage-2 Unity Play-mode gate was
-   NOT re-run and is the one outstanding verification**; its MCP tools were not reachable from the
-   audit session. It matters more than usual because the plugin DLL was rebuilt three times across 2026-07-27/28 —
-   once for the SSE main-thread fix, once for the client timing term — so run it before recording:
-   open the scene, enable `autoRun`, expect 8/8 with chunk callbacks on thread 1.)*
+   independently re-verified twice during the audit pass. **The stage-2 Unity Play-mode gate LANDED
+   2026-07-29** — fake 8/8 + an independent floor-verifier re-run 8/8 + a real-mode 8/8
+   corroboration (check #8 +1061 frames under real streaming; DLL provenance re-proven, no drift) —
+   closing the last outstanding verification; it is now floor row 19.)*
 
 **Pre-ship latency items** (2026-07-21 latency slate; **audit re-sequenced 2026-07-22** — the
    perceived-TTFT metric moved into item 1; pre-warm build proposed post-demo):

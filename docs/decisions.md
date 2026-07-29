@@ -59,6 +59,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Reconstruction model class + migration immutability — 2026-07-28](#reconstruction-model-class--migration-immutability--2026-07-28)
 - [Floors-register append-only scope — 2026-07-29](#floors-register-append-only-scope--2026-07-29)
 - [Haiku dialogue + quote-embargo lift — 2026-07-29](#haiku-dialogue--quote-embargo-lift--2026-07-29)
+- [Stage-2 Play-mode gate verification + real-mode corroboration — 2026-07-29](#stage-2-play-mode-gate-verification--real-mode-corroboration--2026-07-29)
 
 ## Primary decisions
 
@@ -2324,3 +2325,32 @@ plus its §7 embargo sentence resolved; `unity-client.md`'s init-timeout annotat
 at the Haiku numbers; `status.md` rows (b)/(b2). Deliberately NOT changed: the v1 `sonnet_*`
 wire-instrumentation names (`app\schemas.py` keeps them by an in-line kept-names note; the C#
 client mirrors them field-for-field) — renaming that contract would be its own scoped task.
+
+## Stage-2 Play-mode gate verification + real-mode corroboration — 2026-07-29
+
+**Decided (one ruling, one verification session):**
+
+1. **The stage-2 Unity Play-mode gate runs fake-mode as the gate-of-record, AND a real-mode pass is
+   run alongside it.** Asked at plan approval whether to run only the documented fake-mode gate or
+   also a real-mode pass, Jack ruled **also a real-mode pass**. Basis: fake-mode streaming is fast
+   enough to *mask* the SSE main-thread stall the plugin DLL was rebuilt to fix — check #8
+   (frame-pump) passed 8/8 in fake mode even with that bug historically present — so only real
+   inter-chunk gaps actually exercise the fix.
+
+**Outcome:** both passed **8/8** through the MCP-for-Unity bridge (fake-mode gate-of-record +
+independent floor-verifier live re-run; real-mode corroboration). Check #8 read +11/+12 frames in
+fake mode vs **+1061 frames** in real mode — the real pass is the genuine regression test the fake
+path cannot be. The gate landed as floor row 19 (`floors.md`); DLL build-identity provenance
+re-proven (150 build-identity bytes vs a fresh HEAD build, no source/binary drift).
+
+**Context:** the gate was the one verification outstanding before demo recording, reported
+**blocked** on 2026-07-29 by session-start ordering (the session began before the Unity Editor
+opened, so no `mcp__UnityMCP__*` tools registered). Cleared by opening Unity first — the bridge
+reached both the main loop and the floor-verifier subagent. Root cause named, not worked around.
+
+**Still surfaced (not ruled, not fixed here):** the `~\.claude.json` duplicate repo keys — the empty
+backslash key is the latent re-trigger of this exact blocker (cleaning it prevents recurrence); and
+the committed plugin DLL still has no automated staleness guard (it is proven current by manual
+byte-diff each time). Two non-blocking gate soft spots recorded in `floors.md` row 19: check #1 is a
+guarded `Check(true,…)` and directive/reputation callbacks are subscribed-but-not-asserted
+(delegated to the stage-1 console floor).

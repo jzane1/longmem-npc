@@ -1146,6 +1146,52 @@ app/db/client/tests changes.
     wire-instrumentation names (kept by an in-line note in `app\schemas.py`; mirrored
     field-for-field by the C# client) — renaming that contract would be its own scoped task.
 
+**2026-07-29 — stage-2 Unity Play-mode gate LANDED as a floor + real-mode corroboration (Opus
+4.8).** The one verification outstanding before demo recording — blocked on 2026-07-29 by
+session-start ordering (the session began before the Editor opened, so no `mcp__UnityMCP__*` tools
+registered). This session started with Unity already open; the bridge reached the main loop AND the
+floor-verifier subagent, so the block is cleared and root-caused, not worked around. Nineteen floors
+now stand.
+
+  - **MCP bridge verified read-only first** (the user's explicit requirement): one instance
+    `unity@5c4691b082890e05` (Unity 6000.3.17f1), `ready_for_tools: true`, `project/info` =
+    `…\longmem-npc\unity`, `read_console` round-trip clean, `NpcDemo` live (instanceID 47906). No
+    diagnosing session needed.
+  - **Fake-mode gate 8/8 GREEN — the gate-of-record.** Backend up in fake mode on scratch DB
+    `longmem_smoke` (`docker compose` → migrate 001–005 → `python -m app.serve`; `/docs` 200 — there
+    is no `/health` route; the ~30 s warmup is the spaCy/fastcoref load fake mode still does).
+    `autoRun` flipped true via `manage_components` in edit mode (before Play — scene mutations fail in
+    Play), entered Play via `manage_editor`, read the `[npc-demo]` receipts: all 8 PASS + `ALL
+    PLAY-MODE BEATS PASSED (8 checks)` (agent 552052c0, +11 frames; the transient `no_unity_session`
+    right after Play-enter is the domain-reload window, expected and retried).
+  - **Independent floor-verifier: PASS — and it re-drove the gate live** (subagent bridge reachable —
+    the 2026-07-29 failure did NOT recur): fresh 8/8, new agent 1bbd6b3b, +12 frames, 0 console
+    errors. DLL build-identity provenance re-proven — a fresh `dotnet build -c Release` differs from
+    the committed `NpcMemory.Core.dll` by **150 bytes, all build-identity** (COFF stamp, MVID, PDB
+    GUID/checksum, embedded version sha), fresh sha == HEAD `5bec081`, all IL/metadata byte-identical →
+    no source/binary drift (the committed DLL's embedded sha `ae967cf` lags one commit — built 5 min
+    before `750a9dd` — but its IL is current). Two non-blocking soft spots recorded: check #1 is a
+    guarded `Check(true,…)` (protected by the 30 s Ready-wait timeout) and directive/reputation
+    callbacks are subscribed-but-not-asserted (delegated to the stage-1 console floor). Quirk: only
+    `mcp__UnityMCP__`-prefixed tool names resolve for a subagent, not bare names.
+  - **Real-mode corroboration pass 8/8 (Jack ruled it in at plan approval) — exercises the SSE fix
+    fake mode masks.** Swapped the backend to real mode (Haiku dialogue, fresh scratch DB; real config
+    validated at startup — all 7 model roles + keys present or it refuses to start), re-entered Play:
+    8/8 again (agent 41d3838e), 0 errors — and check #8 read **+1061 frames** through the real streamed
+    turn (vs +11/+12 fake). That is the regression test the fake path can't be: real inter-chunk gaps
+    mean a main-thread block would collapse the frame count; ~1000 frames proves the
+    `ConfigureAwait(false)`-removal / `ReadLineAsync` SSE fix holds under real streaming.
+  - **State restored, nothing leaked.** `autoRun` set back to `false`, scene NOT saved (committed
+    `autoRun: 0` preserved); real server stopped, `longmem_smoke` dropped, port 8000 free; `longmem`
+    pristine by construction (every `DATABASE_URI` used was the scratch DB — `databases present:
+    ['longmem']` after the drop).
+  - **Records + commit:** `floors.md` row 19 + counting convention 18→19 + the blocked note resolved;
+    `status.md` (new dated block, remaining-before-recording, floor counts, queue item 2); the dated
+    **"Stage-2 Play-mode gate verification + real-mode corroboration"** register entry + TOC line; this
+    entry. Docs-only commit (zero app/db/client/tests/scene changes). Still surfaced for a ruling, not
+    fixed here: the `~\.claude.json` duplicate-key cleanup (the empty backslash key is the latent
+    re-trigger of this exact blocker) and a DLL staleness guard.
+
 
 ---
 
