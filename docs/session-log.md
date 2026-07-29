@@ -1056,9 +1056,35 @@ a dated correction note. The living state — current phase, queues, open questi
     and journal `...\subagents\workflows\wf_5810df26-b8a\journal.jsonl` beside it (run id
     `wf_5810df26-b8a`; in-session resume only — a future session re-runs the 17 or harvests
     the journal). Remaining work is enumerated in status.md queue item 0.5.
-  - **Final state:** one commit (this wrap-up — docs and registers only), nothing pushed; no
-    app/db/client/tests changes; scratch DBs dropped (`longmem_smoke`, `longmem_test`), port
-    8000 free, `longmem` pristine.
+  - **Continuation (same session, later 2026-07-29).** A usage-limit diagnosis interlude
+    measured the burn mechanics (request-count × context size dominates; the 7/28 dual-repo
+    audit marathons ≈ 252M weighted tokens in one day; Opus 5's loop takes ~2–3× more, smaller
+    steps than Fable's; the status.md split already cut per-request context ~283k → ~106k).
+    **Two rulings from Jack:** (i) **quality over token thrift** — never degrade work scope or
+    effort to save tokens; no thrift prescriptions in the repo (he would rather upgrade the
+    plan); (ii) after the resumed 17-finder fan-out burned ~10% of a usage window in three
+    minutes (every subagent inheriting xhigh effort), **the exhaustive fan-out was descoped by
+    ruling** and replaced with a main-loop tail of the four highest-value checks. The three
+    completed finder verdicts stand as recorded-unrefereed.
+  - **Main-loop tail — all four checks green:** sanctioned-writes sweep (every UPDATE/DELETE in
+    `app\`+`db\` maps to the sanctioned set — pin toggle, reputation apply, `invalid_at`
+    supersession ×3, the sole cache-eviction DELETE, 003's self-sanctioned backfill; nothing
+    else exists); `.env` in zero of the 72 commits across all refs; wire parity **31/31 classes,
+    zero field-name mismatches** (scripted, both sides); docs-split losslessness re-proof —
+    **all 18 floor rows and all 851 session-log lines present**, six carrying deliberate dated
+    in-place annotations from phase 7's research-folder move, so the 7/28 "verbatim /
+    byte-identical" attestations were true-at-measurement but stale-at-wrap-up (the same error
+    class as the 21/21 figure).
+  - **Series B corrections applied (rulings 3 + 5):** `SETUP.md` 21→23 checks; `status.md`
+    30→31 wire models; `floors.md` 21/21→23/23 plus the verbatim-preamble exception and the
+    lossless-claim clarification — each corrected in place with a 2026-07-29 date per the
+    append-only-scope ruling. Still surfaced, not built: check-8/F3 teeth, the Ledger live feed
+    + REPL warm-init verb, CRLF renormalization, `~\.claude.json` duplicate keys, the Unity
+    session-ordering procedure.
+  - **Final state:** two commits (both docs/registers only — zero app/db/client/tests changes);
+    scratch DBs dropped (`longmem_smoke`, `longmem_test`), port 8000 free, `longmem` pristine;
+    **pushed to `origin/main` (fast-forward) per the ruling — the off-machine backup is
+    restored.**
 
 
 ---

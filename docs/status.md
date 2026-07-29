@@ -15,7 +15,7 @@ Schema frozen at migrations 001–005 throughout. **Eighteen floors stand verifi
 adversarial verification pass over their findings; four refuted (two because the "problem" was an
 existing dated ruling of Jack's). The audit's own verdict on the codebase was that it is in good
 shape — zero prose assertions across the suite and walkers, every UPDATE/DELETE sanctioned, `.env`
-never in any git ref, the C# client mirroring all 30 wire models field-for-field. The pass fixed
+never in any git ref, the C# client mirroring all 31 wire models field-for-field. The pass fixed
 one real defect and a systematic layer of drift:
 
 - **The SSE consumer stalled the Unity main thread.** `NpcMemoryClient` drove its SSE loop off
@@ -43,8 +43,10 @@ current source (build-identity bytes only). The aborted work session's revert is
 ahead 13) — **push ruled: fast-forward once the audit completes, not blocked by the Unity
 gate**. The stage-2 Play-mode gate was attempted and remains blocked (session-start ordering —
 open Unity BEFORE launching the session; see the session log). The finding fan-out was cut
-short twice by usage limits (3/20 finders done, none refereed) — **the continuation is queue
-item 0.5**.
+short twice by usage limits (3/20 finders done, none refereed); the exhaustive re-run was then
+**descoped by ruling** in favor of a main-loop verification tail — all green — and the audit is
+**complete** (details in queue item 0.5, now DONE). The ruled fast-forward push is executed;
+`origin/main` matches local again.
 
 Remaining before recording: the **stage-2 Unity Play-mode gate** (the one verification not re-run
 in the audit pass — its MCP tools were unreachable from that session, and the plugin DLL was
@@ -136,20 +138,19 @@ dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over
    `LONGMEM_MODEL_BEHAVIOR` is present (prior thread); verified via `config.load_settings` (no values
    printed): all eleven `LONGMEM_PRICE_*` keys parse, provider mode `real`, `load_settings()` OK. The
    2026-07-21 flagged crash is resolved; real mode is unblocked for the real-providers-only demo.
-0.5. **Re-audit continuation (from 2026-07-29 — usage limits cut the session short).** Standing:
-   every mechanical gate re-verified green (phase header above; evidence + exact artifact paths
-   in the session log's 2026-07-28/29 entry). Remaining: (i) run the **17 never-run finders** +
-   adversarial refutation over ALL findings (workflow script + journal preserved — paths in the
-   session log; the 3 completed finder verdicts are unrefereed); (ii) triage the three completed
-   verdicts (check-8/SSE-stall coverage gap CONFIRMED-unrefereed; (b2) "Zero code" PARTIAL —
-   see the session log for the surviving grain; Ledger score panel paste-only + no REPL
-   warm-init verb); (iii) **Series B register corrections already measurement-confirmed:**
-   `docs\SETUP.md:192` "21 checks" → 23, floors.md re-verification prose "21/21" → 23/23
-   (edit-in-place per the 2026-07-29 append-only-scope ruling), "30 wire models" → 31 where
-   stated; (iv) surfaced ruling-worthy items: check-8 teeth (Fork F3), Ledger live feed +
-   warm-init verb, CRLF working-tree renormalization (16 files; blobs are LF), `~\.claude.json`
-   duplicate repo keys, the Unity-gate session-ordering procedure; (v) the ruled **fast-forward
-   push** once (i)–(ii) complete.
+0.5. **Re-audit continuation — DONE (2026-07-29, same session).** The exhaustive 17-finder
+   fan-out was **descoped by ruling** (it burned ~10% of a usage window in minutes; Jack chose a
+   main-loop tail instead). Tail results, all green: sanctioned-writes sweep clean; `.env` in
+   zero refs across all 72 commits; wire parity **31/31 classes, zero field-name mismatches**;
+   docs-split losslessness re-proven — content complete, with the 7/28 "byte-identical"
+   attestations shown measurement-time-true (six lines/rows gained dated phase-7 annotations;
+   floors.md corrected in place per the append-only-scope ruling). Register corrections applied:
+   SETUP 21→23, status 30→31, floors 21/21→23/23. The three completed-but-unrefereed finder
+   verdicts stand as recorded in the session log (check-8/SSE-stall coverage gap; (b2) "Zero
+   code" PARTIAL; Ledger score panel paste-only + no REPL warm-init verb). **Still surfaced for
+   rulings:** F3 check-8 teeth, Ledger live feed + REPL warm-init verb, CRLF renormalization
+   (16 files; blobs are LF), `~\.claude.json` duplicate keys, Unity-gate session-ordering.
+   **Pushed to `origin/main` (fast-forward) per the ruling.**
 1. **HTTP dialogue-turn route + honest latency metric — DONE (built + floor-verified 2026-07-23).**
    `POST /v1/dialogue/turn` is live (stateless, non-streaming, 404/422, pass-through), with
    `perceived_first_word_ms` beside `first_word_ms` — the <1 s bar's field — surfaced in the CLI

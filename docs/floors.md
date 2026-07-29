@@ -4,7 +4,9 @@ Split out of `status.md` on 2026-07-28 (full-repo audit). The table lived inside
 auto-loaded living file, where it cost ~8.7k tokens of every session's context and had
 drifted: blank lines between rows broke the GFM table after row 8, so the ten most recent
 floors did not render as a table anywhere, and the headline count disagreed with the rows.
-Rows are moved **verbatim** — no cell text was edited.
+Rows are moved **verbatim** — no cell text was edited. *(One exception, noted 2026-07-29: the
+Target-A row's `Research Papers\` pointer became `docs\research\` when the audit's phase 7 moved
+that folder into the repo — a path fix during propagation, not an evidence edit.)*
 
 **Append-only.** A row lands here only after an independent floor-verifier pass returns
 **pass** (CLAUDE.md: staged verification). Never edit a landed row except to add a dated
@@ -69,12 +71,17 @@ path grown by two for the malformed-output ladder row); full suite **55** twice 
 keyless subset **48** with both API keys provably scrubbed; `ruff check` clean and
 `ruff format --check` 35/35 with `target-version` confirmed unset; `migrate.py` no-arg "5 applied,
 0 pending" and schema frozen; `longmem` pristine (ten product tables 0 rows, ledger exactly
-001–005, no scratch residue); both C# projects 0 warnings and the console interop gate **21/21**
-live against a served backend; every tracked text blob LF with **no lone CR**; the committed Unity
+001–005, no scratch residue); both C# projects 0 warnings and the console interop gate **23/23**
+live against a served backend *(corrected 2026-07-29 — this note originally said 21/21, a stale
+figure: the [11] client-timing checks had already grown the gate to 23 mid-audit, and a fresh
+2026-07-29 live run measured 23/23)*; every tracked text blob LF with **no lone CR**; the committed Unity
 DLL diffed against a fresh build down to five build-identity fields with **0 differing bytes
 outside them**; the guard mutation-tested to prove it can fail; and the `status.md` three-way
 split proven **lossless by extraction** against `49a635b` — 18/18 floor rows and 851/851
-non-empty session-log lines byte-identical.
+non-empty session-log lines byte-identical. *(2026-07-29 re-proof: all 18 rows and all 851 lines
+remain present; six of them — five session-log lines and the Target-A floor row — later gained
+dated in-place annotations from phase 7's research-folder move, so "byte-identical" was true at
+the split-time measurement, not at wrap-up.)*
 
 Invariants re-checked and intact: no new in-place UPDATE of stored content, no new DELETE, read
 payloads still carrying IDs and scores, nothing integrator-configurable newly hardcoded.
