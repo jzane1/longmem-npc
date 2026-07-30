@@ -52,6 +52,7 @@ from app.schemas import (
     ObserveEvent,
     PinRequest,
     PinResult,
+    ReconstructionMetricsResult,
     RetrievalResult,
     SceneBoundaryEvent,
     SceneResult,
@@ -265,6 +266,24 @@ async def memory_chain(memory_id: UUID) -> MemoryChainResult:
     404 on unknown memory (the pin-route precedent)."""
     try:
         return await app.state.retrieval.memory_chain(memory_id)
+    except UnknownMemoryError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get(
+    "/v1/memories/{memory_id}/reconstruction-metrics",
+    response_model=ReconstructionMetricsResult,
+)
+async def reconstruction_metrics(memory_id: UUID) -> ReconstructionMetricsResult:
+    """The judge-free metric read (eval-harness.md stage 1, ruled
+    2026-07-29): gist-precision / detail-recall / fabrication / keyword
+    retention against the live telling head, The Ledger's on-screen numbers.
+    Runs no retrieval (no scores exist — the invariant does not bind) and
+    performs ZERO writes; the two inspector reads' unscored-by-contract
+    wording is untouched. 404 on unknown memory (the /chain shape);
+    pass-through by ruling."""
+    try:
+        return await app.state.retrieval.reconstruction_metrics(memory_id)
     except UnknownMemoryError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

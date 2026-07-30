@@ -425,4 +425,26 @@ namespace NpcMemory
         public int Limit { get; set; }
         public double TotalMs { get; set; }
     }
+
+    public sealed class ReconstructionMetricsResult
+    {
+        public Guid MemoryId { get; set; }
+        public Guid AgentId { get; set; }
+        public Guid? LiveDetailId { get; set; }
+        public string? LiveWriteCause { get; set; }
+        public string? AnchorCause { get; set; }
+        public int GistFactsTotal { get; set; }
+        public int GistFactsPresent { get; set; }
+        public double? GistPrecision { get; set; }
+        public int DetailLemmasTotal { get; set; }
+        public int DetailLemmasPresent { get; set; }
+        public double? DetailRecall { get; set; }
+        public List<string> TellingEntities { get; set; } = new List<string>();
+        public List<string> FabricatedEntities { get; set; } = new List<string>();
+        public double? FabricationRate { get; set; }
+        public double? KeywordRetention { get; set; }
+        public List<int> CacheBands { get; set; } = new List<int>();
+        public double MetricsMs { get; set; }
+        public double TotalMs { get; set; }
+    }
 }

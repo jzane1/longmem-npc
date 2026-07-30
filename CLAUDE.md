@@ -56,10 +56,12 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
   ruled 2026-07-15) — are deliberately updated in place and sit outside it.
 - Recency decay and bi-temporal invalidation are distinct mechanisms. Never conflate them.
 - Read endpoints **that run retrieval** always return memory IDs and scores alongside prose. The
-  test suite dies without this. Carve-out (ruled 2026-07-27, propagated 2026-07-28): the two
-  inspector reads — `GET /v1/memories/{id}/chain` and `GET /v1/agents/{id}/memories` — run no
-  retrieval, so no scores exist to return; they carry IDs and structured fields on every row and
-  are unscored *by contract*, not by omission.
+  test suite dies without this. Carve-out (ruled 2026-07-27, propagated 2026-07-28; third member
+  2026-07-29): the two inspector reads — `GET /v1/memories/{id}/chain` and
+  `GET /v1/agents/{id}/memories` — and the judge-free metric read
+  (`GET /v1/memories/{id}/reconstruction-metrics`, eval-harness.md) run no retrieval, so no
+  scores exist to return; they carry IDs and structured fields (the metric read: IDs + numbers)
+  and are unscored *by contract*, not by omission.
 - Nothing integrator-configurable is ever hardcoded: vocabularies, thresholds, model roles, knobs.
 - Within a scene, absent a diegetic event or an authorial correction on a memory, repeated reads
   return byte-identical text (correction added by the 2026-07-17 authorial-correction ruling).

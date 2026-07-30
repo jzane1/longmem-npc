@@ -1200,6 +1200,52 @@ now stand.
     Claude Code fully CLOSED, so the next session starts from a clean file; the verified removal
     script lives in the session scratchpad. Not a repo change (`.claude.json` is outside the repo).
 
+**2026-07-29 — eval-harness v1 planned + stage 1 built and floor-verified (Fable 5).** Started as
+a queue-confirmation question; Jack picked the eval harness (item 3) over choreography-first at an
+explicit ask, then ruled four plan forks at plan time (AskUserQuestion, all on the recommended
+options): judge role eval-runner-only, v1 judged categories = core 3 + prose quality, Ledger
+binding = a new read route, no migration. Plan explored (3 read-only agents), designed (Plan
+agent), spot-verified against source (one real catch at plan verification: the Plan agent's
+"31/31 wire-parity mechanism" claim is an attestation, not a mechanical gate — no reflective
+enumerator exists; and the ablation OFF arm must exclude correction-anchored chains, whose gist
+slot IS the corrected head — recorded as fork 11), approved, and stage 1 built in the same
+session.
+
+  - **Landed:** `docs\eval-harness.md` (plan-as-spec, all four stages contracted, 12-fork
+    settle-at-build table, stage-1 BUILT banner) + README spec row; `app\eval_metrics.py` (pure
+    judge-free metrics — anchor-cause-aware gist facts, threshold presence rule, honest-None
+    denominators, whole-word fabrication grounding, keyword retention, band parser);
+    `nlp.lemma_content_set` (write-pass filter promoted); `metric_gist_match_threshold` knob
+    (1.0); `ReconstructionMetricsResult` (18 fields); read-only `db.fetch_cache_keys`;
+    `RetrievalService.reconstruction_metrics` (live-head-only, pure identity render, spaCy in a
+    worker thread); `GET /v1/memories/{id}/reconstruction-metrics` (404 the /chain shape); the
+    Ledger numbers panel now fetches + renders the three metrics (try/catch — a metrics failure
+    never hides the chain) with the footer promise flipped to bound; C# mirror (Models.cs 31→32,
+    `ReconstructionMetricsAsync`, harness check 23→24); suite Set G (5 pure unmarked + 3
+    nlp-marked, incl. the non-perturbation pair). Docs propagated in-pass: test-suite.md (63/53 +
+    Set G section + route row), architecture.md (§6 metric-read paragraph, twelve-route table,
+    eleven client verbs), CLAUDE.md (the unscored-reads carve-out grew its third member — the
+    floor-verifier's catch).
+  - **Verified:** suite **63 ×1 full + the 8 new twice more** (5 pure fast-pass, 3 nlp), keyless
+    subset collects 53; walkers `verify_read_path` 56 + `verify_reconstruction` 42 on
+    `longmem_test` (provisioned this session — it had not survived since the audit); ruff
+    format+check clean at 0.15.21; both C# builds 0 warnings; live interop gate **24/24** on
+    fresh `longmem_smoke` (the new check hit the honest-denominator path live: gist 0/0 → null,
+    bands [3]); the live route payload on the corrected chain exactly per contract
+    (reconstruction head over a correction anchor: gist 1/1 = 1.0, detail null, zero fabricated,
+    retention 1.0, band 3, metrics 48.74 ms inside total 71.82 ms); browser beat — The Ledger
+    rendered **gist precision 1.00 (1/1 facts held)** beside the four counts. **Independent
+    floor-verifier PASS** (all eight done-when re-run fresh; zero-write proven three ways; both
+    floors beneath intact; teardown verified — smoke DB dropped, `longmem` untouched). Floor
+    row 20.
+  - **Honest notes:** the Windows `execve` quirk detached the smoke server from its background
+    task handle (killed by port at teardown — worked, but the serve script should spawn-and-wait
+    instead, a stage-2 nicety); the suite's non-perturbation pair compares `/chain` with
+    `total_ms` excluded (a per-call timing field — the plan's "byte-identical" wording
+    overpromised by one field and the test says so); the floor-verifier noted my brief
+    undercounted the wire model (18 fields, not 17 — the mirror itself is exact). Nothing
+    blocked; nothing abandoned. Remaining for item 3: stages 2–4 (runner, judge layer, ablation).
+
 
 ---
 

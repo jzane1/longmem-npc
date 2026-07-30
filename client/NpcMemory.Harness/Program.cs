@@ -217,6 +217,24 @@ namespace NpcMemory.Harness
                         .All(i => byId[i.MemoryId] == i.Content),
                 "within-scene reread: cache-hit and byte-identical served text");
 
+            // The judge-free metrics read (eval-harness.md stage 1): every
+            // served-reconstructed item has a cache row (write-back, hit, or
+            // refusal all leave one), so bands are non-empty; structural
+            // consistency only — the ratio VALUES are the eval story's, not
+            // this gate's.
+            var reconItem = drifted.Items.First(i => i.ReadMode == "reconstructed");
+            var metrics = await client.ReconstructionMetricsAsync(reconItem.MemoryId);
+            Check(
+                metrics.MemoryId == reconItem.MemoryId
+                    && metrics.AgentId == created.AgentId
+                    && metrics.LiveDetailId != null
+                    && metrics.CacheBands.Count > 0
+                    && (metrics.GistPrecision == null) == (metrics.GistFactsTotal == 0)
+                    && metrics.GistFactsPresent <= metrics.GistFactsTotal,
+                "metrics route: judge-free numbers on the reconstructed chain",
+                $"gist {metrics.GistFactsPresent}/{metrics.GistFactsTotal}, "
+                + $"bands=[{string.Join(",", metrics.CacheBands)}]");
+
             // -- [8] mid-scene gate fire -----------------------------------
             Console.WriteLine("\n[8] Mid-scene gate fire on a novel utterance");
             var obsHerons = await session.ObserveAsync(

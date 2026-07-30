@@ -7,7 +7,7 @@ file records what was chosen, what it beat, and why (where the rationale was rec
 
 ## Index
 
-*44 dated sections. Regenerated 2026-07-28 — the first hand-written pass mixed two
+*45 dated sections. Regenerated 2026-07-28 — the first hand-written pass mixed two
 slug conventions and miscounted. Anchors follow GitHub's slugger: the em dash is dropped and
 its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as `#name--2026-07-28`.*
 
@@ -60,6 +60,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Floors-register append-only scope — 2026-07-29](#floors-register-append-only-scope--2026-07-29)
 - [Haiku dialogue + quote-embargo lift — 2026-07-29](#haiku-dialogue--quote-embargo-lift--2026-07-29)
 - [Stage-2 Play-mode gate verification + real-mode corroboration — 2026-07-29](#stage-2-play-mode-gate-verification--real-mode-corroboration--2026-07-29)
+- [Eval-harness v1 plan rulings + stage-1 build — 2026-07-29](#eval-harness-v1-plan-rulings--stage-1-build--2026-07-29)
 
 ## Primary decisions
 
@@ -2354,3 +2355,51 @@ the committed plugin DLL still has no automated staleness guard (it is proven cu
 byte-diff each time). Two non-blocking gate soft spots recorded in `floors.md` row 19: check #1 is a
 guarded `Check(true,…)` and directive/reputation callbacks are subscribed-but-not-asserted
 (delegated to the stage-1 console floor).
+
+## Eval-harness v1 plan rulings + stage-1 build — 2026-07-29
+
+**Decided (four plan-time rulings at plan approval, then stage 1 built and floor-verified the
+same session; spec: `eval-harness.md` — immediate-queue item 3, chosen over
+choreography-first because three deferred consumers wait on the harness — The Ledger's
+on-screen numbers, the sonnet-5/B2 prose re-assessments, and R7's ablation data — while
+nothing new waits on choreography):**
+
+1. **The judge model role is eval-runner-only.** `LONGMEM_MODEL_JUDGE` +
+   `LONGMEM_PRICE_JUDGE_IN/OUT` will exist (stage 3), but `load_settings` real mode stays
+   seven-role — the server/REPL never requires a judge; the eval runner validates the var
+   itself when a judged run starts. **Rejected:** an eighth mandatory real-mode role (the API
+   server refusing to start without a judge model for pure gameplay). Precedent honored:
+   roles arrive with their feature; the judge provider will NOT be a field on the frozen
+   `Providers` bundle.
+2. **v1 judged categories = core 3 + prose quality**: selective-forgetting (single/multi-hop),
+   abstention/false-premise, reconstruction-faithfulness (FactScore retargeted), plus the
+   prose-quality pairwise rubric — the instrument the 2026-07-29 sonnet-5/B2 deferrals
+   explicitly wait on. **Rejected:** the full starter list in v1 (FAMA stale-leakage +
+   MemTrace trajectory probe deferred); core-3-only (would leave the prose re-assessment
+   blocked).
+3. **The Ledger binding is a new small read route** —
+   `GET /v1/memories/{id}/reconstruction-metrics`, computed server-side (detail-recall needs
+   spaCy lemmas; client JS cannot). **Rejected:** folding metrics into `/chain` (amends a
+   route whose unscored-by-contract wording was ruled 2026-07-27); compute-and-paste (the
+   on-screen number would not be live). Consequence: the unscored-reads carve-out now has a
+   **third member** — the metric read runs no retrieval and returns IDs + numbers
+   (CLAUDE.md wording grown in-pass).
+4. **No new migration** — the explicit per-target scope fact the schema-evolution rule
+   requires: scenarios/gold/corpora are repo files (`data\eval\`, stages 2–3), run artifacts
+   are JSON files, nothing eval-related persists in Postgres; runs use disposable pid-scoped
+   scratch DBs. **Rejected:** an `eval_runs` table (migration 006 — durable run history not
+   worth re-opening the frozen ledger for v1).
+
+**Build record (stage 1, same session):** the judge-free metric layer + the metrics route +
+The Ledger binding landed and floor-verified — `floors.md` row 20 carries the evidence (suite
+55 → 63 with Set G, keyless subset 48 → 53, interop gate 23 → 24, walkers 56/42, zero-write
+proven three ways, live browser beat). Stage-1 physical shapes settled at build under the
+spec's latitude: the wire payload omits `identity_version` (a metric input, not an output);
+unmeasurable gist facts (empty lemma sets) are excluded from both sides of the ratio —
+**honest denominators return `None`, never a flattering 1.0** (the thin-gist lesson made a
+metric contract); keyword-retention entities are recomputed via `extract_entities` rather
+than read from the stored write-time merge. Twelve forks recorded in the spec's
+settle-at-build table — forks 1 (C# mirror), 2 (threshold 1.0), and 6 (live head only) closed
+with stage 1; 3–5, 7–12 stay open for stages 2–4 with recommendations stated (notably fork 11,
+caught at plan verification: the ablation OFF arm must exclude authorial-correction-anchored
+chains, whose gist slot IS the corrected head — blanking it would delete the correction).

@@ -8,7 +8,7 @@ provisioning, and the two unscored inspector reads), then `client\NpcMemory.Core
 harness (**interop gate 21/21**), then the Unity adapter + gray-box set (**Play-mode gate 8/8**,
 chunk callbacks on the main thread), then The Ledger at `GET /ledger`, which rendered a real
 corrected chain in the browser — original greyed → correction greyed → reconstruction live.
-Schema frozen at migrations 001–005 throughout. **Nineteen floors stand verified**
+Schema frozen at migrations 001–005 throughout. **Twenty floors stand verified**
 (`docs\floors.md`).
 
 **2026-07-28 — full-repo audit + remediation.** Seven read-only dimension auditors plus an
@@ -50,7 +50,8 @@ short twice by usage limits (3/20 finders done, none refereed); the exhaustive r
 `origin/main` matches local again.
 
 Remaining before recording: demo choreography + the demo corpus, and the judged
-eval harness (item 3). *(The **stage-2 Unity Play-mode gate** — long the one outstanding
+eval harness (item 3 — **now staged and underway: stage 1 of 4 BUILT + floor-verified
+2026-07-29**, spec `eval-harness.md`; stages 2–4 remain). *(The **stage-2 Unity Play-mode gate** — long the one outstanding
 verification — LANDED 2026-07-29: fake 8/8 + an independent floor-verifier re-run + a real-mode 8/8
 corroboration; floor row 19.)* *(The 2026-07-29 measurement rulings closed the model slate: haiku ships
 as the dialogue role, the reconstruction quote embargo is lifted, and sonnet-5 + the B2
@@ -72,6 +73,22 @@ the fake path cannot be for the SSE main-thread fix. `autoRun` restored (scene u
 `autoRun: 0` preserved), `longmem_smoke` dropped, `longmem` pristine, port free. **Nineteen floors**
 now stand (`docs\floors.md` row 19). Dated register entry: **"Stage-2 Play-mode gate verification +
 real-mode corroboration."**
+
+**2026-07-29 — eval-harness v1 planned (four rulings) + stage 1 LANDED as floor 20 (Fable 5).**
+Item 3 chosen over choreography-first (three deferred consumers wait on the harness; nothing
+new waits on choreography). Four plan-time rulings (dated register entry): judge role
+**eval-runner-only** (server real mode stays seven-role), v1 judged categories = **core 3 +
+prose quality**, the Ledger binding = a **new read route**, and **no migration** (the explicit
+per-target scope fact). Stage 1 then built and floor-verified the same session: the judge-free
+metric layer (`app\eval_metrics.py` — gist-precision / detail-recall / fabrication / keyword
+retention, honest-None denominators), `GET /v1/memories/{id}/reconstruction-metrics` (the third
+unscored-by-contract read; zero writes, proven three ways), and The Ledger's numbers panel now
+rendering the metrics live (browser beat: **gist precision 1.00 (1/1 facts held)** on a
+corrected-then-reconstructed chain). Suite 55 → **63** (Set G; keyless subset 53), interop gate
+23 → **24**, walkers 56/42 re-run, both C# builds 0 warnings, ruff clean at the pin.
+**Remaining for item 3:** stage 2 (eval runner + scratch provisioning + drift capture +
+`drift-validate`), stage 3 (judge layer + rubrics + gold + A/B-Pareto — the sonnet-5/B2
+re-assessment instrument), stage 4 (the fixed-gist ON/OFF ablation → R7's deciding data).
 
 **Prior phases:** the stacked phase blocks moved to `docs\session-log.md` ("Archived phase headers") on 2026-07-28 — they are era summaries, not live state.
 
@@ -100,7 +117,7 @@ and the structured behavior output survive the interview. Research publication c
 
 ## Verified floors
 
-**Nineteen floors stand verified.** The full table — layer, what it was verified against, and
+**Twenty floors stand verified.** The full table — layer, what it was verified against, and
 the date — moved to **`docs\floors.md`** on 2026-07-28 so this living file stays small enough
 to auto-load. That file states the counting convention; cite it rather than a number in prose.
 
@@ -255,7 +272,16 @@ dialogue-turn route** — the cognition layer is REPL-only, and Unity is C# over
 spec/build session; ordering after the Unity/pre-ship items is Jack's to re-slate. Papers per
 item are traced in `docs\research\CHANGES-FROM-RESEARCH.md`.)*
 
-3. **Judged eval harness v1 — PULLED PRE-DEMO (ruled 2026-07-22 with the Ledger scope).** Judge
+3. **Judged eval harness v1 — PULLED PRE-DEMO (ruled 2026-07-22 with the Ledger scope); SPECCED
+   + STAGE 1 BUILT AND FLOOR-VERIFIED 2026-07-29** (spec **`eval-harness.md`**, plan-as-spec;
+   floor row 20; four plan rulings in the dated "Eval-harness v1 plan rulings + stage-1 build"
+   register entry — judge role eval-runner-only, v1 categories = core 3 + prose quality, Ledger
+   binding = the new `GET /v1/memories/{id}/reconstruction-metrics` route, no migration). The
+   judge-free layer is LIVE: gist-precision / detail-recall / fabrication / keyword-retention
+   computed server-side and rendered on The Ledger's numbers panel. **Remaining: stage 2**
+   (eval runner over `SessionRunner` + scratch provisioning + `drift_observer` capture +
+   `drift-validate`), **stage 3** (judge role plumbing + four rubrics + gold emission +
+   A/B-Pareto), **stage 4** (the fixed-gist ON/OFF ablation → R7's data). Judge
    model role/env var + LLM-judged categories (judged signal real-mode-only — sequenced with that).
    **Audit additions:** (i) a judge-free gist-precision/detail-recall metric (from existing gist spans +
    spaCy, no judge call) feeding The Ledger's on-screen numbers; (ii) a small **hand-labeled gold set**

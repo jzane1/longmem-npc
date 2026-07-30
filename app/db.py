@@ -839,6 +839,21 @@ async def fetch_cache_rows(
     return {(row[0], row[1]): row[2] for row in rows}
 
 
+async def fetch_cache_keys(pool: AsyncConnectionPool, memory_id: UUID) -> list[str]:
+    """All composed reconstruction keys cached for one memory, read-only —
+    the metrics route's band-binning source (eval-harness.md stage 1): the
+    stored identity_version column carries the composed key, whose |b<N>
+    tail is the decay band. Deterministic order for a stable payload."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT identity_version FROM reconstruction_cache "
+            "WHERE memory_id = %s ORDER BY identity_version",
+            (memory_id,),
+        )
+        rows = await cur.fetchall()
+    return [row[0] for row in rows]
+
+
 async def insert_cache_row(
     pool: AsyncConnectionPool, memory_id: UUID, composed_key: str, rendered_text: str
 ) -> None:

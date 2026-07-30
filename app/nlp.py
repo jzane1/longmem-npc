@@ -198,6 +198,19 @@ def extract_entities(text: str) -> list[str]:
     ]
 
 
+def lemma_content_set(text: str) -> set[str]:
+    """Lowercased content lemmas — byte-for-byte the write pass's Warriner
+    token filter (not stop/punct/space), promoted public for the judge-free
+    eval metrics (eval-harness.md stage 1; the extract_entities promotion
+    precedent). The lru-cached spaCy model means no extra load."""
+    doc = _spacy()(text)
+    return {
+        token.lemma_.lower()
+        for token in doc
+        if not (token.is_stop or token.is_punct or token.is_space)
+    }
+
+
 def _dedupe_overlapping(spans: list[GistSpanCandidate]) -> list[GistSpanCandidate]:
     """Drop spans fully contained in an already-kept span (longest first)."""
     kept: list[GistSpanCandidate] = []

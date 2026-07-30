@@ -64,6 +64,7 @@ spec is no longer a plan.
 | `mid-dialogue-gate.md` | conditional retrieval mid-scene | 003 |
 | `split-brain-streaming.md` | concurrent prose stream + behavior call | — |
 | `unity-client.md` | SSE + provisioning + inspector reads, C# client, Unity, Ledger | — |
+| `eval-harness.md` | judged eval harness: judge-free metrics + metrics route (stage 1); runner, judge, ablation (stages 2–4) | — |
 
 **Note on `migration-01.md`:** it documents migration **001 only**. Migrations 002–005 (fact
 versions, fact entities, the lexical index, `escalation_failed`) are specced in the targets above

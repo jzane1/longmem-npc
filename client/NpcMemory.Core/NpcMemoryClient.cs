@@ -135,6 +135,11 @@ namespace NpcMemory
                 $"/v1/agents/{agentId}/memories" + (limit is int l ? $"?limit={l}" : ""),
                 ct);
 
+        public Task<ReconstructionMetricsResult> ReconstructionMetricsAsync(
+            Guid memoryId, CancellationToken ct = default) =>
+            GetAsync<ReconstructionMetricsResult>(
+                $"/v1/memories/{memoryId}/reconstruction-metrics", ct);
+
         /// <summary>
         /// The SSE turn (POST /v1/dialogue/turn/stream): onChunk fires per
         /// prose chunk as it arrives; onReconstructing fires if the server

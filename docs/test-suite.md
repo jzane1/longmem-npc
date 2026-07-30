@@ -1,11 +1,12 @@
 # longmem-npc — Test suite spec
 
-**BUILT 2026-07-20 — 55 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation +
-hygiene; the Set A diegetic pair still lands with the dissonance mechanism). Count as of
-2026-07-28: Set A 8, Set B 7, Set C 7, Set D 20, degradation 11, **hygiene 2** — grown from the 38
-built on 2026-07-20 by the route-contract scenarios that arrived with each later route, and by the
-gap-closing and guard scenarios from the full-repo audit. **Seven carry the `nlp` marker**, so the
-turn-end subset runs **48**. Build rulings 2026-07-20
+**BUILT 2026-07-20 — 63 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation +
+hygiene + eval metrics; the Set A diegetic pair still lands with the dissonance mechanism). Count
+as of 2026-07-29: Set A 8, Set B 7, Set C 7, Set D 20, degradation 11, hygiene 2, **Set G eval
+metrics 8** — grown from the 38 built on 2026-07-20 by the route-contract scenarios that arrived
+with each later route, by the gap-closing and guard scenarios from the full-repo audit, and by the
+judge-free metric layer (eval-harness.md stage 1). **Ten carry the `nlp` marker**, so the
+turn-end subset runs **53**. Build rulings 2026-07-20
 (dated `decisions.md` entry): the suite-gate Stop hook runs the `-m "not nlp"` subset (the 7
 `nlp`-marked scenarios call the write pass at the service level and pay the lazy
 spaCy+fastcoref load; the full suite runs on demand + at floor verification); Postgres
@@ -134,6 +135,29 @@ because the rule had already been broken once:
   SQL (a stack constant, and what keeps the injection surface auditable in one file).
   `app\load_driver.py` had violated it with a hand-rolled INSERT.
 
+## Set G — judge-free eval metrics *(added 2026-07-29 with eval-harness.md stage 1)*
+
+Eight scenarios in `tests\test_eval_metrics.py`, two layers matching the build:
+
+- **Pure arithmetic (5, unmarked, no database — the Set F precedent):** anchor-cause-aware gist
+  facts (merged-span slices; correction anchors sentence-split and owe no detail); the
+  `metric_gist_match_threshold` presence rule; **honest denominators** — empty/unmeasurable
+  denominators return `None`, never a flattering 1.0; whole-word fabrication grounding + rate;
+  keyword retention; the composed-cache-key band parser round-trips `compose_cache_key`.
+- **Route contract (3, `nlp`-marked — any 200 runs the spaCy lemma/NER block):** 200 payload with
+  exact ratios against fixture tellings (db-layer writes, never model prose — the values are
+  byte-known, so asserting them IS structural); zero-span memory reports `gist_precision: null`;
+  404 unknown memory; the anchor-cause contract end to end (correction → gist IS the corrected
+  head; a reconstruction head on top → anchor unchanged, cache band parsed, never-observed entity
+  flagged fabricated, gist violation reads 0.0); and the **non-perturbation pair** — a metrics
+  read leaves `/chain` identical (per-call `total_ms` timing field excluded) and the telling
+  chain / reconstruction cache / identity documents count-stable (the identity render is pure,
+  never the `ensure_` upsert).
+
+Judged and LLM-graded evals still do NOT live in this folder — they arrive with the eval
+*runner* (eval-harness.md stages 2–3) as a separate surface. This set is the metric
+*arithmetic* and the route, which are structural.
+
 ## Route contracts *(added as each route shipped; consolidated here 2026-07-28)*
 
 Every route in `app\api.py` has at least one HTTP-level scenario asserting its success payload,
@@ -157,6 +181,8 @@ rather than quietly implied by "every route", because that is what this section 
 - `POST /v1/agents` (server-minted UUID, NULL knobs resolve; 422 on empty name)
 - `GET /v1/memories/{id}/chain` · `GET /v1/agents/{id}/memories` (unscored by contract; superseded
   rows present; 404) · `GET /ledger`
+- `GET /v1/memories/{id}/reconstruction-metrics` (IDs + counts + ratios, honest-`None`
+  denominators, zero writes; 404) — `tests\test_eval_metrics.py`
 
 ## Degradation cases
 

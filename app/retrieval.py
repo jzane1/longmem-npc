@@ -82,6 +82,7 @@ from app.schemas import (
     DialogueInitRequest,
     GateInstrumentation,
     MemoryChainResult,
+    ReconstructionMetricsResult,
     RetrievalInstrumentation,
     RetrievalResult,
 )
@@ -695,5 +696,139 @@ class RetrievalService:
             memories=rows,
             total_count=total,
             limit=limit,
+            total_ms=_ms(time.perf_counter() - t_total),
+        )
+
+    async def reconstruction_metrics(
+        self, memory_id: UUID
+    ) -> ReconstructionMetricsResult:
+        """The judge-free metric read (eval-harness.md stage 1, ruled
+        2026-07-29): gist-precision / detail-recall / fabrication / keyword
+        retention for one memory, computed against the LIVE telling head only
+        (fork 6). Read-only like the inspector reads above — the identity
+        document is the PURE render (never the ensure_ upsert) and nothing is
+        written, cached, or reconstructed. spaCy work (lemmas + NER) runs in
+        one worker-thread hop (the serve() pattern); the dialogue read path
+        proper stays spaCy-free — this route is a metric read, not retrieval,
+        so no scores exist and the IDs-and-scores invariant does not bind."""
+        from app import eval_metrics
+        from app.identity import render_identity_document
+        from app.nlp import extract_entities, lemma_content_set
+
+        t_total = time.perf_counter()
+        chain = await db.fetch_memory_chain(self._pool, memory_id)
+        if chain is None:
+            raise UnknownMemoryError(f"unknown memory_id {memory_id}")
+        agent = await db.fetch_agent(self._pool, chain["agent_id"])
+        config = agent["config"] if agent else {}
+        source = (await db.fetch_reconstruction_sources(self._pool, [memory_id])).get(
+            memory_id
+        )
+        cache_keys = await db.fetch_cache_keys(self._pool, memory_id)
+
+        observation_text = chain["observation_text"]
+        # The anchor-bearing source is the constraint's own input shape; a
+        # degenerate chain with no anchoring row falls back to the chain's
+        # spans with an original-shaped (None) cause — never an error.
+        spans = (
+            source.spans
+            if source
+            else [(s["start_char"], s["end_char"]) for s in chain["gist_spans"]]
+        )
+        anchor_cause = source.anchor_cause if source else None
+        anchor_content = source.anchor_content if source else ""
+        live = next((d for d in chain["details"] if d["is_live"]), None)
+        identity_document, _ = render_identity_document(
+            agent["seed_identity"] if agent else None
+        )
+        threshold = agent_knob(config, "metric_gist_match_threshold", self._settings)
+
+        t_metrics = time.perf_counter()
+        fact_texts = eval_metrics.gist_fact_texts(
+            observation_text, spans, anchor_cause, anchor_content
+        )
+        segments = eval_metrics.detail_segment_texts(
+            observation_text, spans, anchor_cause
+        )
+        bands = sorted(
+            {
+                band
+                for key in cache_keys
+                if (band := eval_metrics.band_from_composed_key(key)) is not None
+            }
+        )
+
+        def _nlp_sets() -> tuple[list[set[str]], set[str], list[str]]:
+            fact_lemma_sets = [lemma_content_set(text) for text in fact_texts]
+            gist_union: set[str] = set().union(*fact_lemma_sets)
+            detail_lemmas = (
+                set().union(*(lemma_content_set(s) for s in segments)) - gist_union
+                if segments
+                else set()
+            )
+            return fact_lemma_sets, detail_lemmas, extract_entities(observation_text)
+
+        fact_lemma_sets, detail_lemmas, observation_ents = await asyncio.to_thread(
+            _nlp_sets
+        )
+
+        if live is None:
+            # No live head (legacy shape): counts still report; every ratio
+            # is None — there is no telling to measure (the degraded-path
+            # precedent). No flattering zeros-as-scores.
+            return ReconstructionMetricsResult(
+                memory_id=memory_id,
+                agent_id=chain["agent_id"],
+                live_detail_id=None,
+                live_write_cause=None,
+                anchor_cause=anchor_cause,
+                gist_facts_total=sum(1 for s in fact_lemma_sets if s),
+                gist_facts_present=0,
+                gist_precision=None,
+                detail_lemmas_total=len(detail_lemmas),
+                detail_lemmas_present=0,
+                detail_recall=None,
+                telling_entities=[],
+                fabricated_entities=[],
+                fabrication_rate=None,
+                keyword_retention=None,
+                cache_bands=bands,
+                metrics_ms=_ms(time.perf_counter() - t_metrics),
+                total_ms=_ms(time.perf_counter() - t_total),
+            )
+
+        def _telling_sets() -> tuple[set[str], list[str]]:
+            return lemma_content_set(live["content"]), extract_entities(live["content"])
+
+        telling_lemmas, telling_ents = await asyncio.to_thread(_telling_sets)
+
+        precision, flags = eval_metrics.gist_precision(
+            fact_lemma_sets, telling_lemmas, threshold
+        )
+        measurable = [flag for flag in flags if flag is not None]
+        recall = eval_metrics.detail_recall(detail_lemmas, telling_lemmas)
+        fabricated = eval_metrics.fabricated_entities(
+            telling_ents, [observation_text, identity_document, anchor_content]
+        )
+        return ReconstructionMetricsResult(
+            memory_id=memory_id,
+            agent_id=chain["agent_id"],
+            live_detail_id=live["detail_id"],
+            live_write_cause=live["write_cause"],
+            anchor_cause=anchor_cause,
+            gist_facts_total=len(measurable),
+            gist_facts_present=sum(measurable),
+            gist_precision=precision,
+            detail_lemmas_total=len(detail_lemmas),
+            detail_lemmas_present=len(detail_lemmas & telling_lemmas),
+            detail_recall=recall,
+            telling_entities=telling_ents,
+            fabricated_entities=fabricated,
+            fabrication_rate=eval_metrics.fabrication_rate(telling_ents, fabricated),
+            keyword_retention=eval_metrics.keyword_retention(
+                observation_ents, live["content"]
+            ),
+            cache_bands=bands,
+            metrics_ms=_ms(time.perf_counter() - t_metrics),
             total_ms=_ms(time.perf_counter() - t_total),
         )

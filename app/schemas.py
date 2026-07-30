@@ -727,3 +727,37 @@ class AgentMemoriesResult(BaseModel):
     total_count: int
     limit: int
     total_ms: float
+
+
+class ReconstructionMetricsResult(BaseModel):
+    """GET /v1/memories/{id}/reconstruction-metrics — the judge-free metric
+    read (eval-harness.md stage 1, ruled 2026-07-29): gist-precision /
+    detail-recall / fabrication / keyword-retention computed server-side
+    against the LIVE telling head only (fork 6). Runs no retrieval (the
+    IDs-and-scores invariant does not bind) and performs ZERO writes —
+    identity render is pure, never the ensure_ upsert. Honest denominators:
+    every ratio is None when its denominator is empty, and a chain with no
+    live head reports counts with every ratio None (the degraded-path
+    precedent). `gist_facts_total` counts MEASURABLE facts (merged spans —
+    or anchor sentences on a correction-anchored chain — whose content-lemma
+    sets are non-empty); `cache_bands` are the decay bands observed in this
+    memory's reconstruction-cache keys, the ruled band-binning source."""
+
+    memory_id: UUID
+    agent_id: UUID
+    live_detail_id: UUID | None
+    live_write_cause: str | None
+    anchor_cause: str | None
+    gist_facts_total: int
+    gist_facts_present: int
+    gist_precision: float | None
+    detail_lemmas_total: int
+    detail_lemmas_present: int
+    detail_recall: float | None
+    telling_entities: list[str] = Field(default_factory=list)
+    fabricated_entities: list[str] = Field(default_factory=list)
+    fabrication_rate: float | None
+    keyword_retention: float | None
+    cache_bands: list[int] = Field(default_factory=list)
+    metrics_ms: float
+    total_ms: float

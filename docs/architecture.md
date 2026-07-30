@@ -200,6 +200,18 @@ dropped) plus gist spans and a `has_embedding` flag that never exposes the vecto
 its live telling head, `limit` a caller argument (the `k` precedent) and never a config knob.
 SELECT-only end to end; 404 on unknown memory/agent.
 
+**The judge-free metric read** (`eval-harness.md` stage 1, **built 2026-07-29**):
+`GET /v1/memories/{id}/reconstruction-metrics` computes gist-precision / detail-recall /
+fabrication / keyword-retention against the **live telling head** — The Ledger's on-screen
+numbers and the eval harness's judge-free layer, one implementation (`app\eval_metrics.py`).
+Anchor-cause-aware (a correction-anchored chain scores against the corrected head and owes no
+detail), honest denominators (`None`, never a flattering 1.0), bands parsed from the
+reconstruction cache's composed keys. Runs no retrieval (no scores exist — the invariant does
+not bind; the two inspector reads' unscored contract is untouched) and performs **zero writes**:
+the identity document is the pure render, never the `ensure_` upsert. The presence rule is the
+`metric_gist_match_threshold` knob (default 1.0 — strict lexical; paraphrase slack belongs to
+the judged categories).
+
 **Retrieval scoring** (built & floor-verified 2026-07-14, `read-path.md`; shapes ruled in the
 dated `decisions.md` entry): `relevance × recency(decay class) × importance_norm`; pin exemption;
 normalization; reserved slots for a future encoding-context term and per-call overrides under the
@@ -417,19 +429,22 @@ invalidation doubles as compiler-cache eviction.
 
 ## 12. Integrator surface requirements
 
-**The shipped HTTP surface** *(eleven routes; the last five landed 2026-07-23 and 2026-07-27 —
-`unity-client.md`)*: `POST /v1/events/observe`, `POST /v1/events/scene-boundary`,
+**The shipped HTTP surface** *(twelve routes; five landed 2026-07-23 and 2026-07-27 —
+`unity-client.md`; the metric read 2026-07-29 — `eval-harness.md`)*: `POST /v1/events/observe`,
+`POST /v1/events/scene-boundary`,
 `PUT /v1/memories/{id}/pin`, `POST /v1/memories/{id}/correction`, `POST /v1/dialogue/init`,
 **`POST /v1/dialogue/turn`** (stateless — all scene state rides the request; the runner bookkeeping
 is the client's job), **`POST /v1/dialogue/turn/stream`** (its SSE twin, iterating the SAME
 async-generator seam — `chunk` / `reconstructing` / `result` / `error` events), **`POST /v1/agents`**
-(provisioning; UUID minted server-side), the two **inspector reads** (§6), and **`GET /ledger`**
-(the static browser inspector, served BY the API so it shares the origin of the routes it polls —
-no CORS surface, no second server).
+(provisioning; UUID minted server-side), the two **inspector reads** (§6),
+**`GET /v1/memories/{id}/reconstruction-metrics`** (the judge-free metric read, §6), and
+**`GET /ledger`** (the static browser inspector, served BY the API so it shares the origin of the
+routes it polls — no CORS surface, no second server).
 
 **The client package** *(built 2026-07-27)*: `client\NpcMemory.Core` — netstandard2.1,
 engine-agnostic (**zero `UnityEngine` types** by ruling), one flat `NpcMemoryClient` covering all
-ten verbs 1:1, plus `NpcSession`, the C# port of the Python runner's turn bookkeeping. Unity gets a
+eleven verbs 1:1 *(the metrics read joined 2026-07-29)*, plus `NpcSession`, the C# port of the
+Python runner's turn bookkeeping. Unity gets a
 thin MonoBehaviour adapter over it; a `dotnet run` console harness plays every demo beat headless.
 
 Docs are written as though a **hostile integrator** is reading them, answering ownership questions

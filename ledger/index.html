@@ -8,10 +8,12 @@
   designer-facing ground-truth-vs-telling inspector. One static file,
   vanilla JS, no build step (fork 6) — served by the API itself at
   GET /ledger (same origin, no CORS, no second server), reading only the
-  ruled inspector routes:
+  ruled inspector routes plus the judge-free metric read:
 
     GET /v1/agents/{id}/memories   — the index (live telling heads)
     GET /v1/memories/{id}/chain    — the full record (both chains + spans)
+    GET /v1/memories/{id}/reconstruction-metrics — gist-precision /
+      detail-recall / fabrication (eval-harness.md stage 1, 2026-07-29)
 
   Superseded rows render greyed BUT PRESENT — the non-destructive record
   made visible. The per-turn score panel (read_mode/scores/IDs + both
@@ -149,8 +151,9 @@
 </main>
 <footer>
   read-only over GET /v1/agents/{id}/memories and GET /v1/memories/{id}/chain — unscored
-  inspector reads by ruled contract; the gist-precision / detail-recall metrics bind here when
-  the judged-eval harness (immediate-queue item 3) lands.
+  inspector reads by ruled contract — plus GET /v1/memories/{id}/reconstruction-metrics, the
+  judge-free gist-precision / detail-recall / fabrication read (eval-harness.md stage 1,
+  bound 2026-07-29).
 </footer>
 <script>
 "use strict";
@@ -237,7 +240,8 @@ async function renderChainFor(memoryId) {
   $("indexErr").textContent = "";
   $("chainWrap").hidden = false;
 
-  // Numbers: the record's own honest counts (item 3's metrics bind later).
+  // Numbers: the record's own honest counts + the judge-free metrics
+  // (eval-harness.md stage 1 — the binding this panel used to promise).
   const supersededTellings = c.details.filter((d) => !d.is_live).length;
   const live = c.details.find((d) => d.is_live);
   const nums = $("numbers");
@@ -246,6 +250,18 @@ async function renderChainFor(memoryId) {
   addNum(nums, c.details.length, "telling versions");
   addNum(nums, supersededTellings, "superseded — kept, never deleted");
   addNum(nums, c.facts.length, "fact versions");
+  try {
+    const m = await fetchJson(`/v1/memories/${memoryId}/reconstruction-metrics`);
+    const ratio = (v) => (v == null ? "—" : v.toFixed(2));
+    addNum(nums, ratio(m.gist_precision),
+      `gist precision (${m.gist_facts_present}/${m.gist_facts_total} facts held)`);
+    addNum(nums, ratio(m.detail_recall), "detail recall");
+    addNum(nums, m.fabricated_entities.length, "fabricated entities");
+  } catch (e) {
+    // The metric is additive to the record, not part of it: a metrics
+    // failure must never hide the chain.
+    addNum(nums, "—", "metrics unavailable");
+  }
 
   // Ground truth with gist spans marked (offsets into the immutable text).
   const obs = $("obsText");

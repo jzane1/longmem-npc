@@ -193,6 +193,12 @@ SERVICE_DEFAULTS: dict[str, float] = {
     # most this many most-recent resolved directives as world-fact context
     # (integer-valued; cast at the call site, the gate_fetch_k precedent).
     "recent_actions_cap": 8.0,
+    # --- judge-free eval metrics (eval-harness.md stage 1; ruled 2026-07-29) --
+    # Gist-precision presence rule: a gist fact counts as present when this
+    # fraction of its content lemmas appears in the live telling's lemma set.
+    # 1.0 = strict lexical (the fork-2 ruling); paraphrase slack belongs to
+    # the judged faithfulness category, never to this knob.
+    "metric_gist_match_threshold": 1.0,
 }
 
 # Behavior-view weight clamp bounds (split-brain-streaming.md settle-tag,
