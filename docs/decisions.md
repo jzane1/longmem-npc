@@ -61,6 +61,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Haiku dialogue + quote-embargo lift — 2026-07-29](#haiku-dialogue--quote-embargo-lift--2026-07-29)
 - [Stage-2 Play-mode gate verification + real-mode corroboration — 2026-07-29](#stage-2-play-mode-gate-verification--real-mode-corroboration--2026-07-29)
 - [Eval-harness v1 plan rulings + stage-1 build — 2026-07-29](#eval-harness-v1-plan-rulings--stage-1-build--2026-07-29)
+- [Scope consolidation + road-to-completion rulings — 2026-08-04](#scope-consolidation--road-to-completion-rulings--2026-08-04)
 
 ## Primary decisions
 
@@ -2403,3 +2404,63 @@ settle-at-build table — forks 1 (C# mirror), 2 (threshold 1.0), and 6 (live he
 with stage 1; 3–5, 7–12 stay open for stages 2–4 with recommendations stated (notably fork 11,
 caught at plan verification: the ablation OFF arm must exclude authorial-correction-anchored
 chains, whose gist slot IS the corrected head — blanking it would delete the correction).
+
+## Scope consolidation + road-to-completion rulings — 2026-08-04
+
+**Decided (planning session — Jack judged the remaining scope disorganized and re-planned it end
+to end from his own draft schedule; no code changed; the resulting phased roadmap lives in
+`status.md`):**
+
+1. **The research track is scrapped entirely.** No formal write-up, no submission. The end
+   products are exactly three: the demo video, a Unity Package + one-command backend spin-up
+   (ruling 8), and the public GitHub repo. Dies with it: the asymmetry ablation and the judged
+   drift / Bartlett-style evals. **Survives it (ruled explicitly):** the eval-harness stage-4
+   fixed-gist ON/OFF ablation — it answers the engineering question R7 (drift-budget
+   soundness), not a research question.
+2. **The behavior/action side of split-brain is scrapped entirely; reputation is scrapped with
+   it.** Deciding actions belongs to the game developer, not this project; the NPC's own
+   actions arrive as ordinary observes (the game-authored action-observe contract). Removed
+   when the re-shape lands (roadmap A1): the behavior call and model role (real mode 7 → 6
+   roles), the action directive, the divergence record (and its separate interview clip —
+   accepted), and the reputation system whole — delta emission, the sanctioned in-place
+   `agents.reputation` apply, wire fields, boundary snapshot, C#/Unity callbacks. The
+   `agents.reputation` column stays in the schema (applied migrations are immutable) but goes
+   unread. **The hidden-weights idea survives, moved to the speech side:** `weight_overrides`
+   will re-rank the view feeding the *prose* prompt — the NPC's words shaped by weights it is
+   unaware of. This deliberately inverts the 2026-07-21 topology (speak-honest / act-weighted);
+   supersedes the split-brain portions of the 2026-07-21 latency-slate + build rulings and the
+   2026-07-22 interview-clip ruling.
+3. **The mid-to-late-August demo date is dropped.** The demo lands after the build phases
+   (roadmap A–D). Flagged in review as colliding with the re-planned scope; Jack ruled the move
+   acceptable — an explicit re-ruling of the deadline framing, not deadline-driven drift.
+4. **Cut from scope:** graph/associative memory (ruled too large a task for not enough
+   benefit), recall-reinforced decay, automatic conflict/staleness detection, habituation, the
+   Whisper soft-steering hook + safe-default action fallback, and the optional/stretch list
+   (disclosure gate, faithful-vs-reconstructive dual read modes, local-model packaging, the
+   dormant-agent overseer, the full modulator suite). The reflection → parameter compiler
+   itself SURVIVES (roadmap C3); only the suite extension is cut.
+5. **Kept and confirmed by name:** reflection (+ compiler), Engram-style deferred write
+   processing, the dissonance path + diegetic-correction event as ONE working session, the
+   agent-state read route, the identity authoring guide, async observes as its own explicit
+   client task (Jack had assumed it rode "deferred write processing"; ruled in explicitly), the
+   purge endpoint (release-blocker reconfirmed), the latency trio (concurrency cap, background
+   pre-warm, prompt caching), and eval-harness stages 2–4. The three audit-surfaced hygiene
+   items — the "what this is not" auth/rate-limit paragraph, the Unity MCP pin +
+   manifest/lockfile reconciliation, and the committed-DLL staleness check — are ruled INTO
+   cleanup-and-packaging by name (roadmap Phase F).
+6. **The real-game plug-in clip is an optional epilogue** — time-permitting, explicitly
+   droppable (roadmap Phase G).
+7. **Ordering is delegated to Claude on efficiency grounds — for the whole schedule.** Jack's
+   stated purpose: which tasks are in, which are out, and a visible path to the end; ordering
+   is not of primary concern. Resulting order (rationale recorded with the roadmap): A re-shape
+   → B measurement rig → C components → D optimization → E demo → F release → G epilogue.
+8. **The packaged end product is defined:** a Unity Package Manager package + a one-command
+   backend spin-up.
+
+**Not ruled (deliberately):** the walkers' shared fixed-name scratch-DB refactor stays on the
+"carried, not fixed" list awaiting its own ruling — surfaced in review, left unscheduled.
+
+**Consequences to propagate:** `status.md` rewritten around the roadmap (the superseded queues,
+ledgers, deadline framing, and dated narrative moved verbatim to `session-log.md`'s archive);
+CLAUDE.md's seven-role and reputation-carve-out wording deliberately NOT edited now — it stays
+true until the Phase A re-shape lands, and A1 owns that edit.
