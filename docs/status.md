@@ -10,9 +10,9 @@ end on the FINAL seam — backend (one streaming prose call; a dialogue turn per
 real mode six model roles), C# client (`NpcMemory.Core` + console harness, interop gate 24/24),
 Unity adapter + gray-box scene, The Ledger at `GET /ledger`, and eval-harness stage 1 —
 **twenty-one floors stand verified** (`docs\floors.md`), schema frozen at migrations 001–005.
-**One pending proof:** the Unity Play-mode gate re-run (the adapter shrank + the DLL refreshed;
-the Editor wasn't open during the A1 session, so no UnityMCP tools — **open the Unity Editor
-before the next session starts** and re-run the 8/8 as that session's first move). The research
+The pending Unity Play-mode proof is **CLOSED (2026-08-05)**: fake-mode 8/8 GREEN through the
+bridge (clean in-engine compile, `longmem` pristine, scene not saved; fake-only by ruling —
+dated resolution notes on floors rows 19/21). The research
 track, the behavior/action side of split-brain (with reputation), graph memory, and the other
 cuts listed below are OUT by ruling. *(The pre-2026-08-04 phase narrative and the superseded
 queues/ledgers moved verbatim to `docs\session-log.md`'s archive.)*
