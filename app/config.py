@@ -9,13 +9,11 @@ call serves render + importance + typology in ONE Haiku call, so at startup
 in real mode the three role vars must name the same model — divergence is a
 loud config error, never a silent pick (ruled with the write-path plan,
 2026-07-13). The dialogue role (LONGMEM_MODEL_DIALOGUE, cli-harness build
-2026-07-15) is the Sonnet-class call; since the split-brain build (2026-07-21)
-it streams PURE PROSE only. The reconstruction role
+2026-07-15) streams PURE PROSE — the dialogue turn's only model call since
+the A1 re-shape (2026-08-04; the split-brain `behavior` role was removed by
+ruling, real mode 7 -> 6 vars). The reconstruction role
 (LONGMEM_MODEL_RECONSTRUCTION, reconstruction build 2026-07-17) is the
-Haiku-class batched retelling call (reconstruction.md). The behavior role
-(LONGMEM_MODEL_BEHAVIOR, split-brain build 2026-07-21) is the concurrent
-Haiku-class call that emits the action directive + reputation delta while the
-prose streams (split-brain-streaming.md).
+Haiku-class batched retelling call (reconstruction.md).
 
 Service-level defaults below are integrator-overridable per agent via
 `agents.config` keys of the same name (nothing integrator-configurable is
@@ -47,11 +45,6 @@ ENV_MODEL_TYPOLOGY = "LONGMEM_MODEL_TYPOLOGY"
 ENV_MODEL_ESCALATION = "LONGMEM_MODEL_ESCALATION"
 ENV_MODEL_DIALOGUE = "LONGMEM_MODEL_DIALOGUE"
 ENV_MODEL_RECONSTRUCTION = "LONGMEM_MODEL_RECONSTRUCTION"
-# The split-brain BEHAVIOR call's role (split-brain-streaming.md, built
-# 2026-07-21): the concurrent Haiku-class call that chooses the action
-# directive and emits the reputation delta while the prose call streams.
-# Its own env var (ruled: a new `behavior` role, not a reuse of `reputation`).
-ENV_MODEL_BEHAVIOR = "LONGMEM_MODEL_BEHAVIOR"
 ENV_PROVIDER_MODE = "LONGMEM_PROVIDER_MODE"
 
 # Optional per-Mtok USD prices (CLI-harness build ruling, 2026-07-15): cost
@@ -60,8 +53,6 @@ ENV_PROVIDER_MODE = "LONGMEM_PROVIDER_MODE"
 PRICE_ENV_KEYS: dict[str, str] = {
     "LONGMEM_PRICE_DIALOGUE_IN": "dialogue_in",
     "LONGMEM_PRICE_DIALOGUE_OUT": "dialogue_out",
-    "LONGMEM_PRICE_BEHAVIOR_IN": "behavior_in",
-    "LONGMEM_PRICE_BEHAVIOR_OUT": "behavior_out",
     "LONGMEM_PRICE_WRITE_IN": "write_in",
     "LONGMEM_PRICE_WRITE_OUT": "write_out",
     "LONGMEM_PRICE_ESCALATION_IN": "escalation_in",
@@ -112,15 +103,6 @@ SERVICE_DEFAULTS: dict[str, float] = {
     # default class resolves in agents.config — a read never fails on a
     # resolvable row.
     "tau_fallback_seconds": 604800.0,
-    # --- dialogue turn (cli-harness.md; build rulings 2026-07-15) -----------
-    # Reputation scale + apply defaults. The agents.reputation /
-    # reputation_sensitivity columns carry no DEFAULT by migration-01 ruling;
-    # these service defaults (per-agent overridable, like every key here)
-    # supply the neutral point and clamp bounds the apply formula needs.
-    "reputation_scale_min": -1.0,
-    "reputation_scale_max": 1.0,
-    "reputation_neutral": 0.0,
-    "reputation_sensitivity_default": 1.0,
     # --- reconstruction (reconstruction.md; build rulings 2026-07-17) -------
     # Reconstruct when decayed detail strength (= decay.recency at the
     # scene-frozen basis) falls below theta. Pinned rows are exempt.
@@ -176,23 +158,19 @@ SERVICE_DEFAULTS: dict[str, float] = {
     # embedding). 0.0 disables the channel (the gate_enabled kill-switch
     # shape): pure-vector candidates, v1-byte-identical.
     "lexical_fetch_k": 8.0,
-    # --- split-brain streaming (split-brain-streaming.md; built 2026-07-21) --
-    # The behavior view re-ranks the SAME served top-k the dialogue view got,
-    # with resolved per-call weights (the reserved WeightOverrides slot goes
-    # live for the behavior view; the dialogue view keeps byte-parity). Weights
-    # apply as exponents on the product score component-wise
-    # (behavior_score = item.score * rel^(w_rel-1) * rec^(w_rec-1) *
-    # imp^(w_imp-1)) — so 1.0 reproduces the dialogue-view order exactly (the
-    # parity contract) and any other value genuinely re-ranks. Resolution is
-    # request field -> agents.config -> these defaults, then clamped to
-    # [BEHAVIOR_WEIGHT_MIN, BEHAVIOR_WEIGHT_MAX].
-    "behavior_weight_relevance": 1.0,
-    "behavior_weight_recency": 1.0,
-    "behavior_weight_importance": 1.0,
-    # Caller-held recent-actions scene block cap: the prose prompt carries at
-    # most this many most-recent resolved directives as world-fact context
-    # (integer-valued; cast at the call site, the gate_fetch_k precedent).
-    "recent_actions_cap": 8.0,
+    # --- weights-on-speech (A1 re-shape, ruled 2026-08-04; formerly the
+    # split-brain behavior view, built 2026-07-21) ---------------------------
+    # Per-call WeightOverrides re-rank the SAME served top-k that retrieval
+    # produced, feeding the PROSE prompt — the NPC's words shaped by weights
+    # it is unaware of. Weights apply as exponents on the product score
+    # component-wise (weighted_score = item.score * rel^(w_rel-1) *
+    # rec^(w_rec-1) * imp^(w_imp-1)) — so 1.0 reproduces the served ranking
+    # exactly (the parity contract) and any other value genuinely re-ranks.
+    # Resolution is request field -> agents.config -> these defaults, then
+    # clamped to [WEIGHT_MIN, WEIGHT_MAX].
+    "weight_relevance": 1.0,
+    "weight_recency": 1.0,
+    "weight_importance": 1.0,
     # --- judge-free eval metrics (eval-harness.md stage 1; ruled 2026-07-29) --
     # Gist-precision presence rule: a gist fact counts as present when this
     # fraction of its content lemmas appears in the live telling's lemma set.
@@ -201,13 +179,14 @@ SERVICE_DEFAULTS: dict[str, float] = {
     "metric_gist_match_threshold": 1.0,
 }
 
-# Behavior-view weight clamp bounds (split-brain-streaming.md settle-tag,
-# ruled at build): a soft de-/re-emphasis range, never a mask. 0.0 zeroes a
-# component's exponent contribution to +1 (pow(x, -1)); the ceiling bounds
-# runaway emphasis. Module constants, not knobs — the range itself is not
-# integrator policy (the EMBEDDING_DIM precedent for a fixed structural bound).
-BEHAVIOR_WEIGHT_MIN = 0.0
-BEHAVIOR_WEIGHT_MAX = 4.0
+# Prose-view weight clamp bounds (ruled at the split-brain build 2026-07-21;
+# carried by the A1 re-shape): a soft de-/re-emphasis range, never a mask. 0.0
+# zeroes a component's exponent contribution to +1 (pow(x, -1)); the ceiling
+# bounds runaway emphasis. Module constants, not knobs — the range itself is
+# not integrator policy (the EMBEDDING_DIM precedent for a fixed structural
+# bound).
+WEIGHT_MIN = 0.0
+WEIGHT_MAX = 4.0
 
 # The lexical channel's text-search config: a string knob, so it follows the
 # decay_classes precedent (a plain agents.config key + a module default)
@@ -249,7 +228,6 @@ def load_env(path: Path = ENV_PATH) -> dict[str, str]:
             ENV_MODEL_ESCALATION,
             ENV_MODEL_DIALOGUE,
             ENV_MODEL_RECONSTRUCTION,
-            ENV_MODEL_BEHAVIOR,
         }
         | set(PRICE_ENV_KEYS)
     )
@@ -267,9 +245,8 @@ class Settings:
     provider_mode: str = "fake"  # "real" | "fake"; fake is the offline default
     model_write: str = ""  # the single write-call model (render+importance+typology)
     model_escalation: str = ""
-    model_dialogue: str = ""  # the streaming prose role (dialogue call; split-brain)
+    model_dialogue: str = ""  # the streaming prose role (the turn's only call)
     model_reconstruction: str = ""  # the batched retelling role (reconstruction.md)
-    model_behavior: str = ""  # the concurrent behavior call (directive + delta)
     anthropic_api_key: str = field(default="", repr=False)
     openai_api_key: str = field(default="", repr=False)
     defaults: dict[str, float] = field(default_factory=lambda: dict(SERVICE_DEFAULTS))
@@ -300,7 +277,6 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
     model_escalation = ""
     model_dialogue = ""
     model_reconstruction = ""
-    model_behavior = ""
     anthropic_key = ""
     openai_key = ""
     if mode == "real":
@@ -310,7 +286,6 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         escalation = env.get(ENV_MODEL_ESCALATION, "")
         dialogue = env.get(ENV_MODEL_DIALOGUE, "")
         reconstruction = env.get(ENV_MODEL_RECONSTRUCTION, "")
-        behavior = env.get(ENV_MODEL_BEHAVIOR, "")
         missing = [
             name
             for name, value in (
@@ -320,7 +295,6 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
                 (ENV_MODEL_ESCALATION, escalation),
                 (ENV_MODEL_DIALOGUE, dialogue),
                 (ENV_MODEL_RECONSTRUCTION, reconstruction),
-                (ENV_MODEL_BEHAVIOR, behavior),
             )
             if not value
         ]
@@ -340,7 +314,6 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         model_escalation = escalation
         model_dialogue = dialogue
         model_reconstruction = reconstruction
-        model_behavior = behavior
         anthropic_key = env.get("ANTHROPIC_API_KEY", "")
         openai_key = env.get("OPENAI_API_KEY", "")
         if not anthropic_key:
@@ -365,7 +338,6 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         model_escalation=model_escalation,
         model_dialogue=model_dialogue,
         model_reconstruction=model_reconstruction,
-        model_behavior=model_behavior,
         anthropic_api_key=anthropic_key,
         openai_api_key=openai_key,
         prices=prices,

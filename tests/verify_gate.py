@@ -158,9 +158,9 @@ def fake_providers(embedding=None) -> Providers:
 async def make_agent(pool, name: str, config: dict, components: list[tuple]) -> object:
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
-            "INSERT INTO agents (name, seed_identity, reputation, rigidity, "
-            "reputation_sensitivity, diagnosticity_goal, config) "
-            "VALUES (%s, %s, 0, 1.0, 1.0, %s, %s) RETURNING agent_id",
+            "INSERT INTO agents (name, seed_identity, rigidity, "
+            "diagnosticity_goal, config) "
+            "VALUES (%s, %s, 1.0, %s, %s) RETURNING agent_id",
             (name, SEED_PROSE, "what threatens the chapel", Jsonb(config)),
         )
         agent_id = (await cur.fetchone())[0]
@@ -756,9 +756,7 @@ async def main(database_uri: str) -> None:
         fake_item(id_c, "the recollection", fetched=True),
         fake_item(id_a, "first loaded"),
     ]
-    prompt = assemble_prose_prompt(
-        SEED_PROSE, 0.0, -1.0, 1.0, items, [], loaded_order=[id_a, id_b]
-    )
+    prompt = assemble_prose_prompt(SEED_PROSE, items, loaded_order=[id_a, id_b])
     lines = prompt.splitlines()
     pos_a = next(i for i, ln in enumerate(lines) if str(id_a) in ln)
     pos_b = next(i for i, ln in enumerate(lines) if str(id_b) in ln)
@@ -773,22 +771,16 @@ async def main(database_uri: str) -> None:
     )
     no_fetch_prompt = assemble_prose_prompt(
         SEED_PROSE,
-        0.0,
-        -1.0,
-        1.0,
         [fake_item(id_a, "first loaded"), fake_item(id_b, "second loaded")],
-        [],
         loaded_order=[id_a, id_b],
     )
     check(
         _MEMORY_RECOLLECTION_SUBHEADER not in no_fetch_prompt,
         "the sub-header appears only when a gate fetch happened this turn",
     )
-    v1_prompt = assemble_prose_prompt(
-        SEED_PROSE, 0.0, -1.0, 1.0, [fake_item(id_a, "first loaded")], []
-    )
+    v1_prompt = assemble_prose_prompt(SEED_PROSE, [fake_item(id_a, "first loaded")])
     v1_prompt_again = assemble_prose_prompt(
-        SEED_PROSE, 0.0, -1.0, 1.0, [fake_item(id_a, "first loaded")], []
+        SEED_PROSE, [fake_item(id_a, "first loaded")]
     )
     check(
         v1_prompt == v1_prompt_again

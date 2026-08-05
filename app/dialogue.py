@@ -1,69 +1,49 @@
-"""dialogue.py — THE dialogue-turn service: the split-brain streaming seam.
+"""dialogue.py — THE dialogue-turn service: the streaming prose seam.
 
 All callers — the interactive REPL and the synthetic load driver (via the
 shared session-runner), and the stateless HTTP route (`POST /v1/dialogue/turn`
 in app\\api.py, 2026-07-23) — sit on this module; none duplicates the timing
 or token accounting recorded here (CLAUDE.md: instrument at the seam; specs:
-docs\\cli-harness.md 2026-07-15, docs\\split-brain-streaming.md 2026-07-21).
-The streaming SSE route (`POST /v1/dialogue/turn/stream`, 2026-07-27)
-iterates this SAME generator — the no-rewrite payoff of the generator shape.
+docs\\cli-harness.md 2026-07-15; re-shaped by A1 2026-08-04 — the split-brain
+behavior call, the action directive, and the reputation system were removed
+by ruling, and `weight_overrides` moved onto the prose view). The streaming
+SSE route (`POST /v1/dialogue/turn/stream`, 2026-07-27) iterates this SAME
+generator — the no-rewrite payoff of the generator shape.
 
-Split-brain pipeline per turn (split-brain-streaming.md, ruled topology):
-  resolve agent + vocabulary -> retrieval ONCE (retrieve_dialogue_init, built)
-  -> two scored views off the SAME served set:
-       dialogue view  = the served ranking (dialogue weights, byte-identical)
-       behavior view  = the same served memories re-ranked with resolved
-                        per-call weights (exponent-form on the product score,
-                        so all-1.0 reproduces the dialogue order — parity)
-  -> assemble the prose prompt (identity + reputation snapshot + dialogue-view
-     memories + recent-actions block + prose instruction) and the behavior
-     prompt (identity + reputation snapshot + behavior-view memories + the
-     directive/delta contract)
-  -> fire the two calls CONCURRENTLY:
-       prose call (dialogue role) STREAMS pure prose — its first chunk is the
-         product metric (first_word_ms); chunks yield through this seam
-       behavior call (behavior role) returns {directive|null, delta} as JSON
-  -> on both legs settled: validate the directive against the vocabulary
-     (drop-soft), apply the reputation delta IN PLACE (atomic clamped UPDATE
-     of the agents.reputation runtime scalar — outside the memory-content
-     non-destructive invariant, same class as set_pinned)
-  -> yield the terminal DialogueTurnResult (both views recorded — the
-     divergence record for §13).
+Pipeline per turn (weights-on-speech, ruled 2026-08-04):
+  resolve agent -> retrieval ONCE (retrieve_dialogue_init, byte-untouched)
+  -> re-rank the served set with the resolved per-call weights
+     (exponent-form on the product score, so all-1.0 reproduces the served
+     ranking — the parity contract carried over from the split-brain build)
+  -> assemble the prose prompt (identity + the weight-ranked memories + the
+     pure-prose instruction) — the NPC's words are shaped by weights it is
+     unaware of; on gated turns the [memories] block still renders the loaded
+     set in the caller's append-only order (the byte-stable-prefix ruling,
+     2026-07-19), so the weighted order is fully visible on loader turns and
+     among gate-fetched items on gated turns
+  -> the prose call (dialogue role) STREAMS pure prose — its first chunk is
+     the product metric (first_word_ms); chunks yield through this seam
+  -> yield the terminal DialogueTurnResult (`items` = the raw retrieval echo,
+     `dialogue_view` = the weight-ranked view the prompt was built from).
 
-The two calls run concurrently, so one turn's WORDS and ACTION are chosen
-independently: occasional same-turn incoherence is the split-brain character
-(ruled 2026-07-21), bounded by the shared retrieval inputs + the vocabulary,
-self-correcting from the next turn via the caller-held recent-actions block,
-and instrumented from day one (dialogue_view + behavior_view + directive on
-the result). The current turn's action never feeds the prose call — the prose
-call sees PAST actions as world facts (the recent-actions block within a
-scene; game-authored action observes across scenes).
+A dialogue turn persists NOTHING: the sole in-place reputation write left
+with the A1 re-shape, and directives were never stored. The NPC's own actions
+are the game developer's domain and arrive as ordinary observes (the
+game-authored action-observe contract, ruled 2026-07-21, standing).
 
 `run_dialogue_turn` is an ASYNC GENERATOR (ruled seam shape): it yields prose
 chunks (str) as they arrive, then yields the terminal DialogueTurnResult. The
 sync streaming SDK is bridged into the async side through a worker thread + an
 asyncio.Queue (the asyncio.to_thread + SelectorEventLoop precedent).
 
-Scene state lives in the caller: the frozen `reputation_snapshot` and the
-caller-held `recent_actions` arrive on every request and are refreshed by the
-caller only at a scene boundary, so "snapshot / actions frozen within a scene"
-is a property of the seam contract.
+Scene state lives in the caller (identity version, scene basis, loaded set,
+context) and rides on every request unreinterpreted.
 
-Degradation ladder (never-blank-a-dialogue, split-brain rows):
+Degradation ladder (never-blank-a-dialogue):
   - prose call fails BEFORE the first chunk -> fallback line, degraded flag.
   - prose stream DROPS mid-stream            -> KEEP the partial prose (it is
     non-blank) + degraded flag (ruled 2026-07-21).
-  - behavior call fails / JSON malformed     -> no directive, zeroed delta,
-    degraded flag; the prose stream is unaffected.
-  - both fail                                -> fallback line + zeroed delta +
-    flags (never-blank holds).
-  - unknown / unparseable directive          -> logged, dropped, turn succeeds.
   - retrieval degraded                       -> inherited in nested instrumentation.
-  - delta would exceed the scale             -> clamped in SQL; never throws.
-
-A client `reputation_delta_override` wins over the behavior model's delta
-(§9) — client-authoritative, so it applies even on the degraded path (the
-ladder's zeroed delta describes the no-override default).
 """
 
 from __future__ import annotations
@@ -79,27 +59,22 @@ from psycopg_pool import AsyncConnectionPool
 
 from app import db
 from app.config import (
-    BEHAVIOR_WEIGHT_MAX,
-    BEHAVIOR_WEIGHT_MIN,
+    WEIGHT_MAX,
+    WEIGHT_MIN,
     Settings,
     agent_knob,
 )
 from app.ingest import UnknownAgentError
 from app.providers import (
-    BehaviorCallResult,
-    MalformedOutputError,
     ProseResult,
-    ProviderCallError,
     Providers,
 )
 from app.retrieval import RetrievalService
 from app.schemas import (
-    ActionDirective,
     DialogueInitRequest,
     DialogueTurnInstrumentation,
     DialogueTurnRequest,
     DialogueTurnResult,
-    RecentAction,
     RetrievedMemory,
     ScoredRef,
     WeightOverrides,
@@ -114,43 +89,17 @@ DIALOGUE_FALLBACK_LINE = "..."
 # Prompt blocks. Labeled, in spec order. Identical inputs assemble
 # byte-identical prompts (memories arrive in a deterministic rank order).
 _BLOCK_IDENTITY = "[identity]\n{seed}"
-_BLOCK_REPUTATION = (
-    "[reputation]\nThe player's standing with you is {snapshot} on a scale "
-    "from {scale_min} (worst) to {scale_max} (best)."
-)
 _BLOCK_MEMORIES_HEADER = "[memories]\nWhat you remember, most salient first:"
 _MEMORY_LINE = "- ({memory_id}) {content}"
 # Gated turns (mid-dialogue-gate.md, 2026-07-19): the [memories] block renders
 # the scene's loaded set in the caller's append-only order (a byte-stable
 # prefix — the structure prompt caching later attaches to), with this turn's
-# gate fetches under a marked sub-header. This shaping is a DIALOGUE-view /
-# prose-prompt concern (prompt-cache stability of the streaming call); the
-# behavior prompt renders its view in plain behavior-rank order (loaded_order
-# None).
+# gate fetches under a marked sub-header.
 _MEMORY_RECOLLECTION_SUBHEADER = "Recalled just now, mid-conversation:"
-# Recent-actions block (split-brain-streaming.md): world-fact phrasing, never
-# "you decided to." Prose prompt only.
-_BLOCK_RECENT_ACTIONS_HEADER = (
-    "[recent actions]\nEarlier in this conversation you were seen to:"
-)
-_RECENT_ACTION_LINE = "- {type} {params}"
-# The prose call's output contract: PURE PROSE, no JSON envelope (the directive
-# + delta live on the concurrent behavior call now).
+# The prose call's output contract: PURE PROSE, no JSON envelope.
 _BLOCK_PROSE_INSTRUCTION = (
     "[output]\nReply with ONLY your spoken line, in character. Prose only — no "
     "JSON, no labels, no surrounding quotation marks."
-)
-# The behavior call's output contract: directive + delta as JSON, no prose.
-_BLOCK_BEHAVIOR_CONTRACT_WITH_VOCAB = (
-    "[output]\nReturn ONLY a JSON object with keys: directive (an object "
-    '{{"type": <one of {vocabulary}>, "params": <object>}} or null when no '
-    "action fits), reputation_delta (a float in [-1, 1]: how this exchange "
-    "moves the player's standing with you). No other text."
-)
-_BLOCK_BEHAVIOR_CONTRACT_NO_VOCAB = (
-    "[output]\nReturn ONLY a JSON object with keys: directive (always null), "
-    "reputation_delta (a float in [-1, 1]: how this exchange moves the "
-    "player's standing with you). No other text."
 )
 
 
@@ -167,7 +116,8 @@ def _render_memories(
 ) -> str:
     """The [memories] block. `loaded_order` (gate build): loaded items in the
     caller's append-only order, then gate-fetched items under the recollection
-    sub-header. None => plain payload rank order, byte-identical to v1."""
+    sub-header. None => plain payload rank order (since A1, the weight-ranked
+    order the seam hands in)."""
     if loaded_order is None:
         ordered = list(items)
         fetched: list[RetrievedMemory] = []
@@ -192,110 +142,53 @@ def _render_memories(
     return _BLOCK_MEMORIES_HEADER + "\n" + "\n".join(lines)
 
 
-def _render_recent_actions(recent_actions: list[RecentAction]) -> str:
-    """The recent-actions block, world-fact phrasing. Rendered only when the
-    caller holds scene actions — the prose prompt carries it iff non-empty."""
-    lines = [
-        _RECENT_ACTION_LINE.format(type=action.type, params=action.params)
-        for action in recent_actions
-    ]
-    return _BLOCK_RECENT_ACTIONS_HEADER + "\n" + "\n".join(lines)
-
-
 def assemble_prose_prompt(
     seed_identity: str | None,
-    snapshot: float,
-    scale_min: float,
-    scale_max: float,
     items: list[RetrievedMemory],
-    recent_actions: list[RecentAction],
     *,
     loaded_order: list[UUID] | None = None,
 ) -> str:
-    """The streaming prose call's system prompt: identity + reputation snapshot
-    + dialogue-view memories + recent-actions (iff any) + the pure-prose
-    instruction. Exposed so the walker can assert block order + byte-stability
-    without a model call. The prose call never sees the vocabulary or the JSON
-    contract — it speaks."""
+    """The streaming prose call's system prompt: identity + the weight-ranked
+    memories + the pure-prose instruction. Exposed so the walker can assert
+    block order + byte-stability without a model call. The prose call sees no
+    JSON contract — it speaks."""
     blocks: list[str] = []
     if seed_identity:
         blocks.append(_BLOCK_IDENTITY.format(seed=seed_identity))
-    blocks.append(
-        _BLOCK_REPUTATION.format(
-            snapshot=snapshot, scale_min=scale_min, scale_max=scale_max
-        )
-    )
     if items:
         blocks.append(_render_memories(items, loaded_order))
-    if recent_actions:
-        blocks.append(_render_recent_actions(recent_actions))
     blocks.append(_BLOCK_PROSE_INSTRUCTION)
     return "\n\n".join(blocks)
 
 
-def assemble_behavior_prompt(
-    seed_identity: str | None,
-    snapshot: float,
-    scale_min: float,
-    scale_max: float,
-    items: list[RetrievedMemory],
-    vocabulary: list[str],
-) -> str:
-    """The concurrent behavior call's system prompt: identity + reputation
-    snapshot + behavior-view memories (plain behavior-rank order) + the
-    directive/delta JSON contract. Identity is shared with the prose prompt so
-    the asymmetry stays STATISTICAL, not architectural (§9): same character,
-    same candidates, different weights — the recent-actions block is the one
-    ruled information difference and it is prose-only (the behavior call
-    chooses a new action, it does not explain a past one)."""
-    blocks: list[str] = []
-    if seed_identity:
-        blocks.append(_BLOCK_IDENTITY.format(seed=seed_identity))
-    blocks.append(
-        _BLOCK_REPUTATION.format(
-            snapshot=snapshot, scale_min=scale_min, scale_max=scale_max
-        )
-    )
-    if items:
-        blocks.append(_render_memories(items, None))
-    if vocabulary:
-        blocks.append(_BLOCK_BEHAVIOR_CONTRACT_WITH_VOCAB.format(vocabulary=vocabulary))
-    else:
-        blocks.append(_BLOCK_BEHAVIOR_CONTRACT_NO_VOCAB)
-    return "\n\n".join(blocks)
-
-
-def resolve_behavior_weights(
+def resolve_dialogue_weights(
     config: dict, overrides: WeightOverrides | None, settings: Settings
 ) -> tuple[float, float, float]:
-    """The behavior view's per-call weights: request field -> agents.config ->
-    1.0 defaults, each clamped to [BEHAVIOR_WEIGHT_MIN, BEHAVIOR_WEIGHT_MAX].
-    Pure, module-level: the walker asserts it without a service."""
+    """The prose view's per-call weights: request field -> agents.config ->
+    1.0 defaults, each clamped to [WEIGHT_MIN, WEIGHT_MAX]. Pure,
+    module-level: the walker asserts it without a service."""
 
     def pick(key: str, override_value: float | None) -> float:
         if override_value is not None:
             value = float(override_value)
         else:
             value = agent_knob(config, key, settings)
-        return _clamp(value, BEHAVIOR_WEIGHT_MIN, BEHAVIOR_WEIGHT_MAX)
+        return _clamp(value, WEIGHT_MIN, WEIGHT_MAX)
 
     return (
-        pick("behavior_weight_relevance", overrides.relevance if overrides else None),
-        pick("behavior_weight_recency", overrides.recency if overrides else None),
-        pick(
-            "behavior_weight_importance",
-            overrides.importance if overrides else None,
-        ),
+        pick("weight_relevance", overrides.relevance if overrides else None),
+        pick("weight_recency", overrides.recency if overrides else None),
+        pick("weight_importance", overrides.importance if overrides else None),
     )
 
 
-def behavior_score(
+def weighted_score(
     item: RetrievedMemory, w_rel: float, w_rec: float, w_imp: float
 ) -> float:
     """Exponent-form re-weighting of an already-scored served item: start from
-    its dialogue-view score (which folds in the encoding-context factor) and
-    adjust each component by its weight minus one. At all-1.0 the exponents are
-    zero, so behavior_score == item.score — the parity contract. A zero base
+    its served score (which folds in the encoding-context factor) and adjust
+    each component by its weight minus one. At all-1.0 the exponents are zero,
+    so weighted_score == item.score — the parity contract. A zero base
     component is skipped (pow(0, negative) is undefined), never a divide."""
     score = item.score
     if item.relevance is not None and item.relevance > 0.0:
@@ -307,14 +200,16 @@ def behavior_score(
     return score
 
 
-def rank_behavior_view(
+def rank_dialogue_view(
     items: list[RetrievedMemory], weights: tuple[float, float, float]
 ) -> list[tuple[float, RetrievedMemory]]:
-    """The behavior view: the SAME served items re-scored with the resolved
+    """The prose view: the SAME served items re-scored with the resolved
     weights, in deterministic order (ties break on memory_id — the retrieval
-    _sort_scored convention, so identical inputs reproduce byte-identically)."""
+    _sort_scored convention, so identical inputs reproduce byte-identically).
+    Membership never changes — weights re-rank the served set, they cannot
+    pull in a memory the top-k excluded (ruled at spec, 2026-08-04)."""
     w_rel, w_rec, w_imp = weights
-    scored = [(behavior_score(item, w_rel, w_rec, w_imp), item) for item in items]
+    scored = [(weighted_score(item, w_rel, w_rec, w_imp), item) for item in items]
     scored.sort(key=lambda entry: (-entry[0], entry[1].memory_id))
     return scored
 
@@ -323,23 +218,15 @@ def _turn_cost_usd(
     prices: dict[str, float],
     prose_in: int,
     prose_out: int,
-    behavior_in: int,
-    behavior_out: int,
     embed_tokens: int,
 ) -> float | None:
     """USD per turn, only from the prices actually configured; None when
-    nothing is priced (tokens are the unconditional unit — ruled 2026-07-15).
-    The behavior call has its own price pair (split-brain build)."""
+    nothing is priced (tokens are the unconditional unit — ruled 2026-07-15)."""
     total = 0.0
     priced = False
     if "dialogue_in" in prices and "dialogue_out" in prices:
         total += (
             prose_in * prices["dialogue_in"] + prose_out * prices["dialogue_out"]
-        ) / 1e6
-        priced = True
-    if "behavior_in" in prices and "behavior_out" in prices:
-        total += (
-            behavior_in * prices["behavior_in"] + behavior_out * prices["behavior_out"]
         ) / 1e6
         priced = True
     if "embedding" in prices:
@@ -369,8 +256,8 @@ class DialogueService:
         *,
         on_reconstruct: Callable[[], None] | None = None,
     ) -> AsyncIterator[str | DialogueTurnResult]:
-        """The split-brain streaming seam (async generator): yields prose
-        chunks (str) as they arrive, then the terminal DialogueTurnResult.
+        """The streaming dialogue seam (async generator): yields prose chunks
+        (str) as they arrive, then the terminal DialogueTurnResult.
         Non-streaming callers drain to the terminal item (session.utterance);
         the REPL yields the chunks live (session.stream_utterance)."""
         t_total = time.perf_counter()
@@ -379,16 +266,6 @@ class DialogueService:
         if state is None:
             raise UnknownAgentError(f"unknown agent_id {request.agent_id}")
         config = state.config
-
-        # --- vocabulary resolution (ruled 2026-07-15): per-call wins, then
-        # agents.config; neither -> every emitted directive drops.
-        if request.action_vocabulary is not None:
-            vocabulary = [str(v) for v in request.action_vocabulary]
-            vocabulary_configured = True
-        else:
-            configured = config.get("action_vocabulary")
-            vocabulary = [str(v) for v in configured] if configured else []
-            vocabulary_configured = configured is not None
 
         # --- retrieval: the built read seam, run ONCE, passed through
         # unreinterpreted (scene state + gate loaded set + on_reconstruct).
@@ -409,28 +286,23 @@ class DialogueService:
             on_reconstruct=on_reconstruct,
         )
 
-        # --- two scored views off the SAME served set --------------------
-        scale_min = agent_knob(config, "reputation_scale_min", self._settings)
-        scale_max = agent_knob(config, "reputation_scale_max", self._settings)
-        # dialogue view = the served ranking; behavior view = re-rank with the
-        # resolved weights (behavior view only — the dialogue view keeps parity).
-        weights = resolve_behavior_weights(
+        # --- weights-on-speech (A1 re-shape, 2026-08-04): re-rank the served
+        # set with the resolved per-call weights; the re-ranked list feeds the
+        # prose prompt and is reported as dialogue_view. `items` stays the raw
+        # retrieval echo, so at all-1.0 weights dialogue_view == its (id,
+        # score) projection — the parity contract.
+        weights = resolve_dialogue_weights(
             config, request.weight_overrides, self._settings
         )
-        behavior_scored = rank_behavior_view(retrieval.items, weights)
-        behavior_items = [item for _score, item in behavior_scored]
+        ranked = rank_dialogue_view(retrieval.items, weights)
+        ranked_items = [item for _score, item in ranked]
         dialogue_view = [
-            ScoredRef(memory_id=item.memory_id, score=item.score)
-            for item in retrieval.items
-        ]
-        behavior_view = [
-            ScoredRef(memory_id=item.memory_id, score=score)
-            for score, item in behavior_scored
+            ScoredRef(memory_id=item.memory_id, score=score) for score, item in ranked
         ]
 
         # The append-only prompt order applies only when the gate actually
         # evaluated (a gate-disabled agent with loaded IDs took the loader path
-        # — its prose prompt stays byte-identical to v1).
+        # — its prose prompt renders the weight-ranked order directly).
         loaded_order = (
             request.loaded_memory_ids
             if retrieval.instrumentation.gate.evaluated
@@ -438,41 +310,11 @@ class DialogueService:
         )
         prose_prompt = assemble_prose_prompt(
             state.seed_identity,
-            request.reputation_snapshot,
-            scale_min,
-            scale_max,
-            retrieval.items,
-            request.recent_actions,
+            ranked_items,
             loaded_order=loaded_order,
         )
-        behavior_prompt = assemble_behavior_prompt(
-            state.seed_identity,
-            request.reputation_snapshot,
-            scale_min,
-            scale_max,
-            behavior_items,
-            vocabulary,
-        )
 
-        # --- fire both calls CONCURRENTLY --------------------------------
         loop = asyncio.get_running_loop()
-
-        async def _run_behavior() -> tuple[str, object, float]:
-            t0 = time.perf_counter()
-            try:
-                res = await asyncio.to_thread(
-                    self._providers.behavior.decide,
-                    system_prompt=behavior_prompt,
-                    utterance=request.utterance,
-                    vocabulary=vocabulary,
-                )
-                return "ok", res, _ms(time.perf_counter() - t0)
-            except ProviderCallError as exc:
-                return "error", exc, _ms(time.perf_counter() - t0)
-            except MalformedOutputError as exc:
-                return "malformed", exc, _ms(time.perf_counter() - t0)
-
-        behavior_task = asyncio.create_task(_run_behavior())
 
         # Prose leg: run the sync stream generator in a worker thread, bridge
         # its chunks onto an asyncio.Queue, yield them from this async
@@ -527,27 +369,11 @@ class DialogueService:
         await producer  # let the worker thread finish cleanly
         prose_stream_ms = _ms(time.perf_counter() - t_prose)
 
-        # --- behavior leg: settle (it ran concurrently) ------------------
-        behavior_status, behavior_payload, behavior_ms = await behavior_task
-        behavior_result: BehaviorCallResult | None = None
-        behavior_in = behavior_out = 0
-        behavior_degraded_reason: str | None = None
-        if behavior_status == "ok":
-            behavior_result = behavior_payload  # type: ignore[assignment]
-            behavior_in = behavior_result.input_tokens
-            behavior_out = behavior_result.output_tokens
-        elif behavior_status == "malformed":
-            behavior_degraded_reason = f"behavior output malformed: {behavior_payload}"
-            behavior_in = behavior_payload.input_tokens  # type: ignore[attr-defined]
-            behavior_out = behavior_payload.output_tokens  # type: ignore[attr-defined]
-        else:  # "error"
-            behavior_degraded_reason = f"behavior call failed: {behavior_payload}"
-
         # --- content: never-blank-a-dialogue (keep-partial on mid-drop) --
         prose_text = "".join(content_parts)
-        prose_degraded_reason: str | None = None
+        degraded_reason: str | None = None
         if prose_error is not None:
-            prose_degraded_reason = (
+            degraded_reason = (
                 f"prose stream dropped mid-stream: {prose_error}"
                 if content_parts
                 else f"prose call failed: {prose_error}"
@@ -556,122 +382,36 @@ class DialogueService:
             content = prose_text  # full, or partial kept (ruled 2026-07-21)
         else:
             content = str(config.get("dialogue_fallback_line", DIALOGUE_FALLBACK_LINE))
-            if prose_degraded_reason is None:
-                prose_degraded_reason = "prose produced no text"
+            if degraded_reason is None:
+                degraded_reason = "prose produced no text"
             logger.warning(
                 "never-blank fallback served for agent %s: %s",
                 request.agent_id,
-                prose_degraded_reason,
+                degraded_reason,
             )
 
         prose_in = prose_result.input_tokens if prose_result else 0
         prose_out = prose_result.output_tokens if prose_result else 0
 
-        # --- action directive: validate against the vocabulary, soft-fail --
-        directive: ActionDirective | None = None
-        directive_dropped = False
-        dropped_reason: str | None = None
-        if behavior_result is not None:
-            if behavior_result.directive_error is not None:
-                directive_dropped = True
-                dropped_reason = behavior_result.directive_error
-            elif behavior_result.directive_type is not None:
-                if not vocabulary_configured:
-                    directive_dropped = True
-                    dropped_reason = "no vocabulary configured"
-                elif behavior_result.directive_type not in vocabulary:
-                    directive_dropped = True
-                    dropped_reason = (
-                        f"unknown directive type {behavior_result.directive_type!r}"
-                    )
-                else:
-                    directive = ActionDirective(
-                        type=behavior_result.directive_type,
-                        params=behavior_result.directive_params,
-                    )
-        if directive_dropped:
-            logger.warning(
-                "directive dropped for agent %s: %s", request.agent_id, dropped_reason
-            )
-
-        # --- reputation delta: override wins; degraded/absent -> zeroed ----
-        if request.reputation_delta_override is not None:
-            delta = request.reputation_delta_override
-            delta_source = "override"
-        elif (
-            behavior_result is not None and behavior_result.reputation_delta is not None
-        ):
-            delta = behavior_result.reputation_delta
-            delta_source = "model"
-        else:
-            delta = 0.0
-            delta_source = "zeroed"
-            if behavior_result is not None and behavior_result.delta_error is not None:
-                logger.warning(
-                    "reputation delta zeroed for agent %s: %s",
-                    request.agent_id,
-                    behavior_result.delta_error,
-                )
-
-        # --- apply in place (atomic clamp; the one persisted state change) -
-        sensitivity = (
-            state.reputation_sensitivity
-            if state.reputation_sensitivity is not None
-            else agent_knob(config, "reputation_sensitivity_default", self._settings)
-        )
-        neutral = agent_knob(config, "reputation_neutral", self._settings)
-        t0 = time.perf_counter()
-        applied = await db.apply_reputation_delta(
-            self._pool,
-            request.agent_id,
-            addend=sensitivity * delta,
-            neutral=neutral,
-            scale_min=scale_min,
-            scale_max=scale_max,
-        )
-        apply_ms = _ms(time.perf_counter() - t0)
-        if applied is None:  # agents row vanished mid-turn: loud, not silent
-            raise UnknownAgentError(f"unknown agent_id {request.agent_id}")
-        reputation_prev, reputation_after = applied
-
-        reasons = [r for r in (prose_degraded_reason, behavior_degraded_reason) if r]
-        degraded_reason = "; ".join(reasons) if reasons else None
-
         yield DialogueTurnResult(
             agent_id=request.agent_id,
             content=content,
-            directive=directive,
-            directive_dropped=directive_dropped,
-            directive_dropped_reason=dropped_reason,
-            reputation_snapshot=request.reputation_snapshot,
-            reputation_prev=reputation_prev,
-            reputation_delta=delta,
-            reputation_delta_source=delta_source,
-            reputation_sensitivity=sensitivity,
-            reputation_after=reputation_after,
             items=retrieval.items,
             dialogue_view=dialogue_view,
-            behavior_view=behavior_view,
             instrumentation=DialogueTurnInstrumentation(
                 retrieval=retrieval.instrumentation,
                 sonnet_ms=prose_stream_ms,
                 sonnet_first_token_ms=first_word_ms,
-                apply_ms=apply_ms,
                 total_ms=_ms(time.perf_counter() - t_total),
                 sonnet_input_tokens=prose_in,
                 sonnet_output_tokens=prose_out,
                 first_word_ms=first_word_ms,
                 perceived_first_word_ms=perceived_first_word_ms,
                 prose_stream_ms=prose_stream_ms,
-                behavior_ms=behavior_ms,
-                behavior_input_tokens=behavior_in,
-                behavior_output_tokens=behavior_out,
                 cost_usd=_turn_cost_usd(
                     self._settings.prices,
                     prose_in,
                     prose_out,
-                    behavior_in,
-                    behavior_out,
                     retrieval.instrumentation.embedding_tokens,
                 ),
                 degraded=degraded_reason is not None,

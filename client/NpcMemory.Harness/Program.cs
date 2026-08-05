@@ -14,7 +14,8 @@ namespace NpcMemory.Harness
     /// provisions its own agent over the API, proves the tri-state
     /// serialization contract against the live gate, and walks provision ->
     /// observe -> loader -> correction-override -> chain inspection ->
-    /// drift + cache -> gate fire -> warm-init -> SSE stream -> divergence.
+    /// drift + cache -> gate fire -> warm-init -> SSE stream -> the
+    /// weights-on-speech re-rank (A1 re-shape, 2026-08-04).
     /// Structural asserts only: IDs, flags, byte-identity — never prose.
     /// </summary>
     internal static class Program
@@ -51,7 +52,6 @@ namespace NpcMemory.Harness
             {
                 Name = "harness-keeper",
                 SeedIdentity = "I keep the ford and remember who pays their toll.",
-                Reputation = 0.0,
                 DiagnosticityGoal = "what threatens the ford",
                 Config = new JObject
                 {
@@ -64,18 +64,12 @@ namespace NpcMemory.Harness
                         ["semantic"] = 2592000.0,
                     },
                     ["decay_class_default"] = "episodic",
-                    ["action_vocabulary"] = new JArray("greet", "warn", "recall"),
                 },
             });
             Check(created.AgentId != Guid.Empty, "agent provisioned, server-minted UUID",
                 created.AgentId.ToString());
 
-            var session = new NpcSession(client, created.AgentId, created.Reputation ?? 0.0,
-                phaseTag: "harness");
-            var directives = 0;
-            session.OnDirective += d => { directives++; };
-            var reputationEvents = new List<(double Prev, double After)>();
-            session.OnReputationChanged += (prev, after) => reputationEvents.Add((prev, after));
+            var session = new NpcSession(client, created.AgentId, phaseTag: "harness");
 
             // -- [2] observes at injected world times ----------------------
             Console.WriteLine("\n[2] Observes at injected timestamps (time travel)");
@@ -132,7 +126,6 @@ namespace NpcMemory.Harness
             {
                 AgentId = created.AgentId,
                 Utterance = "Anything at all?",
-                ReputationSnapshot = session.ReputationSnapshot,
                 AsOf = t0,
                 IdentityVersion = session.IdentityVersion,
                 SceneStartedAt = session.SceneStartedAt,
@@ -269,18 +262,45 @@ namespace NpcMemory.Harness
                 "after the off-camera init, the on-camera read is a pure cache hit",
                 $"init write_backs={warm.Instrumentation.WriteBacks}, turn cache_hits={onCamera.Instrumentation.Retrieval.CacheHits}");
 
-            // -- [10] the divergence record --------------------------------
-            Console.WriteLine("\n[10] Split-brain views + weight overrides");
-            var overridden = await session.SayAsync(
-                "What matters most right now?",
-                weightOverrides: new WeightOverrides { Recency = 4.0 });
+            // -- [10] weights-on-speech (A1 re-shape, 2026-08-04) ----------
+            Console.WriteLine("\n[10] Weights-on-speech: parity, then re-rank");
+            // Raw stateless turns with a null loaded set (loader by
+            // construction) so the parity contract applies: at default
+            // weights DialogueView == the (id, score) projection of Items.
+            // The utterance targets the 94-day-old toll observe, so at
+            // t0+92d the base ranking is recency-dominated (the 46-day
+            // herons observe tops it) while relevance favors the old toll
+            // memory — zeroing the recency exponent must re-order.
+            DialogueTurnRequest WeightsTurn(WeightOverrides? overrides) =>
+                new DialogueTurnRequest
+                {
+                    AgentId = created.AgentId,
+                    Utterance = "Who raised the toll at the bridge?",
+                    AsOf = session.AsOf,
+                    IdentityVersion = session.IdentityVersion,
+                    SceneStartedAt = session.SceneStartedAt,
+                    WeightOverrides = overrides,
+                };
+            var baseline = await client.DialogueTurnAsync(WeightsTurn(null));
+            Check(
+                baseline.DialogueView.Count > 0
+                    && baseline.DialogueView.Select(v => v.MemoryId)
+                        .SequenceEqual(baseline.Items.Select(i => i.MemoryId))
+                    && baseline.DialogueView.Zip(baseline.Items, (v, i) => (v, i))
+                        .All(p => Math.Abs(p.v.Score - p.i.Score) < 1e-12),
+                "default weights: dialogue_view == the served ranking (parity)",
+                $"{baseline.DialogueView.Count} refs");
+            var overridden = await client.DialogueTurnAsync(
+                WeightsTurn(new WeightOverrides { Recency = 0.0 }));
             Check(
                 overridden.DialogueView.Count > 0
-                    && overridden.BehaviorView.Count > 0
                     && new HashSet<Guid>(overridden.DialogueView.Select(v => v.MemoryId))
-                        .SetEquals(overridden.BehaviorView.Select(v => v.MemoryId)),
-                "both scored views ride the result over the same served set",
-                $"dialogue[{overridden.DialogueView.Count}] behavior[{overridden.BehaviorView.Count}]");
+                        .SetEquals(overridden.Items.Select(i => i.MemoryId))
+                    && !overridden.DialogueView.Select(v => v.MemoryId)
+                        .SequenceEqual(overridden.Items.Select(i => i.MemoryId)),
+                "override re-ranks the view feeding the prose prompt (same set, new order)",
+                $"top {overridden.DialogueView[0].MemoryId.ToString().Substring(0, 8)}… "
+                + $"vs served {overridden.Items[0].MemoryId.ToString().Substring(0, 8)}…");
 
             // -- [11] client-side instrumentation --------------------------
             // ClientTotalMs must be a REAL number after any call, whether or
@@ -305,11 +325,9 @@ namespace NpcMemory.Harness
                 $"{measured[0]} @ {client.ClientTotalMs:F2} ms");
 
             // -- wrap-up ---------------------------------------------------
-            Check(reputationEvents.Count > 0, "reputation callbacks fired",
-                $"{reputationEvents.Count} turns, last after={reputationEvents.Last().After:F3}");
             Console.WriteLine(
-                $"\nALL HARNESS BEATS PASSED ({_checks} checks, {directives} directives resolved)"
-                + " — the Wk-1 interop gate is GREEN");
+                $"\nALL HARNESS BEATS PASSED ({_checks} checks)"
+                + " — the interop gate is GREEN");
             return 0;
         }
     }

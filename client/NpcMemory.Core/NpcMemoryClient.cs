@@ -38,7 +38,7 @@ namespace NpcMemory
     ///
     /// Deliberately NO ConfigureAwait(false) anywhere: continuations honor
     /// the caller's SynchronizationContext, so in Unity every await — and
-    /// every callback (chunks, directives, reputation) — resumes on the
+    /// every callback (chunks) — resumes on the
     /// main thread with no explicit marshaling. The classic library-deadlock
     /// hazard needs a caller that BLOCKS on these tasks, and blocking
     /// (.Result/.Wait) is banned by the adapter contract. Play-mode-proven:

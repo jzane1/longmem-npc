@@ -309,66 +309,103 @@ def test_runner_append_only_and_scene_reset(scene):
     run_structural(scene, scenario)
 
 
-def test_split_brain_views_parity_and_rerank(scene):
-    """Split-brain (split-brain-streaming.md, 2026-07-21): one retrieval, two
-    scored views. The divergence record rides the turn result over the served
-    set; at default weights the behavior view is byte-identical to the dialogue
-    view (parity); a weight override re-scores the behavior view over the SAME
-    set while the dialogue view is unaffected. The seam streams prose ==
-    content."""
+def test_weights_shape_the_prose_view(scene):
+    """Weights-on-speech (A1 re-shape, ruled 2026-08-04): one retrieval, one
+    weight-ranked view. At default weights `dialogue_view` is byte-identical
+    to the (id, score) projection of `items` (the parity contract carried
+    over from the split-brain build); a weight override re-scores the SAME
+    served set, the re-ranked order matches a recomputation through the pure
+    weight functions, and the prose prompt's [memories] block renders in that
+    order (the weights-shape-the-words proof — loader turn, so no append-only
+    prefix applies). The seam streams prose == content."""
 
     async def scenario(ctx):
-        from app.dialogue import DialogueService
+        import re
+
+        from app.dialogue import (
+            DialogueService,
+            rank_dialogue_view,
+            resolve_dialogue_weights,
+        )
+        from app.providers import FakeProseProvider
         from app.schemas import DialogueTurnRequest, WeightOverrides
 
-        config = {**V1_CONFIG, "action_vocabulary": ["greet", "warn"]}
-        agent = await ctx.make_agent("d-split", config)
+        class RecordingProseProvider:
+            """FakeProseProvider that keeps the last system prompt so the
+            [memories] render order is assertable (IDs only, never prose)."""
+
+            def __init__(self):
+                self._inner = FakeProseProvider()
+                self.last_system_prompt = None
+
+            def stream_prose(self, *, system_prompt, utterance):
+                self.last_system_prompt = system_prompt
+                return self._inner.stream_prose(
+                    system_prompt=system_prompt, utterance=utterance
+                )
+
+        agent = await ctx.make_agent("d-weights", V1_CONFIG)
         await ctx.seed(agent, T_BRIDGE, NOW - timedelta(hours=1), importance=0.9)
         await ctx.seed(agent, T_STORM, NOW - timedelta(hours=20), importance=0.3)
         await ctx.seed(agent, T_QUARRY, NOW - timedelta(hours=2), importance=0.6)
+        recording = RecordingProseProvider()
         service = DialogueService(
-            ctx.pool, ctx.providers(), ctx.settings, ctx.retrieval()
+            ctx.pool,
+            ctx.providers(dialogue=recording),
+            ctx.settings,
+            ctx.retrieval(),
         )
 
         def turn(**over):
             base = dict(
                 agent_id=agent,
                 utterance="Tell me the news.",
-                reputation_snapshot=0.0,
                 as_of=NOW,
             )
             base.update(over)
             return DialogueTurnRequest(**base)
 
+        def prompt_memory_ids(prompt: str) -> list[str]:
+            return re.findall(r"^- \(([0-9a-f-]{36})\)", prompt, flags=re.MULTILINE)
+
         prose, r = await drain_turn(service.run_dialogue_turn(turn()))
         assert prose and r.content == prose  # the seam streamed
         served = {i.memory_id for i in r.items}
-        assert (
-            served
-            == {v.memory_id for v in r.dialogue_view}
-            == {v.memory_id for v in r.behavior_view}
-        )
-        # parity at default weights: byte-identical order AND scores.
-        assert [v.memory_id for v in r.dialogue_view] == [
-            v.memory_id for v in r.behavior_view
+        assert served == {v.memory_id for v in r.dialogue_view}
+        # parity at default weights: dialogue_view == the (id, score)
+        # projection of the served ranking, order AND scores.
+        assert [v.memory_id for v in r.dialogue_view] == [i.memory_id for i in r.items]
+        assert [v.score for v in r.dialogue_view] == [i.score for i in r.items]
+        # ...and the prompt rendered the served (== weight-ranked) order.
+        assert prompt_memory_ids(recording.last_system_prompt) == [
+            str(v.memory_id) for v in r.dialogue_view
         ]
-        assert [v.score for v in r.dialogue_view] == [v.score for v in r.behavior_view]
 
-        # a weight override re-scores the behavior view over the SAME set;
-        # the dialogue view stays byte-identical (the parity contract).
+        # a weight override re-scores the SAME served set; the re-rank is
+        # exactly what the pure functions compute, and the prose prompt
+        # renders in the re-ranked order.
         _p, rw = await drain_turn(
             service.run_dialogue_turn(
                 turn(weight_overrides=WeightOverrides(relevance=0.0))
             )
         )
-        assert {v.memory_id for v in rw.behavior_view} == served
-        assert [v.score for v in rw.dialogue_view] != [
-            v.score for v in rw.behavior_view
-        ]
+        assert {v.memory_id for v in rw.dialogue_view} == served
+        assert [v.score for v in rw.dialogue_view] != [i.score for i in rw.items]
+        weights = resolve_dialogue_weights(
+            dict(V1_CONFIG), WeightOverrides(relevance=0.0), ctx.settings
+        )
+        expected = rank_dialogue_view(list(rw.items), weights)
         assert [v.memory_id for v in rw.dialogue_view] == [
-            v.memory_id for v in r.dialogue_view
+            item.memory_id for _s, item in expected
         ]
-        assert [v.score for v in rw.dialogue_view] == [v.score for v in r.dialogue_view]
+        assert [v.score for v in rw.dialogue_view] == [s for s, _i in expected]
+        assert prompt_memory_ids(recording.last_system_prompt) == [
+            str(v.memory_id) for v in rw.dialogue_view
+        ]
+        # `items` stays the raw retrieval echo under an override: same served
+        # ranking both turns (the read path is untouched by weights).
+        assert [i.memory_id for i in rw.items] == [i.memory_id for i in r.items]
+        assert [i.score for i in rw.items] == [i.score for i in r.items]
 
     run_structural(scene, scenario)
 
@@ -391,8 +428,7 @@ def test_dialogue_turn_route_contract(scene):
         from app.dialogue import DialogueService
         from app.schemas import DialogueTurnRequest
 
-        config = {**V1_CONFIG, "action_vocabulary": ["greet", "warn"]}
-        agent = await ctx.make_agent("d-route", config)
+        agent = await ctx.make_agent("d-route", V1_CONFIG)
         await ctx.seed(agent, T_BRIDGE, NOW - timedelta(hours=1))
         await ctx.seed(agent, T_STORM, NOW - timedelta(hours=2))
         service = DialogueService(
@@ -420,7 +456,6 @@ def test_dialogue_turn_route_contract(scene):
             base = dict(
                 agent_id=agent,
                 utterance="Tell me the news.",
-                reputation_snapshot=0.0,
                 as_of=NOW,
             )
             base.update(over)
@@ -564,7 +599,6 @@ def test_turn_stream_route_contract(scene):
             base = dict(
                 agent_id=agent,
                 utterance="What happened at the bridge?",
-                reputation_snapshot=0.0,
                 as_of=NOW,
             )
             base.update(over)
@@ -634,15 +668,19 @@ def test_create_agent_route(scene):
                 json={
                     "name": "prov-full",
                     "seed_identity": "I keep the ford and remember who pays.",
-                    "reputation": 0.25,
                     "rigidity": 1.5,
-                    "reputation_sensitivity": 0.8,
                     "diagnosticity_goal": "what threatens the ford",
                     "config": dict(V1_CONFIG),
                 },
             )
             assert full.status_code == 200
             fb = full.json()
+            # The reputation surface left provisioning with the A1 re-shape
+            # (2026-08-04): not echoed on the wire, and the schema column —
+            # which stays, applied migrations being immutable — is never
+            # written.
+            assert "reputation" not in fb
+            assert "reputation_sensitivity" not in fb
             row = await ctx.fetchrow(
                 "SELECT name, seed_identity, reputation, rigidity, config "
                 "FROM agents WHERE agent_id = %s",
@@ -650,7 +688,7 @@ def test_create_agent_route(scene):
             )
             assert row[0] == "prov-full"
             assert row[1] == "I keep the ford and remember who pays."
-            assert float(row[2]) == 0.25
+            assert row[2] is None  # reputation column stays NULL, unwritten
             assert float(row[3]) == 1.5
             assert row[4] == dict(V1_CONFIG)  # config jsonb round-trip
 
@@ -660,7 +698,6 @@ def test_create_agent_route(scene):
                     DialogueTurnRequest(
                         agent_id=fb["agent_id"],
                         utterance="Do you know me?",
-                        reputation_snapshot=0.25,
                         as_of=NOW,
                     ).model_dump_json()
                 ),
@@ -1015,7 +1052,6 @@ def test_turn_stream_reconstructing_and_error_events(scene):
             DialogueTurnRequest(
                 agent_id=agent,
                 utterance="What happened at the quarry?",
-                reputation_snapshot=0.0,
                 as_of=NOW,
                 scene_started_at=NOW,
                 identity_version=boundary.identity_version,

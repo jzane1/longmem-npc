@@ -39,7 +39,6 @@ T_QUARRY = (
 FALLBACK_LINE = "[fallback] The keeper stares into the ford."
 DIALOGUE_CONFIG = {
     **V1_CONFIG,
-    "action_vocabulary": ["greet", "warn"],
     "dialogue_fallback_line": FALLBACK_LINE,
 }
 
@@ -376,48 +375,30 @@ def test_gate_degradation_ladder(scene):
 
 
 def test_dialogue_never_blank(scene):
-    """The split-brain seam's never-blank ladder (split-brain-streaming.md):
-    the prose and behavior legs degrade INDEPENDENTLY. Behavior failure =>
-    prose survives, directive None + delta zeroed, row unchanged. Prose failure
-    before the first chunk => the fallback line, but the behavior leg's
-    directive + delta STILL land (words and action are chosen apart). A
-    mid-stream prose drop KEEPS the partial (ruled 2026-07-21). An
-    off-vocabulary directive drops with a reason while prose survives, turn not
-    degraded. Both legs failing holds never-blank + zeroed."""
+    """The dialogue seam's never-blank ladder (re-shaped by A1 2026-08-04 —
+    prose is the turn's only leg). Prose failure before the first chunk =>
+    the fallback line + degraded flag, with the served view still riding the
+    result (retrieval is unaffected by the prose leg). A mid-stream prose
+    drop KEEPS the partial (ruled 2026-07-21). The happy row streams
+    prose == content, not degraded. A dialogue turn persists nothing:
+    `agents.reputation` stays NULL throughout."""
 
     async def scenario(ctx):
         from app.dialogue import DialogueService
         from app.providers import (
-            BehaviorCallResult,
-            FailingBehaviorProvider,
             FailingProseProvider,
-            MalformedBehaviorProvider,
             MidStreamDropProseProvider,
         )
         from app.schemas import DialogueTurnRequest
-
-        class OffVocabBehaviorProvider:
-            def decide(self, **_kwargs) -> BehaviorCallResult:
-                return BehaviorCallResult(
-                    directive_type="brandish",  # not in the DIALOGUE_CONFIG vocab
-                    directive_params={},
-                    directive_error=None,
-                    reputation_delta=0.1,
-                    delta_error=None,
-                    input_tokens=1,
-                    output_tokens=1,
-                )
 
         agent = await ctx.make_agent("g-dialogue", DIALOGUE_CONFIG)
         await ctx.seed(agent, T_OBS, NOW - timedelta(hours=1))
         retrieval = ctx.retrieval()
 
-        def service(*, dialogue=None, behavior=None) -> DialogueService:
+        def service(*, dialogue=None) -> DialogueService:
             overrides = {}
             if dialogue is not None:
                 overrides["dialogue"] = dialogue
-            if behavior is not None:
-                overrides["behavior"] = behavior
             return DialogueService(
                 ctx.pool, ctx.providers(**overrides), ctx.settings, retrieval
             )
@@ -426,40 +407,25 @@ def test_dialogue_never_blank(scene):
             return DialogueTurnRequest(
                 agent_id=agent,
                 utterance="Tell me about the forge.",
-                reputation_snapshot=0.0,
                 as_of=NOW,
             )
 
-        # (1) behavior fails -> prose survives, directive None, delta zeroed,
-        # the reputation row unchanged (addend 0).
-        rep_before = await ctx.fetchrow(
-            "SELECT reputation FROM agents WHERE agent_id = %s", agent
-        )
-        prose_b, r_bfail = await drain_turn(
-            service(behavior=FailingBehaviorProvider()).run_dialogue_turn(turn())
-        )
-        assert bool(prose_b) and r_bfail.content == prose_b  # streamed prose kept
-        assert r_bfail.content != FALLBACK_LINE
-        assert r_bfail.directive is None
-        assert r_bfail.reputation_delta == 0.0
-        assert r_bfail.reputation_delta_source == "zeroed"
-        assert r_bfail.instrumentation.degraded
-        assert "behavior call failed" in r_bfail.instrumentation.degraded_reason
-        rep_after = await ctx.fetchrow(
-            "SELECT reputation FROM agents WHERE agent_id = %s", agent
-        )
-        assert rep_after == rep_before
+        # (1) happy row: streamed prose == content, not degraded.
+        prose_h, r_happy = await drain_turn(service().run_dialogue_turn(turn()))
+        assert bool(prose_h) and r_happy.content == prose_h
+        assert r_happy.content != FALLBACK_LINE
+        assert not r_happy.instrumentation.degraded
 
-        # (2) prose fails BEFORE the first chunk -> fallback line, but the
-        # behavior leg's directive + delta STILL land (independence).
+        # (2) prose fails BEFORE the first chunk -> fallback line + degraded;
+        # the served view still rides the result (retrieval unaffected).
         _p2, r_pfail = await drain_turn(
             service(dialogue=FailingProseProvider()).run_dialogue_turn(turn())
         )
         assert r_pfail.content == FALLBACK_LINE
         assert r_pfail.instrumentation.degraded
         assert "prose call failed" in r_pfail.instrumentation.degraded_reason
-        assert r_pfail.directive is not None and r_pfail.directive.type == "greet"
-        assert r_pfail.reputation_delta_source == "model"
+        assert [i.memory_id for i in r_pfail.items]
+        assert [v.memory_id for v in r_pfail.dialogue_view]
 
         # (3) prose DROPS mid-stream -> keep the partial (ruled 2026-07-21).
         prose_d, r_drop = await drain_turn(
@@ -470,37 +436,12 @@ def test_dialogue_never_blank(scene):
         assert r_drop.instrumentation.degraded
         assert "mid-stream" in r_drop.instrumentation.degraded_reason
 
-        # (4) behavior malformed -> no directive, delta zeroed, tokens accounted.
-        _p4, r_mal = await drain_turn(
-            service(behavior=MalformedBehaviorProvider()).run_dialogue_turn(turn())
+        # A turn persists nothing (A1): the reputation column was never
+        # written — not at provisioning, not by any of the turns above.
+        rep_row = await ctx.fetchrow(
+            "SELECT reputation FROM agents WHERE agent_id = %s", agent
         )
-        assert r_mal.directive is None
-        assert r_mal.reputation_delta == 0.0
-        assert r_mal.instrumentation.degraded
-        assert r_mal.instrumentation.behavior_input_tokens == 7
-        assert r_mal.instrumentation.behavior_output_tokens == 3
-
-        # (5) off-vocabulary directive -> dropped with a reason, prose survives,
-        # the turn is NOT degraded (both calls succeeded).
-        prose_o, r_off = await drain_turn(
-            service(behavior=OffVocabBehaviorProvider()).run_dialogue_turn(turn())
-        )
-        assert r_off.directive is None
-        assert r_off.directive_dropped
-        assert "unknown directive type" in r_off.directive_dropped_reason
-        assert bool(prose_o) and r_off.content == prose_o
-        assert not r_off.instrumentation.degraded
-
-        # (6) BOTH legs fail -> fallback + zeroed + degraded (never-blank holds).
-        _p6, r_both = await drain_turn(
-            service(
-                dialogue=FailingProseProvider(), behavior=FailingBehaviorProvider()
-            ).run_dialogue_turn(turn())
-        )
-        assert r_both.content == FALLBACK_LINE
-        assert r_both.directive is None
-        assert r_both.reputation_delta == 0.0
-        assert r_both.instrumentation.degraded
+        assert rep_row[0] is None
 
     run_structural(scene, scenario)
 

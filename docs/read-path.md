@@ -29,7 +29,8 @@ it are in [decisions.md](decisions.md); the schema it reads is frozen in
 > per-agent overridable). **A request with no context fields skips the term entirely — scoring
 > stays byte-identical to v1** (the parity contract; walker criterion [7] asserts the exact
 > factors). Ruled client-supplied (no LLM query decomposition) — the 2026-07-14
-> query-embedded-as-is ruling stands; `weight_overrides` stays reserved. The term applies on
+> query-embedded-as-is ruling stands; `weight_overrides` left this request with the A1
+> re-shape (2026-08-04 — it re-ranks the prose view at the dialogue seam now). The term applies on
 > loader, gated, and degraded paths alike (it is lexical/structural, never a vector dependency,
 > never a filter, never a penalty).
 >
@@ -125,7 +126,7 @@ reconstruction on miss, `read_mode = "reconstructed"` past threshold.
 | `query_text` | **required** — the relevance probe, embedded **as-is** (ruled 2026-07-14: the integrator authors it — opening utterance or scene blurb; the service never composes prose; a template would be a hidden hardcoded authorial artifact). |
 | `k` | optional; default = integrator knob (per-agent via `agents.config`, service default in `app\config.py`). |
 | `location_name` / `entities[]` / `event_time` | **RESERVED** (ruled 2026-07-14): accepted and shape-validated, **not consumed by v1 scoring, not echoed** — slots for the post-August encoding-context term, mirroring three of the four write-side context stamps. **Affect is deliberately not reserved** (ruled 2026-07-14): a query-side affect field's shape — and whose affect it would carry — is undesigned; it gets its shape with the encoding-context term rather than as a guessed slot. Documented inert (hostile-integrator discipline: per-field behavior stated). *(**Consumed since 2026-07-20** — the encoding-context build; see the banner note. Still never echoed; affect still deliberately absent.)* |
-| `weight_overrides` | **RESERVED** slot for per-call split-brain scoring overrides (post-August): accepted, not consumed, not echoed. `[SETTLE-AT-BUILD]` exact shape — **ruled 2026-07-14 as suggested:** `{relevance, recency, importance}` optional float multipliers. *(**Going live 2026-07-21** — the split-brain pull-forward, `split-brain-streaming.md`: consumed for the BEHAVIOR view only via a second scoring pass; dialogue-view scoring stays byte-identical — the parity contract. Reserved-inert in code until that build.)* |
+| `weight_overrides` | **REMOVED from this request by the A1 re-shape (2026-08-04).** The slot was reserved here 2026-07-14 (`{relevance, recency, importance}` optional float multipliers), went live 2026-07-21 for the split-brain BEHAVIOR view on the TURN request, and now lives on the turn request as **weights-on-speech**: the dialogue seam re-ranks the served view feeding the prose prompt (`architecture.md` §9). The init request carries no weights field, and retrieval scoring has no weights surface — the walker asserts the field's absence. |
 | `as_of` | optional world-time override for age computation (time-travel / Set B test surface). `[SETTLE-AT-BUILD]` — **ADOPTED as suggested (ruled 2026-07-14):** tz-aware timestamp, defaults to server now (UTC), surfaced in instrumentation as `as_of_effective`; `tests\CLAUDE.md`'s time-travel line carries the second mechanic. |
 
 ## `RetrievalResult` — the structured payload
@@ -201,8 +202,9 @@ computed at read time, returned per item with all components.
 - **Reserved slots** — the encoding-context term multiplies in post-August; per-call
   `weight_overrides` apply under the split-brain topology. Neither is consumed in v1.
   *(The context term **landed 2026-07-20**, exactly as this line drew it — a multiplicative
-  factor; `weight_overrides` remains reserved in code — **ruled live for the split-brain
-  behavior view 2026-07-21**, `split-brain-streaming.md`.)*
+  factor. `weight_overrides` went live for the split-brain behavior view 2026-07-21; **since
+  the A1 re-shape 2026-08-04 it rides the TURN request only** and re-ranks the prose view at
+  the dialogue seam — retrieval scoring itself never consumed weights and still doesn't.)*
 - **`scoring_failed` rows** flow through normally (importance was neutral at write; no read-time
   special case).
 
@@ -270,8 +272,9 @@ role, `LONGMEM_MODEL_RECONSTRUCTION`, landed 2026-07-17.)
   `weight_overrides` return identical items and scores (fake provider), and none of those fields
   is echoed. *(**Re-scoped 2026-07-20** by the encoding-context build — the one ruling-driven
   criterion change: walker criterion [7] now asserts the context contract instead — no-context
-  parity, exact per-component factors, never-penalize, never-echo — while `weight_overrides`-only
-  inertness stands as written.)*
+  parity, exact per-component factors, never-penalize, never-echo. **Re-scoped again by the A1
+  re-shape 2026-08-04:** `weight_overrides` is no longer a field on this request at all —
+  criterion [7] now asserts its absence from the model.)*
 - **Byte-identity.** Two identical calls (same store, same `as_of`, fake provider) return
   byte-identical `content` per memory_id and identical scores.
 - **NULL-embedding exclusion.** A NULL-embedding row never appears via the vector path; under the

@@ -5,10 +5,11 @@ builder). The observe insert is ONE transaction: memories row + `original`
 memory_details head + `original` memory_fact_versions head (migration 002,
 fact-level-correction.md) + memory_gist_spans + any new identity_components
 land together or not at all (write-path.md §pipeline step d). Nothing here
-ever UPDATEs stored content; the only in-place writes are the two agent-row
-runtime scalars — `set_pinned` (`memories.pinned`, write-path v1) and
-`apply_reputation_delta` (`agents.reputation`, CLI-harness build ruling
-2026-07-15) — both outside the memory-content non-destructive invariant. The
+ever UPDATEs stored content; the only in-place write is the runtime scalar
+`set_pinned` (`memories.pinned`, write-path v1) — outside the memory-content
+non-destructive invariant. (`apply_reputation_delta` was the second sanctioned
+scalar until the A1 re-shape, 2026-08-04, removed the reputation system; the
+`agents.reputation` column stays in the schema, unwritten and unread.) The
 only DELETE is `apply_authorial_correction`'s cache eviction — derived rows,
 not memory content (the standing eviction invariant, authorial-correction.md).
 
@@ -88,27 +89,27 @@ async def insert_agent(
     *,
     name: str,
     seed_identity: str | None,
-    reputation: float | None,
     rigidity: float | None,
-    reputation_sensitivity: float | None,
     diagnosticity_goal: str | None,
     config: dict | None,
 ) -> UUID:
     """Provision one agent row (unity-client.md fork 2, ruled 2026-07-27).
     The UUID is minted server-side by the column default (stack constant);
     numeric knobs land NULL when unsupplied and resolve through config →
-    SERVICE_DEFAULTS at read time, exactly like a hand-provisioned row."""
+    SERVICE_DEFAULTS at read time, exactly like a hand-provisioned row.
+    The reputation / reputation_sensitivity columns are deliberately absent
+    from the INSERT since the A1 re-shape (2026-08-04): they stay in the
+    schema (applied migrations are immutable) but are never written or
+    read."""
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
-            "INSERT INTO agents (name, seed_identity, reputation, rigidity, "
-            "reputation_sensitivity, diagnosticity_goal, config) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING agent_id",
+            "INSERT INTO agents (name, seed_identity, rigidity, "
+            "diagnosticity_goal, config) "
+            "VALUES (%s, %s, %s, %s, %s) RETURNING agent_id",
             (
                 name,
                 seed_identity,
-                reputation,
                 rigidity,
-                reputation_sensitivity,
                 diagnosticity_goal,
                 Jsonb(config) if config is not None else None,
             ),
@@ -710,14 +711,12 @@ async def fetch_agent_memories(
 
 @dataclass(frozen=True)
 class DialogueAgentState:
-    """The agent facts the dialogue turn consumes (cli-harness.md): seed
-    identity prose for the prompt prefix, the reputation runtime scalars, and
-    config for knob resolution. Numeric columns arrive as float, not Decimal."""
+    """The agent facts the dialogue turn consumes (cli-harness.md; shrunk by
+    the A1 re-shape 2026-08-04 — the reputation scalars left the read): seed
+    identity prose for the prompt prefix and config for knob resolution."""
 
     agent_id: UUID
     seed_identity: str | None
-    reputation: float | None  # NULL = never set; neutral is a config knob
-    reputation_sensitivity: float | None  # NULL -> config default
     config: dict
 
 
@@ -726,8 +725,7 @@ async def fetch_dialogue_agent_state(
 ) -> DialogueAgentState | None:
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
-            "SELECT agent_id, seed_identity, reputation, reputation_sensitivity, "
-            "config FROM agents WHERE agent_id = %s",
+            "SELECT agent_id, seed_identity, config FROM agents WHERE agent_id = %s",
             (agent_id,),
         )
         row = await cur.fetchone()
@@ -736,50 +734,8 @@ async def fetch_dialogue_agent_state(
     return DialogueAgentState(
         agent_id=row[0],
         seed_identity=row[1],
-        reputation=float(row[2]) if row[2] is not None else None,
-        reputation_sensitivity=float(row[3]) if row[3] is not None else None,
-        config=row[4] or {},
+        config=row[2] or {},
     )
-
-
-async def apply_reputation_delta(
-    pool: AsyncConnectionPool,
-    agent_id: UUID,
-    *,
-    addend: float,
-    neutral: float,
-    scale_min: float,
-    scale_max: float,
-) -> tuple[float, float] | None:
-    """Apply one turn's reputation change in a single atomic statement
-    (cli-harness build ruling 2026-07-15):
-
-        reputation = clamp(COALESCE(reputation, neutral) + addend, min, max)
-
-    `addend` is sensitivity x delta, computed by the seam. An in-place UPDATE
-    of a runtime scalar — deliberately outside the memory-content
-    non-destructive invariant (the two sanctioned scalars are `agents.reputation`
-    here and `memories.pinned` in `set_pinned`; reworded 2026-07-16 because
-    `pinned` lives on a memory row, not an agent row). Returns
-    (prev_effective, after) as floats, or None when the agent is unknown.
-    The clamp lives in SQL so the value can never leave the scale, even under
-    concurrent turns.
-    """
-    async with pool.connection() as conn, conn.cursor() as cur:
-        await cur.execute(
-            "UPDATE agents a "
-            "SET reputation = GREATEST(%s::numeric, LEAST(%s::numeric, "
-            "COALESCE(a.reputation, %s::numeric) + %s::numeric)) "
-            "FROM (SELECT agent_id, reputation FROM agents "
-            "      WHERE agent_id = %s FOR UPDATE) old "
-            "WHERE a.agent_id = old.agent_id "
-            "RETURNING COALESCE(old.reputation, %s::numeric), a.reputation",
-            (scale_min, scale_max, neutral, addend, agent_id, neutral),
-        )
-        row = await cur.fetchone()
-    if row is None:
-        return None
-    return float(row[0]), float(row[1])
 
 
 # ---------------------------------------------------------------------------

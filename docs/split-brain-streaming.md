@@ -1,6 +1,17 @@
 # Split-brain streaming — build target (specced 2026-07-21)
 
-> **Status: BUILT, verified, and committed 2026-07-21.** The twelfth verified floor. The seam
+> **Status: RETIRED 2026-08-04 — the A1 re-shape.** The behavior/action side this doc specs —
+> the concurrent behavior call and its model role, the action directive, the divergence record,
+> the recent-actions block, and the reputation system whole — was **removed by ruling** (ruling 2
+> of the 2026-08-04 "Scope consolidation + road-to-completion rulings" entry in `decisions.md`;
+> the removal build's own dated A1 entry records the seam that replaced it). What SURVIVES, moved:
+> the async-generator streaming seam and its latency terms (unchanged), the game-authored
+> action-observe contract (§"world record" below — still standing), and the weights machinery —
+> the exponent-form re-rank, clamp, and resolution order now re-rank the view feeding the
+> **prose** prompt (weights-on-speech; `architecture.md` §9 is the living statement). This file
+> stays as the historical spec of the retired topology; nothing below governs the build anymore.
+>
+> **Status at retirement: BUILT, verified, and committed 2026-07-21.** The twelfth verified floor. The seam
 > is an async generator streaming pure prose concurrently with the behavior call off one
 > retrieval; two scored views (dialogue view = the served ranking; behavior view = the same
 > served set re-ranked with resolved weights, exponent-form); the divergence record, the

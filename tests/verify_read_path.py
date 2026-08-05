@@ -57,7 +57,6 @@ from app.schemas import (
     DialogueInitRequest,
     ObserveEvent,
     RetrievalResult,
-    WeightOverrides,
 )
 
 NOW = datetime(2026, 7, 14, 12, 0, 0, tzinfo=timezone.utc)
@@ -122,9 +121,9 @@ def fake_providers(**overrides) -> Providers:
 async def make_agent(pool, name: str, config: dict):
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
-            "INSERT INTO agents (name, seed_identity, reputation, rigidity, "
-            "reputation_sensitivity, diagnosticity_goal, config) "
-            "VALUES (%s, %s, 0, 1.0, 1.0, %s, %s) RETURNING agent_id",
+            "INSERT INTO agents (name, seed_identity, rigidity, "
+            "diagnosticity_goal, config) "
+            "VALUES (%s, %s, 1.0, %s, %s) RETURNING agent_id",
             (name, "A verification NPC.", "what threatens the forge", Jsonb(config)),
         )
         agent_id = (await cur.fetchone())[0]
@@ -389,7 +388,7 @@ async def main(database_uri: str) -> None:
     # ------------------------------------------------------------------ #
     print(
         "\n[7] Encoding-context term (consumed 2026-07-20; formerly the "
-        "reserved-fields criterion) + weight_overrides inert on the dialogue view"
+        "reserved-fields criterion) + no weights surface on the init request"
     )
     plain = await retrieval.retrieve_dialogue_init(request(agent_a))
     check(
@@ -398,17 +397,12 @@ async def main(database_uri: str) -> None:
         "no-context request: context_active False (the v1-parity contract — "
         "criteria 1-6, 8-10 above assert unchanged scoring end to end)",
     )
-    wo = await retrieval.retrieve_dialogue_init(
-        request(
-            agent_a,
-            weight_overrides=WeightOverrides(relevance=9.0, recency=0.1),
-        )
-    )
     check(
-        items_json(plain) == items_json(wo),
-        "weight_overrides inert on the dialogue/retrieval view: identical items "
-        "and scores (consumed for the BEHAVIOR view on the dialogue turn — "
-        "split-brain 2026-07-21; the dialogue-view parity contract)",
+        "weight_overrides" not in DialogueInitRequest.model_fields,
+        "weight_overrides is GONE from the init request (A1 re-shape "
+        "2026-08-04: live weights ride the TURN request and re-rank the "
+        "prose view at the dialogue seam; retrieval scoring keeps no "
+        "weights surface — the parity contract holds by construction)",
     )
     # The context fixtures live on their OWN agent so every agent_a count
     # elsewhere in this walker stands byte-identical.

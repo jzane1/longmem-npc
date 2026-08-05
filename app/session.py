@@ -7,22 +7,14 @@ dialogue) — one runner core, two thin callers, so the paths cannot drift
 apart (spec-time ruling 2026-07-14). No timing or token accounting happens
 here; the seams record it.
 
-Scene state lives here, per the seam contract (cli-harness.md): the runner
-freezes the reputation snapshot read at the last scene boundary and passes it
-into every turn; mid-scene deltas accumulate on the agents.reputation row but
-the injected snapshot does not change until `scene()` re-reads it. The
-scene-boundary reputation-snapshot consumer (deferred in write-v1) lands
-here, per the 2026-07-14 re-slating.
-
-Since the reconstruction build (2026-07-17) the frozen scene state also
-carries `identity_version` (returned by the scene-boundary handler's
-server-side recompile — the hybrid plumbing ruling) and `scene_started_at`
-(the boundary's world time — the basis for every text-affecting decay
-evaluation, so read-mode and served text cannot flip mid-scene). Both pass
-through every turn, exactly like the reputation snapshot. Since the split-brain
-build (2026-07-21) the frozen state also carries the recent-actions block —
-each turn's resolved directive, appended as world-fact context for later
-turns' prose prompts and reset at scene boundaries.
+Scene state lives here, per the seam contract (cli-harness.md; re-shaped by
+A1 2026-08-04 — the reputation snapshot and the recent-actions block left
+with the behavior/reputation removal). The frozen scene state carries
+`identity_version` (returned by the scene-boundary handler's server-side
+recompile — the hybrid plumbing ruling, reconstruction build 2026-07-17) and
+`scene_started_at` (the boundary's world time — the basis for every
+text-affecting decay evaluation, so read-mode and served text cannot flip
+mid-scene). Both pass through every turn.
 
 `as_of` is the session's time-travel surface: when set, it rides retrieval's
 age computation AND becomes the client_timestamp of `observe()` events, so a
@@ -44,7 +36,7 @@ from uuid import UUID
 from psycopg_pool import AsyncConnectionPool
 
 from app import db, identity
-from app.config import Settings, agent_knob, load_settings
+from app.config import Settings, load_settings
 from app.db import build_pool
 from app.dialogue import DialogueService
 from app.ingest import IngestService, UnknownAgentError
@@ -59,7 +51,6 @@ from app.schemas import (
     IngestResult,
     ObserveEvent,
     PinResult,
-    RecentAction,
     SceneBoundaryEvent,
     SceneResult,
     WeightOverrides,
@@ -87,17 +78,15 @@ class SessionRunner:
         self._dialogue = dialogue
         self.agent_id = agent_id
         self.phase_tag = phase_tag  # passthrough label on observe events
-        self.reputation_snapshot: float = 0.0  # set by _refresh_snapshot
         self.identity_version: str | None = None  # frozen at scene boundaries
         self.scene_started_at: datetime | None = None  # the scene basis
         self.as_of: datetime | None = None  # session time-travel override
         self.debug: bool = False  # rendering hint; inert to the seams
         # Caller-held loaded set + damper streak (mid-dialogue-gate.md fork 1,
         # 2026-07-19 — the third application of the caller-freezes-scene-state
-        # contract, and caller-side ONLY: no fourth scene-boundary server
-        # consumer). None => the next turn is a loader; the loader turn's
-        # served IDs seed the set; gate fetches append; scene() and session
-        # start reset both.
+        # contract, and caller-side ONLY: no scene-boundary server consumer).
+        # None => the next turn is a loader; the loader turn's served IDs seed
+        # the set; gate fetches append; scene() and session start reset both.
         self.loaded_memory_ids: list[UUID] | None = None
         self.gate_fruitless_streak: int = 0
         # Caller-held scene context (encoding-context build 2026-07-20 — the
@@ -109,16 +98,6 @@ class SessionRunner:
         self.context_location: str | None = None
         self.context_entities: list[str] | None = None
         self.context_event_time: datetime | None = None
-        # Caller-held recent-actions scene block (split-brain-streaming.md
-        # 2026-07-21 — the fifth application of the caller-holds-scene-state
-        # contract): each turn's resolved directive is appended as world-fact
-        # context for later turns' PROSE prompts, capped; scene() resets it;
-        # never stored server-side. The current turn's action never feeds its
-        # own prose call — only subsequent turns'.
-        self.recent_actions: list[RecentAction] = []
-        # The cap is a per-agent knob (recent_actions_cap); frozen from the
-        # agent config each _refresh_snapshot, service default until then.
-        self._recent_actions_cap: int = int(settings.defaults["recent_actions_cap"])
         # Fork 5: the pre-serve callback — set by the REPL to print
         # "(reconstructing…)" DURING a blocking mid-scene serve; the future
         # Unity hook attaches here. None => nothing fires (the load driver).
@@ -135,7 +114,7 @@ class SessionRunner:
         phase_tag: str = "cli",
         warm_nlp: bool = False,
     ) -> SessionRunner:
-        """Bootstrap the seams and read the scene-start snapshot. Injection
+        """Bootstrap the seams and freeze the scene-start state. Injection
         points (settings/providers/pool) exist for the load driver and the
         structural walker; the REPL uses the defaults. `warm_nlp` front-loads
         the spaCy/fastcoref model cost (the load driver warms so warm-up never
@@ -161,10 +140,12 @@ class SessionRunner:
             agent_id=agent_id,
             phase_tag=phase_tag,
         )
-        # Session start is an implicit scene start: freeze the snapshot, the
-        # identity version (ensured directly, the _refresh_snapshot precedent
-        # — no boundary event is emitted), and the scene basis.
-        state = await runner._refresh_snapshot()  # loud UnknownAgentError
+        # Session start is an implicit scene start: verify the agent loudly,
+        # freeze the identity version (ensured directly — no boundary event is
+        # emitted), and the scene basis.
+        state = await db.fetch_dialogue_agent_state(pool, agent_id)
+        if state is None:
+            raise UnknownAgentError(f"unknown agent_id {agent_id}")
         version, _rendered, _created = await identity.ensure_identity_document(
             pool, agent_id, state.seed_identity
         )
@@ -175,44 +156,21 @@ class SessionRunner:
     def _now(self) -> datetime:
         return self.as_of if self.as_of is not None else datetime.now(timezone.utc)
 
-    async def _refresh_snapshot(self) -> db.DialogueAgentState:
-        """Read the reputation scalar into the frozen snapshot (NULL row value
-        -> the agent's neutral point; nothing hardcoded). Returns the fetched
-        agent state so callers can reuse it without a second read."""
-        state = await db.fetch_dialogue_agent_state(self._pool, self.agent_id)
-        if state is None:
-            raise UnknownAgentError(f"unknown agent_id {self.agent_id}")
-        self.reputation_snapshot = (
-            state.reputation
-            if state.reputation is not None
-            else agent_knob(state.config, "reputation_neutral", self._settings)
-        )
-        self._recent_actions_cap = int(
-            agent_knob(state.config, "recent_actions_cap", self._settings)
-        )
-        return state
-
     async def stream_utterance(
         self,
         text: str,
         *,
-        reputation_delta_override: float | None = None,
-        action_vocabulary: list[str] | None = None,
         k: int | None = None,
         weight_overrides: WeightOverrides | None = None,
     ) -> AsyncIterator[str | DialogueTurnResult]:
-        """One dialogue turn through the split-brain seam, streaming: yields
-        prose chunks (str) as they arrive, then the terminal DialogueTurnResult
-        (the REPL prints the chunks live). All scene state — reputation
-        snapshot, context, identity version, basis time, loaded set, damper
-        streak, and the recent-actions block — rides frozen from the caller;
+        """One dialogue turn through the streaming seam: yields prose chunks
+        (str) as they arrive, then the terminal DialogueTurnResult (the REPL
+        prints the chunks live). All scene state — context, identity version,
+        basis time, loaded set, damper streak — rides frozen from the caller;
         the turn's bookkeeping is applied when the result arrives."""
         request = DialogueTurnRequest(
             agent_id=self.agent_id,
             utterance=text,
-            reputation_snapshot=self.reputation_snapshot,
-            reputation_delta_override=reputation_delta_override,
-            action_vocabulary=action_vocabulary,
             k=k,
             as_of=self.as_of,
             location_name=self.context_location,
@@ -223,7 +181,6 @@ class SessionRunner:
             loaded_memory_ids=self.loaded_memory_ids,
             gate_fruitless_streak=self.gate_fruitless_streak,
             weight_overrides=weight_overrides,
-            recent_actions=list(self.recent_actions),
             debug=self.debug,
         )
         async for item in self._dialogue.run_dialogue_turn(
@@ -237,8 +194,6 @@ class SessionRunner:
         self,
         text: str,
         *,
-        reputation_delta_override: float | None = None,
-        action_vocabulary: list[str] | None = None,
         k: int | None = None,
         weight_overrides: WeightOverrides | None = None,
     ) -> DialogueTurnResult:
@@ -249,8 +204,6 @@ class SessionRunner:
         result: DialogueTurnResult | None = None
         async for item in self.stream_utterance(
             text,
-            reputation_delta_override=reputation_delta_override,
-            action_vocabulary=action_vocabulary,
             k=k,
             weight_overrides=weight_overrides,
         ):
@@ -270,12 +223,7 @@ class SessionRunner:
         loader turn -> the served IDs become the loaded set, streak resets;
         gated fire -> this turn's gate-fetched IDs append, streak resets on a
         productive fetch and increments on a fruitless one; gated closed ->
-        untouched.
-
-        Recent-actions bookkeeping (split-brain 2026-07-21): a resolved
-        directive is appended as world-fact scene context for later turns,
-        capped at recent_actions_cap; a dropped/absent directive appends
-        nothing (only what actually happened enters the record)."""
+        untouched."""
         gate_inst = result.instrumentation.retrieval.gate
         if not gate_inst.evaluated:
             self.loaded_memory_ids = [item.memory_id for item in result.items]
@@ -289,16 +237,6 @@ class SessionRunner:
                 if gate_inst.fetched_new_count == 0
                 else 0
             )
-        if result.directive is not None:
-            self.recent_actions.append(
-                RecentAction(
-                    type=result.directive.type,
-                    params=result.directive.params,
-                    at=self._now(),
-                )
-            )
-            if len(self.recent_actions) > self._recent_actions_cap:
-                self.recent_actions = self.recent_actions[-self._recent_actions_cap :]
 
     async def observe(self, text: str) -> IngestResult:
         """One observe event through the write seam, at the session's time."""
@@ -315,9 +253,8 @@ class SessionRunner:
     async def scene(self, scene_type: str | None = None) -> SceneResult:
         """Scene boundary: emit the event (whose handler recompiles the
         identity document server-side and returns its version), then refresh
-        every piece of frozen scene state — the next scene sees the
-        accumulated reputation, the current identity version, and a new
-        basis; within the ending scene none of them moved."""
+        the frozen scene state — the next scene sees the current identity
+        version and a new basis; within the ending scene neither moved."""
         result = await self._ingest.scene_boundary(
             SceneBoundaryEvent(
                 agent_id=self.agent_id,
@@ -325,7 +262,6 @@ class SessionRunner:
                 scene_type=scene_type,
             )
         )
-        await self._refresh_snapshot()
         self.identity_version = result.identity_version
         self.scene_started_at = self._now()
         # Gate scene reset (caller-side only): next turn is a loader; the
@@ -337,9 +273,6 @@ class SessionRunner:
         self.context_location = None
         self.context_entities = None
         self.context_event_time = None
-        # Recent actions die with the scene (split-brain 2026-07-21): a new
-        # scene starts with no world-fact action history in the prose prompt.
-        self.recent_actions = []
         return result
 
     async def pin(self, memory_id: UUID, pinned: bool) -> PinResult:

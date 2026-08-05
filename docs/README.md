@@ -62,7 +62,7 @@ spec is no longer a plan.
 | `authorial-correction.md` | the operator correction verb | — |
 | `fact-level-correction.md` | the fact-version chain — retrieval follows the fix | 002 |
 | `mid-dialogue-gate.md` | conditional retrieval mid-scene | 003 |
-| `split-brain-streaming.md` | concurrent prose stream + behavior call | — |
+| `split-brain-streaming.md` | RETIRED 2026-08-04 (the A1 re-shape) — historical spec of the concurrent prose + behavior topology; the living seam is `architecture.md` §9 | — |
 | `unity-client.md` | SSE + provisioning + inspector reads, C# client, Unity, Ledger | — |
 | `eval-harness.md` | judged eval harness: judge-free metrics + metrics route (stage 1); runner, judge, ablation (stages 2–4) | — |
 

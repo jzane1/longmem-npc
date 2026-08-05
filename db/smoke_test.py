@@ -26,16 +26,17 @@ ZERO_VEC = "array_fill(0::real, ARRAY[1536])::vector"
 def main() -> None:
     uri = load_database_uri()
     with psycopg.connect(uri, autocommit=False) as conn, conn.cursor() as cur:
-        # agent
+        # agent — the reputation / reputation_sensitivity columns exist in the
+        # schema (applied migrations are immutable) but are never written
+        # since the A1 re-shape (2026-08-04); the fixture models the current
+        # provisioning path.
         cur.execute(
-            "INSERT INTO agents (name, seed_identity, reputation, rigidity, "
-            "reputation_sensitivity, diagnosticity_goal, config) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING agent_id",
+            "INSERT INTO agents (name, seed_identity, rigidity, "
+            "diagnosticity_goal, config) "
+            "VALUES (%s, %s, %s, %s, %s) RETURNING agent_id",
             (
                 "Smoke NPC",
                 "A test seed identity.",
-                0,
-                1.0,
                 1.0,
                 "what this NPC finds diagnostic",
                 Jsonb({}),

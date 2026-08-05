@@ -22,6 +22,13 @@ not re-derive.
 > delta" describes the *post-August split-brain* behavior call, not this slice. Do not wire a second
 > Haiku behavior call into the vertical slice. *(Pulled forward pre-demo 2026-07-21 —
 > `split-brain-streaming.md` now governs the second call; this slice stands as built.)*
+>
+> **A1 re-shape note (2026-08-04):** the reputation mechanic, the action directive, the
+> `reputation_snapshot` / `reputation_delta_override` / `action_vocabulary` request fields, and
+> the split-brain degradation rows below are **removed by ruling** — a dialogue turn now makes
+> one streaming prose call, re-ranks the served view with per-call `weight_overrides`
+> (weights-on-speech), and **persists nothing**. `architecture.md` §9 is the living seam
+> statement; the sections below stand as the v1 historical spec.
 
 ## Principles this build honors
 
@@ -134,6 +141,10 @@ Returned by `run_dialogue_turn`, surfaced verbatim in the CLI debug view and ass
 
 ## Reputation mechanic (the one persisted state change)
 
+> **Removed by the A1 re-shape (2026-08-04).** The delta emission, the in-place apply, the
+> snapshot plumbing, and the wire fields are gone; `agents.reputation` stays in the schema,
+> unwritten and unread. Historical spec below.
+
 The single Sonnet call emits `reputation_delta` in its structured output. Applied:
 
 ```
@@ -173,6 +184,10 @@ no-vocabulary turn instructs `directive: null`); user message = the raw utteranc
 assemble byte-identical prompts (`assemble_system_prompt`, assertable without a model call).
 
 ## Action directive
+
+> **Removed by the A1 re-shape (2026-08-04).** Deciding actions belongs to the game developer;
+> the NPC's own actions arrive as ordinary observes (the game-authored action-observe contract,
+> standing). Historical spec below.
 
 Per-turn, from an **integrator-supplied vocabulary** (free `type` + `params`). The emitted directive
 is validated against the vocabulary; an unknown or unparseable directive is **logged, ignored, and

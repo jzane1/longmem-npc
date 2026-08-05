@@ -121,7 +121,9 @@ with the per-agent cap, scene-boundary reset of loaded set + streak + context + 
 `ObserveAsync(text)`, `SceneBoundaryAsync()`, `CorrectAsync(...)`, plus `OnDirective` and
 `OnReputationChanged(prev, after)` callbacks. The `(reconstructing…)` during-wait hook exists
 only under SSE (fork 1); until then the session surfaces the result's post-hoc reconstruction
-fields — no faked signal.
+fields — no faked signal. *(**A1 re-shape, 2026-08-04:** the snapshot refresh, both callbacks,
+and the recent-actions block are removed with the behavior/reputation cut; `SayAsync` gained
+the `weightOverrides` weights-on-speech parameter. Gate/loaded-set bookkeeping unchanged.)*
 
 ### Console harness (the Wk-1 gate)
 
@@ -130,7 +132,9 @@ demo beat headless: observe → loader turn (IDs + scores + `read_mode` printed)
 head-swap → the corrected memory's retrieval move visible in scores → `as_of` jump + scene
 boundary → reconstructed serve + call-free cache-hit reread → gate fire mid-scene →
 warm-init (`DialogueInitAsync` at a jumped basis, then the on-camera-equivalent read hitting
-cache) → a `weight_overrides` divergence turn. Debug output mirrors the REPL's debug view
+cache) → a `weight_overrides` divergence turn *(since the A1 re-shape 2026-08-04: the
+weights-on-speech pair — parity at default weights, then an override re-ranking the view that
+feeds the prose prompt over the same served set)*. Debug output mirrors the REPL's debug view
 (IDs, scores, gate line, both TTFT fields, cost row). Passing this end-to-end IS the interop
 go/no-go.
 
@@ -140,7 +144,8 @@ Thin `MonoBehaviour` wrapper under `Assets\Scripts\` (`NpcMemory` namespace): as
 marshaled back to the main thread (Unity's SynchronizationContext — awaits resume on the main
 thread; no blocking `.Result`/`.Wait()` anywhere), dialogue text to a world-space or overlay
 TMP field, directive callback driving a visible acknowledgment (nameplate flash / simple move),
-reputation callback to a debug readout, scene-boundary emission wired to the camera-cut /
+reputation callback to a debug readout *(both callbacks and their driver wiring removed by the
+A1 re-shape, 2026-08-04)*, scene-boundary emission wired to the camera-cut /
 scene-change points. MCP for Unity connects at this step (`mcp-setup.md` §2) with an **early
 one-hour verification** (the bridge has never been connected; note that scene-manipulation
 operations fail during Play mode — `mcp-setup.md` §2 — so the Play-mode debug loop is partly
@@ -229,7 +234,8 @@ held-out corpus arm rides item 3's eval build).
    real mode), printing IDs + scores + `read_mode` + both TTFT fields + the cost row — the
    Wk-1 interop go/no-go, recorded in the session log with receipts.
 5. **Unity Play mode**: a full turn from the gray-box scene with dialogue text on screen,
-   directive + reputation callbacks firing, and the main thread never blocked (no
+   directive + reputation callbacks firing *(callbacks removed by the A1 re-shape 2026-08-04 —
+   this criterion's callback clause is historical)*, and the main thread never blocked (no
    `.Result`/`.Wait()`; interaction stays responsive during a turn).
 6. **Scene-boundary + warm-init choreography proven in-engine**: boundary emission at the
    scene edge refreshes frozen state; an off-camera `DialogueInitAsync` at a jumped basis makes

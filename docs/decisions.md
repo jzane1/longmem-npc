@@ -62,6 +62,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Stage-2 Play-mode gate verification + real-mode corroboration — 2026-07-29](#stage-2-play-mode-gate-verification--real-mode-corroboration--2026-07-29)
 - [Eval-harness v1 plan rulings + stage-1 build — 2026-07-29](#eval-harness-v1-plan-rulings--stage-1-build--2026-07-29)
 - [Scope consolidation + road-to-completion rulings — 2026-08-04](#scope-consolidation--road-to-completion-rulings--2026-08-04)
+- [A1 split-brain removal + weights-on-speech — spec forks + build record — 2026-08-04](#a1-split-brain-removal--weights-on-speech--spec-forks--build-record--2026-08-04)
 
 ## Primary decisions
 
@@ -2464,3 +2465,84 @@ to end from his own draft schedule; no code changed; the resulting phased roadma
 ledgers, deadline framing, and dated narrative moved verbatim to `session-log.md`'s archive);
 CLAUDE.md's seven-role and reputation-carve-out wording deliberately NOT edited now — it stays
 true until the Phase A re-shape lands, and A1 owns that edit.
+
+## A1 split-brain removal + weights-on-speech — spec forks + build record — 2026-08-04
+
+The A1 re-shape (ruling 2 of the scope-consolidation entry above) was specced, built, and
+verified in one session. Four forks were settled by Jack at spec time (explicit questions at
+plan approval), and the build settled the seam-design details below.
+
+**The four spec rulings (Jack, 2026-08-04):**
+
+1. **Weights are a post-cut re-rank at the dialogue seam.** The split-brain behavior view's
+   exponent mechanics move over verbatim — resolution request field → `agents.config` → 1.0;
+   clamp [0.0, 4.0]; `weighted_score = item.score · rel^(w_rel−1) · rec^(w_rec−1) ·
+   imp^(w_imp−1)` with the zero-base guard; ties on `memory_id` — now re-ranking the served
+   view that feeds the PROSE prompt. Retrieval code stays byte-identical; **membership never
+   changes** (weights re-order the served top-k, they cannot pull in an excluded memory). The
+   pre-cut alternative (weights inside retrieval scoring, changing which memories serve) was
+   surfaced with its cost and declined.
+2. **The recent-actions channel is removed entirely** — the `recent_actions` request field, the
+   `[recent actions]` prose-prompt block, the `RecentAction` models (Python + C#), the
+   `recent_actions_cap` knob, and the C# `RecentActions` surface. The game-authored
+   action-observe contract (2026-07-21) is the ONE channel for NPC deeds; same-scene immediacy
+   gets settled at C1's un-enriched-window fork, not by a second channel.
+3. **The provisioning surface is stripped too.** `POST /v1/agents` stops accepting/echoing
+   `reputation` + `reputation_sensitivity` (both dropped from the `insert_agent` INSERT column
+   list — the columns stay in the schema, applied migrations being immutable, but are never
+   written or read), and the four reputation knobs (`reputation_scale_min/max`,
+   `reputation_neutral`, `reputation_sensitivity_default`) leave `SERVICE_DEFAULTS`. The
+   2026-08-04 ruling's "goes unread" covers both columns.
+4. **`DialogueInitRequest.weight_overrides` is removed** (reserved 2026-07-14, inert ever
+   since). The turn-side field covers the whole merged view; an accepted-but-ignored field is
+   the silent-no-op trap. The read-path walker's criterion [7] re-scopes to assert the field's
+   absence.
+
+**Seam-design rulings settled at build:**
+
+- **`items` vs `dialogue_view`.** `items` stays the raw retrieval echo (served order + scores —
+  the IDs+scores invariant rides on it, byte-untouched by weights). `dialogue_view` changes
+  meaning: the weight-ranked view the prose prompt was built from, sorted `(-score,
+  memory_id)`. On a **loader turn at all-1.0 weights** it equals the (id, score) projection of
+  `items` — the parity contract carried over. On gated turns `items` keeps the loaded+fetched
+  serve shape while `dialogue_view` is the global weight ranking. `behavior_view` is gone.
+- **Gated-turn prompt precedence.** The prompt's `[memories]` block still renders the loaded
+  set in the caller's append-only order (the 2026-07-19 byte-stable-prefix ruling stands); the
+  weighted order is fully visible on loader turns and among gate-fetched items on gated turns.
+- **Renames** (mechanics byte-preserved): `resolve_behavior_weights → resolve_dialogue_weights`,
+  `behavior_score → weighted_score`, `rank_behavior_view → rank_dialogue_view`,
+  `BEHAVIOR_WEIGHT_MIN/MAX → WEIGHT_MIN/MAX`, knobs `behavior_weight_* → weight_*` (defaults
+  1.0 unchanged; pre-release, no external configs to break).
+- **Wire hygiene stance:** pydantic's default `extra="ignore"` means a stale client sending the
+  dead fields gets a 200 with the fields silently dropped — accepted, no 422 hardening in A1.
+- **A dialogue turn persists nothing.** The sanctioned in-place `agents.reputation` UPDATE left
+  with the re-shape; `apply_reputation_delta` is deleted; the invariant carve-out shrinks to
+  the one runtime scalar `memories.pinned` (CLAUDE.md updated in this session, as the
+  scope-consolidation entry assigned).
+- **The interop gate stays at 24 checks, different composition:** the divergence beat and the
+  reputation-callbacks check died; a weights-on-speech pair replaced them — [10a] parity
+  (DialogueView == Items projection, loader turn by construction) and [10b] re-rank (a
+  `Recency = 0.0` override over an utterance aimed at an old memory: same id set, provably new
+  order — the flip is structural: the base ranking is recency-dominated at t0+92d while
+  relevance favors the 94-day-old toll observe).
+
+**Verified this session:** ruff clean; suite subset 53 green at every stage end; full suite
+63/63; all seven walkers green against `longmem_test` (CLI walker rewritten 67 → 51 assertions;
+read-path 56 with criterion [7] re-scoped; write-path 53 with the provisioning asserts
+re-pointed; gate 51 — its three `assemble_prose_prompt` call sites updated to the new
+signature; reconstruction 42 / authorial 34 / fact 34 with shrunk fixture INSERTs);
+`db\smoke_test.py` green with the shrunk INSERT; the C# interop gate **24/24** live against a
+served fake-mode backend; the Release DLL rebuilt and copied to
+`unity\Assets\Plugins\NpcMemory\`. **Pending:** the Unity Play-mode gate re-run (the adapter
+and demo driver shrank; the 8/8 beats assert nothing behavior/reputation-shaped, so compile +
+re-run is the remaining proof) — blocked this session because the Unity Editor was not open, so
+no `mcp__UnityMCP` tools registered; runs at the next editor session.
+
+**Supersedes:** the split-brain portions of the 2026-07-21 "Latency slate + split-brain
+pull-forward rulings" and "Split-brain streaming build rulings" entries (the streaming seam,
+latency terms, and game-authored action observes stand; the behavior call, directive,
+divergence record, recent-actions block, and per-call weights-on-the-behavior-view are
+replaced); the 2026-07-15 reputation rulings in the CLI-harness build entry (apply formula,
+snapshot plumbing, sensitivity resolution — all removed); the 2026-07-14 read-path ruling 8's
+reserved init-side `weight_overrides` slot (removed). `split-brain-streaming.md` carries the
+retirement banner; `architecture.md` §9 is the living seam statement.

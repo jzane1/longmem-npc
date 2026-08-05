@@ -9,8 +9,9 @@ namespace NpcMemory.Unity
     /// <summary>
     /// The gray-box demo surface (unity-client.md fork 7, settled at build:
     /// an IMGUI dev-tool overlay — the intended systems aesthetic — over the
-    /// primitive set; dialogue streams into the panel, the directive flashes
-    /// the NPC body, reputation/gate lines read out live).
+    /// primitive set; dialogue streams into the panel, the gate line reads
+    /// out live). Re-shaped by A1 (2026-08-04): the directive flash and the
+    /// reputation readout left with the behavior/reputation removal.
     ///
     /// autoRun plays a scripted Play-mode verification: provision → observes
     /// at injected times → boundary → loader turn → streamed turn — logging
@@ -24,18 +25,13 @@ namespace NpcMemory.Unity
     {
         public NpcMemoryNpc npc;
 
-        [Tooltip("Renderer flashed when a directive resolves (the capsule).")]
-        public Renderer directiveFlashTarget;
-
         [Tooltip("Run the scripted Play-mode verification beats on Start.")]
         public bool autoRun;
 
         private string _input = "What has happened at the ford lately?";
         private string _dialogue = "";
         private string _status = "(connecting…)";
-        private string _lastDirective = "-";
         private string _gateLine = "-";
-        private double _reputation;
         private bool _busy;
         private int _frames;
         private int _mainThreadId;
@@ -48,40 +44,11 @@ namespace NpcMemory.Unity
             // pumps, and the frame-pump proof reads zero).
             Application.runInBackground = true;
             _mainThreadId = Thread.CurrentThread.ManagedThreadId;
-            if (npc != null)
-            {
-                npc.OnDirective += HandleDirective;
-                npc.OnReputationChanged += (prev, after) => _reputation = after;
-            }
         }
 
         private void Update()
         {
             _frames++;
-        }
-
-        private Color _flashOriginal;
-        private bool _flashOriginalCaptured;
-
-        private async void HandleDirective(ActionDirective directive)
-        {
-            _lastDirective = directive.Type;
-            if (directiveFlashTarget != null)
-            {
-                // Capture the true original ONCE — overlapping flashes must
-                // never capture each other's yellow as "original".
-                if (!_flashOriginalCaptured)
-                {
-                    _flashOriginal = directiveFlashTarget.material.color;
-                    _flashOriginalCaptured = true;
-                }
-                directiveFlashTarget.material.color = Color.yellow;
-                await Task.Delay(400);
-                if (directiveFlashTarget != null)
-                {
-                    directiveFlashTarget.material.color = _flashOriginal;
-                }
-            }
         }
 
         private async void Start()
@@ -200,7 +167,6 @@ namespace NpcMemory.Unity
             // The dev-tool overlay IS the intended aesthetic (ruled 2026-07-22).
             GUILayout.BeginArea(new Rect(12, 12, 560, 320), GUI.skin.box);
             GUILayout.Label($"longmem-npc — {_status}");
-            GUILayout.Label($"reputation: {_reputation:F3}   directive: {_lastDirective}");
             GUILayout.Label(_gateLine);
             GUILayout.Space(6);
             GUILayout.Label(_dialogue, GUILayout.Height(140));

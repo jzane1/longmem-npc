@@ -4,10 +4,10 @@ bottom as documentation of the turn loop.
 
     PowerShell:  python -m app.cli --agent <uuid> [--debug]
 
-Plain input is a player utterance: it drives dialogue-init retrieval, the
-single Sonnet-class dialogue call, and the in-place reputation apply — one
-`SessionRunner.utterance()` call on the shared session-runner core
-(app\\session.py); the synthetic load driver drives the very same core.
+Plain input is a player utterance: it drives dialogue-init retrieval and the
+streaming dialogue call — one `SessionRunner.stream_utterance()` pass on the
+shared session-runner core (app\\session.py); the synthetic load driver
+drives the very same core. A turn persists nothing (A1 re-shape, 2026-08-04).
 
 Meta-commands (everything else is an utterance):
 
@@ -15,8 +15,8 @@ Meta-commands (everything else is an utterance):
                        (the first :observe loads the NLP models — one-time cost)
     :scene [type]      scene boundary: emits the event (the handler recompiles
                        the identity document and returns its version), then
-                       re-freezes the scene state — reputation snapshot,
-                       identity version, and the scene basis time
+                       re-freezes the scene state — identity version and the
+                       scene basis time
     :pin <memory_id>   pin a memory (decay exemption)     :unpin undoes it
     :correct <memory_id> <text>
                        authorial correction: replace the live telling with
@@ -28,8 +28,8 @@ Meta-commands (everything else is an utterance):
                        set the scene context the encoding-context term reads
                        (caller-held; each turn passes it through; a scene
                        boundary clears it);  :context clear   :context  shows
-    :debug [on|off]    toggle the full turn debug view (IDs + scores, parsed
-                       structured output, reputation math, tokens + latency)
+    :debug [on|off]    toggle the full turn debug view (IDs + scores, the
+                       weight-ranked dialogue view, tokens + latency)
     :help              this text                          :quit  exit
 
 Windows event-loop constraint: everything runs inside one
@@ -64,21 +64,17 @@ HELP = __doc__.split("Meta-commands", 1)[1]
 
 
 def render_turn_tail(result: DialogueTurnResult) -> str:
-    """The post-prose lines: the action + the soft flags. Split off the content
-    line so the REPL can stream the prose live and print this tail after
-    (split-brain 2026-07-21)."""
+    """The post-prose lines: the soft flags. Split off the content line so
+    the REPL can stream the prose live and print this tail after
+    (split-brain 2026-07-21; directive lines removed by the A1 re-shape)."""
     lines = []
-    if result.directive is not None:
-        lines.append(f"  [directive] {result.directive.type} {result.directive.params}")
-    if result.directive_dropped:
-        lines.append(f"  [directive dropped] {result.directive_dropped_reason}")
     if result.instrumentation.degraded:
         lines.append(f"  [degraded] {result.instrumentation.degraded_reason}")
     return "\n".join(lines)
 
 
 def render_turn(result: DialogueTurnResult) -> str:
-    """The normal (non-debug) view: the line, the action, the soft flags."""
+    """The normal (non-debug) view: the line + the soft flags."""
     lines = [f"npc> {result.content}"]
     tail = render_turn_tail(result)
     if tail:
@@ -88,8 +84,8 @@ def render_turn(result: DialogueTurnResult) -> str:
 
 def render_debug(result: DialogueTurnResult) -> str:
     """The full turn debug view (status.md requirement): retrieved memory IDs
-    with score components, the parsed structured output, the reputation math,
-    and the token + latency accounting — all straight off the payload."""
+    with score components, the weight-ranked dialogue view, and the token +
+    latency accounting — all straight off the payload."""
     ins = result.instrumentation
     ret = ins.retrieval
     lines = ["-- retrieved memories (IDs + score components) --"]
@@ -103,27 +99,11 @@ def render_debug(result: DialogueTurnResult) -> str:
             f"mode={item.read_mode}"
             f"{'  [pinned]' if item.pinned else ''}"
         )
-    lines.append("-- structured output --")
-    lines.append(f"  prose:     {result.content}")
-    if result.directive is not None:
-        lines.append(f"  directive: {result.directive.type} {result.directive.params}")
-    elif result.directive_dropped:
-        lines.append(f"  directive: DROPPED ({result.directive_dropped_reason})")
-    else:
-        lines.append("  directive: none")
-    lines.append(
-        f"  delta:     {result.reputation_delta} ({result.reputation_delta_source})"
-    )
-    # Divergence record (split-brain 2026-07-21): the two concurrent calls'
-    # scored views, short-id ranked — re-ordering here is the split brain.
-    lines.append("-- split-brain views (dialogue | behavior) --")
-    lines.append(f"  dialogue:  {[str(r.memory_id)[:8] for r in result.dialogue_view]}")
-    lines.append(f"  behavior:  {[str(r.memory_id)[:8] for r in result.behavior_view]}")
-    lines.append("-- reputation --")
-    lines.append(
-        f"  snapshot={result.reputation_snapshot}  prev={result.reputation_prev}  "
-        f"sensitivity={result.reputation_sensitivity}  after={result.reputation_after}"
-    )
+    # The weight-ranked view that fed the prose prompt (weights-on-speech,
+    # A1 2026-08-04), short-id ranked — at default weights it matches the
+    # served order above (the parity contract).
+    lines.append("-- dialogue view (weight-ranked) --")
+    lines.append(f"  {[str(r.memory_id)[:8] for r in result.dialogue_view]}")
     lines.append("-- timing / tokens --")
     lines.append(
         f"  retrieval: embed={ret.embed_ms}ms sql={ret.sql_ms}ms "
@@ -160,13 +140,9 @@ def render_debug(result: DialogueTurnResult) -> str:
         f"perceived={ins.perceived_first_word_ms}ms "
         f"stream={ins.prose_stream_ms}ms  tokens in={ins.sonnet_input_tokens} "
         f"out={ins.sonnet_output_tokens}"
-    )
-    lines.append(
-        f"  behavior:  {ins.behavior_ms}ms  tokens "
-        f"in={ins.behavior_input_tokens} out={ins.behavior_output_tokens}"
         + (f"  cost=${ins.cost_usd}" if ins.cost_usd is not None else "")
     )
-    lines.append(f"  apply={ins.apply_ms}ms  turn_total={ins.total_ms}ms")
+    lines.append(f"  turn_total={ins.total_ms}ms")
     if ins.degraded:
         lines.append(f"  [turn degraded] {ins.degraded_reason}")
     return "\n".join(lines)
@@ -245,10 +221,7 @@ async def repl(agent_id: UUID, debug: bool) -> None:
     # fires just before the retelling call blocks the turn).
     runner.on_reconstruct = lambda: print("(reconstructing…)", flush=True)
     nlp_warm = False
-    print(
-        f"longmem-npc CLI — agent {agent_id}  "
-        f"(reputation snapshot {runner.reputation_snapshot}; :help for commands)"
-    )
+    print(f"longmem-npc CLI — agent {agent_id}  (:help for commands)")
     try:
         while True:
             try:
@@ -282,7 +255,6 @@ async def repl(agent_id: UUID, debug: bool) -> None:
                     )
                     print(
                         f"scene boundary accepted ({result.total_ms}ms); "
-                        f"reputation snapshot -> {runner.reputation_snapshot}; "
                         f"identity {version}"
                         f"{' (new document)' if result.identity_document_new else ''}"
                     )

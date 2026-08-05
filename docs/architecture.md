@@ -33,7 +33,7 @@ memory can drift and be defended, while the ground-truth record underneath never
   Relevance is computed per-query at read time.
 - **Write-time facts vs runtime state.** Facts about the event (typology, confidence, context
   components, decay class, provenance, gist/detail spans, importance) are populated from day one.
-  Runtime state (reflection pressure, reputation accumulation, drift headroom) ships with its
+  Runtime state (reflection pressure, drift headroom) ships with its
   mechanism and needs no backfill. Rationale on record: importance is a write-time fact about the
   event; reconstruction drifts the *telling*, not the event's centrality, so defending by day-0
   importance is arguably correct. If dynamic salience ever enters, it enters as a separate runtime
@@ -42,10 +42,11 @@ memory can drift and be defended, while the ground-truth record underneath never
   the consuming mechanism lands later. Sequencing of the mechanisms themselves lives in
   `status.md`'s queues — and sequencing orders work, it never vetoes a design option (reframed
   2026-07-17; the 2026-07-14 reconstruction re-slating is the pull-forward template).
-- **Integrator-defined vocabulary everywhere.** Observation phase tags, diagnosticity goal, action
-  vocabulary, context-match weights, scene-type vocabulary, model roles, rigidity, reputation
-  sensitivity, decay knobs, drift threshold, habituation cap/decay — none is ever hardcoded.
-  Violating this anywhere makes the config surface incoherent.
+- **Integrator-defined vocabulary everywhere.** Observation phase tags, diagnosticity goal,
+  context-match weights, scene-type vocabulary, model roles, rigidity, prose-view weights,
+  decay knobs, drift threshold, habituation cap/decay — none is ever hardcoded.
+  Violating this anywhere makes the config surface incoherent. *(The action vocabulary and
+  reputation sensitivity left the surface with the A1 re-shape, 2026-08-04.)*
 - **Instrument at the seam, not after.** Timing and token accounting are added to each layer as that
   layer is built.
 - **Storage before cognition** build ordering.
@@ -78,19 +79,20 @@ PostgreSQL 16 + pgvector in Docker (the `pgvector/pgvector` image); UUID primary
 server-side; HNSW vector index (a cheaply reversible choice).
 
 **Models.** Haiku-class for importance scoring, description rendering, typology classification,
-gist escalation, the behavior call, reflection, reconstruction *(re-confirmed 2026-07-28 — this
+gist escalation, reflection, reconstruction *(re-confirmed 2026-07-28 — this
 line still said Sonnet-class for reconstruction until 2026-07-29, a propagation miss; §7 carries
 the resolution note)*, and — **ruled 2026-07-29 off the B1 A/B** — streaming dialogue prose
 (sonnet-5 held the dialogue role from the 2026-07-15 slice until then; it and the thinking-off
 variants are re-assessed once the judged-eval harness can score prose). Every model role is an
-integrator knob with its own env var — nothing is hardcoded. **Seven vars exist today** and real mode requires all seven: `LONGMEM_MODEL_` +
-`IMPORTANCE`, `RENDER`, `TYPOLOGY`, `ESCALATION`, `DIALOGUE`, `RECONSTRUCTION`, `BEHAVIOR`.
+integrator knob with its own env var — nothing is hardcoded. **Six vars exist today** and real
+mode requires all six: `LONGMEM_MODEL_` + `IMPORTANCE`, `RENDER`, `TYPOLOGY`, `ESCALATION`,
+`DIALOGUE`, `RECONSTRUCTION`. *(The `BEHAVIOR` role — seven vars, 2026-07-21 to 2026-08-04 —
+left with the A1 re-shape.)*
 
-Two honest limits on "each upgrades independently" *(corrected 2026-07-28 — the sentence
+One honest limit on "each upgrades independently" *(corrected 2026-07-28 — the sentence
 previously over-claimed)*: v1 serves importance + render + typology from **one** write call, so
 those three vars must name the same model (`load_settings` raises rather than silently picking one
-— a documented v1 limitation, not a design position); and **reputation-delta emission has no role
-of its own** — it rides the `behavior` call (split-brain, 2026-07-21). Reflection's var arrives
+— a documented v1 limitation, not a design position). Reflection's var arrives
 with reflection. The retrieval gate is **non-LLM** — there is no gate model and no gate env var.
 
 **Embeddings.** OpenAI `text-embedding-3-small` at 1536 dimensions; the column dimension is locked.
@@ -147,7 +149,7 @@ the sole mechanism that removes a durable fact.
    into the exact prompt block. `identity_version` = a content hash of the rendered document.
    Recompiled at scene edges *(plumbing ruled 2026-07-17: the scene-boundary handler recompiles
    server-side and returns `identity_version`; the caller freezes it as scene state and passes it
-   per read request — the reputation-snapshot contract)*.
+   per read request — the caller-frozen-scene-state contract)*.
 
 ### 4.4 The fact-version chain *(specced & **built** 2026-07-18 — `fact-level-correction.md`; migration 002 live; the build ruled **freeze**: observe writes the vector only to the fact head)*
 
@@ -225,10 +227,12 @@ embedding — scoring inputs otherwise unchanged; scores move only through relev
 `event_time` now multiply a soft context factor into the score — entity coverage over the live
 fact head's entities + an event-time proximity kernel + casefold location match, each weighted by
 its own integrator knob. A no-context request skips the factor — v1-byte-identical scoring; never
-a filter, never a penalty; applies on loader, gated, and degraded paths. `weight_overrides` stays
-reserved in code *(ruled 2026-07-21: goes live for the split-brain BEHAVIOR view at the
-pulled-forward build — `split-brain-streaming.md`; dialogue-view scoring keeps byte-parity)*;
-affect stays deliberately absent. `read-path.md` carries the annotated contract.)*
+a filter, never a penalty; applies on loader, gated, and degraded paths. `weight_overrides`
+lived on the BEHAVIOR view from 2026-07-21; **since the A1 re-shape (2026-08-04) it re-ranks the
+served view feeding the PROSE prompt at the dialogue seam** (§9 — weights-on-speech). Retrieval
+scoring itself stays byte-identical: the re-rank is post-cut, membership never changes, and the
+init request carries no weights field (removed 2026-08-04; it had been reserved-inert since
+2026-07-14). Affect stays deliberately absent. `read-path.md` carries the annotated contract.)*
 
 *(**Hybrid lexical channel built 2026-07-20** — Target B of the same slate, **migration 004**:
 a token-OR full-text candidate fetch off a partial GIN over live fact heads
@@ -258,14 +262,13 @@ the live fact heads — the lexical fetch reads fact-head entities; `mid-dialogu
 
 **Prompt caching:** within a scene, gate-fetched memories are **appended after the cached head** as
 a marked recollection block; the head is **rebuilt at scene boundaries**, where the cache is cold
-anyway. The **scene boundary is a load-bearing, explicit client-sent API event** with three
-consumers: prompt-head rebuild, identity-document recompile, reputation snapshot. Scene edges settle
-prefix, identity version, and reputation in one heartbeat. *(Consumer slating ruled 2026-07-14:
-reputation snapshot lands with the dialogue turn — **landed 2026-07-15**, the session-runner
-re-reads `agents.reputation` at each boundary; identity recompile with reconstruction —
-**landed 2026-07-17**, the boundary handler recompiles server-side and returns
-`identity_version`, which the session-runner freezes as scene state (`reconstruction.md`);
-prompt-head rebuild / prompt caching is post-August.)*
+anyway. The **scene boundary is a load-bearing, explicit client-sent API event** with two
+consumers: prompt-head rebuild and identity-document recompile. Scene edges settle
+prefix and identity version in one heartbeat. *(Identity recompile **landed 2026-07-17**: the
+boundary handler recompiles server-side and returns `identity_version`, which the caller freezes
+as scene state (`reconstruction.md`); prompt-head rebuild / prompt caching lands with the C7
+latency work. A third consumer — the reputation snapshot, landed 2026-07-15 — left with the A1
+re-shape, 2026-08-04.)*
 
 **Read-mode boundary (self-describing, not just documented):** every returned memory carries
 `read_mode` (`verbatim | reconstructed`) and `pinned`, in payloads and the debug view. Three states:
@@ -356,44 +359,52 @@ chains" does not mean "no chains" — event-driven corrections proceed at the no
 frequency. Pin/unpin are endpoints; pinning **freezes the current head** (restoration is a
 correction verb, not pin); unpinning resumes the chain from the frozen head.
 
-## 9. Behavior output & turn topology
+## 9. Dialogue output & turn topology
 
 **Built slice (was "August ship"):** a single Sonnet-class call emitting prose + structured
 output *(built & floor-verified 2026-07-15, `cli-harness.md`; shapes ruled in the dated
 `decisions.md` entry — one `run_dialogue_turn` seam in `app\dialogue.py`, REPL + load driver
 on a shared session-runner core)*. *(Superseded as the SHIP topology by the 2026-07-21
-pull-forward below — the demo ships the split-brain; this slice stands as the built floor it
-grows from.)*
+split-brain pull-forward, which was itself re-shaped 2026-08-04 — below. The intermediate
+split-brain topology — two concurrent calls, action directive, reputation delta, divergence
+record — is retired; `split-brain-streaming.md` carries its retirement banner.)*
 
-**Committed target topology: multi-call split-brain** *(pulled forward pre-demo and amended
-2026-07-21 — `split-brain-streaming.md`, specced **and BUILT 2026-07-21**: the async-generator
-seam streams pure prose concurrently with the behavior call off one retrieval; two scored views;
-`first_word_ms` the headline. Dated "Latency slate + split-brain pull-forward rulings" and
-"Split-brain streaming build rulings" entries in `decisions.md`. **Over HTTP since 2026-07-23 /
-2026-07-27:** `POST /v1/dialogue/turn` drains this generator to the terminal result, and the SSE
-twin `POST /v1/dialogue/turn/stream` **iterates the same generator** — the no-rewrite payoff of
-choosing a generator seam. `perceived_first_word_ms` rides beside `first_word_ms`, clocked from
-turn start rather than from the prose call, so it SEES the cold-reconstruction stall the latter is
-blind to — the honest metric the <1 s bar is measured against)*. A behavior call (Haiku-class, with its own
-retrieval weights) chooses the action; the dialogue call sees **past actions as observed world
-facts — never "you decided to."** *(Amended: never the current turn's action — the two calls
-run **concurrently** within a turn, so prose streams from its first token; the current action
-enters the world record for subsequent turns via game-authored action observes + the
-caller-held recent-actions scene block. Same-turn word/action incoherence is an accepted,
-instrumented design fact — the divergence record feeds §13's ablation.)* The asymmetry is
-**statistical, not architectural** (per-call scoring weights, no masks). Write the
-action-directive contract so it survives this migration unchanged *(it did — built 2026-07-15
-to survive, unchanged by the pull-forward)*.
+**The shipped topology: one streaming prose call + weights-on-speech** *(the A1 re-shape, ruled
+in the 2026-08-04 "Scope consolidation + road-to-completion rulings" entry, built 2026-08-04.
+It deliberately inverts the 2026-07-21 speak-honest/act-weighted design: the behavior/action
+side — the concurrent behavior call and its model role, the action directive, the divergence
+record, and the reputation system whole — is removed by ruling. Deciding actions belongs to the
+game developer; the NPC's own actions arrive as ordinary observes — the game-authored
+action-observe contract, ruled 2026-07-21, standing.)*
 
-**Action directive:** per-turn, from an **integrator-supplied vocabulary** (free type + params);
-unknown or unparseable directives → log, ignore, the turn still succeeds.
+The seam (`app\dialogue.py`, an async generator — the 2026-07-21 shape, kept): retrieval runs
+ONCE → the served top-k is **re-ranked with resolved per-call weights** → the re-ranked view
+feeds the prose prompt (`[identity] [memories] [output]`) → the dialogue-role call **streams
+pure prose**, chunks yielding through the seam. **Over HTTP since 2026-07-23 / 2026-07-27:**
+`POST /v1/dialogue/turn` drains this generator to the terminal result, and the SSE twin
+`POST /v1/dialogue/turn/stream` iterates the same generator — the no-rewrite payoff of the
+generator seam. `first_word_ms` is prose TTFT at the seam; `perceived_first_word_ms` rides
+beside it, clocked from turn start, so it SEES the cold-reconstruction stall the former is
+blind to — the honest metric the <1 s bar is measured against. **A dialogue turn persists
+nothing** — the sanctioned in-place `agents.reputation` UPDATE left with the re-shape (the
+column stays in the schema, unwritten and unread; applied migrations are immutable).
 
-**Reputation:** a scalar on the NPC row. The Haiku call emits a delta by default; a client override
-wins; per-NPC sensitivity scalar; hard clamp on a defined scale. Injected into the prompt prefix
-from a **scene-start snapshot**. *(Built 2026-07-15 in the single-call slice: the Sonnet call emits
-the delta, applied in-place to `agents.reputation` by an atomic clamped UPDATE; the snapshot is
-caller-frozen scene state — the "Haiku call" wording is the split-brain behavior call,
-pulled forward pre-demo 2026-07-21, `split-brain-streaming.md`.)*
+**Weights-on-speech (the surviving hidden-weights idea):** per-call `weight_overrides`
+`{relevance, recency, importance}` resolve request field → `agents.config`
+(`weight_relevance` / `weight_recency` / `weight_importance`) → 1.0, clamped [0.0, 4.0]
+(module constants, not knobs), and re-rank the served set exponent-form on the product score —
+`weighted_score = item.score · rel^(w_rel−1) · rec^(w_rec−1) · imp^(w_imp−1)`, zero-base
+components skipped, ties on `memory_id`. The NPC's words are shaped by weights it is unaware
+of. Contracts: **membership never changes** (the re-rank is post-cut over the served top-k,
+ruled at spec 2026-08-04 — weights cannot pull in a memory retrieval excluded); retrieval
+scoring stays **byte-identical** (the re-rank lives at the dialogue seam; `app\retrieval.py`
+untouched); at all-1.0 weights the re-rank is the identity (the parity contract: on a loader
+turn `dialogue_view` equals the (id, score) projection of `items`). On gated turns the
+prompt's `[memories]` block still renders the loaded set in the caller's append-only order
+(the §6 byte-stable-prefix ruling) — the weighted order is fully visible on loader turns and
+among gate-fetched items on gated turns; `dialogue_view` reports the weighted ranking in all
+cases. The turn result carries `items` (the raw retrieval echo — the IDs+scores invariant)
+beside `dialogue_view` (the weight-ranked view the prompt was built from).
 
 ## 10. Reflection & parameter bundles (mechanism sequenced later — see `status.md`)
 
@@ -470,11 +481,12 @@ real counter-example system (still unpicked — see the artifact queue in `statu
 **Citations on record:** compressive-RAG framing (Spens & Burgess); the CoALA supersede-vs-decay gap
 is answered by bi-temporal invalidation + differential decay classes; Talk of the Town's
 repetition-breeds-commitment validates write-back; PSI/MicroPsi lineage for the parameter compiler;
-Turpin (unfaithful chain-of-thought) and Gazzaniga (confabulated reasons) for the asymmetric-
-cognition line. Cite **encoding specificity as a phenomenon family, not the diving study** (its 2021
-replication attempt failed, ~0.25 SD).
+Cite **encoding specificity as a phenomenon family, not the diving study** (its 2021
+replication attempt failed, ~0.25 SD). *(Turpin and Gazzaniga backed the asymmetric-cognition
+line; that leg was removed with the behavior side — kept on record as history.)*
 
-**Research track (post-demo):** the signature pair is **identity-conditioned reconstructive memory**
-and **information-asymmetric multi-call cognition** (confabulation via information asymmetry); they
-compose into one paper-shaped thesis about character psychology. The demo video comes before the
-research pursuit.
+**The signature claim** *(re-scoped 2026-08-04 — the research track is scrapped by ruling: no
+write-up, no submission; the stage-4 fixed-gist ablation survives as R7's engineering evidence)*:
+**identity-conditioned reconstructive memory** — the same store retold through the character.
+The information-asymmetry leg died with the behavior/action side; its small surviving flavor is
+weights-on-speech (§9): the NPC's words shaped by per-call weights it is unaware of.

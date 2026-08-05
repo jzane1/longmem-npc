@@ -100,24 +100,25 @@ moves scores, not rows; detail-hiding assertions land with reconstruction.)*
   entities (NER + optional operator field, merged); windowed SQL re-derives entity liveness at
   any instant; superseded fact rows keep their entities.
 
-## Set E — split-brain turn topology *(specced **and BUILT** 2026-07-21,
-`split-brain-streaming.md`)*
+## Set E — dialogue-turn topology *(built 2026-07-21 as the split-brain set; REWRITTEN by the
+A1 re-shape 2026-08-04 — the behavior/reputation/recent-actions claims died with their
+mechanisms)*
 
 *Landed as scenarios inside `test_set_d_gate.py` and `test_degradation.py` rather than a file of
-its own — the concurrency and divergence claims share Set D's fixtures. The CLI-harness walker
-(now 67 assertions) carries the seam-level proofs.*
+its own — the weights and degradation claims share Set D's fixtures. The CLI-harness walker
+(rewritten to 51 assertions) carries the seam-level proofs.*
 
-- **Concurrency proof:** a deliberately slow behavior fake never delays the first prose chunk
-  (first word = prose TTFT at the seam, structurally timed).
-- **Divergence record:** both calls' ranked `(memory_id, score)` views + directive + delta ride
-  the turn result — structural, never prose.
-- **Dialogue-view parity:** no overrides => dialogue-view scoring byte-identical to the
-  pre-split turn.
-- **Recent-actions block:** in the prose prompt exactly when scene state has actions; reset at
-  the boundary; provably no server-side write.
-- **Degradation rows:** behavior-fail -> no directive + zero delta + flag, prose unaffected;
-  prose-fail pre-token -> fallback line; mid-stream drop -> as ruled at build; both-fail ->
-  never-blank holds.
+- **Weights-on-speech parity:** at default weights `dialogue_view` is byte-identical to the
+  (id, score) projection of `items` (loader turn — the parity contract).
+- **Weights-on-speech re-rank:** an override re-scores the SAME served set; the seam's view
+  equals a recomputation through the pure weight functions, and the prose prompt's `[memories]`
+  block renders in the re-ranked order (asserted by ID extraction — structural, never prose).
+- **Raw-echo invariance:** `items` stays the untouched retrieval echo under any override —
+  the read path has no weights surface.
+- **Zero persistence:** a dialogue turn writes nothing; `agents.reputation` stays NULL through
+  provisioning and every turn.
+- **Degradation rows:** prose-fail pre-token -> fallback line + degraded, the served view still
+  on the result; mid-stream drop -> partial kept (ruled 2026-07-21); never-blank holds.
 
 ## Set F — repo hygiene *(added 2026-07-28 with the full-repo audit)*
 
@@ -208,5 +209,5 @@ rather than quietly implied by "every route", because that is what this section 
 - Gate degradation ladder: embeddings down → entity-only lexical fetch; no entities → novelty-only;
   both out → gate closed, loaded set served, fail-quiet. *(Specced & built 2026-07-19: the lexical fetch
   reads the post-003 fact-head entities GIN — `mid-dialogue-gate.md`.)*
-- Malformed model responses (unparseable structured output, unknown action directive) → log, ignore,
-  turn succeeds.
+- Malformed model responses → log, ignore, turn succeeds. *(The unknown-action-directive case
+  died with the directive — A1 re-shape, 2026-08-04.)*

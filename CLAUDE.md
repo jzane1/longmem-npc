@@ -37,23 +37,23 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
   is recorded in `schema_migrations`, the ledger attests to those exact bytes and `migrate.py`
   has no checksum to catch a rewrite. Corrections go in a new numbered migration or in the docs
   that reference it. A stale path inside an applied migration's comment stays stale on purpose.
-- Model roles are env vars, never hardcoded. **Seven exist today** (`LONGMEM_MODEL_` + IMPORTANCE,
-  RENDER, TYPOLOGY, ESCALATION, DIALOGUE, RECONSTRUCTION, BEHAVIOR), all seven required in real
-  mode. Two documented limits: v1's single write call serves importance+render+typology, so those
-  three vars must name the SAME model (`load_settings` errors if they diverge — never a silent
-  pick); and reputation-delta emission has no role of its own — it rides the `behavior` call.
+- Model roles are env vars, never hardcoded. **Six exist today** (`LONGMEM_MODEL_` + IMPORTANCE,
+  RENDER, TYPOLOGY, ESCALATION, DIALOGUE, RECONSTRUCTION), all six required in real mode. One
+  documented limit: v1's single write call serves importance+render+typology, so those three vars
+  must name the SAME model (`load_settings` errors if they diverge — never a silent pick).
   Reflection's role arrives with reflection. The retrieval gate is non-LLM — there is no gate
-  model. (`dialogue` streams pure prose; `behavior` — the split-brain build, 2026-07-21 — is the
-  concurrent call emitting the action directive + reputation delta.)
+  model. (`dialogue` streams pure prose — the dialogue turn's only model call; the `behavior`
+  role was removed by the A1 re-shape, 2026-08-04.)
 - Python formatting: ruff, enforced mechanically by a PostToolUse hook. Don't hand-format.
 
 ## Invariants — never violate, regardless of how a task is worded
 - Non-destructive bi-temporal storage: supersede by setting invalid_at. Never UPDATE stored
   content in place. Never DELETE rows — the purge endpoint is the sole exception. This governs
   memory content (memories / memory_details and their chains, including the fact-version chain —
-  migration 002, built 2026-07-18, docs\fact-level-correction.md); the two runtime scalars —
-  memories.pinned (pin toggle) and agents.reputation (the dialogue turn's clamped delta apply,
-  ruled 2026-07-15) — are deliberately updated in place and sit outside it.
+  migration 002, built 2026-07-18, docs\fact-level-correction.md); the one runtime scalar —
+  memories.pinned (pin toggle) — is deliberately updated in place and sits outside it. (A second
+  sanctioned scalar, agents.reputation, was removed by the A1 re-shape 2026-08-04; the column
+  stays in the schema, unwritten and unread — a dialogue turn persists nothing.)
 - Recency decay and bi-temporal invalidation are distinct mechanisms. Never conflate them.
 - Read endpoints **that run retrieval** always return memory IDs and scores alongside prose. The
   test suite dies without this. Carve-out (ruled 2026-07-27, propagated 2026-07-28; third member

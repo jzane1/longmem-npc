@@ -5,7 +5,8 @@ would be a hidden hardcoded authorial artifact); reflections join the render
 post-August by extending render_identity_document — the version hash and the
 plumbing stay put. identity_version = sha256 hex of the rendered text.
 
-Plumbing (spec-time ruling 2026-07-17, the reputation-snapshot precedent):
+Plumbing (spec-time ruling 2026-07-17, the caller-frozen-scene-state
+precedent):
 the scene-boundary handler recompiles server-side via ensure_identity_document
 and returns identity_version; the caller freezes it as scene state and passes
 it on each read request. A read arriving without a version lazy-bootstraps

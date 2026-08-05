@@ -180,7 +180,7 @@ class SceneResult(BaseModel):
     """Scene boundary result. Since the reconstruction build (2026-07-17) the
     handler recompiles the identity document server-side and returns its
     version — the boundary's first server-side consumer; the caller freezes
-    `identity_version` as scene state (the reputation-snapshot contract).
+    `identity_version` as scene state (the caller-frozen-scene-state contract).
     `identity_document_new` is True when this version's row was inserted (an
     unchanged seed re-hashes to the existing version)."""
 
@@ -229,14 +229,15 @@ class CorrectionResult(BaseModel):
 
 
 class WeightOverrides(BaseModel):
-    """Per-call split-brain scoring multipliers (ruled 2026-07-14 as reserved;
-    LIVE since the split-brain build 2026-07-21 — for the BEHAVIOR view only).
+    """Per-call scoring multipliers (reserved 2026-07-14; live for the
+    split-brain behavior view 2026-07-21; moved to the PROSE view by the A1
+    re-shape 2026-08-04 — weights-on-speech).
 
-    On `DialogueTurnRequest` these resolve the behavior call's second scoring
-    pass over the served top-k (exponent-form on the product score, so 1.0
-    reproduces the dialogue-view order — the parity contract). On
-    `DialogueInitRequest` they stay INERT: the dialogue/retrieval view keeps
-    byte-parity with v1 (the read-path walker asserts it).
+    On `DialogueTurnRequest` these resolve the turn's re-rank of the served
+    top-k feeding the prose prompt (exponent-form on the product score, so
+    1.0 reproduces the served ranking — the parity contract). The NPC's words
+    are shaped by weights it is unaware of; retrieval scoring itself is
+    byte-untouched.
     """
 
     relevance: float | None = None
@@ -266,8 +267,6 @@ class DialogueInitRequest(BaseModel):
     location_name: str | None = None  # context: casefold match vs the row's
     entities: list[str] | None = None  # context: fact-head entity coverage
     event_time: datetime | None = None  # context: proximity kernel
-    weight_overrides: WeightOverrides | None = None  # inert here (dialogue view;
-    # consumed for the BEHAVIOR view on DialogueTurnRequest — split-brain 2026-07-21)
     as_of: datetime | None = None  # defaults to server now (UTC)
     # Caller-frozen scene state (reconstruction build 2026-07-17): the
     # identity version returned by the last scene boundary, and the boundary's
@@ -282,8 +281,8 @@ class DialogueInitRequest(BaseModel):
     # scene's already-surfaced memory IDs, append-only, reset by the caller
     # at scene boundaries. Absent -> loader turn, v1 byte-parity (the gate
     # never evaluates). `gate_fruitless_streak` is the damper's caller-held
-    # consecutive-fruitless-fetch count (same trust class as
-    # reputation_snapshot). The context `entities` field above is NOT the
+    # consecutive-fruitless-fetch count (the caller-frozen-scene-state trust
+    # class). The context `entities` field above is NOT the
     # gate's input — the tripwire reads the utterance text; the context term
     # and the gate consume the same request independently.
     loaded_memory_ids: list[UUID] | None = None
@@ -423,63 +422,30 @@ class RetrievalResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class ActionDirective(BaseModel):
-    """One emitted action: free `type` from the integrator-supplied vocabulary
-    plus a free params object (architecture §9). Written as observed world
-    fact so the contract survives the split-brain migration unchanged (it did —
-    byte-shape identical after the 2026-07-21 build; done-when 4)."""
-
-    type: str
-    params: dict = Field(default_factory=dict)
-
-
-class RecentAction(BaseModel):
-    """One resolved directive in the caller-held recent-actions scene block
-    (split-brain-streaming.md): the type + params the behavior call chose on a
-    prior turn, plus that turn's world time. Rendered as world-fact context in
-    the PROSE prompt only (never "you decided to"); caller-held scene state,
-    reset at scene boundaries, never stored server-side."""
-
-    type: str
-    params: dict = Field(default_factory=dict)
-    at: datetime
-
-    @field_validator("at")
-    @classmethod
-    def _tz_aware(cls, value: datetime) -> datetime:
-        if value.tzinfo is None:
-            raise ValueError("timestamp must be timezone-aware")
-        return value
-
-
 class ScoredRef(BaseModel):
-    """One (memory_id, score) tuple in a ranked view — the divergence record's
-    unit (split-brain-streaming.md): the turn result carries both the
-    dialogue-view and behavior-view rankings so §13's explanation-cause
-    divergence is measurable structurally, prose-free."""
+    """One (memory_id, score) tuple in a ranked view — the unit of the turn
+    result's `dialogue_view` (weights-on-speech, A1 re-shape 2026-08-04): the
+    weight-ranked ordering the seam computed for the prose prompt, assertable
+    structurally, prose-free."""
 
     memory_id: UUID
     score: float
 
 
 class DialogueTurnRequest(BaseModel):
-    """One dialogue turn (cli-harness.md request contract).
+    """One dialogue turn (cli-harness.md request contract; re-shaped by A1
+    2026-08-04 — the behavior/reputation/recent-actions surface is gone).
 
-    Scene state lives in the caller: `reputation_snapshot` is the scene-start
-    value the caller froze at the last scene boundary — a required explicit
-    field (build ruling 2026-07-15) so "snapshot frozen within a scene" is a
-    property of the seam contract. `action_vocabulary` per-call wins over
-    `agents.config["action_vocabulary"]`; with neither configured, every
-    emitted directive is dropped (never a hardcoded default vocabulary).
+    Scene state lives in the caller (identity version, scene basis time,
+    loaded set, context) and rides on every request unreinterpreted.
+    `weight_overrides` is the live weights-on-speech slot: per-call
+    multipliers re-rank the served view feeding the prose prompt.
     `k` / `as_of` pass through to retrieval unreinterpreted; `debug` is a
     caller-side rendering hint, inert to the seam's computation.
     """
 
     agent_id: UUID
     utterance: str = Field(min_length=1)
-    reputation_snapshot: float
-    reputation_delta_override: float | None = None  # client override wins (§9)
-    action_vocabulary: list[str] | None = None
     k: int | None = Field(default=None, ge=1)
     as_of: datetime | None = None
     # Caller-held scene context (encoding-context build 2026-07-20) — passed
@@ -490,7 +456,7 @@ class DialogueTurnRequest(BaseModel):
     entities: list[str] | None = None
     event_time: datetime | None = None
     # Caller-frozen scene state, passed through to retrieval unreinterpreted
-    # (reconstruction build 2026-07-17; the reputation_snapshot precedent).
+    # (reconstruction build 2026-07-17).
     identity_version: str | None = None
     scene_started_at: datetime | None = None
     # Caller-held loaded set + damper streak (mid-dialogue-gate.md fork 1,
@@ -498,15 +464,11 @@ class DialogueTurnRequest(BaseModel):
     # identity_version precedent. Absent -> loader turn, v1 byte-parity.
     loaded_memory_ids: list[UUID] | None = None
     gate_fruitless_streak: int = Field(default=0, ge=0)
-    # Split-brain streaming (split-brain-streaming.md, 2026-07-21). The reserved
-    # WeightOverrides slot goes LIVE here for the BEHAVIOR view's second scoring
-    # pass (request field wins over agents.config wins over 1.0; 1.0 => the
-    # behavior view reproduces the dialogue view's order — the parity contract).
-    # `recent_actions` is the caller-held scene block of prior resolved
-    # directives, rendered as world-fact context in the prose prompt only;
-    # empty => no block. Neither is stored server-side.
+    # Weights-on-speech (A1 re-shape 2026-08-04; supersedes the split-brain
+    # behavior view): the per-call WeightOverrides re-rank the served set
+    # feeding the PROSE prompt (request field wins over agents.config wins
+    # over 1.0; all-1.0 reproduces the served ranking — the parity contract).
     weight_overrides: WeightOverrides | None = None
-    recent_actions: list[RecentAction] = Field(default_factory=list)
     debug: bool = False
 
     @field_validator("as_of", "scene_started_at", "event_time")
@@ -533,23 +495,18 @@ class DialogueTurnInstrumentation(BaseModel):
     # continuity; since the split-brain build this is the STREAMING PROSE call.
     sonnet_ms: float  # total prose stream duration (== prose_stream_ms)
     sonnet_first_token_ms: float  # == first_word_ms (prose TTFT at the seam)
-    apply_ms: float  # the reputation UPDATE
     total_ms: float
     sonnet_input_tokens: int
     sonnet_output_tokens: int
     cost_usd: float | None = None
-    degraded: bool = False  # the never-blank / behavior-degraded path was taken
+    degraded: bool = False  # the never-blank path was taken
     degraded_reason: str | None = None
-    # Split-brain streaming (split-brain-streaming.md, 2026-07-21). Defaulted:
-    # pre-split constructions stand. `first_word_ms` is the HEADLINE latency
-    # term (prose TTFT at the seam — the <1s viability bar); `prose_stream_ms`
-    # the full stream; the behavior call runs CONCURRENTLY, so `behavior_ms`
-    # overlaps the prose stream rather than adding to the turn serially.
+    # Streaming terms (2026-07-21 build; the behavior/apply terms left with the
+    # A1 re-shape 2026-08-04). Defaulted: pre-split constructions stand.
+    # `first_word_ms` is the HEADLINE latency term (prose TTFT at the seam —
+    # the <1s viability bar); `prose_stream_ms` the full stream.
     first_word_ms: float = 0.0
     prose_stream_ms: float = 0.0
-    behavior_ms: float = 0.0
-    behavior_input_tokens: int = 0
-    behavior_output_tokens: int = 0
     # Perceived TTFT (HTTP turn-route build, 2026-07-23 — the audit's honest
     # latency metric): first-chunk time measured from TURN START (t_total),
     # so it includes agent fetch + retrieval — everything `first_word_ms` is
@@ -562,34 +519,22 @@ class DialogueTurnInstrumentation(BaseModel):
 class DialogueTurnResult(BaseModel):
     """Structured return of `run_dialogue_turn` — surfaced verbatim in the
     CLI debug view; the suite asserts on this structure, never on prose.
-
-    `content` is the only unassertable field. `reputation_after` equals the
-    persisted `agents.reputation` scalar; `reputation_delta` is the delta
-    actually applied (pre-sensitivity), with `reputation_delta_source`
-    making override-wins and the zeroed degradation paths assertable.
-    """
+    `content` is the only unassertable field."""
 
     agent_id: UUID
     content: str
-    directive: ActionDirective | None
-    directive_dropped: bool = False
-    directive_dropped_reason: str | None = None
-    reputation_snapshot: float  # what the prompt actually saw
-    reputation_prev: float  # row value the apply started from
-    reputation_delta: float
-    reputation_delta_source: Literal["model", "override", "zeroed"]
-    reputation_sensitivity: float
-    reputation_after: float
     items: list[RetrievedMemory]  # retrieval echo: IDs + scores invariant
-    # Divergence record (split-brain-streaming.md, 2026-07-21): the two scored
-    # views the concurrent calls saw — `dialogue_view` is the served ranking
-    # (what the prose call read, dialogue weights), `behavior_view` the same
-    # served memories re-ranked with the behavior call's resolved weights. At
-    # all-1.0 weights the two orders match (parity). Structural, prose-free —
-    # §13's explanation-cause divergence data. Defaulted: pre-split
-    # constructions stand.
+    # The weight-ranked view that fed the prose prompt (weights-on-speech,
+    # A1 re-shape 2026-08-04): the SAME served memories re-scored with the
+    # resolved per-call weights, sorted (-score, memory_id). On a LOADER
+    # turn at all-1.0 weights this equals the (id, score) projection of
+    # `items` — the parity contract, carried over from the split-brain
+    # build. On gated turns `items` keeps the loaded+fetched serve shape
+    # while this field is the global weight ranking, and the prompt's
+    # [memories] block still renders the loaded set in the caller's
+    # append-only order (the byte-stable-prefix ruling, 2026-07-19).
+    # Defaulted: pre-split constructions stand.
     dialogue_view: list[ScoredRef] = Field(default_factory=list)
-    behavior_view: list[ScoredRef] = Field(default_factory=list)
     instrumentation: DialogueTurnInstrumentation
 
 
@@ -602,16 +547,16 @@ class DialogueTurnResult(BaseModel):
 
 class CreateAgentRequest(BaseModel):
     """Body of POST /v1/agents (unity-client.md fork 2). The UUID is minted
-    server-side (stack constant); every other column is optional — an agent
+    server-side (stack constant); every accepted field is optional — an agent
     is viable with just a name, and knobs default through `agents.config` →
     `SERVICE_DEFAULTS` exactly as for a hand-provisioned row. `rigidity`
-    bounds mirror the schema CHECK."""
+    bounds mirror the schema CHECK. The A1 re-shape (2026-08-04) removed the
+    reputation fields from this surface; the schema columns remain, never
+    written or read."""
 
     name: str = Field(min_length=1)
     seed_identity: str | None = None
-    reputation: float | None = None
     rigidity: float | None = Field(default=None, ge=0.5, le=2.0)
-    reputation_sensitivity: float | None = None
     diagnosticity_goal: str | None = None
     config: dict | None = None
 
@@ -622,9 +567,7 @@ class CreateAgentResult(BaseModel):
     agent_id: UUID
     name: str
     seed_identity: str | None
-    reputation: float | None
     rigidity: float | None
-    reputation_sensitivity: float | None
     diagnosticity_goal: str | None
     config: dict
     total_ms: float

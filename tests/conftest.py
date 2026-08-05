@@ -53,7 +53,6 @@ from scratch_uri import scratch_uri
 from app import db
 from app.config import Settings
 from app.providers import (
-    FakeBehaviorProvider,
     FakeEmbeddingProvider,
     FakeEscalationProvider,
     FakeProseProvider,
@@ -197,14 +196,13 @@ class Ctx:
             write=overrides.get("write", FakeWriteProvider()),
             escalation=overrides.get("escalation", FakeEscalationProvider()),
             embedding=overrides.get("embedding", FakeEmbeddingProvider()),
-            # Split-brain (2026-07-21): the streaming prose provider + the
-            # concurrent behavior provider, either overridable for the
+            # The streaming prose provider — the dialogue turn's only model
+            # call since the A1 re-shape (2026-08-04) — overridable for the
             # degradation cases.
             dialogue=overrides.get("dialogue", FakeProseProvider()),
             reconstruction=overrides.get(
                 "reconstruction", FakeReconstructionProvider()
             ),
-            behavior=overrides.get("behavior", FakeBehaviorProvider()),
         )
 
     def retrieval(self, **overrides):
@@ -227,9 +225,9 @@ class Ctx:
     ) -> UUID:
         async with self.pool.connection() as conn, conn.cursor() as cur:
             await cur.execute(
-                "INSERT INTO agents (name, seed_identity, reputation, rigidity, "
-                "reputation_sensitivity, diagnosticity_goal, config) "
-                "VALUES (%s, %s, 0, 1.0, 1.0, %s, %s) RETURNING agent_id",
+                "INSERT INTO agents (name, seed_identity, rigidity, "
+                "diagnosticity_goal, config) "
+                "VALUES (%s, %s, 1.0, %s, %s) RETURNING agent_id",
                 (name, seed_identity, "what threatens the ford", Jsonb(dict(config))),
             )
             agent_id = (await cur.fetchone())[0]

@@ -1,15 +1,20 @@
 # longmem-npc — Status
 
 **Last updated:** 2026-08-04
-**Phase:** **Road to completion — the full remaining scope was consolidated 2026-08-04 into the
-phased roadmap below** (dated "Scope consolidation + road-to-completion rulings" entry in
-`decisions.md`). The system is BUILT end to end — backend, C# client (`NpcMemory.Core` + console
-harness, interop gate 24/24), Unity adapter + gray-box scene (Play-mode gate 8/8 incl. a
-real-mode pass), The Ledger at `GET /ledger`, and eval-harness stage 1 (the judge-free metric
-layer) — **twenty floors stand verified** (`docs\floors.md`), schema frozen at migrations
-001–005. The research track, the behavior/action side of split-brain (with reputation), graph
-memory, and the other cuts listed below are OUT by ruling. Nothing is mid-build; the next
-working session starts Phase A. *(The pre-2026-08-04 phase narrative and the superseded
+**Phase:** **Road to completion — Phase A is DONE; the next working session starts Phase B1.**
+The scope was consolidated 2026-08-04 into the phased roadmap below (dated "Scope consolidation
++ road-to-completion rulings" entry in `decisions.md`), and **A1 landed the same day** — the
+split-brain removal + weights-on-speech re-shape, floor-verified (the dated A1 entry in
+`decisions.md` records the four spec rulings + the seam contracts). The system is BUILT end to
+end on the FINAL seam — backend (one streaming prose call; a dialogue turn persists nothing;
+real mode six model roles), C# client (`NpcMemory.Core` + console harness, interop gate 24/24),
+Unity adapter + gray-box scene, The Ledger at `GET /ledger`, and eval-harness stage 1 —
+**twenty-one floors stand verified** (`docs\floors.md`), schema frozen at migrations 001–005.
+**One pending proof:** the Unity Play-mode gate re-run (the adapter shrank + the DLL refreshed;
+the Editor wasn't open during the A1 session, so no UnityMCP tools — **open the Unity Editor
+before the next session starts** and re-run the 8/8 as that session's first move). The research
+track, the behavior/action side of split-brain (with reputation), graph memory, and the other
+cuts listed below are OUT by ruling. *(The pre-2026-08-04 phase narrative and the superseded
 queues/ledgers moved verbatim to `docs\session-log.md`'s archive.)*
 
 This is the *living* file — update it at the end of every working session. `architecture.md`
@@ -36,7 +41,7 @@ on-screen eval numbers are what survive the interview. The demo records real-pro
 
 ## Verified floors
 
-**Twenty floors stand verified.** The full table — layer, what it was verified against, and
+**Twenty-one floors stand verified.** The full table — layer, what it was verified against, and
 the date — lives in **`docs\floors.md`** (moved there 2026-07-28 so this living file stays
 small enough to auto-load). That file states the counting convention; cite it rather than a
 number in prose.
@@ -65,9 +70,15 @@ Every build session keeps the standing discipline: settle forks at spec, build, 
 independent floor-verify, docs, commit. After each Phase C landing, a harness run checks
 believability didn't regress (the point of doing Phase B first).
 
-### Phase A — Re-shape the dialogue seam (~1–2 sessions)
+### Phase A — Re-shape the dialogue seam — DONE
 
-- **A1. Split-brain removal + weights-on-speech.** Strip the behavior call end to end: action
+- **A1. Split-brain removal + weights-on-speech.** ✅ **LANDED 2026-08-04, floor-verified**
+  (the twenty-first floor row; the dated A1 entry in `decisions.md` records the four spec
+  rulings — post-cut re-rank at the seam, recent-actions removed whole, provisioning stripped,
+  init-side `weight_overrides` removed — and the seam contracts: `items` = the raw retrieval
+  echo, `dialogue_view` = the weight-ranked prose view, loader-turn parity at all-1.0). One
+  pending proof: the Unity Play-mode gate re-run (see the phase header). Original scope, as
+  planned: strip the behavior call end to end: action
   directive, reputation (delta emission + the in-place apply + wire fields + boundary snapshot +
   C#/Unity callbacks), the divergence record, the `behavior` model role (real mode 7 → 6 roles).
   Move `weight_overrides` to re-rank the view feeding the **prose** prompt — the surviving

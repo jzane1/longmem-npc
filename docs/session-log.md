@@ -1267,6 +1267,44 @@ session.
     gate this session. Next session: Phase A1 — the split-brain re-shape (strip behavior
     call/directive/reputation end to end; move `weight_overrides` onto the prose view).
 
+- **2026-08-04 — Phase A1: split-brain removal + weights-on-speech (the re-shape session).**
+  Planned in plan mode (three explorers + a plan agent); Jack ruled the four spec forks at plan
+  approval — post-cut re-rank at the dialogue seam, the recent-actions channel removed whole,
+  the provisioning surface + four reputation knobs stripped, the init-side `weight_overrides`
+  removed — recorded with the seam contracts in the dated A1 entry in `decisions.md`.
+  - **Landed:** the removal end to end — the behavior call + `behavior` role (real mode 7 → 6
+    vars), the action directive, the divergence record, the recent-actions channel, and the
+    reputation system whole (`apply_reputation_delta` deleted; provisioning writes neither
+    column; **a dialogue turn persists nothing**) — and weights-on-speech: the exponent re-rank
+    re-pointed at the served view feeding the prose prompt
+    (`resolve_dialogue_weights`/`weighted_score`/`rank_dialogue_view`, `weight_*` knobs,
+    `WEIGHT_MIN/MAX`; loader-turn parity at all-1.0; `dialogue_view` re-defined as the
+    weight-ranked view beside the raw `items` echo). C# mirror shrunk field-for-field and the
+    harness re-composed (the gate stays **24 checks** — the divergence + reputation-callback
+    checks replaced by the [10a] parity / [10b] re-rank pair); Unity adapter + demo driver
+    shrunk; the Ledger turn panel single-view; docs propagated (architecture §9 rewritten as
+    the living seam + §13 re-scoped to the surviving signature claim, CLAUDE.md's six-role +
+    one-scalar wording — the edit A1 owned, `split-brain-streaming.md` retired with a banner,
+    cli-harness/read-path/unity-client/test-suite annotated, eight `floors.md` supersede notes
+    + the new A1 row). Net −923 lines.
+  - **Verified:** independent floor-verifier **PASS**, everything re-run fresh — all seven
+    walkers (write 53 / read 56 / CLI **51, rewritten from 67** / gate 51 / reconstruction 42 /
+    authorial 34 / fact 34) + smoke test, full suite **63** + keyless subset **53**, both C#
+    builds 0 warnings, the live interop gate **24/24**,
+    retrieval/gate/eval_metrics/reconstruction/migrations byte-identical to HEAD, product DB
+    pristine, config surface exactly six roles.
+  - **Blocked:** the Unity Play-mode gate re-run — the Editor wasn't open before session start,
+    so no `mcp__UnityMCP` tools registered (the known 2026-07-28 ordering constraint).
+    Mitigation on record: the committed plugin DLL is sha256-identical to a fresh Release build
+    of the tree (the verifier's provenance proof); the 8/8 re-run is the next editor session's
+    first move, and the stage-2 floor row carries the dated re-open note.
+  - **Honest notes:** harness beat [10b] needed one re-aim — the first utterance was too
+    generic for the recency-kill to re-order the fixture, so it now targets the 94-day-old toll
+    observe (the flip is structurally argued, not tuned; one red gate run in between).
+    `app\gate.py:29`'s stale "reputation_snapshot trust class" comment phrase deliberately left
+    — the file's byte-identity to HEAD is verification evidence; logged as a post-A1 hygiene
+    item for whenever gate.py is next legitimately touched.
+
 
 ---
 

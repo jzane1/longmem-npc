@@ -132,9 +132,9 @@ def fake_providers() -> Providers:
 async def make_agent(pool, name: str):
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
-            "INSERT INTO agents (name, seed_identity, reputation, rigidity, "
-            "reputation_sensitivity, diagnosticity_goal, config) "
-            "VALUES (%s, %s, 0, 1.0, 1.0, %s, %s) RETURNING agent_id",
+            "INSERT INTO agents (name, seed_identity, rigidity, "
+            "diagnosticity_goal, config) "
+            "VALUES (%s, %s, 1.0, %s, %s) RETURNING agent_id",
             (name, SEED_PROSE, "what threatens the ford", Jsonb(AGENT_CONFIG)),
         )
         agent_id = (await cur.fetchone())[0]

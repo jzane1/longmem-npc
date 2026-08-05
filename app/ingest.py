@@ -453,8 +453,8 @@ class IngestService:
         handler carries its first server-side consumer: the identity-document
         recompile (render seed prose -> content hash -> upsert), returning
         identity_version for the caller to freeze as scene state (the hybrid
-        plumbing ruling; the reputation snapshot stays caller-side in the
-        session-runner, and the prompt-head rebuild remains post-August)."""
+        plumbing ruling; the prompt-head rebuild remains a later
+        consumer)."""
         t_total = time.perf_counter()
         agent = await db.fetch_agent(self._pool, event.agent_id)
         if agent is None:
@@ -486,9 +486,7 @@ class IngestService:
             self._pool,
             name=request.name,
             seed_identity=request.seed_identity,
-            reputation=request.reputation,
             rigidity=request.rigidity,
-            reputation_sensitivity=request.reputation_sensitivity,
             diagnosticity_goal=request.diagnosticity_goal,
             config=request.config,
         )
@@ -496,9 +494,7 @@ class IngestService:
             agent_id=agent_id,
             name=request.name,
             seed_identity=request.seed_identity,
-            reputation=request.reputation,
             rigidity=request.rigidity,
-            reputation_sensitivity=request.reputation_sensitivity,
             diagnosticity_goal=request.diagnosticity_goal,
             config=request.config or {},
             total_ms=_ms(time.perf_counter() - t_total),

@@ -97,9 +97,9 @@ async def make_agent(pool, name: str) -> tuple:
     """Fixture agent + one known identity component (SQL, like db\\smoke_test.py)."""
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
-            "INSERT INTO agents (name, seed_identity, reputation, rigidity, "
-            "reputation_sensitivity, diagnosticity_goal, config) "
-            "VALUES (%s, %s, 0, 1.0, 1.0, %s, %s) RETURNING agent_id",
+            "INSERT INTO agents (name, seed_identity, rigidity, "
+            "diagnosticity_goal, config) "
+            "VALUES (%s, %s, 1.0, %s, %s) RETURNING agent_id",
             (
                 name,
                 "A verification NPC.",
@@ -621,7 +621,7 @@ async def main(database_uri: str) -> None:
                 "name": "walker-provisioned",
                 "seed_identity": "I mind the mill ledger.",
                 "rigidity": 1.25,
-                "config": {"reputation_neutral": 0.0},
+                "config": {"retrieval_top_k": 8},
             },
         )
         invalid = await client.post("/v1/agents", json={"name": ""})
@@ -640,12 +640,13 @@ async def main(database_uri: str) -> None:
         and prow[1] == "I mind the mill ledger."
         and float(prow[2]) == 1.25
         and prow[3] is None
-        and prow[4] == {"reputation_neutral": 0.0},
-        "server-minted UUID; row stores exactly the supplied fields; knobs NULL",
+        and prow[4] == {"retrieval_top_k": 8},
+        "server-minted UUID; row stores exactly the supplied fields; the "
+        "reputation column stays NULL, unwritten (A1 re-shape 2026-08-04)",
     )
     check(
-        prov["config"] == {"reputation_neutral": 0.0} and prov["reputation"] is None,
-        "result echoes stored fields (pass-through)",
+        prov["config"] == {"retrieval_top_k": 8} and "reputation" not in prov,
+        "result echoes stored fields (pass-through); no reputation echo",
     )
     provisioned_write = await service.ingest_observation(
         observe_event(agent_id=prov_id)

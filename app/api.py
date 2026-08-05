@@ -60,7 +60,8 @@ from app.schemas import (
 
 # Running SSE pump tasks hold a reference here so a client disconnect can
 # never garbage-collect a mid-turn task — the turn always completes
-# server-side (the reputation apply is atomic inside the seam).
+# server-side (coherent instrumentation and reconstruction write-backs, never
+# a half-run seam).
 _stream_tasks: set[asyncio.Task] = set()
 
 
@@ -101,11 +102,11 @@ async def dialogue_init(request: DialogueInitRequest) -> RetrievalResult:
 @app.post("/v1/dialogue/turn", response_model=DialogueTurnResult)
 async def dialogue_turn(request: DialogueTurnRequest) -> DialogueTurnResult:
     """One dialogue turn over HTTP (the audit's #1 gap, built 2026-07-23) —
-    the Unity/C# front door to the split-brain seam. STATELESS: all scene
-    state (reputation snapshot, identity version, scene basis, loaded set,
-    context, recent actions) rides on the request, and the runner bookkeeping
-    (`session._apply_turn_result`) is the CLIENT'S job — the future C#
-    NpcSession ports it. Non-streaming: drains `run_dialogue_turn`'s async
+    the Unity/C# front door to the dialogue seam. STATELESS: all scene
+    state (identity version, scene basis, loaded set, context) rides on the
+    request, and the runner bookkeeping (`session._apply_turn_result`) is the
+    CLIENT'S job — the C# NpcSession ports it. Non-streaming: drains
+    `run_dialogue_turn`'s async
     generator to the terminal result (first_word_ms/perceived_first_word_ms
     ride in the instrumentation, so no chunk consumption is needed); the SSE
     route below iterates the SAME generator — no rewrite, as designed.

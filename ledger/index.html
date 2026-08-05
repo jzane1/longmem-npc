@@ -358,11 +358,12 @@ function renderTurn(result) {
   host.append(table);
 
   const views = el("div", "cols");
-  for (const [name, view] of [["dialogue view", result.dialogue_view],
-                              ["behavior view", result.behavior_view]]) {
+  {
+    // The weight-ranked view that fed the prose prompt (weights-on-speech,
+    // A1 2026-08-04); at default weights it matches the served table above.
     const card = el("div", "card");
-    card.append(el("div", "cap", name));
-    (view || []).forEach((v, i) => {
+    card.append(el("div", "cap", "dialogue view (weight-ranked)"));
+    (result.dialogue_view || []).forEach((v, i) => {
       card.append(el("div", "mono",
         `${i + 1}. ${v.memory_id.slice(0, 8)}…  ${v.score.toFixed(4)}`));
     });
@@ -375,8 +376,7 @@ function renderTurn(result) {
   host.append(el("div", "meta",
     `perceived_first_word ${ins.perceived_first_word_ms} ms · first_word `
     + `${ins.first_word_ms} ms · gate ${JSON.stringify(
-        (ins.retrieval || {}).gate ? ins.retrieval.gate.signals_fired : [])} `
-    + `· reputation ${result.reputation_prev} → ${result.reputation_after}`));
+        (ins.retrieval || {}).gate ? ins.retrieval.gate.signals_fired : [])}`));
 }
 
 function tryLoadTurn(text) {

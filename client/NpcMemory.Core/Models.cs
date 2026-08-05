@@ -65,9 +65,7 @@ namespace NpcMemory
     {
         public string Name { get; set; } = "";
         public string? SeedIdentity { get; set; }
-        public double? Reputation { get; set; }
         public double? Rigidity { get; set; }
-        public double? ReputationSensitivity { get; set; }
         public string? DiagnosticityGoal { get; set; }
         public JObject? Config { get; set; }
     }
@@ -157,9 +155,7 @@ namespace NpcMemory
         public Guid AgentId { get; set; }
         public string Name { get; set; } = "";
         public string? SeedIdentity { get; set; }
-        public double? Reputation { get; set; }
         public double? Rigidity { get; set; }
-        public double? ReputationSensitivity { get; set; }
         public string? DiagnosticityGoal { get; set; }
         public JObject Config { get; set; } = new JObject();
         public double TotalMs { get; set; }
@@ -182,7 +178,6 @@ namespace NpcMemory
         public string? LocationName { get; set; }
         public List<string>? Entities { get; set; }
         public DateTimeOffset? EventTime { get; set; }
-        public WeightOverrides? WeightOverrides { get; set; }
         public DateTimeOffset? AsOf { get; set; }
         public string? IdentityVersion { get; set; }
         public DateTimeOffset? SceneStartedAt { get; set; }
@@ -263,19 +258,12 @@ namespace NpcMemory
 
     // -- dialogue turn --------------------------------------------------
 
-    public sealed class ActionDirective
-    {
-        public string Type { get; set; } = "";
-        public JObject Params { get; set; } = new JObject();
-    }
-
-    public sealed class RecentAction
-    {
-        public string Type { get; set; } = "";
-        public JObject Params { get; set; } = new JObject();
-        public DateTimeOffset At { get; set; }
-    }
-
+    /// <summary>One (memory_id, score) tuple in the weight-ranked view that
+    /// fed the prose prompt (weights-on-speech, A1 re-shape 2026-08-04).
+    /// On a loader turn at default weights DialogueView equals the
+    /// (id, score) projection of Items — the parity contract; on gated
+    /// turns Items keeps the loaded+fetched serve shape while DialogueView
+    /// is the global weight ranking.</summary>
     public sealed class ScoredRef
     {
         public Guid MemoryId { get; set; }
@@ -286,9 +274,6 @@ namespace NpcMemory
     {
         public Guid AgentId { get; set; }
         public string Utterance { get; set; } = "";
-        public double ReputationSnapshot { get; set; }
-        public double? ReputationDeltaOverride { get; set; }
-        public List<string>? ActionVocabulary { get; set; }
         public int? K { get; set; }
         public DateTimeOffset? AsOf { get; set; }
         public string? LocationName { get; set; }
@@ -303,7 +288,6 @@ namespace NpcMemory
 
         public int GateFruitlessStreak { get; set; }
         public WeightOverrides? WeightOverrides { get; set; }
-        public List<RecentAction> RecentActions { get; set; } = new List<RecentAction>();
         public bool Debug { get; set; }
     }
 
@@ -313,7 +297,6 @@ namespace NpcMemory
             new RetrievalInstrumentation();
         public double SonnetMs { get; set; }
         public double SonnetFirstTokenMs { get; set; }
-        public double ApplyMs { get; set; }
         public double TotalMs { get; set; }
         public int SonnetInputTokens { get; set; }
         public int SonnetOutputTokens { get; set; }
@@ -322,9 +305,6 @@ namespace NpcMemory
         public string? DegradedReason { get; set; }
         public double FirstWordMs { get; set; }
         public double ProseStreamMs { get; set; }
-        public double BehaviorMs { get; set; }
-        public int BehaviorInputTokens { get; set; }
-        public int BehaviorOutputTokens { get; set; }
         public double PerceivedFirstWordMs { get; set; }
     }
 
@@ -332,18 +312,8 @@ namespace NpcMemory
     {
         public Guid AgentId { get; set; }
         public string Content { get; set; } = "";
-        public ActionDirective? Directive { get; set; }
-        public bool DirectiveDropped { get; set; }
-        public string? DirectiveDroppedReason { get; set; }
-        public double ReputationSnapshot { get; set; }
-        public double ReputationPrev { get; set; }
-        public double ReputationDelta { get; set; }
-        public string ReputationDeltaSource { get; set; } = "";
-        public double ReputationSensitivity { get; set; }
-        public double ReputationAfter { get; set; }
         public List<RetrievedMemory> Items { get; set; } = new List<RetrievedMemory>();
         public List<ScoredRef> DialogueView { get; set; } = new List<ScoredRef>();
-        public List<ScoredRef> BehaviorView { get; set; } = new List<ScoredRef>();
         public DialogueTurnInstrumentation Instrumentation { get; set; } =
             new DialogueTurnInstrumentation();
     }

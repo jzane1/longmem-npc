@@ -7,16 +7,17 @@ namespace NpcMemory.Unity
 {
     /// <summary>
     /// The thin MonoBehaviour adapter over the engine-agnostic core
-    /// (unity-client.md stage 2, ruled 2026-07-27): one component holding
-    /// the flat client + the NpcSession, exposing thin async passthroughs
-    /// and the directive/reputation callbacks. All scene state lives in the
-    /// session (the server is stateless by ruling); this class adds ONLY
-    /// Unity lifecycle + inspector config.
+    /// (unity-client.md stage 2, ruled 2026-07-27; re-shaped by A1
+    /// 2026-08-04 — the directive/reputation surface left with the
+    /// behavior/reputation removal): one component holding the flat client
+    /// + the NpcSession, exposing thin async passthroughs. All scene state
+    /// lives in the session (the server is stateless by ruling); this class
+    /// adds ONLY Unity lifecycle + inspector config.
     ///
     /// Main-thread rule: never .Result / .Wait(). Awaits started from the
     /// main thread resume on Unity's SynchronizationContext, so callbacks
-    /// (chunks, directives, reputation) land on the main thread without
-    /// explicit marshaling — the demo driver asserts this in Play mode.
+    /// (chunks) land on the main thread without explicit marshaling — the
+    /// demo driver asserts this in Play mode.
     /// </summary>
     public sealed class NpcMemoryNpc : MonoBehaviour
     {
@@ -30,9 +31,6 @@ namespace NpcMemory.Unity
         [Tooltip("Existing agent UUID when autoProvision is off.")]
         public string agentIdOverride = "";
 
-        [Tooltip("Scene-start reputation snapshot when attaching to an existing agent.")]
-        public double initialReputationSnapshot;
-
         [Header("Agent (auto-provision)")]
         public string agentName = "graybox-keeper";
 
@@ -41,7 +39,6 @@ namespace NpcMemory.Unity
             "I keep the ford and remember who pays their toll.";
 
         public string diagnosticityGoal = "what threatens the ford";
-        public string[] actionVocabulary = { "greet", "warn", "recall" };
 
         [Tooltip("Decay taus (seconds) written to the provisioned agent's config.")]
         public double episodicTauSeconds = 604800.0;
@@ -53,9 +50,6 @@ namespace NpcMemory.Unity
         public NpcSession Session { get; private set; }
         public Guid AgentId { get; private set; }
         public bool Ready { get; private set; }
-
-        public event Action<ActionDirective> OnDirective;
-        public event Action<double, double> OnReputationChanged;
 
         private async void Start()
         {
@@ -73,14 +67,12 @@ namespace NpcMemory.Unity
         public async Task InitializeAsync()
         {
             Client = new NpcMemoryClient(baseUrl);
-            var snapshot = initialReputationSnapshot;
             if (autoProvision)
             {
                 var created = await Client.CreateAgentAsync(new CreateAgentRequest
                 {
                     Name = agentName,
                     SeedIdentity = seedIdentity,
-                    Reputation = 0.0,
                     DiagnosticityGoal = diagnosticityGoal,
                     Config = new JObject
                     {
@@ -90,20 +82,15 @@ namespace NpcMemory.Unity
                             ["semantic"] = semanticTauSeconds,
                         },
                         ["decay_class_default"] = "episodic",
-                        ["action_vocabulary"] = new JArray(actionVocabulary),
                     },
                 });
                 AgentId = created.AgentId;
-                snapshot = created.Reputation ?? 0.0;
             }
             else
             {
                 AgentId = Guid.Parse(agentIdOverride);
             }
-            Session = new NpcSession(Client, AgentId, snapshot, phaseTag);
-            Session.OnDirective += d => OnDirective?.Invoke(d);
-            Session.OnReputationChanged += (prev, after) =>
-                OnReputationChanged?.Invoke(prev, after);
+            Session = new NpcSession(Client, AgentId, phaseTag);
             Ready = true;
         }
 
