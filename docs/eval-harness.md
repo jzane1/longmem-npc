@@ -17,6 +17,17 @@ build receipts; each stage gains its own dated BUILT banner.
 route + The Ledger binding landed and floor-verified the same day this spec was written
 (plan-as-spec session). See the Done-when for what was proven.
 
+**BUILT (stage 2) — 2026-08-05.** The runner core landed to the stage-2 contract paragraph
+verbatim and floor-verified (the twenty-second `floors.md` row; session rulings + build
+latitude in the dated `decisions.md` entry): `app\scratch_db.py` (the promoted
+`scratch_uri` + pid-scoped `provision_scratch`/`drop_scratch`), `app\eval_scenarios.py`
+(strict schema + the one loader), `app\eval_runner.py` (`run` + `drift-validate`), the
+`drift_observer` seam, fixtures under `data\eval\`, suite Set H. The ruled single real-mode
+`drift-validate` on the fixture corpus (7 authored observes, aged 30 days, threshold 0.35):
+**7/7 items checked, 0 over budget — distance p50 0.030 / p95 0.100 / max 0.120**,
+`drift_refusals` self-check exact. Fake-mode e2e: 6/6 expected-IDs checks, byte-identical
+across runs.
+
 ## The ruled shape
 
 1. **Judge model role from v1** (ruled 2026-07-20): `LONGMEM_MODEL_JUDGE` + judged categories
@@ -150,7 +161,8 @@ Footer updated: the binding promise is now the binding.
 
 ## Mechanism — stages 2–4 (contract)
 
-- **Stage 2 — runner core.** `app\scratch_db.py` promotes `tests\scratch_uri.py` (re-export
+- **Stage 2 — runner core. BUILT 2026-08-05** (banner above; built to this paragraph
+  verbatim). `app\scratch_db.py` promotes `tests\scratch_uri.py` (re-export
   shim keeps conftest + all seven walkers byte-untouched) and adds `provision_scratch` /
   `drop_scratch` (CREATE + `db\migrate.py` subprocess + drop; hard refusal when the resolved
   dbname is the product `longmem`). `app\eval_scenarios.py` = pydantic scenario schema + JSONL
@@ -201,10 +213,10 @@ until their stage builds.
 | 4 | Rubric text home | Recommendation: module constants with `rubric_version` tags (stage 3) |
 | 5 | Judge-agreement acceptance bar | Recommendation: kappa ≥ 0.6 per category before judged numbers are quotable (stage 3/4) |
 | 6 | Metrics-route scoring target | **Live head only** (built, stage 1) — the Ledger shows the live telling; the runner walks chains itself |
-| 7 | Milestone run artifacts | Recommendation: gitignored runs + numbers quoted into dated doc entries (stage 2) |
-| 8 | conftest adoption of `provision_scratch` | Recommendation: deferred — keep this build off the suite's fixture spine |
+| 7 | Milestone run artifacts | **Gitignored runs + numbers quoted into dated doc entries** (built, stage 2) — `.gitignore` carries `data/eval/runs/`; the stage-2 banner quotes the real drift numbers |
+| 8 | conftest adoption of `provision_scratch` | **Deferred** (ruled at stage-2 build) — the suite's fixture spine stays byte-untouched; the shim keeps conftest + all seven walkers unmodified |
 | 9 | Prose-quality rubric dimensions | Open until stage 3 (naturalness / character-consistency / memory-grounding / brevity, 1–5, proposed) |
-| 10 | `drift-validate` corpus schema | Recommendation: subset of the scenario schema — one loader (stage 2) |
+| 10 | `drift-validate` corpus schema | **Subset of the scenario schema — one loader** (built, stage 2): observe/as_of only, `assert_corpus_shape` states the restriction |
 | 11 | Ablation OFF semantics on correction-anchored chains | Recommendation: exclude from ablation arms (stage 4); a third arm measuring exactly that is the alternative |
 | 12 | Gold-set size | Recommendation: ~20–30 items/category, emitted from the stage-3 real smoke |
 
@@ -214,6 +226,18 @@ chain route does not echo it either); unmeasurable gist facts are excluded from 
 the ratio and flagged `None` in the per-fact list; the observation's keyword-retention entity
 set is recomputed via `extract_entities` (measures the definition, not the stored write-time
 merge).
+
+Stage-2 physical shapes settled at build (same latitude; the dated 2026-08-05 `decisions.md`
+entry records them with rationale): argparse subparsers for verb dispatch; `extra="forbid"` +
+tz-aware datetime validators on every scenario model (an authoring mistake dies at load with
+`path:line`, never mid-run); `drift_observer`'s third argument is `refused`
+(`distance > threshold`, computed exactly where the serving decision is made — the blind
+embed-failure refusal path carries no distance and never calls the observer); one scratch DB
+per invocation, fresh agent per scenario; exit codes (`run`: 0 checks green / 1 any failed;
+`drift-validate`: 0 under budget / 1 over / 2 mode-gate refusal); defaults `--age-days 30` +
+a plain coverage probe (coverage rides k, not wording); fixture scoring pinned by explicit
+config facts (`importance_norm_floor: 1.0` + `decay_k_importance: 0.0` neutralize
+hash-derived fake importance so expected-IDs cut on pure fake-embedding similarity).
 
 ## Done-when (stage 1 — the build's floor)
 

@@ -46,6 +46,10 @@ unity/Packages/com.coplaydev.unity-mcp/
 !client/**/*.csproj
 !client/**/*.sln
 
+# Eval run artifacts (eval-harness.md stage 2, fork 7: runs stay local;
+# milestone numbers get quoted into dated doc entries instead)
+data/eval/runs/
+
 # Claude Code personal overrides
 CLAUDE.local.md
 .claude/settings.local.json

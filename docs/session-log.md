@@ -1305,6 +1305,35 @@ session.
     — the file's byte-identity to HEAD is verification evidence; logged as a post-A1 hygiene
     item for whenever gate.py is next legitimately touched.
 
+- **2026-08-05 — Unity gate re-run + Phase B1: eval-harness stage 2 (the runner).**
+  - **Landed (1 of 2):** A1's pending proof CLOSED as the session's first move — the Editor
+    was open before session start (the ordering constraint held), and the Play-mode gate
+    re-ran **8/8 GREEN** fake-mode (agent 594b2a18, +13 frames, 0 console errors/warnings —
+    the shrunk adapter compiled clean; `longmem_smoke` created/migrated/dropped; scene not
+    saved). Fake-only by ruling; committed as `97bbf80` with the floors 19/21 resolution notes.
+  - **Landed (2 of 2):** eval-harness stage 2, built to the contract paragraph verbatim:
+    `app\scratch_db.py` (the promoted `scratch_uri` + pid-scoped provision/drop with the
+    double product-DB refusal), `app\eval_scenarios.py` (strict schema, one loader,
+    membership-only `check_expected`), `app\eval_runner.py` (`run` + `drift-validate`), the
+    two-hunk `drift_observer` seam, the smoke + drift fixtures, `.gitignore` runs rule, suite
+    Set H (72 total). Four forks ruled at plan approval (all recommended options, first
+    pass); forks 7/8/10 settled as the spec recommended; details in the dated `decisions.md`
+    entry.
+  - **Verified:** independent floor-verifier **PASS**, everything re-run fresh — suite 72 +
+    keyless 61, reconstruction walker 42 (the None-default byte-identity proof) + read-path
+    56, fake e2e 6/6 twice byte-identical, plumbing drift 7/7 + the exit-2 mode-gate
+    refusal, TEST-NET no-dial-out refusal proof, `longmem` pristine, ledger 001–005. The
+    ruled single real-mode `drift-validate`: **7/7 items, 0 over budget, p50 0.030 / p95
+    0.100 / max 0.120** vs threshold 0.35 — the stage-2 BUILT banner's numbers.
+  - **Honest notes:** the first e2e smoke of the runner ran in REAL provider mode by
+    accident — `.env` carries `LONGMEM_PROVIDER_MODE=real` from earlier real-mode work and
+    the runner (correctly) honors it; ~$0.03 of unplanned spend, all six checks passed, and
+    every subsequent offline run set the fake override explicitly. The first fake run then
+    exposed two expected-ID k-cut flips — hash-derived fake importance outranked similarity —
+    fixed by pinning fixture scoring with explicit config facts (`importance_norm_floor:
+    1.0` + `decay_k_importance: 0.0`), not by mining probe text; recorded as build latitude.
+    Nothing blocked; nothing abandoned. Next session: Phase B2, the judge layer.
+
 
 ---
 

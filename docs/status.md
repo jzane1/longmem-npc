@@ -1,15 +1,17 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-08-04
-**Phase:** **Road to completion — Phase A is DONE; the next working session starts Phase B1.**
+**Last updated:** 2026-08-05
+**Phase:** **Road to completion — Phase A and B1 are DONE; the next working session starts
+Phase B2 (the judge layer).**
 The scope was consolidated 2026-08-04 into the phased roadmap below (dated "Scope consolidation
 + road-to-completion rulings" entry in `decisions.md`), and **A1 landed the same day** — the
 split-brain removal + weights-on-speech re-shape, floor-verified (the dated A1 entry in
 `decisions.md` records the four spec rulings + the seam contracts). The system is BUILT end to
 end on the FINAL seam — backend (one streaming prose call; a dialogue turn persists nothing;
 real mode six model roles), C# client (`NpcMemory.Core` + console harness, interop gate 24/24),
-Unity adapter + gray-box scene, The Ledger at `GET /ledger`, and eval-harness stage 1 —
-**twenty-one floors stand verified** (`docs\floors.md`), schema frozen at migrations 001–005.
+Unity adapter + gray-box scene, The Ledger at `GET /ledger`, and eval-harness stages 1–2
+(the metric layer + the runner, `run`/`drift-validate` live) — **twenty-two floors stand
+verified** (`docs\floors.md`), schema frozen at migrations 001–005.
 The pending Unity Play-mode proof is **CLOSED (2026-08-05)**: fake-mode 8/8 GREEN through the
 bridge (clean in-engine compile, `longmem` pristine, scene not saved; fake-only by ruling —
 dated resolution notes on floors rows 19/21). The research
@@ -90,9 +92,12 @@ believability didn't regress (the point of doing Phase B first).
 
 ### Phase B — Finish the measurement rig (~3 sessions)
 
-- **B1. Eval-harness stage 2** — the runner: `provision_scratch`/`drop_scratch`, scenario schema
-  + JSONL loader, the `run` + `drift-validate` verbs, the `drift_observer` capture seam (spec:
-  `eval-harness.md`).
+- **B1. Eval-harness stage 2.** ✅ **LANDED 2026-08-05, floor-verified** (the twenty-second
+  floor row; the dated stage-2 entry in `decisions.md` records the session rulings — fake-only
+  gate re-run, drift-validate's real-mode gate + `--plumbing`, the ruled real run's numbers,
+  membership-only expected-IDs — and the build latitude). As planned: the runner —
+  `provision_scratch`/`drop_scratch`, scenario schema + JSONL loader, the `run` +
+  `drift-validate` verbs, the `drift_observer` capture seam (spec: `eval-harness.md`).
 - **B2. Eval-harness stage 3** — the judge: eval-runner-only judge role, four rubrics, the gold
   set + agreement scoring, A/B `compare` with the accuracy-vs-latency-vs-USD Pareto table.
   First real use: the queued dialogue-model prose-quality check (haiku vs sonnet-5 + the B2

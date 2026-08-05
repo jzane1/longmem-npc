@@ -62,6 +62,14 @@ from app.schemas import DialogueInitRequest, RetrievedMemory
 
 logger = logging.getLogger(__name__)
 
+# Eval capture seam (eval-harness.md stage 2, the `on_reconstruct` shape):
+# invoked once per checked item at the drift computation as
+# (memory_id, cosine_distance, refused), where refused == distance > threshold
+# — the budget refused this write-back. None (the default) leaves serving
+# byte-identical to the pre-seam floor. Set only by the eval runner; the blind
+# embed-failure refusal path carries no distance and never calls it.
+drift_observer: Callable[[UUID, float, bool], None] | None = None
+
 
 class UnknownIdentityVersionError(RuntimeError):
     """A caller-passed identity_version the server does not know — a broken
@@ -446,7 +454,10 @@ class ReconstructionService:
                         distance = cosine_distance(
                             vectors[2 * index], vectors[2 * index + 1]
                         )
-                        if distance > threshold:
+                        refused = distance > threshold
+                        if drift_observer is not None:
+                            drift_observer(slot.row.memory_id, distance, refused)
+                        if refused:
                             drift_refusals += 1
                             logger.info(
                                 "drift budget refused write-back for %s "

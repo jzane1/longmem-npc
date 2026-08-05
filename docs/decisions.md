@@ -63,6 +63,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Eval-harness v1 plan rulings + stage-1 build — 2026-07-29](#eval-harness-v1-plan-rulings--stage-1-build--2026-07-29)
 - [Scope consolidation + road-to-completion rulings — 2026-08-04](#scope-consolidation--road-to-completion-rulings--2026-08-04)
 - [A1 split-brain removal + weights-on-speech — spec forks + build record — 2026-08-04](#a1-split-brain-removal--weights-on-speech--spec-forks--build-record--2026-08-04)
+- [Eval-harness stage 2 — session rulings + build record — 2026-08-05](#eval-harness-stage-2--session-rulings--build-record--2026-08-05)
 
 ## Primary decisions
 
@@ -2546,3 +2547,65 @@ replaced); the 2026-07-15 reputation rulings in the CLI-harness build entry (app
 snapshot plumbing, sensitivity resolution — all removed); the 2026-07-14 read-path ruling 8's
 reserved init-side `weight_overrides` slot (removed). `split-brain-streaming.md` carries the
 retirement banner; `architecture.md` §9 is the living seam statement.
+
+## Eval-harness stage 2 — session rulings + build record — 2026-08-05
+
+**Context.** Phase B1 of the road-to-completion roadmap: eval-harness stage 2 — the runner
+core — built to the 2026-07-29 spec's stage-2 contract paragraph verbatim (`eval-harness.md`;
+now carrying its dated BUILT banner). The session opened by closing A1's one pending proof:
+the Unity Play-mode gate re-ran **8/8 GREEN** fake-mode through the MCP bridge (Editor open
+before session start; the dated resolution notes on `floors.md` rows 19/21). Four forks
+settled at plan approval — all recommended options taken first pass.
+
+1. **Unity gate re-run scope: fake-mode 8/8 only.** The fake gate is the gate-of-record; the
+   original real-mode pass's unique evidence (+1061 frames through real SSE chunk gaps)
+   tested streaming code A1 did not change, and the committed DLL is sha256-identical to a
+   fresh Release build of the tree. **Rejected:** repeating the real corroboration pass —
+   spend without new evidence.
+
+2. **`drift-validate` gates on full real provider mode, with `--plumbing`.** The verb's
+   construct is real-retelling drift under real embeddings; an embeddings-only narrow path
+   (OpenAI key without the six model roles) would measure fake retellings — which
+   deliberately hug their anchors — under real embeddings, a construct mismatch, and the
+   write pass ingesting the corpus needs the real write model anyway. `--plumbing` permits
+   fake mode with the report labeled `plumbing_only: true` — the stage-3 `--judged` labeling
+   pattern pulled one stage forward; no new provider mode exists. **Rejected:** the
+   embeddings-only path.
+
+3. **One real-mode `drift-validate` run this session.** Proven on the fixture corpus
+   (7 authored observes aged 30 days): **7/7 items checked, 0 over budget — distance p50
+   0.030 / p95 0.100 / max 0.120** against threshold 0.35, `drift_refusals` self-check
+   exact. The numbers live in the stage-2 BUILT banner; the run artifact is gitignored
+   (fork 7's discipline). **Rejected:** plumbing-only this session (first real numbers
+   waiting on stage 3).
+
+4. **Expected-IDs checks are membership-only.** `present`/`absent` observe ordinals scored
+   against `DialogueTurnResult.items` — the raw retrieval echo; the A1 seam contract makes
+   membership weight-invariant (weights re-order, never admit or evict). **Rejected for
+   v1:** ordered/top-1 assertions — rank under hash-derived fake importance is fragile, and
+   the schema can grow an ordering vocabulary additively later.
+
+**Spec fork-table rows settled (stage 2).** Fork 7: run artifacts **gitignored**
+(`data/eval/runs/` in `.gitignore`) + milestone numbers quoted into dated doc entries.
+Fork 8: conftest adoption of `provision_scratch` **deferred** — the suite's fixture spine is
+byte-untouched (the `tests\scratch_uri.py` re-export shim keeps conftest and all seven
+walkers unmodified). Fork 10: the drift corpus is the scenario schema's **observe/as_of
+subset through the one loader**, with `assert_corpus_shape` stating the restriction.
+
+**Build latitude (the stage-2 [SETTLE-AT-BUILD] shapes, recorded with rationale in the
+spec's settled-shapes paragraph):** argparse subparsers for verb dispatch (first use in the
+repo); `extra="forbid"` + tz-aware datetime validators across the scenario schema;
+`drift_observer`'s third argument = `refused` (`distance > threshold`, computed exactly
+where the serving decision is made; the blind embed-failure refusal path never calls the
+observer); one scratch DB per invocation with a fresh agent per scenario; exit codes
+(`run` 0/1; `drift-validate` 0/1/2 with 2 = the mode-gate refusal); defaults
+`--age-days 30` + a plain coverage probe; fixture scoring pinned by explicit config facts —
+`importance_norm_floor: 1.0` + `decay_k_importance: 0.0` neutralize hash-derived fake
+importance so expected-ID cuts ride pure fake-embedding similarity (the first fake run
+exposed two k-cut flips before the pin; the pinned run is deterministic, proven twice
+byte-identical).
+
+**Floor:** the twenty-second `floors.md` row — independent floor-verifier pass (suite 72 +
+keyless 61, walkers 42 + 56, fake e2e 6/6 twice, plumbing 7/7 + the exit-2 refusal, the
+TEST-NET no-dial-out refusal proof, live `longmem` pristine, ledger exactly 001–005, no
+scratch DB left behind).
