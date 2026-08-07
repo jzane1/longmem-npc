@@ -7,7 +7,9 @@ file records what was chosen, what it beat, and why (where the rationale was rec
 
 ## Index
 
-*45 dated sections. Regenerated 2026-07-28 — the first hand-written pass mixed two
+*49 dated sections (recounted 2026-08-07, full-repo audit: 49 body entries, 49 index lines,
+one-to-one — this header count had gone stale, last set 2026-07-29). Regenerated
+2026-07-28 — the first hand-written pass mixed two
 slug conventions and miscounted. Anchors follow GitHub's slugger: the em dash is dropped and
 its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as `#name--2026-07-28`.*
 

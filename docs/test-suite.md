@@ -29,7 +29,8 @@ distortion operators) belong to the eval story and the paper ablations, not this
 
 Corollary that makes this possible: read endpoints that run retrieval return memory IDs and scores
 alongside prose. That contract is load-bearing; if an endpoint stops returning IDs, the suite is
-dead. *(The two inspector reads — `/chain` and `/agents/{id}/memories`, ruled 2026-07-27 — run no
+dead. *(The three unscored-by-contract reads — `/chain` and `/agents/{id}/memories`, ruled
+2026-07-27, and `/memories/{id}/reconstruction-metrics`, the third member 2026-07-29 — run no
 retrieval and are unscored by contract; they still carry IDs and structured fields on every row,
 which is what their scenarios assert.)*
 

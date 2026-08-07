@@ -1386,6 +1386,36 @@ session.
     mode — next session opens with Jack's labels → `agreement` vs the 0.6 bar → the first
     real `compare`, then B3 (stage 4, the fixed-gist ablation → R7's deciding data).
 
+- **2026-08-07 — Full-repo audit, run parallel to Jack's offline gold labeling (Fable 5).**
+  - **Landed:** the mechanical re-verification of all standing floors — everything green
+    (full evidence in the dated 2026-08-07 entry of `floors.md`'s re-verification-passes
+    section: suite 86, walkers 53/56/51/51/42/34/34, migrate no-op, `longmem` pristine,
+    C# 0 warnings + DLL provenance clean, interop gate 24/24, eval fake e2e all three verbs,
+    blobs CR-free, gold blind intact). A six-file doc-drift fix set, each edit under its
+    register's rules: `SETUP.md` (suite 55→86, subset 48→74, ten→eleven routes),
+    `decisions.md` index header (45→49, recounted, one-to-one with the body),
+    `unity-client.md` (dated banner note — gate 21→24, stage-2 closure history; the eleventh
+    verb row `ReconstructionMetricsAsync`; the done-when §2 field list), `mid-dialogue-gate.md`
+    (two dated `assemble_system_prompt` → `assemble_prose_prompt` rename notes),
+    `test-suite.md` + `tests\CLAUDE.md` (the unscored carve-out grown to its ruled three
+    members). Sub-agent usage held to ONE doc-auditor (sonnet) per Jack's economy constraint;
+    it returned 8 findings — 7 fixed as mechanical drift, 1 reported for Jack's judgment
+    (status.md narrative accumulation vs "live state only"). Roadmap-ordering audit: sound —
+    no dependency inversions found; next-session queue verified ready on disk (arm files
+    tracked, gold file well-formed).
+  - **Honest notes:** (i) the interop-gate first attempt FAILED on the audit's own runner
+    (undrained stdout pipe deadlocked the served backend mid-harness) — diagnosed runner-side
+    (port free, DB pristine), re-run clean 24/24; (ii) one eval e2e invocation ran REAL by
+    omission of the fake-mode override — ~$0.03 measured plus a real `drift-validate`
+    (incidentally corroborating the ruled 2026-08-05 drift numbers) and a judged leg killed
+    within ~a minute; orphan scratch dropped, all three legs re-run fake and green;
+    (iii) the agreement input `data\eval\runs\run_20260807T193049Z_pid_31688.json` is
+    gitignored and exists ONLY on this machine — losing it before next session's `agreement`
+    means re-buying the ~$0.58 judged smoke (surfaced, not acted on); (iv) Jack's in-progress
+    gold labels were never touched and no per-row judge verdicts were surfaced anywhere in the
+    audit output (blind preserved).
+  - Nothing blocked; nothing abandoned.
+
 
 ---
 

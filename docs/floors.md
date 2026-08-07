@@ -102,3 +102,32 @@ floor-verifier subagent; the gate ran 8/8 in fake mode, the floor-verifier re-ra
 a real-mode pass corroborated it (+1061 frames on check #8). It mattered more than usual because
 the plugin DLL was rebuilt three times across 2026-07-27/28 — provenance re-proven clean.
 
+**2026-08-07 — full-repo audit (run parallel to Jack's offline gold labeling): the standing
+floors mechanically re-verified on today's tree. VERDICT: pass.** No layer landed; the
+twenty-three-row table is unchanged. Re-run this session, independently of every recorded
+result: `ruff check` clean + `format --check` 43/43 at the 0.15.21 pin; full suite **86
+passed** (108 s); all seven walkers green, each on a fresh per-walker scratch — write **53**,
+read **56**, CLI-harness **51**, gate **51**, reconstruction **42**, authorial **34**, fact
+**34** — exactly the stage-3 row's counts; `db\migrate.py` no-arg → "Up to date: 5 migration(s)
+applied, 0 pending"; `longmem` pristine via the postgres MCP (ten product tables 0 rows, ledger
+exactly 001–005, zero scratch residue after all runs); both C# builds 0 warnings; committed
+Unity plugin DLL vs a fresh Release build — same size, **150 differing bytes, ALL
+build-identity** (COFF stamp, MVID, PDB GUID/checksum, embedded revision sha — the committed
+DLL embeds ancestor `2b15b15`, and zero commits have touched `client\NpcMemory.Core\` since it
+landed, so IL/metadata are byte-identical; this also reconciles the 2026-07-29 "150 bytes" and
+2026-08-04 "sha-identical" provenance claims — both true at their build shas); the console
+interop gate **24/24** fake-mode against a served backend on scratch `longmem_smoke` (a first
+attempt failed on an audit-runner stdout-pipe deadlock — diagnosed as runner-side, not repo:
+port free after, product DB pristine, clean 24/24 on the file-backed re-run); eval-harness fake
+e2e — `run` **6/6** exit 0, `drift-validate --plumbing` exit 0 with 0 over budget and the
+self-check matching, judged `--plumbing` exit 0 labeled plumbing-only with **0 judge_failed**
+across 24 sf + 24 abstention + 30 faithfulness facts; every blob at HEAD carries zero CR bytes
+(lone-CR included); gold-file blind intact (78 rows, 24/24/30, every label null, no
+verdict-shaped keys). Honest note: one eval e2e invocation first ran REAL by omission of the
+fake override (the `.env` real-mode trap) — ~$0.03 measured on the `run` leg plus a real
+`drift-validate` (which incidentally corroborated the ruled 2026-08-05 numbers: p50 0.06 / max
+0.117 vs 0.030 / 0.120, both far under the 0.35 budget) and a judged leg killed within ~a
+minute; scratch dropped, all three re-run fake. The audit's six-file doc-drift fix set is
+recorded in the session log; the Unity Play-mode gate was deliberately out of scope (closed
+2026-08-05, fake-only by ruling; Editor not open before session start).
+

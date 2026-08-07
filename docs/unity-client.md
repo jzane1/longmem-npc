@@ -6,7 +6,12 @@
 > beat + suite 49) carry live receipts. *(2026-07-28: stage 3's re-runnable half — the `/ledger`
 > route contract — plus stage 1's build and interop gate were independently re-verified during the
 > full-repo audit. The **stage-2 Play-mode gate remains the one outstanding verification**; see
-> `status.md`, which is the authority on what is still owed.)* Fork rulings + build record:
+> `status.md`, which is the authority on what is still owed.)* *(2026-08-07 audit note: both
+> figures above are as-built history — the interop gate has since grown 21 → 23 → 24 checks
+> (client-timing 2026-07-28, metrics read 2026-07-29, re-composed by A1 2026-08-04) and runs
+> 24/24; the stage-2 Play-mode gate closed 2026-07-29, was re-opened by the A1 re-shape, and
+> re-closed 2026-08-05 fake-only by ruling — the dated notes on `floors.md` rows 19/21 are the
+> evidence.)* Fork rulings + build record:
 > the two dated 2026-07-27 entries in `decisions.md` and the five 2026-07-27 session-log
 > entries in `session-log.md` (they lived in `status.md` until the 2026-07-28 split).
 
@@ -80,8 +85,10 @@ register entry):
 (request models serialize exactly what Pydantic accepts; response models deserialize every field
 the service returns — the route pass-through ruling carried to the client).
 
-**Ten verbs as built** *(table corrected 2026-07-28: it was written before the forks were ruled
-and still said "six routes" — forks 1–3 added four more, all of which shipped in stage 0)*:
+**Eleven verbs as built** *(table corrected 2026-07-28: it was written before the forks were ruled
+and still said "six routes" — forks 1–3 added four more, all of which shipped in stage 0; row
+eleven added 2026-08-07 audit — `ReconstructionMetricsAsync` had joined 2026-07-29 with
+eval-harness stage 1 and the table was never updated)*:
 
 | Verb | Route | Errors surfaced |
 |---|---|---|
@@ -95,6 +102,7 @@ and still said "six routes" — forks 1–3 added four more, all of which shippe
 | `CreateAgentAsync` | `POST /v1/agents` (provisioning, fork 2) | 422 on an empty name |
 | `MemoryChainAsync` | `GET /v1/memories/{id}/chain` (fork 3, unscored) | 404 |
 | `AgentMemoriesAsync` | `GET /v1/agents/{id}/memories` (fork 3, unscored) | 404 |
+| `ReconstructionMetricsAsync` | `GET /v1/memories/{id}/reconstruction-metrics` (eval-harness stage 1, 2026-07-29; the third unscored-by-contract read) | 404 |
 
 HTTP errors map to typed exceptions (the Python service-error precedent — never swallowed,
 never retried silently). Timeouts are per-route config: `init` must tolerate the cold
@@ -225,7 +233,8 @@ held-out corpus arm rides item 3's eval build).
    present-empty vs populated, each visibly changing gate behavior in the returned
    instrumentation — and every response field of `DialogueTurnResult` / `IngestResult` /
    `CorrectionResult` / `SceneResult` / `PinResult` / `RetrievalResult` deserialized without
-   loss.
+   loss *(+ `ReconstructionMetricsResult` since 2026-07-29 — eval-harness stage 1; noted
+   2026-08-07 audit)*.
 3. **`NpcSession` bookkeeping parity with `app\session.py`**: driven by the same fixture
    sequence of turn results (loader / gated-fire productive / gated-fire fruitless / closed /
    directive present / dropped), the C# scene state matches the Python runner's field-for-field,

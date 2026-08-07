@@ -261,8 +261,9 @@ The gate is a stage inside the existing read seam — no new route, no new event
 - **Dialogue seam** (`app\dialogue.py`): pass-through of the new fields; the `[memories]`
   prompt block becomes the scene's loaded set in stable append-only order, gate-fetched items
   under a marked recollection sub-header (`[SETTLE-AT-BUILD]` exact block text) — the
-  structure prompt caching later attaches to. `assemble_system_prompt` stays a pure function;
-  block order stays walker-assertable. Floor re-opens; walker re-runs.
+  structure prompt caching later attaches to. `assemble_system_prompt` *(renamed
+  `assemble_prose_prompt` at the 2026-07-21 split-brain build; noted 2026-08-07 audit)* stays a
+  pure function; block order stays walker-assertable. Floor re-opens; walker re-runs.
 - **Retrieval** (`app\retrieval.py` + `app\gate.py` + `app\db.py`): the gate stage in front
   of the probe; new keyed SQL `fetch_loaded_set` and degraded `fetch_entity_candidates`; the
   loader path **byte-identical to v1** — the parity claim the prior walkers prove. Floor
@@ -436,7 +437,8 @@ gate is non-LLM: no token or USD row exists for it.
   liveness at any instant; superseded fact rows keep their entities.
 - **Efficacy + aggregates.** The efficacy booleans populate per the ruled comparators; the
   load driver emits the `gate_check` series and the per-100-turn gate rows.
-- **Prompt structure assertable.** `assemble_system_prompt` stays pure; loaded-set order
+- **Prompt structure assertable.** `assemble_system_prompt` *(renamed `assemble_prose_prompt`,
+  2026-07-21 split-brain build; noted 2026-08-07 audit)* stays pure; loaded-set order
   stable; the marked recollection sub-block present exactly when gate-fetched items exist.
 - **Floors re-verified.** All seven prior walkers re-run on fresh scratch (expected deltas
   per the settle-tag); `longmem` pristine via the postgres MCP; floor-verifier **pass**.

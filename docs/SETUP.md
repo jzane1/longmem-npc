@@ -109,7 +109,7 @@ python -m app.serve
 
 Useful once it is up:
 
-- `http://127.0.0.1:8000/docs` — the generated OpenAPI surface (ten routes; `/ledger` is deliberately `include_in_schema=False`)
+- `http://127.0.0.1:8000/docs` — the generated OpenAPI surface (eleven routes; `/ledger` is deliberately `include_in_schema=False`)
 - `http://127.0.0.1:8000/ledger` — **The Ledger**, the browser inspector. Paste an agent UUID to
   see its memories, and click one to see the immutable observation beside both version chains
   with superseded rows greyed but present.
@@ -140,11 +140,11 @@ python -m app.load_driver
 
 Two systems, deliberately distinct — see `docs\README.md` for what each is for.
 
-**The suite** (55 scenarios, self-managing scratch DB, no arguments needed):
+**The suite** (86 scenarios, self-managing scratch DB, no arguments needed):
 
 ```powershell
 python -m pytest tests -q
-python -m pytest tests -q -m "not nlp"   # 48, the turn-end subset — seconds, not minutes
+python -m pytest tests -q -m "not nlp"   # 74, the turn-end subset — seconds, not minutes
 ```
 
 Postgres unreachable ⇒ every scenario skips loudly and the run exits green, by ruling.
