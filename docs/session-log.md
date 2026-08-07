@@ -1376,7 +1376,11 @@ session.
     standing grep-verify rule, fixed, the entry swept byte-clean; (v)
     `unity\Assets\Scenes\SampleScene.unity` sits dirty in the worktree (A1-removal
     serialization fallout from an Editor save, predates this session) — deliberately kept
-    OUT of the B2 commit, awaiting Jack's call.
+    OUT of the B2 commit, awaiting Jack's call. *Resolved same session:* Jack ruled Unity
+    an extension of the repo (the dated "Unity state is ordinary repo state" entry in
+    `decisions.md`); the scene diff was inspected (exactly the three stale A1 fields
+    dropped, `autoRun: 0` preserved), the Editor console verified clean, and the scene
+    committed in the wrap-up commit.
   - Nothing blocked; nothing abandoned. `agreement` and the real haiku-vs-sonnet-5
     (± thinking-off) `compare` are built and fake-verified but deliberately unrun in real
     mode — next session opens with Jack's labels → `agreement` vs the 0.6 bar → the first

@@ -65,6 +65,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [A1 split-brain removal + weights-on-speech — spec forks + build record — 2026-08-04](#a1-split-brain-removal--weights-on-speech--spec-forks--build-record--2026-08-04)
 - [Eval-harness stage 2 — session rulings + build record — 2026-08-05](#eval-harness-stage-2--session-rulings--build-record--2026-08-05)
 - [Eval-harness stage 3 — session rulings + build record — 2026-08-07](#eval-harness-stage-3--session-rulings--build-record--2026-08-07)
+- [Unity state is ordinary repo state — 2026-08-07](#unity-state-is-ordinary-repo-state--2026-08-07)
 
 ## Primary decisions
 
@@ -2703,3 +2704,23 @@ holds the verdicts.
 e2e 6/6 twice identical with the plain artifact judged-free; the exit-2 gate code-confirmed
 BEFORE provisioning; plumbing + compare + agreement all exercised; the real artifact re-read
 number-for-number; gold blind; `longmem` pristine, ledger 001-005, no scratch residue).
+
+## Unity state is ordinary repo state — 2026-08-07
+
+**Ruled (Jack, at B2 wrap-up).** Unity exists on this laptop solely to serve this project —
+treat the Unity project as an extension of the repo, never a surface preserved for other
+work: save, clean, edit, and commit Unity assets and scenes as the work needs, like any
+other tracked file.
+
+**Immediate consequence:** the dirty `unity\Assets\Scenes\SampleScene.unity` — A1-removal
+serialization fallout from an Editor save; three stale serialized fields dropped
+(`directiveFlashTarget`, `initialReputationSnapshot`, `actionVocabulary`) with `autoRun: 0`
+preserved — is committed rather than held out (it had been deliberately excluded from the
+B2 commit pending this call). Editor console verified clean at commit time.
+
+**Scope note:** the earlier per-session "scene NOT saved" clauses (the stage-2 Unity gate
+and A1 floor evidence cells) were verification-discipline snapshots of those sessions —
+proofs that the gate run itself perturbed nothing — not a standing keep-the-scene-pristine
+rule; they are superseded only to the extent anyone read them as one. Gate re-runs still
+avoid *incidental* scene writes during verification, but a deliberate, inspected scene save
+is now ordinary work.

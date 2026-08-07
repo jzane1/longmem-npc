@@ -526,7 +526,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NpcMemory.Unity.NpcDemoDriver
   npc: {fileID: 526319682}
-  directiveFlashTarget: {fileID: 1841877927}
   autoRun: 0
 --- !u!114 &526319682
 MonoBehaviour:
@@ -543,14 +542,9 @@ MonoBehaviour:
   baseUrl: http://127.0.0.1:8000
   autoProvision: 1
   agentIdOverride: 
-  initialReputationSnapshot: 0
   agentName: graybox-keeper
   seedIdentity: I keep the ford and remember who pays their toll.
   diagnosticityGoal: what threatens the ford
-  actionVocabulary:
-  - greet
-  - warn
-  - recall
   episodicTauSeconds: 604800
   semanticTauSeconds: 2592000
   phaseTag: unity
