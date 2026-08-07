@@ -87,7 +87,10 @@ variants are re-assessed once the judged-eval harness can score prose). Every mo
 integrator knob with its own env var — nothing is hardcoded. **Six vars exist today** and real
 mode requires all six: `LONGMEM_MODEL_` + `IMPORTANCE`, `RENDER`, `TYPOLOGY`, `ESCALATION`,
 `DIALOGUE`, `RECONSTRUCTION`. *(The `BEHAVIOR` role — seven vars, 2026-07-21 to 2026-08-04 —
-left with the A1 re-shape.)*
+left with the A1 re-shape.)* A seventh var, `LONGMEM_MODEL_JUDGE` (Opus-4.8-class by the
+2026-08-07 B2 ruling), is **eval-runner-only**: loaded in both modes, required by neither —
+the server never carries a judge; the eval runner validates it itself on judged runs
+(eval-harness.md stage 3).
 
 One honest limit on "each upgrades independently" *(corrected 2026-07-28 — the sentence
 previously over-claimed)*: v1 serves importance + render + typology from **one** write call, so

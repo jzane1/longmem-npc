@@ -1334,6 +1334,54 @@ session.
     1.0` + `decay_k_importance: 0.0`), not by mining probe text; recorded as build latitude.
     Nothing blocked; nothing abandoned. Next session: Phase B2, the judge layer.
 
+- **2026-08-07 — Phase B2: eval-harness stage 3, the judge layer (Fable 5).**
+  - **Landed:** stage 3 built to the spec contract with one API-forced correction,
+    floor-verified (the twenty-third `floors.md` row; the dated B2 `decisions.md` entry
+    records the four plan-approval rulings — **Opus 4.8 judge** (the spec's sonnet-class
+    recommendation would have self-graded the sonnet arm of the first real compare), the
+    `LONGMEM_DIALOGUE_THINKING` knob built now (the queued "measure or drop" resolves to
+    measure), the smoke+gold sequencing, the three spec knobs as recommended — plus the
+    build latitude). The pieces: config (`LONGMEM_MODEL_JUDGE` loaded-never-required — the
+    2026-07-29 ruling as Set I's regression test — `LONGMEM_JUDGE_MAX_TOKENS`, the thinking
+    knob, judge prices, all on the override allowlist); providers (Fake/Real judge +
+    failure fakes + standalone `build_judge_provider`; the real judge runs adaptive
+    thinking with NO sampling params — the spec's "temperature 0" was unimplementable on
+    the 4.7+ API, corrected in place, dated); the pure `app\eval_judge.py` (four versioned
+    rubrics, pydantic verdicts, position-swap combine with disagreement⇒tie, hand-rolled
+    kappa with honest-None, Pareto non-domination, blind gold rows); the runner's judged
+    pass (prose capture judged-only, per-item `judge_failed`, judge ms/tokens/USD at the
+    seam, the `models` provenance stamp) + three verbs (`compare` over arm-overlay JSON
+    files, `emit-gold`, `agreement --kappa-bar 0.6`); fixtures (`judged.jsonl` — 8
+    scenarios, 24 sf + 24 abstention with a true-premise control per trio; three committed
+    arm files incl. `sonnet5-thinking-off`); suite Set I (14; suite 72 → 86, keyless
+    61 → 74).
+  - **The ruled single real judged smoke** (~$0.58 of the $2 budget; judge $0.398,
+    36,784/8,574 tokens, ~2.8 s/verdict): 12 scenarios / 62 turns / 44 observes /
+    0 degraded, 6/6 structural checks, **0 judge_failed across all 78 verdict items** —
+    sf 18/24, abstention 23/24, faithfulness 88/89 facts + 63 fabricated-claim flags
+    (7 never-reconstructed memories honestly skipped). *Pre-agreement readings, not yet
+    quotable.* The instrument earned itself on run one: lexical gist-precision 0.765 vs
+    the judge's semantic support 0.9888 — the paraphrase-slack gap the spec predicted —
+    and 63 judged embellishment flags where the lexical entity-detector saw 2. `emit-gold`
+    produced `data\eval\gold\candidates-2026-08-07.jsonl` — **78 blind rows (24/24/30)
+    awaiting Jack's labels**.
+  - **Honest notes:** (i) the spec's "temperature 0" and "seven-role" wordings were both
+    stale/unimplementable — corrected in place, dated, with the supersede noted in the
+    decisions entry; (ii) `docs\test-suite.md` had not been touched since stage 1 (no
+    Set H section, 63/53 counts) — that propagation debt cleared this session alongside
+    Set I's section; (iii) the session was interrupted mid-fixtures by an external task
+    and resumed clean (the Unity MCP bridge disconnected in the gap — irrelevant, B2
+    touches nothing Unity-side); (iv) a heredoc doc-append corrupted one path in the
+    decisions entry with a BELL byte (the fifth bite of the known trap) — caught by the
+    standing grep-verify rule, fixed, the entry swept byte-clean; (v)
+    `unity\Assets\Scenes\SampleScene.unity` sits dirty in the worktree (A1-removal
+    serialization fallout from an Editor save, predates this session) — deliberately kept
+    OUT of the B2 commit, awaiting Jack's call.
+  - Nothing blocked; nothing abandoned. `agreement` and the real haiku-vs-sonnet-5
+    (± thinking-off) `compare` are built and fake-verified but deliberately unrun in real
+    mode — next session opens with Jack's labels → `agreement` vs the 0.6 bar → the first
+    real `compare`, then B3 (stage 4, the fixed-gist ablation → R7's deciding data).
+
 
 ---
 

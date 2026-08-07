@@ -1,9 +1,12 @@
-"""eval_runner.py — the eval harness runner (eval-harness.md stage 2).
+"""eval_runner.py — the eval harness runner (eval-harness.md stages 2-3).
 
-Two verbs (PowerShell, from the repo root):
+Five verbs (PowerShell, from the repo root):
 
-    python -m app.eval_runner run --scenarios data\\eval\\scenarios\\smoke.jsonl
+    python -m app.eval_runner run --scenarios data\\eval\\scenarios\\smoke.jsonl [--judged]
     python -m app.eval_runner drift-validate --corpus data\\eval\\corpora\\drift-fixture.jsonl
+    python -m app.eval_runner compare --scenarios ... --arm-a data\\eval\\arms\\haiku.json --arm-b data\\eval\\arms\\sonnet5.json
+    python -m app.eval_runner emit-gold --artifact data\\eval\\runs\\run_....json --out data\\eval\\gold\\candidates.jsonl
+    python -m app.eval_runner agreement --gold data\\eval\\gold\\candidates.jsonl --artifact data\\eval\\runs\\run_....json
 
 `run` replays authored scenarios literally through `SessionRunner` — REPL
 parity: `as_of` sets the session attribute, a decay-basis re-freeze is an
@@ -30,6 +33,32 @@ runs the mechanics offline in fake mode with the report labeled
 `plumbing_only: true` (the stage-3 `--judged` labeling pattern). Exit 2 =
 refused mode gate.
 
+Stage 3 (`--judged`, the judge layer): a judged `run` additionally captures
+each utterance's prose, judges the fixture-authored selective_forgetting /
+abstention items and every reconstructed memory's faithfulness (rubrics +
+verdict models: app\\eval_judge.py; providers: app\\providers.py), and
+carries the judge's token/USD/latency accounting. A judge failure degrades
+PER ITEM (judge_failed) — it never kills a run and never changes the exit
+code, which stays structural-checks-only; judged numbers are quotable only
+past the agreement bar. The same real-mode gate as drift-validate applies
+(`--plumbing` for offline mechanics, report labeled plumbing_only).
+
+`compare` runs the same scenarios through two arm overlays — JSON files whose
+`env` block may vary the model roles, the dialogue thinking knob, and prices
+(each arm carries its OWN dialogue prices: USD from each model's own counts
+at its own rates — token columns are never comparable across models, ruled
+2026-07-29) but never the mode, database, keys, or judge. Two pid-scoped
+scratch DBs, sequential in-process runs; with `--judged`, paired turns are
+prose-judged pairwise with a position-swapped second call (disagreement =>
+tie) and the report closes with the Pareto table (accuracy vs
+perceived_first_word p50/p95 vs USD/100 turns, non-dominated rows marked).
+
+`emit-gold` projects a judged artifact into blind gold-candidate JSONL
+(verdicts stripped; `label: null` for hand-filling); `agreement` joins a
+hand-labeled gold file back against an artifact's verdicts and reports raw %
++ Cohen's kappa per category against the quotability bar (default 0.6). Both
+are offline file operations — no database, no providers, no mode gate.
+
 Nothing eval-related persists in Postgres (ruled: no migration); scratch
 databases are provisioned and dropped per invocation. Windows: both verbs run
 under a SelectorEventLoop (psycopg's async pool cannot run on the default
@@ -42,6 +71,7 @@ import argparse
 import asyncio
 import json
 import sys
+import time
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -49,9 +79,35 @@ from uuid import UUID
 
 from psycopg_pool import AsyncConnectionPool
 
-from app import db, reconstruction
-from app.config import REPO_ROOT, Settings, agent_knob, load_settings
+from app import db, eval_metrics, reconstruction
+from app.config import (
+    ENV_DIALOGUE_THINKING,
+    ENV_MODEL_DIALOGUE,
+    ENV_MODEL_ESCALATION,
+    ENV_MODEL_IMPORTANCE,
+    ENV_MODEL_RECONSTRUCTION,
+    ENV_MODEL_RENDER,
+    ENV_MODEL_TYPOLOGY,
+    PRICE_ENV_KEYS,
+    REPO_ROOT,
+    ConfigError,
+    Settings,
+    agent_knob,
+    load_env,
+    load_settings,
+)
 from app.db import build_pool
+from app.eval_judge import (
+    RUBRICS,
+    GoldItem,
+    cohen_kappa,
+    combine_pairwise,
+    gold_line,
+    load_gold,
+    pareto_non_dominated,
+    raw_agreement,
+    validate_verdict,
+)
 from app.eval_scenarios import (
     AsOfStep,
     ContextStep,
@@ -67,7 +123,14 @@ from app.eval_scenarios import (
     load_scenarios,
 )
 from app.load_driver import percentile
-from app.providers import Providers, build_providers
+from app.providers import (
+    JudgeProvider,
+    MalformedOutputError,
+    Providers,
+    ProviderCallError,
+    build_judge_provider,
+    build_providers,
+)
 from app.retrieval import RetrievalService
 from app.schemas import DialogueTurnResult, IngestResult
 from app.scratch_db import drop_scratch, pid_scoped_name, provision_scratch
@@ -105,9 +168,12 @@ def _cost_totals(
     settings: Settings,
     turns: list[DialogueTurnResult],
     observes: list[IngestResult],
+    judge_tokens: tuple[int, int] | None = None,
 ) -> dict:
     """Run-total tokens per model role; USD only when both prices are set
-    (the prices-optional -> None pattern, load_driver shape)."""
+    (the prices-optional -> None pattern, load_driver shape). `judge_tokens`
+    is None on non-judged runs — the judge row is then absent entirely, so
+    the no-judged cost block stays byte-identical to stage 2's."""
     prices = settings.prices
 
     def usd(t_in: int, t_out: int, key_in: str, key_out: str) -> float | None:
@@ -132,7 +198,7 @@ def _cost_totals(
         + sum(t.instrumentation.retrieval.embedding_tokens for t in turns)
         + sum(t.instrumentation.retrieval.reconstruction_embed_tokens for t in turns)
     )
-    return {
+    totals = {
         "dialogue": {
             "input_tokens": dialogue_in,
             "output_tokens": dialogue_out,
@@ -162,6 +228,30 @@ def _cost_totals(
             ),
         },
     }
+    if judge_tokens is not None:
+        judge_in, judge_out = judge_tokens
+        totals["judge"] = {
+            "input_tokens": judge_in,
+            "output_tokens": judge_out,
+            "usd": usd(judge_in, judge_out, "judge_in", "judge_out"),
+        }
+    return totals
+
+
+def _models_block(settings: Settings) -> dict:
+    """Arm/run provenance (stage 3): the resolved role names + the dialogue
+    thinking knob. Without this, two compare arms' artifacts are
+    indistinguishable after the fact. Fake mode resolves roles to "" — the
+    arm's overlay block carries the provenance there."""
+    return {
+        "provider_mode": settings.provider_mode,
+        "write": settings.model_write,
+        "escalation": settings.model_escalation,
+        "dialogue": settings.model_dialogue,
+        "reconstruction": settings.model_reconstruction,
+        "judge": settings.model_judge,
+        "dialogue_thinking": settings.dialogue_thinking,
+    }
 
 
 def _metrics_summary(memory_payloads: list[dict]) -> dict:
@@ -178,6 +268,192 @@ def _metrics_summary(memory_payloads: list[dict]) -> dict:
     summary["fabricated_entities_total"] = sum(
         len(m.get("fabricated_entities") or []) for m in memory_payloads
     )
+    return summary
+
+
+# ---------------------------------------------------------------------------
+# The judged pass (stage 3)
+# ---------------------------------------------------------------------------
+
+
+def _judge_one(
+    judge: JudgeProvider,
+    category: str,
+    template_kwargs: dict,
+    *,
+    n_facts: int = 0,
+) -> dict:
+    """One judge call + verdict validation, timed and token-accounted.
+
+    Returns the fragment merged into the item record. Any failure —
+    ProviderCallError, MalformedOutputError (tokens still accounted: the
+    spend happened), or a verdict-shape ValidationError — degrades to
+    judge_failed on this item alone; the run continues."""
+    rubric = RUBRICS[category]
+    user_content = rubric.user_template.format(**template_kwargs)
+    t0 = time.perf_counter()
+    fragment: dict = {"rubric_version": rubric.rubric_version}
+    try:
+        call = judge.judge(
+            system_prompt=rubric.system_prompt,
+            user_content=user_content,
+            category=category,
+            n_facts=n_facts,
+        )
+        verdict = validate_verdict(category, call.payload, n_facts=n_facts)
+        fragment.update(
+            judge_failed=False,
+            verdict=verdict.model_dump(),
+            input_tokens=call.input_tokens,
+            output_tokens=call.output_tokens,
+        )
+    except (ProviderCallError, MalformedOutputError, ValueError) as exc:
+        fragment.update(
+            judge_failed=True,
+            error=str(exc),
+            input_tokens=getattr(exc, "input_tokens", 0),
+            output_tokens=getattr(exc, "output_tokens", 0),
+        )
+    fragment["judge_ms"] = round((time.perf_counter() - t0) * 1000.0, 2)
+    return fragment
+
+
+async def _judge_utterance_items(
+    scenario_id: str, prose_records: list[dict], judge: JudgeProvider
+) -> list[dict]:
+    """The fixture-authored categories (selective_forgetting / abstention):
+    one judge call per utterance carrying a JudgedSpec. Display texts ride on
+    the item so emit-gold is a pure artifact projection."""
+    items: list[dict] = []
+    for record in prose_records:
+        spec = record.get("judged")
+        if not spec:
+            continue
+        category = spec["category"]
+        template_kwargs = {
+            "question": record["utterance"],
+            "reply": record["content"],
+            "reference": spec["reference"],
+        }
+        if category == "selective_forgetting":
+            template_kwargs["superseded"] = spec.get("superseded") or "(none)"
+        else:
+            template_kwargs["expected_behavior"] = spec["expected_behavior"]
+        fragment = await asyncio.to_thread(_judge_one, judge, category, template_kwargs)
+        items.append(
+            {
+                "item_id": f"{scenario_id}:{record['event_index']}",
+                "scenario_id": scenario_id,
+                "event_index": record["event_index"],
+                "category": category,
+                "question": record["utterance"],
+                "reply": record["content"],
+                "reference": spec["reference"],
+                "superseded": spec.get("superseded"),
+                "expected_behavior": spec.get("expected_behavior", "answer"),
+                "degraded": record["degraded"],
+                **fragment,
+            }
+        )
+    return items
+
+
+async def _judge_faithfulness_items(
+    scenario_id: str,
+    memory_ids: list[UUID],
+    memory_payloads: list[dict],
+    pool: AsyncConnectionPool,
+    judge: JudgeProvider,
+) -> tuple[list[dict], int]:
+    """reconstruction_faithfulness: one judge call per RECONSTRUCTED memory
+    (live_write_cause == "reconstruction" — the construct; anything else is
+    counted skipped, never silently judged). Inputs are assembled from the
+    same sources the stage-1 metric read uses (fetch_memory_chain +
+    fetch_reconstruction_sources + gist_fact_texts) — but ALL merged-span
+    facts go to the judge, with no lemma-measurability filter: that filter is
+    a lexical-metric artifact; the judge does semantic support (settle-at-
+    build, recorded in the B2 decisions entry)."""
+    items: list[dict] = []
+    skipped = 0
+    for ref, memory_id in enumerate(memory_ids):
+        if memory_payloads[ref].get("live_write_cause") != "reconstruction":
+            skipped += 1
+            continue
+        chain = await db.fetch_memory_chain(pool, memory_id)
+        source = (await db.fetch_reconstruction_sources(pool, [memory_id])).get(
+            memory_id
+        )
+        spans = (
+            source.spans
+            if source
+            else [(s["start_char"], s["end_char"]) for s in chain["gist_spans"]]
+        )
+        anchor_cause = source.anchor_cause if source else None
+        anchor_content = source.anchor_content if source else ""
+        facts = eval_metrics.gist_fact_texts(
+            chain["observation_text"], spans, anchor_cause, anchor_content
+        )
+        live = next((d for d in chain["details"] if d["is_live"]), None)
+        if not facts or live is None:
+            skipped += 1
+            continue
+        telling = live["content"]
+        facts_block = "\n".join(f"{i + 1}. {fact}" for i, fact in enumerate(facts))
+        fragment = await asyncio.to_thread(
+            _judge_one,
+            judge,
+            "reconstruction_faithfulness",
+            {"telling": telling, "facts": facts_block},
+            n_facts=len(facts),
+        )
+        items.append(
+            {
+                "item_id": f"{scenario_id}:mem{ref}",
+                "scenario_id": scenario_id,
+                "memory_ref": ref,
+                "category": "reconstruction_faithfulness",
+                "facts": facts,
+                "telling": telling,
+                **fragment,
+            }
+        )
+    return items, skipped
+
+
+def _judged_summary(items: list[dict]) -> dict:
+    """Per-category aggregates with honest-None rates (only categories that
+    produced items appear — a zero-item category has no rate to state)."""
+    summary: dict = {}
+    for category in ("selective_forgetting", "abstention"):
+        rows = [i for i in items if i["category"] == category]
+        if not rows:
+            continue
+        ok = [i for i in rows if not i["judge_failed"]]
+        passed = sum(1 for i in ok if i["verdict"]["verdict"] == "pass")
+        summary[category] = {
+            "items": len(rows),
+            "judge_failed": len(rows) - len(ok),
+            "passed": passed,
+            "failed": len(ok) - passed,
+            "pass_rate": round(passed / len(ok), 4) if ok else None,
+        }
+    rf = [i for i in items if i["category"] == "reconstruction_faithfulness"]
+    if rf:
+        ok = [i for i in rf if not i["judge_failed"]]
+        facts_total = sum(len(i["facts"]) for i in ok)
+        supported = sum(
+            sum(1 for flag in i["verdict"]["gist_supported"] if flag) for i in ok
+        )
+        summary["reconstruction_faithfulness"] = {
+            "items": len(rf),
+            "judge_failed": len(rf) - len(ok),
+            "facts_total": facts_total,
+            "facts_supported": supported,
+            "support_rate": round(supported / facts_total, 4) if facts_total else None,
+            "fabricated_claims_total": sum(
+                len(i["verdict"]["fabricated_claims"]) for i in ok
+            ),
+        }
     return summary
 
 
@@ -207,6 +483,8 @@ async def _run_one_scenario(
     k: int | None,
     all_turns: list[DialogueTurnResult],
     all_observes: list[IngestResult],
+    judge: JudgeProvider | None = None,
+    capture_prose: bool = False,
 ) -> dict:
     agent_id = await db.insert_agent(
         pool,
@@ -226,6 +504,7 @@ async def _run_one_scenario(
     )
     memory_ids: list[UUID] = []
     checks: list[dict] = []
+    prose_records: list[dict] = []
     turns = 0
     degraded = 0
     event_counts: dict[str, int] = {}
@@ -243,6 +522,16 @@ async def _run_one_scenario(
             turns += 1
             if result.instrumentation.degraded:
                 degraded += 1
+            if capture_prose:
+                prose_records.append(
+                    {
+                        "event_index": index,
+                        "utterance": event.text,
+                        "content": result.content,
+                        "degraded": result.instrumentation.degraded,
+                        "judged": (event.judged.model_dump() if event.judged else None),
+                    }
+                )
             if event.expect is not None:
                 outcome = check_expected(
                     event.expect,
@@ -269,7 +558,7 @@ async def _run_one_scenario(
         metrics = await retrieval.reconstruction_metrics(memory_id)
         memories.append({"memory_ref": ref, **metrics.model_dump(mode="json")})
     failed = sum(1 for c in checks if not c["passed"])
-    return {
+    report = {
         "scenario_id": scenario.scenario_id,
         "held_out": scenario.held_out,
         "agent_id": str(agent_id),
@@ -281,6 +570,18 @@ async def _run_one_scenario(
         "degraded_turns": degraded,
         "memories": memories,
     }
+    if capture_prose:
+        report["prose"] = prose_records
+    if judge is not None:
+        utterance_items = await _judge_utterance_items(
+            scenario.scenario_id, prose_records, judge
+        )
+        faith_items, skipped = await _judge_faithfulness_items(
+            scenario.scenario_id, memory_ids, memories, pool, judge
+        )
+        report["judged_items"] = utterance_items + faith_items
+        report["judged_skipped_not_reconstructed"] = skipped
+    return report
 
 
 async def run_scenarios(
@@ -289,11 +590,17 @@ async def run_scenarios(
     *,
     include_held_out: bool,
     k: int | None,
+    judged: bool = False,
+    judge: JudgeProvider | None = None,
 ) -> dict:
     """The `run` core, separable so the suite can drive it in-process on an
-    injected scratch Settings (the load_driver `run_driver` shape)."""
+    injected scratch Settings (the load_driver `run_driver` shape). With
+    `judged`, prose is captured and the judge pass runs; the defaults keep
+    every pre-stage-3 call site (and its artifact) byte-untouched."""
     included = [s for s in scenarios if include_held_out or not s.held_out]
     excluded = [s.scenario_id for s in scenarios if not include_held_out and s.held_out]
+    if judged and judge is None:
+        judge = build_judge_provider(settings)
     pool = build_pool(settings.database_uri)
     await pool.open()
     providers = build_providers(settings)
@@ -314,16 +621,28 @@ async def run_scenarios(
                     k=k,
                     all_turns=all_turns,
                     all_observes=all_observes,
+                    judge=judge if judged else None,
+                    capture_prose=judged,
                 )
             )
     finally:
         await pool.close()
     memory_payloads = [m for report in scenario_reports for m in report["memories"]]
-    return {
+    judged_items = [
+        item for r in scenario_reports for item in r.get("judged_items", [])
+    ]
+    judge_tokens: tuple[int, int] | None = None
+    if judged:
+        judge_tokens = (
+            sum(i["input_tokens"] for i in judged_items),
+            sum(i["output_tokens"] for i in judged_items),
+        )
+    report = {
         "verb": "run",
         "started_at": started.isoformat(),
         "finished_at": datetime.now(timezone.utc).isoformat(),
         "provider_mode": settings.provider_mode,
+        "models": _models_block(settings),
         "excluded_held_out": excluded,
         "scenarios": scenario_reports,
         "turns": len(all_turns),
@@ -336,10 +655,29 @@ async def run_scenarios(
         "cache_hits": sum(t.instrumentation.retrieval.cache_hits for t in all_turns),
         "metrics_summary": _metrics_summary(memory_payloads),
         "latency_ms": _latency_block(all_turns),
-        "cost": _cost_totals(settings, all_turns, all_observes),
+        "cost": _cost_totals(settings, all_turns, all_observes, judge_tokens),
         "checks_passed_total": sum(r["checks_passed"] for r in scenario_reports),
         "checks_failed_total": sum(r["checks_failed"] for r in scenario_reports),
     }
+    if judged:
+        report["plumbing_only"] = settings.provider_mode != "real"
+        report["judged"] = {
+            "rubric_versions": {
+                category: RUBRICS[category].rubric_version
+                for category in (
+                    "selective_forgetting",
+                    "abstention",
+                    "reconstruction_faithfulness",
+                )
+            },
+            "summary": _judged_summary(judged_items),
+            "items": judged_items,
+            "skipped_not_reconstructed": sum(
+                r.get("judged_skipped_not_reconstructed", 0) for r in scenario_reports
+            ),
+            "judge_ms_total": round(sum(i["judge_ms"] for i in judged_items), 2),
+        }
+    return report
 
 
 def _print_run_report(report: dict) -> None:
@@ -394,10 +732,61 @@ def _print_run_report(report: dict) -> None:
         f"\nchecks: {report['checks_passed_total']} passed, "
         f"{report['checks_failed_total']} failed"
     )
+    if "judged" in report:
+        _print_judged_block(report)
+
+
+def _print_judged_block(report: dict) -> None:
+    judged = report["judged"]
+    label = " [PLUMBING ONLY — fake providers]" if report.get("plumbing_only") else ""
+    print(f"\njudged ({judged['judge_ms_total']} ms total judge time){label}:")
+    for category, block in judged["summary"].items():
+        if category == "reconstruction_faithfulness":
+            rate = block["support_rate"]
+            print(
+                f"  {category:<28} {block['facts_supported']}/"
+                f"{block['facts_total']} facts supported "
+                f"({rate if rate is not None else '(null)'}), "
+                f"{block['fabricated_claims_total']} fabricated claim(s), "
+                f"{block['judge_failed']} judge_failed"
+            )
+        else:
+            rate = block["pass_rate"]
+            print(
+                f"  {category:<28} {block['passed']}/"
+                f"{block['passed'] + block['failed']} pass "
+                f"({rate if rate is not None else '(null)'}), "
+                f"{block['judge_failed']} judge_failed"
+            )
+    if judged["skipped_not_reconstructed"]:
+        print(
+            f"  (faithfulness skipped {judged['skipped_not_reconstructed']} "
+            "memory(ies) never reconstructed)"
+        )
+
+
+_JUDGED_GATE_MESSAGE = (
+    "judged runs require real provider mode — judged signal is only "
+    "meaningful on real prose. Pass --plumbing to exercise the mechanics "
+    "offline in fake mode (report labeled plumbing_only)."
+)
 
 
 def _cmd_run(args: argparse.Namespace) -> int:
     settings = load_settings()
+    judge = None
+    if args.plumbing and not args.judged:
+        print("--plumbing only applies to --judged runs.", file=sys.stderr)
+        return 2
+    if args.judged:
+        if settings.provider_mode != "real" and not args.plumbing:
+            print(_JUDGED_GATE_MESSAGE, file=sys.stderr)
+            return 2
+        try:
+            judge = build_judge_provider(settings)
+        except ConfigError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
     base_uri = args.database_uri or settings.database_uri
     scenarios = load_scenario_files(args.scenarios)
     name = args.database_name or pid_scoped_name("longmem_eval")
@@ -409,6 +798,8 @@ def _cmd_run(args: argparse.Namespace) -> int:
                 scenarios,
                 include_held_out=args.include_held_out,
                 k=args.k,
+                judged=args.judged,
+                judge=judge,
             ),
             loop_factory=asyncio.SelectorEventLoop,
         )
@@ -644,6 +1035,566 @@ def _cmd_drift_validate(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------------------
+# The `compare` verb (stage 3)
+# ---------------------------------------------------------------------------
+
+# An arm overlay may vary the SYSTEM UNDER TEST — model roles, the dialogue
+# thinking knob, and prices (each arm carries its own dialogue prices; USD
+# from each model's own counts at its own rates) — never the mode, database,
+# API keys, or the judge (the instrument must not vary between arms).
+_ARM_ALLOWED_KEYS = frozenset(
+    {
+        ENV_MODEL_IMPORTANCE,
+        ENV_MODEL_RENDER,
+        ENV_MODEL_TYPOLOGY,
+        ENV_MODEL_ESCALATION,
+        ENV_MODEL_DIALOGUE,
+        ENV_MODEL_RECONSTRUCTION,
+        ENV_DIALOGUE_THINKING,
+    }
+) | frozenset(PRICE_ENV_KEYS)
+
+
+def _load_arm(path: Path, base_env: dict[str, str]) -> dict:
+    """Parse one arm JSON file ({"name": ..., "env": {...}}) and resolve its
+    Settings by merging the overlay over the base env — load_settings reuses
+    every validation (role agreement, price parse, thinking values) for free."""
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    name = payload.get("name")
+    if not isinstance(name, str) or not name:
+        raise ValueError(f"{path}: arm file needs a non-empty string 'name'")
+    overlay = payload.get("env", {})
+    if not isinstance(overlay, dict):
+        raise ValueError(f"{path}: arm 'env' must be an object of env overrides")
+    unknown = set(overlay) - _ARM_ALLOWED_KEYS
+    if unknown:
+        raise ValueError(
+            f"{path}: arm overlay key(s) not allowed: {sorted(unknown)} — an "
+            "arm varies the system under test (model roles, dialogue "
+            "thinking, prices), never the mode, database, keys, or judge"
+        )
+    overlay = {key: str(value) for key, value in overlay.items()}
+    settings = load_settings({**base_env, **overlay})
+    return {"name": name, "overlay": overlay, "settings": settings}
+
+
+async def _judge_pairwise_items(
+    report_a: dict, report_b: dict, judge: JudgeProvider
+) -> list[dict]:
+    """Prose judged pairwise across arms: per paired turn, one call in true
+    order plus one position-swapped, combined with disagreement => tie."""
+
+    def prose_index(report: dict) -> dict[tuple[str, int], dict]:
+        return {
+            (s["scenario_id"], p["event_index"]): p
+            for s in report["scenarios"]
+            for p in s.get("prose", [])
+        }
+
+    index_b = prose_index(report_b)
+    rubric = RUBRICS["prose_pairwise"]
+    items: list[dict] = []
+    for scenario in report_a["scenarios"]:
+        for record_a in scenario.get("prose", []):
+            key = (scenario["scenario_id"], record_a["event_index"])
+            record_b = index_b.get(key)
+            if record_b is None:
+                continue
+
+            def call_pair(
+                _q: str = record_a["utterance"],
+                _a: str = record_a["content"],
+                _b: str = record_b["content"],
+            ) -> dict:
+                fragment: dict = {"rubric_version": rubric.rubric_version}
+                tokens_in = tokens_out = 0
+                t0 = time.perf_counter()
+                try:
+                    verdicts = []
+                    for reply_a, reply_b in ((_a, _b), (_b, _a)):
+                        call = judge.judge(
+                            system_prompt=rubric.system_prompt,
+                            user_content=rubric.user_template.format(
+                                question=_q, reply_a=reply_a, reply_b=reply_b
+                            ),
+                            category="prose_pairwise",
+                        )
+                        tokens_in += call.input_tokens
+                        tokens_out += call.output_tokens
+                        verdicts.append(
+                            validate_verdict("prose_pairwise", call.payload)
+                        )
+                    fragment.update(
+                        judge_failed=False,
+                        combined=combine_pairwise(verdicts[0], verdicts[1]),
+                    )
+                except (ProviderCallError, MalformedOutputError, ValueError) as exc:
+                    tokens_in += getattr(exc, "input_tokens", 0)
+                    tokens_out += getattr(exc, "output_tokens", 0)
+                    fragment.update(judge_failed=True, error=str(exc))
+                fragment.update(
+                    input_tokens=tokens_in,
+                    output_tokens=tokens_out,
+                    judge_ms=round((time.perf_counter() - t0) * 1000.0, 2),
+                )
+                return fragment
+
+            fragment = await asyncio.to_thread(call_pair)
+            items.append(
+                {
+                    "item_id": f"cmp:{key[0]}:{key[1]}",
+                    "scenario_id": key[0],
+                    "event_index": key[1],
+                    "category": "prose_pairwise",
+                    "question": record_a["utterance"],
+                    "reply_a": record_a["content"],
+                    "reply_b": record_b["content"],
+                    "degraded_either": record_a["degraded"] or record_b["degraded"],
+                    **fragment,
+                }
+            )
+    return items
+
+
+def _pairwise_summary(items: list[dict]) -> dict:
+    ok = [i for i in items if not i["judge_failed"]]
+    prefs = [i["combined"]["preference"] for i in ok]
+    mean_scores = None
+    if ok:
+        mean_scores = {
+            arm: {
+                dim: round(sum(i["combined"][arm][dim] for i in ok) / len(ok), 3)
+                for dim in ok[0]["combined"][arm]
+            }
+            for arm in ("a", "b")
+        }
+    return {
+        "pairs": len(items),
+        "judge_failed": len(items) - len(ok),
+        "a_wins": prefs.count("a"),
+        "b_wins": prefs.count("b"),
+        "ties": prefs.count("tie"),
+        "positions_agreed": sum(1 for i in ok if i["combined"]["positions_agreed"]),
+        "mean_scores": mean_scores,
+    }
+
+
+def _arm_accuracy(report: dict) -> float | None:
+    """The Pareto accuracy scalar: macro-mean over the non-None of structural
+    check pass rate + the judged per-category rates. Honest-None when nothing
+    was measurable."""
+    rates: list[float] = []
+    checks_total = report["checks_passed_total"] + report["checks_failed_total"]
+    if checks_total:
+        rates.append(report["checks_passed_total"] / checks_total)
+    summary = report.get("judged", {}).get("summary", {})
+    for category in ("selective_forgetting", "abstention"):
+        block = summary.get(category)
+        if block and block["pass_rate"] is not None:
+            rates.append(block["pass_rate"])
+    rf = summary.get("reconstruction_faithfulness")
+    if rf and rf["support_rate"] is not None:
+        rates.append(rf["support_rate"])
+    if not rates:
+        return None
+    return round(sum(rates) / len(rates), 4)
+
+
+def _total_usd(cost: dict) -> float | None:
+    """Sum of role USD; None as soon as any role with nonzero spend is
+    unpriced (an honest total, never a partial one presented as whole)."""
+    total = 0.0
+    for role, row in cost.items():
+        tokens = (
+            row["tokens"]
+            if role == "embedding"
+            else row["input_tokens"] + row["output_tokens"]
+        )
+        if row["usd"] is None:
+            if tokens:
+                return None
+            continue
+        total += row["usd"]
+    return round(total, 6)
+
+
+def _pareto_row(name: str, report: dict) -> dict:
+    turns = report["turns"]
+    total_usd = _total_usd(report["cost"])
+    latency = report["latency_ms"]["perceived_first_word"]
+    return {
+        "arm": name,
+        "accuracy": _arm_accuracy(report),
+        "p50": latency["p50"],
+        "p95": latency["p95"],
+        "usd_per_100_turns": (
+            round(total_usd * 100.0 / turns, 6)
+            if total_usd is not None and turns
+            else None
+        ),
+    }
+
+
+async def compare_scenarios(
+    arm_a: dict,
+    arm_b: dict,
+    scenarios: list[Scenario],
+    *,
+    include_held_out: bool,
+    k: int | None,
+    judged: bool,
+    judge: JudgeProvider | None,
+) -> dict:
+    """The `compare` core: both arms sequentially in-process (each on its own
+    scratch settings), then the pairwise prose pass and the Pareto table."""
+    started = datetime.now(timezone.utc)
+    report_a = await run_scenarios(
+        arm_a["settings"],
+        scenarios,
+        include_held_out=include_held_out,
+        k=k,
+        judged=judged,
+        judge=judge,
+    )
+    report_b = await run_scenarios(
+        arm_b["settings"],
+        scenarios,
+        include_held_out=include_held_out,
+        k=k,
+        judged=judged,
+        judge=judge,
+    )
+    pairwise = None
+    if judged and judge is not None:
+        items = await _judge_pairwise_items(report_a, report_b, judge)
+        pairwise = {
+            "rubric_version": RUBRICS["prose_pairwise"].rubric_version,
+            "summary": _pairwise_summary(items),
+            "items": items,
+            "judge_tokens": {
+                "input_tokens": sum(i["input_tokens"] for i in items),
+                "output_tokens": sum(i["output_tokens"] for i in items),
+            },
+        }
+    rows = [
+        _pareto_row(arm_a["name"], report_a),
+        _pareto_row(arm_b["name"], report_b),
+    ]
+    flags = pareto_non_dominated(rows)
+    report = {
+        "verb": "compare",
+        "started_at": started.isoformat(),
+        "finished_at": datetime.now(timezone.utc).isoformat(),
+        "provider_mode": arm_a["settings"].provider_mode,
+        "arms": [
+            {"name": arm_a["name"], "overlay": arm_a["overlay"], "report": report_a},
+            {"name": arm_b["name"], "overlay": arm_b["overlay"], "report": report_b},
+        ],
+        "pairwise": pairwise,
+        "pareto": [{**row, "non_dominated": flag} for row, flag in zip(rows, flags)],
+    }
+    if judged:
+        report["plumbing_only"] = arm_a["settings"].provider_mode != "real"
+    return report
+
+
+def _print_compare_report(report: dict) -> None:
+    plumbing = (
+        " [PLUMBING ONLY — fake providers]" if report.get("plumbing_only") else ""
+    )
+    print(
+        f"\ncompare — {report['arms'][0]['name']} vs {report['arms'][1]['name']} "
+        f"(provider mode: {report['provider_mode']}){plumbing}"
+    )
+    for arm in report["arms"]:
+        r = arm["report"]
+        print(
+            f"  {arm['name']:<26} checks {r['checks_passed_total']}/"
+            f"{r['checks_passed_total'] + r['checks_failed_total']}, "
+            f"{r['turns']} turns, {r['degraded_turns']} degraded"
+        )
+    pairwise = report.get("pairwise")
+    if pairwise:
+        s = pairwise["summary"]
+        print(
+            f"\nprose pairwise ({s['pairs']} pair(s), position-swapped, "
+            f"disagreement => tie): A {s['a_wins']}  B {s['b_wins']}  "
+            f"tie {s['ties']}  judge_failed {s['judge_failed']}  "
+            f"(positions agreed {s['positions_agreed']}/{s['pairs'] - s['judge_failed']})"
+        )
+        if s["mean_scores"]:
+            for arm_key, arm in zip(("a", "b"), report["arms"]):
+                dims = s["mean_scores"][arm_key]
+                shown = "  ".join(f"{dim} {val}" for dim, val in dims.items())
+                print(f"  {arm['name']:<26} {shown}")
+    print("\nPareto (accuracy vs perceived_first_word p50/p95 vs USD/100 turns):")
+    print(f"  {'arm':<26} {'accuracy':>9} {'p50':>9} {'p95':>9} {'USD/100t':>11}")
+    for row in report["pareto"]:
+
+        def show(value, money: bool = False) -> str:
+            if value is None:
+                return "(null)"
+            return f"${value}" if money else f"{value}"
+
+        marker = "  <- frontier" if row["non_dominated"] else ""
+        print(
+            f"  {row['arm']:<26} {show(row['accuracy']):>9} "
+            f"{show(row['p50']):>9} {show(row['p95']):>9} "
+            f"{show(row['usd_per_100_turns'], money=True):>11}{marker}"
+        )
+
+
+def _cmd_compare(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    judge = None
+    if args.plumbing and not args.judged:
+        print("--plumbing only applies to --judged runs.", file=sys.stderr)
+        return 2
+    if args.judged:
+        if settings.provider_mode != "real" and not args.plumbing:
+            print(_JUDGED_GATE_MESSAGE, file=sys.stderr)
+            return 2
+        try:
+            judge = build_judge_provider(settings)
+        except ConfigError as exc:
+            print(str(exc), file=sys.stderr)
+            return 2
+    base_env = load_env()
+    try:
+        arm_a = _load_arm(args.arm_a, base_env)
+        arm_b = _load_arm(args.arm_b, base_env)
+    except (ValueError, ConfigError, OSError) as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    scenarios = load_scenario_files(args.scenarios)
+    base_uri = args.database_uri or settings.database_uri
+    name_a = pid_scoped_name("longmem_eval_a")
+    name_b = pid_scoped_name("longmem_eval_b")
+    uri_a = provision_scratch(base_uri, name_a)
+    uri_b = provision_scratch(base_uri, name_b)
+    arm_a["settings"] = replace(arm_a["settings"], database_uri=uri_a)
+    arm_b["settings"] = replace(arm_b["settings"], database_uri=uri_b)
+    try:
+        report = asyncio.run(
+            compare_scenarios(
+                arm_a,
+                arm_b,
+                scenarios,
+                include_held_out=args.include_held_out,
+                k=args.k,
+                judged=args.judged,
+                judge=judge,
+            ),
+            loop_factory=asyncio.SelectorEventLoop,
+        )
+    finally:
+        if args.keep_db:
+            print(f"scratch databases kept: {name_a}, {name_b}")
+        else:
+            drop_scratch(base_uri, name_a)
+            drop_scratch(base_uri, name_b)
+    report["scenario_files"] = [str(p) for p in args.scenarios]
+    report["arm_files"] = [str(args.arm_a), str(args.arm_b)]
+    report["database_names"] = [name_a, name_b]
+    _print_compare_report(report)
+    out = _write_artifact(report, args.out or _default_artifact_path("compare"))
+    print(f"\ncompare artifact: {out}")
+    failed = sum(arm["report"]["checks_failed_total"] for arm in report["arms"])
+    return 0 if failed == 0 else 1
+
+
+# ---------------------------------------------------------------------------
+# The `emit-gold` and `agreement` verbs (stage 3; offline file operations)
+# ---------------------------------------------------------------------------
+
+
+def _iter_judged_artifact_items(artifact: dict):
+    """Every judged item in a run OR compare artifact, artifact order."""
+    judged = artifact.get("judged")
+    if judged:
+        yield from judged["items"]
+    for arm in artifact.get("arms", []):
+        arm_judged = arm["report"].get("judged")
+        if arm_judged:
+            yield from arm_judged["items"]
+    pairwise = artifact.get("pairwise")
+    if pairwise:
+        yield from pairwise["items"]
+
+
+def _gold_candidates(artifact: dict) -> tuple[list[GoldItem], int]:
+    """Project a judged artifact into blind gold candidates. Verdicts are
+    DELIBERATELY stripped (labels must be blind; item_id joins back to the
+    artifact where verdicts live); judge_failed items are skipped — they
+    carry no judge label to agree with."""
+    rows: list[GoldItem] = []
+    skipped_failed = 0
+    for item in _iter_judged_artifact_items(artifact):
+        if item.get("judge_failed"):
+            skipped_failed += 1
+            continue
+        category = item["category"]
+        version = item["rubric_version"]
+        if category in ("selective_forgetting", "abstention"):
+            rows.append(
+                GoldItem(
+                    item_id=item["item_id"],
+                    category=category,
+                    rubric_version=version,
+                    question=item["question"],
+                    reply=item["reply"],
+                    reference=item["reference"],
+                    superseded=item.get("superseded"),
+                    expected_behavior=item.get("expected_behavior"),
+                )
+            )
+        elif category == "reconstruction_faithfulness":
+            for i, fact in enumerate(item["facts"]):
+                rows.append(
+                    GoldItem(
+                        item_id=f"{item['item_id']}:fact{i}",
+                        category=category,
+                        rubric_version=version,
+                        fact=fact,
+                        telling=item["telling"],
+                    )
+                )
+        elif category == "prose_pairwise":
+            rows.append(
+                GoldItem(
+                    item_id=item["item_id"],
+                    category=category,
+                    rubric_version=version,
+                    question=item["question"],
+                    reply_a=item["reply_a"],
+                    reply_b=item["reply_b"],
+                )
+            )
+    return rows, skipped_failed
+
+
+def _cmd_emit_gold(args: argparse.Namespace) -> int:
+    artifact = json.loads(args.artifact.read_text(encoding="utf-8"))
+    rows, skipped_failed = _gold_candidates(artifact)
+    if not rows:
+        print(
+            f"{args.artifact}: no judged items — emit-gold needs a --judged "
+            "run or compare artifact.",
+            file=sys.stderr,
+        )
+        return 1
+    capped: list[GoldItem] = []
+    per_category: dict[str, int] = {}
+    dropped = 0
+    for row in rows:
+        count = per_category.get(row.category, 0)
+        if count >= args.limit_per_category:
+            dropped += 1
+            continue
+        per_category[row.category] = count + 1
+        capped.append(row)
+    args.out.parent.mkdir(parents=True, exist_ok=True)
+    args.out.write_text(
+        "".join(gold_line(row) + "\n" for row in capped), encoding="utf-8"
+    )
+    print(f"gold candidates: {args.out}")
+    for category, count in sorted(per_category.items()):
+        print(f"  {category:<28} {count}")
+    if dropped:
+        print(f"  (capped: {dropped} candidate(s) beyond --limit-per-category)")
+    if skipped_failed:
+        print(f"  (skipped {skipped_failed} judge_failed item(s) — no verdict)")
+    print('fill each row\'s "label" (blind — the artifact holds the verdicts).')
+    return 0
+
+
+def _judge_label_index(artifact: dict) -> dict[str, tuple[str, str]]:
+    """item_id -> (category, judge label) for agreement joining."""
+    labels: dict[str, tuple[str, str]] = {}
+    for item in _iter_judged_artifact_items(artifact):
+        if item.get("judge_failed"):
+            continue
+        category = item["category"]
+        if category in ("selective_forgetting", "abstention"):
+            labels[item["item_id"]] = (category, item["verdict"]["verdict"])
+        elif category == "reconstruction_faithfulness":
+            for i, supported in enumerate(item["verdict"]["gist_supported"]):
+                labels[f"{item['item_id']}:fact{i}"] = (
+                    category,
+                    "supported" if supported else "unsupported",
+                )
+        elif category == "prose_pairwise":
+            labels[item["item_id"]] = (category, item["combined"]["preference"])
+    return labels
+
+
+def _cmd_agreement(args: argparse.Namespace) -> int:
+    gold = load_gold(args.gold)
+    artifact = json.loads(args.artifact.read_text(encoding="utf-8"))
+    judge_labels = _judge_label_index(artifact)
+    pairs: dict[str, list[tuple[str, str]]] = {}
+    unlabeled = 0
+    unmatched = 0
+    for row in gold:
+        if row.label is None:
+            unlabeled += 1
+            continue
+        entry = judge_labels.get(row.item_id)
+        if entry is None or entry[0] != row.category:
+            unmatched += 1
+            continue
+        pairs.setdefault(row.category, []).append((row.label, entry[1]))
+    report = {
+        "verb": "agreement",
+        "gold": str(args.gold),
+        "artifact": str(args.artifact),
+        "kappa_bar": args.kappa_bar,
+        "unlabeled": unlabeled,
+        "unmatched": unmatched,
+        "categories": {},
+    }
+    print(
+        f"\nagreement — {sum(len(p) for p in pairs.values())} labeled pair(s) "
+        f"({unlabeled} unlabeled, {unmatched} unmatched) vs kappa bar "
+        f"{args.kappa_bar}"
+    )
+    all_pass = bool(pairs)
+    for category, category_pairs in sorted(pairs.items()):
+        human = [h for h, _ in category_pairs]
+        judge = [j for _, j in category_pairs]
+        raw = raw_agreement(human, judge)
+        kappa = cohen_kappa(human, judge)
+        passed = kappa is not None and kappa >= args.kappa_bar
+        all_pass = all_pass and passed
+        report["categories"][category] = {
+            "n": len(category_pairs),
+            "raw_agreement": round(raw, 4) if raw is not None else None,
+            "kappa": round(kappa, 4) if kappa is not None else None,
+            "passes_bar": passed,
+        }
+        kappa_text = (
+            f"{kappa:.4f}"
+            if kappa is not None
+            else "(undefined — degenerate marginals; rebalance the gold set)"
+        )
+        print(
+            f"  {category:<28} n {len(category_pairs):>3}  raw "
+            f"{raw:.4f}  kappa {kappa_text}  "
+            f"{'PASS' if passed else 'FAIL'}"
+        )
+    if not pairs:
+        print("  no labeled gold rows matched the artifact — nothing to score.")
+    if args.out is not None:
+        print(f"\nagreement report: {_write_artifact(report, args.out)}")
+    print(
+        "\njudged numbers are quotable"
+        if all_pass
+        else "\njudged numbers are NOT yet quotable (the agreement bar rules)"
+    )
+    return 0 if all_pass else 1
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
@@ -651,7 +1602,7 @@ def _cmd_drift_validate(args: argparse.Namespace) -> int:
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="python -m app.eval_runner",
-        description="longmem-npc eval runner (eval-harness.md stage 2)",
+        description="longmem-npc eval runner (eval-harness.md stages 2-3)",
     )
     verbs = parser.add_subparsers(dest="verb", required=True)
 
@@ -687,6 +1638,16 @@ def main() -> None:
         "--keep-db",
         action="store_true",
         help="skip the scratch drop for post-mortem inspection",
+    )
+    run_parser.add_argument(
+        "--judged",
+        action="store_true",
+        help="run the stage-3 judge pass (real mode, or --plumbing)",
+    )
+    run_parser.add_argument(
+        "--plumbing",
+        action="store_true",
+        help="allow --judged in fake mode; the report is labeled plumbing_only",
     )
     run_parser.set_defaults(func=_cmd_run)
 
@@ -728,6 +1689,95 @@ def main() -> None:
         help="allow fake provider mode; the report is labeled plumbing_only",
     )
     drift_parser.set_defaults(func=_cmd_drift_validate)
+
+    compare_parser = verbs.add_parser(
+        "compare",
+        help="A/B two arm overlays over the same scenarios (+ pairwise prose "
+        "and the Pareto table with --judged)",
+    )
+    compare_parser.add_argument(
+        "--scenarios",
+        type=Path,
+        action="append",
+        required=True,
+        help="scenario JSONL file (repeatable)",
+    )
+    compare_parser.add_argument(
+        "--arm-a", type=Path, required=True, help="arm A overlay JSON"
+    )
+    compare_parser.add_argument(
+        "--arm-b", type=Path, required=True, help="arm B overlay JSON"
+    )
+    compare_parser.add_argument(
+        "--out",
+        type=Path,
+        help="artifact path (default: data\\eval\\runs\\compare_<utc>_<pid>.json)",
+    )
+    compare_parser.add_argument("--database-uri", help="override .env DATABASE_URI")
+    compare_parser.add_argument(
+        "--include-held-out",
+        action="store_true",
+        help="also run scenarios marked held_out (excluded by default — "
+        "held-out stays out of tuning/compare runs)",
+    )
+    compare_parser.add_argument(
+        "--k", type=int, help="run-wide top-k for utterances without their own k"
+    )
+    compare_parser.add_argument(
+        "--keep-db",
+        action="store_true",
+        help="skip the scratch drops for post-mortem inspection",
+    )
+    compare_parser.add_argument(
+        "--judged",
+        action="store_true",
+        help="judge both arms + pairwise prose (real mode, or --plumbing)",
+    )
+    compare_parser.add_argument(
+        "--plumbing",
+        action="store_true",
+        help="allow --judged in fake mode; the report is labeled plumbing_only",
+    )
+    compare_parser.set_defaults(func=_cmd_compare)
+
+    gold_parser = verbs.add_parser(
+        "emit-gold",
+        help="project a judged artifact into blind gold-candidate JSONL",
+    )
+    gold_parser.add_argument(
+        "--artifact", type=Path, required=True, help="a --judged run/compare artifact"
+    )
+    gold_parser.add_argument(
+        "--out", type=Path, required=True, help="gold JSONL output path"
+    )
+    gold_parser.add_argument(
+        "--limit-per-category",
+        type=int,
+        default=30,
+        help="gold-candidate cap per category (default 30, fork 12)",
+    )
+    gold_parser.set_defaults(func=_cmd_emit_gold)
+
+    agreement_parser = verbs.add_parser(
+        "agreement",
+        help="hand labels vs judge verdicts: raw %% + Cohen's kappa per category",
+    )
+    agreement_parser.add_argument(
+        "--gold", type=Path, required=True, help="hand-labeled gold JSONL"
+    )
+    agreement_parser.add_argument(
+        "--artifact", type=Path, required=True, help="the judged artifact to score"
+    )
+    agreement_parser.add_argument(
+        "--kappa-bar",
+        type=float,
+        default=0.6,
+        help="quotability bar: kappa >= this per category (default 0.6, fork 5)",
+    )
+    agreement_parser.add_argument(
+        "--out", type=Path, help="also write the agreement report JSON"
+    )
+    agreement_parser.set_defaults(func=_cmd_agreement)
 
     args = parser.parse_args()
     sys.exit(args.func(args))

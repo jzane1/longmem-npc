@@ -68,6 +68,41 @@ class ExpectedIds(_StrictModel):
         return self
 
 
+class JudgedSpec(_StrictModel):
+    """The judged vocabulary for one utterance (eval-harness.md stage 3).
+
+    Two of the four judged categories are fixture-authored; the other two need
+    no fields here — reconstruction-faithfulness rides the memory chain and
+    prose-quality is pairwise over captured prose at compare time.
+
+    `reference` is the current truth the judge grades against: for
+    selective_forgetting, what the reply must convey (post-correction state);
+    for abstention, the true state that contradicts (or, for a true-premise
+    control, confirms) the question's premise. `superseded` (sf only) is the
+    pre-correction telling the reply must NOT assert. `expected_behavior`
+    "abstain" (abstention only) marks a question the NPC should decline to
+    answer from its memories.
+    """
+
+    category: Literal["selective_forgetting", "abstention"]
+    reference: str = Field(min_length=1)
+    superseded: str | None = None
+    expected_behavior: Literal["answer", "abstain"] = "answer"
+
+    @model_validator(mode="after")
+    def _category_rules(self) -> JudgedSpec:
+        if self.superseded is not None and self.category != "selective_forgetting":
+            raise ValueError(
+                "judged.superseded is only valid with category selective_forgetting"
+            )
+        if self.expected_behavior == "abstain" and self.category != "abstention":
+            raise ValueError(
+                "judged.expected_behavior 'abstain' is only valid with "
+                "category abstention"
+            )
+        return self
+
+
 class ObserveStep(_StrictModel):
     kind: Literal["observe"]
     text: str = Field(min_length=1)
@@ -78,6 +113,7 @@ class UtteranceStep(_StrictModel):
     text: str = Field(min_length=1)
     k: int | None = Field(default=None, ge=1)
     expect: ExpectedIds | None = None
+    judged: JudgedSpec | None = None
 
 
 class SceneStep(_StrictModel):

@@ -1,17 +1,23 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-08-05
-**Phase:** **Road to completion — Phase A and B1 are DONE; the next working session starts
-Phase B2 (the judge layer).**
+**Last updated:** 2026-08-07
+**Phase:** **Road to completion — Phases A, B1 and B2 are DONE. The next working session
+opens with Jack's gold labels → `agreement` vs the 0.6 kappa bar → the FIRST REAL `compare`
+(haiku vs sonnet-5 ± thinking-off, the queued 2026-07-29 check), then starts B3 (the
+fixed-gist ablation).** **Jack's offline task: hand-label the 78 blind rows in
+`data\eval\gold\candidates-2026-08-07.jsonl`** (fill each `"label"`: sf/abstention
+`pass|fail`, faithfulness `supported|unsupported` — from the gold file only, blind).
 The scope was consolidated 2026-08-04 into the phased roadmap below (dated "Scope consolidation
 + road-to-completion rulings" entry in `decisions.md`), and **A1 landed the same day** — the
 split-brain removal + weights-on-speech re-shape, floor-verified (the dated A1 entry in
 `decisions.md` records the four spec rulings + the seam contracts). The system is BUILT end to
 end on the FINAL seam — backend (one streaming prose call; a dialogue turn persists nothing;
 real mode six model roles), C# client (`NpcMemory.Core` + console harness, interop gate 24/24),
-Unity adapter + gray-box scene, The Ledger at `GET /ledger`, and eval-harness stages 1–2
-(the metric layer + the runner, `run`/`drift-validate` live) — **twenty-two floors stand
-verified** (`docs\floors.md`), schema frozen at migrations 001–005.
+Unity adapter + gray-box scene, The Ledger at `GET /ledger`, and eval-harness stages 1–3
+(the metric layer + the runner + the judge layer: `run --judged` / `drift-validate` /
+`compare` / `emit-gold` / `agreement` live; judge = Opus 4.8, eval-runner-only) —
+**twenty-three floors stand verified** (`docs\floors.md`), schema frozen at migrations
+001–005.
 The pending Unity Play-mode proof is **CLOSED (2026-08-05)**: fake-mode 8/8 GREEN through the
 bridge (clean in-engine compile, `longmem` pristine, scene not saved; fake-only by ruling —
 dated resolution notes on floors rows 19/21). The research
@@ -43,8 +49,8 @@ on-screen eval numbers are what survive the interview. The demo records real-pro
 
 ## Verified floors
 
-**Twenty-one floors stand verified.** The full table — layer, what it was verified against, and
-the date — lives in **`docs\floors.md`** (moved there 2026-07-28 so this living file stays
+**Twenty-three floors stand verified.** The full table — layer, what it was verified against,
+and the date — lives in **`docs\floors.md`** (moved there 2026-07-28 so this living file stays
 small enough to auto-load). That file states the counting convention; cite it rather than a
 number in prose.
 
@@ -98,10 +104,15 @@ believability didn't regress (the point of doing Phase B first).
   membership-only expected-IDs — and the build latitude). As planned: the runner —
   `provision_scratch`/`drop_scratch`, scenario schema + JSONL loader, the `run` +
   `drift-validate` verbs, the `drift_observer` capture seam (spec: `eval-harness.md`).
-- **B2. Eval-harness stage 3** — the judge: eval-runner-only judge role, four rubrics, the gold
-  set + agreement scoring, A/B `compare` with the accuracy-vs-latency-vs-USD Pareto table.
-  First real use: the queued dialogue-model prose-quality check (haiku vs sonnet-5 + the B2
-  thinking-off variants).
+- **B2. Eval-harness stage 3** — ✅ **LANDED 2026-08-07, floor-verified** (the twenty-third
+  floor row; the dated stage-3 entry in `decisions.md` records the session rulings — Opus
+  4.8 judge, the thinking knob built now, smoke+gold sequencing, kappa bar 0.6 / prose
+  dimensions / gold size as recommended — and the build latitude). As planned: the judge
+  layer — eval-runner-only judge role, four versioned rubrics, `emit-gold`/`agreement`,
+  `compare` with the Pareto table. The real judged smoke ran (~$0.58; 0 judge_failed in 78
+  verdicts, pre-agreement) and emitted the 78-row blind gold file. **Deliberately deferred
+  to next session (ruled):** the first real use — `agreement` on Jack's labels, then the
+  queued haiku-vs-sonnet-5 (± thinking-off) `compare`.
 - **B3. Eval-harness stage 4** — the fixed-gist ON/OFF ablation → **R7's deciding data → Jack's
   ruling**; a tuning follow-up only if the ruling changes the metric.
 

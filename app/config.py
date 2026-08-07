@@ -46,6 +46,18 @@ ENV_MODEL_ESCALATION = "LONGMEM_MODEL_ESCALATION"
 ENV_MODEL_DIALOGUE = "LONGMEM_MODEL_DIALOGUE"
 ENV_MODEL_RECONSTRUCTION = "LONGMEM_MODEL_RECONSTRUCTION"
 ENV_PROVIDER_MODE = "LONGMEM_PROVIDER_MODE"
+# Eval-runner-only judge role (eval-harness.md stage 3, ruled 2026-07-29):
+# loaded in BOTH modes, required by NEITHER — the server/REPL never needs a
+# judge; the eval runner validates it itself when a judged run starts.
+ENV_MODEL_JUDGE = "LONGMEM_MODEL_JUDGE"
+# Dialogue thinking knob (B2 ruling 2026-08-07): "" (unset) omits the thinking
+# parameter from the real prose call entirely — today's request byte-for-byte;
+# "disabled" sends thinking={"type": "disabled"} (the sonnet-5 thinking-off
+# compare arm). Set per-arm via compare overlays, not globally.
+ENV_DIALOGUE_THINKING = "LONGMEM_DIALOGUE_THINKING"
+# Bounded max_tokens for judge calls (adaptive thinking spends against it).
+ENV_JUDGE_MAX_TOKENS = "LONGMEM_JUDGE_MAX_TOKENS"
+JUDGE_MAX_TOKENS_DEFAULT = 2048
 
 # Optional per-Mtok USD prices (CLI-harness build ruling, 2026-07-15): cost
 # fields carry token counts unconditionally; USD appears only when these are
@@ -60,6 +72,8 @@ PRICE_ENV_KEYS: dict[str, str] = {
     "LONGMEM_PRICE_RECONSTRUCTION_IN": "reconstruction_in",
     "LONGMEM_PRICE_RECONSTRUCTION_OUT": "reconstruction_out",
     "LONGMEM_PRICE_EMBEDDING": "embedding",
+    "LONGMEM_PRICE_JUDGE_IN": "judge_in",
+    "LONGMEM_PRICE_JUDGE_OUT": "judge_out",
 }
 
 # Service-level defaults, each overridable per agent via the same key in
@@ -228,6 +242,9 @@ def load_env(path: Path = ENV_PATH) -> dict[str, str]:
             ENV_MODEL_ESCALATION,
             ENV_MODEL_DIALOGUE,
             ENV_MODEL_RECONSTRUCTION,
+            ENV_MODEL_JUDGE,
+            ENV_DIALOGUE_THINKING,
+            ENV_JUDGE_MAX_TOKENS,
         }
         | set(PRICE_ENV_KEYS)
     )
@@ -247,6 +264,11 @@ class Settings:
     model_escalation: str = ""
     model_dialogue: str = ""  # the streaming prose role (the turn's only call)
     model_reconstruction: str = ""  # the batched retelling role (reconstruction.md)
+    # Eval-runner-only judge role: loaded both modes, required by neither
+    # (eval-harness.md stage 3; the runner validates on judged runs).
+    model_judge: str = ""
+    dialogue_thinking: str = ""  # "" omit param | "disabled" thinking-off arm
+    judge_max_tokens: int = JUDGE_MAX_TOKENS_DEFAULT
     anthropic_api_key: str = field(default="", repr=False)
     openai_api_key: str = field(default="", repr=False)
     defaults: dict[str, float] = field(default_factory=lambda: dict(SERVICE_DEFAULTS))
@@ -321,6 +343,30 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         if not openai_key:
             raise ConfigError("real mode requires OPENAI_API_KEY in .env.")
 
+    # Eval-runner-only fields, loaded in BOTH modes (never in the real-mode
+    # required list above — that absence is the stage-3 ruling as code).
+    model_judge = env.get(ENV_MODEL_JUDGE, "")
+    dialogue_thinking = env.get(ENV_DIALOGUE_THINKING, "")
+    if dialogue_thinking not in ("", "disabled"):
+        raise ConfigError(
+            f"{ENV_DIALOGUE_THINKING} must be unset or 'disabled', "
+            f"got {dialogue_thinking!r}."
+        )
+    raw_judge_max = env.get(ENV_JUDGE_MAX_TOKENS, "")
+    if raw_judge_max:
+        try:
+            judge_max_tokens = int(raw_judge_max)
+        except ValueError as exc:
+            raise ConfigError(
+                f"{ENV_JUDGE_MAX_TOKENS} must be an integer, got {raw_judge_max!r}."
+            ) from exc
+        if judge_max_tokens < 1:
+            raise ConfigError(
+                f"{ENV_JUDGE_MAX_TOKENS} must be >= 1, got {judge_max_tokens}."
+            )
+    else:
+        judge_max_tokens = JUDGE_MAX_TOKENS_DEFAULT
+
     prices: dict[str, float] = {}
     for env_key, price_key in PRICE_ENV_KEYS.items():
         raw = env.get(env_key, "")
@@ -338,6 +384,9 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         model_escalation=model_escalation,
         model_dialogue=model_dialogue,
         model_reconstruction=model_reconstruction,
+        model_judge=model_judge,
+        dialogue_thinking=dialogue_thinking,
+        judge_max_tokens=judge_max_tokens,
         anthropic_api_key=anthropic_key,
         openai_api_key=openai_key,
         prices=prices,

@@ -28,15 +28,39 @@ latitude in the dated `decisions.md` entry): `app\scratch_db.py` (the promoted
 `drift_refusals` self-check exact. Fake-mode e2e: 6/6 expected-IDs checks, byte-identical
 across runs.
 
+**BUILT (stage 3) — 2026-08-07.** The judge layer landed to the stage-3 contract paragraph
+with one dated API-forced correction (adaptive thinking / no sampling parameters in place of
+the unimplementable "temperature 0" — see the contract paragraph) and floor-verified (the
+twenty-third `floors.md` row; the four plan-approval rulings — **Opus 4.8 judge**, the
+thinking knob built now, the smoke+gold sequencing, the three spec knobs as recommended —
+plus build latitude in the dated 2026-08-07 `decisions.md` entry). The ruled single real
+judged smoke (`run --judged` over `smoke.jsonl` + `judged.jsonl`: 12 scenarios, 62 turns,
+44 observes, 0 degraded, 6/6 structural checks, total spend **≈ $0.58** of the $2 budget,
+judge $0.398 at 36,784/8,574 tokens): **0 `judge_failed` across all 78 verdict items** —
+selective-forgetting 18/24 pass, abstention 23/24, reconstruction-faithfulness 88/89 facts
+supported with **63 fabricated-claim flags** (7 never-reconstructed memories honestly
+skipped). *These judged readings are pre-agreement — quotable only once Jack's gold labels
+clear the kappa ≥ 0.6 bar (fork 5); the structural and cost numbers are quotable now.* The
+instrument's reason-to-exist showed up in its first run: strict-lexical gist-precision read
+**0.765** where the judge's semantic support read **0.9888** (the paraphrase-slack gap the
+spec predicted), and the judge flagged 63 embellishment claims where the lexical
+entity-detector saw 2. Gold candidates emitted blind to
+`data\eval\gold\candidates-2026-08-07.jsonl` (78 rows: 24/24/30, fact candidates capped at
+30 of 89); `agreement` + the first real `compare` (haiku vs sonnet-5 ± thinking-off, the
+queued 2026-07-29 deferral) open the next session once labels exist.
+
 ## The ruled shape
 
 1. **Judge model role from v1** (ruled 2026-07-20): `LONGMEM_MODEL_JUDGE` + judged categories
    beside the structural scenarios; judged signal is only meaningful in real provider mode, and
    the reports make that mechanical (`plumbing_only` labels under fake mode).
-2. **Judge role is eval-runner-only** (ruled 2026-07-29 at plan approval): server/REPL real mode
-   stays seven-role — `load_settings` does NOT require the judge var; the eval runner validates
-   it itself when a judged run starts. The judge provider is deliberately NOT a field on the
-   frozen `Providers` bundle.
+2. **Judge role is eval-runner-only** (ruled 2026-07-29 at plan approval): the server/REPL
+   real-mode required list is untouched — `load_settings` does NOT require the judge var; the
+   eval runner validates it itself when a judged run starts. The judge provider is deliberately
+   NOT a field on the frozen `Providers` bundle. *(Corrected in place 2026-08-07: this entry
+   originally said "stays seven-role" — written before the A1 re-shape removed the `behavior`
+   role on 2026-08-04. Real mode requires SIX roles; the ruling's substance — judge never among
+   them — is unchanged. The Set I config regression test asserts exactly that.)*
 3. **v1 judged categories = core 3 + prose quality** (ruled 2026-07-29): selective-forgetting
    (single/multi-hop, MemoryAgentBench 2507.05257 shape), abstention/false-premise
    (LongMemEval 2410.10813 / LME-V2 2605.12493 premise-awareness rubric), reconstruction-
@@ -177,17 +201,22 @@ Footer updated: the binding promise is now the binding.
   at the distance computation; `None` default ⇒ byte-identical behavior (the `on_reconstruct`
   shape). Scenario fixtures are authored realistic prose (the 79%-vs-0% escalation
   construct-validity lesson).
-- **Stage 3 — judge layer.** Config: `ENV_MODEL_JUDGE`, `LONGMEM_PRICE_JUDGE_IN/OUT`
+- **Stage 3 — judge layer. BUILT 2026-08-07** (banner above; built to this paragraph with the
+  one dated correction below). Config: `ENV_MODEL_JUDGE`, `LONGMEM_PRICE_JUDGE_IN/OUT`
   (`judge_in`/`judge_out`), `Settings.model_judge` loaded in both modes but absent from the
   real-mode required list (the ruling as a regression test). Providers: `FakeJudgeProvider`
-  (deterministic hash verdicts, plumbing only), `RealJudgeProvider` (temperature 0, bounded
-  max_tokens knob, `MalformedOutputError` with token accounting), standalone
-  `build_judge_provider(settings)`. Runner: per-category rubric constants with
+  (deterministic hash verdicts, plumbing only), `RealJudgeProvider` (adaptive thinking, no
+  sampling parameters, bounded max_tokens knob, `MalformedOutputError` with token accounting),
+  standalone `build_judge_provider(settings)`. Runner: per-category rubric constants with
   `rubric_version` tags; pydantic-validated verdicts; per-item `judge_failed` degradation;
   `--judged` refused in fake mode without `--plumbing`; `emit-gold`; `agreement` (raw % +
   kappa per category); `compare` (A/B over two env overlays; prose judged pairwise with
   position-swap, disagreement ⇒ tie); the Pareto table (accuracy vs `perceived_first_word`
-  p50/p95 vs USD/100 turns, non-dominated rows marked).
+  p50/p95 vs USD/100 turns, non-dominated rows marked). *(Corrected in place 2026-08-07: this
+  contract originally specced the real judge at "temperature 0" — unimplementable on the ruled
+  Opus-4.8-class judge, whose 4.7+ API rejects `temperature`/`top_p`/`top_k` outright. The
+  judge call runs adaptive thinking with no sampling parameters; the rubric's JSON-only output
+  contract carries determinism instead.)*
 - **Stage 4 — ablation rig.** `SERVICE_DEFAULTS["reconstruction_gist_constraint"] = 1.0` (the
   `gate_enabled` kill-switch shape, read via `agent_knob` inside serve() — no signature
   change); when 0.0, gist is blanked on **original-anchored** items and
@@ -209,16 +238,16 @@ until their stage builds.
 |---|---|---|
 | 1 | C# mirror vs dated exemption for the new wire model | **Mirror** (built, stage 1) — keeps the field-for-field attestation true; verified no mechanical parity gate exists either way |
 | 2 | `metric_gist_match_threshold` default | **1.0 strict** (built, stage 1) — paraphrase slack belongs to the judged category |
-| 3 | Judge model class | Open until stage 3 (env value is Jack's); recommendation: sonnet-class judge while dialogue ships haiku — avoids same-model self-grading |
-| 4 | Rubric text home | Recommendation: module constants with `rubric_version` tags (stage 3) |
-| 5 | Judge-agreement acceptance bar | Recommendation: kappa ≥ 0.6 per category before judged numbers are quotable (stage 3/4) |
+| 3 | Judge model class | **Opus 4.8** (`claude-opus-4-8`, ruled 2026-08-07) — the sonnet-class recommendation collided with the first real use (judging haiku vs sonnet-5 prose would self-grade the sonnet arm); an Opus judge grades neither arm's class. Env value in `.env`; verdicts are short, so absolute cost stays small |
+| 4 | Rubric text home | **Module constants with `rubric_version` tags** (built, stage 3) — `app\eval_judge.py` `RUBRICS`, versions sf-v1 / abst-v1 / rf-v1 / pp-v1 |
+| 5 | Judge-agreement acceptance bar | **Kappa ≥ 0.6 per category** (ruled 2026-08-07) — shipped as `agreement --kappa-bar` defaulting to 0.6; an undefined kappa (degenerate marginals) honestly fails the bar |
 | 6 | Metrics-route scoring target | **Live head only** (built, stage 1) — the Ledger shows the live telling; the runner walks chains itself |
 | 7 | Milestone run artifacts | **Gitignored runs + numbers quoted into dated doc entries** (built, stage 2) — `.gitignore` carries `data/eval/runs/`; the stage-2 banner quotes the real drift numbers |
 | 8 | conftest adoption of `provision_scratch` | **Deferred** (ruled at stage-2 build) — the suite's fixture spine stays byte-untouched; the shim keeps conftest + all seven walkers unmodified |
-| 9 | Prose-quality rubric dimensions | Open until stage 3 (naturalness / character-consistency / memory-grounding / brevity, 1–5, proposed) |
+| 9 | Prose-quality rubric dimensions | **Naturalness / character-consistency / memory-grounding / brevity, each 1–5** (ruled 2026-08-07; built as pp-v1) — plus an overall a/b/tie preference, position-swapped |
 | 10 | `drift-validate` corpus schema | **Subset of the scenario schema — one loader** (built, stage 2): observe/as_of only, `assert_corpus_shape` states the restriction |
 | 11 | Ablation OFF semantics on correction-anchored chains | Recommendation: exclude from ablation arms (stage 4); a third arm measuring exactly that is the alternative |
-| 12 | Gold-set size | Recommendation: ~20–30 items/category, emitted from the stage-3 real smoke |
+| 12 | Gold-set size | **~20–30 items/category** (ruled 2026-08-07) — `emit-gold --limit-per-category` defaults to 30; candidates emitted from the stage-3 real smoke, prose-pairwise gold arrives with the first real compare |
 
 Stage-1 physical shapes settled at build (the [SETTLE-AT-BUILD] latitude): the wire payload
 carries no `identity_version` (the identity document is a metric *input*, not an output; the
@@ -238,6 +267,28 @@ per invocation, fresh agent per scenario; exit codes (`run`: 0 checks green / 1 
 a plain coverage probe (coverage rides k, not wording); fixture scoring pinned by explicit
 config facts (`importance_norm_floor: 1.0` + `decay_k_importance: 0.0` neutralize
 hash-derived fake importance so expected-IDs cut on pure fake-embedding similarity).
+
+Stage-3 physical shapes settled at build (same latitude; the dated 2026-08-07 `decisions.md`
+entry records them with rationale): prose capture is **judged-runs-only** — the plain `run`
+artifact stays byte-untouched (the only all-runs addition is the `models` provenance block:
+resolved role names + the thinking knob, without which two compare arms are indistinguishable
+after the fact); faithfulness judges only memories whose `live_write_cause` is
+`reconstruction` (anything else is counted `skipped_not_reconstructed`, never silently judged)
+and sees **all** merged-span gist facts — no lemma-measurability filter (that filter is a
+lexical-metric artifact; the judge does semantic support); `LONGMEM_JUDGE_MAX_TOKENS` is a
+Settings/env knob (default 2048), not an `agent_knob` — service-scoped eval config, not
+per-agent policy; the `LONGMEM_DIALOGUE_THINKING` knob (`""` omits the thinking parameter —
+the pre-B2 request byte-for-byte; `"disabled"` sends thinking off) lands in the real prose
+provider now by ruling, so the queued thinking-off variant is expressible as a pure env
+overlay; a compare arm is a JSON file (`{"name", "env"}`) whose overlay may carry the six role
+vars, the thinking knob, and prices — mode, database, API keys, and the judge are refused (an
+arm varies the system under test, never the instrument), and each arm carries its own dialogue
+prices (the 2026-07-29 cross-model USD caveat honored by construction); judged outcomes never
+change `run`/`compare` exit codes (0/1 stays structural-checks-only; 2 = gate refusal), and
+judged numbers are quotable only past the agreement bar; `emit-gold` strips verdicts (labels
+are blind; `item_id` joins back to the artifact) and skips `judge_failed` items; pairwise
+prose is two calls per pair — true order plus position-swapped — combined with disagreement ⇒
+tie and per-arm scores averaged over both positions, `degraded_either` flagged.
 
 ## Done-when (stage 1 — the build's floor)
 

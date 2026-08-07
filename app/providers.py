@@ -37,7 +37,13 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from app.config import EMBEDDING_DIM, EMBEDDING_MODEL, Settings
+from app.config import (
+    EMBEDDING_DIM,
+    EMBEDDING_MODEL,
+    ENV_MODEL_JUDGE,
+    ConfigError,
+    Settings,
+)
 
 
 class ProviderCallError(RuntimeError):
@@ -144,6 +150,18 @@ class ReconstructionCallResult:
     output_tokens: int
 
 
+@dataclass(frozen=True)
+class JudgeCallResult:
+    """One judge verdict call's parsed output (eval-harness.md stage 3).
+    `payload` is the raw JSON object — semantic validation (the pydantic
+    verdict models) is the eval runner's job, so a shape mismatch degrades
+    per-item (judge_failed) rather than failing the call layer."""
+
+    payload: dict
+    input_tokens: int
+    output_tokens: int
+
+
 # ---------------------------------------------------------------------------
 # Interfaces
 # ---------------------------------------------------------------------------
@@ -200,6 +218,23 @@ class ReconstructionProvider(Protocol):
         user_content: str,
         items: list[ReconstructionItem],
     ) -> ReconstructionCallResult: ...
+
+
+class JudgeProvider(Protocol):
+    """The eval-runner-only judge call (eval-harness.md stage 3). Prompts are
+    fully assembled by the runner from app\\eval_judge.py's rubric constants;
+    `category` and `n_facts` ride structurally so the deterministic fake can
+    emit shape-conformant verdicts (the ReconstructionProvider `items`
+    precedent) — the real provider ignores both."""
+
+    def judge(
+        self,
+        *,
+        system_prompt: str,
+        user_content: str,
+        category: str,
+        n_facts: int = 0,
+    ) -> JudgeCallResult: ...
 
 
 # ---------------------------------------------------------------------------
@@ -348,6 +383,76 @@ class FakeReconstructionProvider:
         )
 
 
+class FakeJudgeProvider:
+    """Deterministic hash verdicts per category (eval-harness.md stage 3,
+    plumbing only): same inputs -> byte-identical payloads that validate under
+    app\\eval_judge.py's verdict models, so the runner's judged mechanics are
+    testable offline and keyless. Judged SIGNAL exists only in real mode —
+    plumbing runs are labeled plumbing_only by the runner."""
+
+    def judge(
+        self,
+        *,
+        system_prompt: str,
+        user_content: str,
+        category: str,
+        n_facts: int = 0,
+    ) -> JudgeCallResult:
+        marker = hashlib.sha256(
+            f"judge:{category}:{user_content}".encode()
+        ).hexdigest()[:8]
+        rationale = f"[fake judge] {marker}"
+        if category in ("selective_forgetting", "abstention"):
+            verdict = (
+                "pass"
+                if _stable_unit_float(user_content, f"judge:{category}") < 0.5
+                else "fail"
+            )
+            payload: dict = {"verdict": verdict, "rationale": rationale}
+        elif category == "reconstruction_faithfulness":
+            payload = {
+                # Biased ~0.8 supported: fake retellings hug their anchors, so
+                # a mostly-supported verdict is the realistic plumbing shape.
+                "gist_supported": [
+                    _stable_unit_float(user_content, f"judge:rf:{i}") < 0.8
+                    for i in range(n_facts)
+                ],
+                "fabricated_claims": [],
+                "rationale": rationale,
+            }
+        elif category == "prose_pairwise":
+
+            def scores(arm: str) -> dict:
+                return {
+                    dim: int(
+                        _stable_unit_float(user_content, f"judge:pp:{arm}:{dim}") * 5
+                    )
+                    + 1
+                    for dim in (
+                        "naturalness",
+                        "character_consistency",
+                        "memory_grounding",
+                        "brevity",
+                    )
+                }
+
+            pref_roll = _stable_unit_float(user_content, "judge:pp:pref")
+            preference = "a" if pref_roll < 0.4 else "b" if pref_roll < 0.8 else "tie"
+            payload = {
+                "a": scores("a"),
+                "b": scores("b"),
+                "preference": preference,
+                "rationale": rationale,
+            }
+        else:
+            raise ValueError(f"unknown judge category: {category!r}")
+        return JudgeCallResult(
+            payload=payload,
+            input_tokens=len(system_prompt.split()) + len(user_content.split()),
+            output_tokens=len(rationale.split()) + max(n_facts, 1),
+        )
+
+
 # --- failure-injection fakes (degradation ladder tests) --------------------
 
 
@@ -441,6 +546,24 @@ class DriftingReconstructionProvider:
             retellings={item.memory_id: text.strip() for item in items},
             input_tokens=len(system_prompt.split()) + len(user_content.split()),
             output_tokens=len(text.split()) * len(items),
+        )
+
+
+class FailingJudgeProvider:
+    """Judge-call failure: the affected item records judge_failed and the
+    judged run continues (per-item degradation, eval-harness.md stage 3)."""
+
+    def judge(self, **_kwargs) -> JudgeCallResult:
+        raise ProviderCallError("injected judge-call failure")
+
+
+class MalformedJudgeProvider:
+    """Call 'succeeds' but the verdict JSON is unparseable: the item degrades,
+    token spend accounted (the MalformedWriteProvider convention)."""
+
+    def judge(self, **_kwargs) -> JudgeCallResult:
+        raise MalformedOutputError(
+            "injected malformed judge output", input_tokens=7, output_tokens=3
         )
 
 
@@ -661,6 +784,16 @@ class RealEscalationProvider:
         )
 
 
+def _dialogue_thinking_kwargs(value: str) -> dict:
+    """The LONGMEM_DIALOGUE_THINKING knob's request shape (B2 ruling
+    2026-08-07): "" -> {} — the pre-B2 request byte-for-byte; "disabled" ->
+    the thinking-off arm (sonnet-5 accepts {"type": "disabled"}). Values are
+    validated at load_settings; nothing else can reach here."""
+    if value == "disabled":
+        return {"thinking": {"type": "disabled"}}
+    return {}
+
+
 class RealDialogueProvider:
     """Anthropic streaming PROSE call (built 2026-07-21; the dialogue turn's
     only model call since the A1 re-shape, 2026-08-04). Streams PURE PROSE —
@@ -681,6 +814,7 @@ class RealDialogueProvider:
 
         self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
         self._model = settings.model_dialogue
+        self._thinking_kwargs = _dialogue_thinking_kwargs(settings.dialogue_thinking)
 
     def stream_prose(self, *, system_prompt: str, utterance: str) -> Iterator[str]:
         t0 = time.perf_counter()
@@ -692,6 +826,7 @@ class RealDialogueProvider:
                 max_tokens=1024,
                 system=system_prompt,
                 messages=[{"role": "user", "content": utterance}],
+                **self._thinking_kwargs,
             ) as stream:
                 for text in stream.text_stream:
                     if not seen_first:
@@ -765,6 +900,61 @@ class RealReconstructionProvider:
         )
 
 
+class RealJudgeProvider:
+    """Anthropic judge call (eval-harness.md stage 3; B2 build 2026-08-07).
+    Eval-runner-only — never constructed by the service; build_judge_provider
+    is the sole entry. Opus-4.8-class by ruling (dialogue ships haiku, and the
+    first real compare's arms are haiku vs sonnet-5 — no same-model
+    self-grading). Adaptive thinking ON and NO sampling params: the 4.7+ API
+    rejects temperature/top_p/top_k outright, so the spec's original
+    "temperature 0" is unimplementable (dated correction in eval-harness.md);
+    the rubric's JSON-only contract carries determinism instead. max_tokens is
+    the LONGMEM_JUDGE_MAX_TOKENS knob — adaptive thinking spends against it."""
+
+    def __init__(self, settings: Settings):
+        import anthropic
+
+        self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        self._model = settings.model_judge
+        self._max_tokens = settings.judge_max_tokens
+
+    def judge(
+        self,
+        *,
+        system_prompt: str,
+        user_content: str,
+        category: str,
+        n_facts: int = 0,
+    ) -> JudgeCallResult:
+        try:
+            response = self._client.messages.create(
+                model=self._model,
+                max_tokens=self._max_tokens,
+                thinking={"type": "adaptive"},
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_content}],
+            )
+        except Exception as exc:
+            raise ProviderCallError(f"judge call failed: {exc}") from exc
+        input_tokens = response.usage.input_tokens
+        output_tokens = response.usage.output_tokens
+        try:
+            payload = json.loads(_lenient_json_text(_first_text_block(response)))
+            if not isinstance(payload, dict):
+                raise ValueError("judge output is not a JSON object")
+        except (ValueError, TypeError, json.JSONDecodeError) as exc:
+            raise MalformedOutputError(
+                f"judge output unparseable: {exc}",
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+            ) from exc
+        return JudgeCallResult(
+            payload=payload,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+
+
 class RealEmbeddingProvider:
     """OpenAI text-embedding-3-small @ 1536 (locked)."""
 
@@ -822,3 +1012,17 @@ def build_providers(settings: Settings) -> Providers:
         dialogue=FakeProseProvider(),
         reconstruction=FakeReconstructionProvider(),
     )
+
+
+def build_judge_provider(settings: Settings) -> JudgeProvider:
+    """Standalone judge selection (stage-3 ruling: the judge is NOT a field on
+    the frozen Providers bundle — the server never carries one). A real judged
+    run without the judge var is the runner-side loud error the spec assigns;
+    the var is otherwise loaded-never-required (load_settings)."""
+    if settings.provider_mode == "real":
+        if not settings.model_judge:
+            raise ConfigError(
+                f"a judged run in real mode requires {ENV_MODEL_JUDGE} in .env."
+            )
+        return RealJudgeProvider(settings)
+    return FakeJudgeProvider()

@@ -1,12 +1,15 @@
 # longmem-npc — Test suite spec
 
-**BUILT 2026-07-20 — 63 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation +
-hygiene + eval metrics; the Set A diegetic pair still lands with the dissonance mechanism). Count
-as of 2026-07-29: Set A 8, Set B 7, Set C 7, Set D 20, degradation 11, hygiene 2, **Set G eval
-metrics 8** — grown from the 38 built on 2026-07-20 by the route-contract scenarios that arrived
-with each later route, by the gap-closing and guard scenarios from the full-repo audit, and by the
-judge-free metric layer (eval-harness.md stage 1). **Ten carry the `nlp` marker**, so the
-turn-end subset runs **53**. Build rulings 2026-07-20
+**BUILT 2026-07-20 — 86 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation +
+hygiene + eval metrics + eval runner + judge; the Set A diegetic pair still lands with the
+dissonance mechanism). Count as of 2026-08-07: Set A 8, Set B 7, Set C 7, Set D 20,
+degradation 11, hygiene 2, Set G eval metrics 8, **Set H eval runner 9** (stage 2, 2026-08-05),
+**Set I judge 14** (stage 3, 2026-08-07) — grown from the 38 built on 2026-07-20 by the
+route-contract scenarios that arrived with each later route, by the gap-closing and guard
+scenarios from the full-repo audit, and by the eval harness stages 1–3. **Twelve carry the
+`nlp` marker**, so the turn-end subset runs **74**. *(Counts corrected 2026-08-07 — this header
+had not been propagated since stage 1; the stage-2 Set H section below lands with the same
+correction.)* Build rulings 2026-07-20
 (dated `decisions.md` entry): the suite-gate Stop hook runs the `-m "not nlp"` subset (the 7
 `nlp`-marked scenarios call the write pass at the service level and pay the lazy
 spaCy+fastcoref load; the full suite runs on demand + at floor verification); Postgres
@@ -158,6 +161,52 @@ Eight scenarios in `tests\test_eval_metrics.py`, two layers matching the build:
 Judged and LLM-graded evals still do NOT live in this folder — they arrive with the eval
 *runner* (eval-harness.md stages 2–3) as a separate surface. This set is the metric
 *arithmetic* and the route, which are structural.
+
+## Set H — eval runner *(added 2026-08-05 with eval-harness.md stage 2; section written
+2026-08-07 clearing the propagation debt)*
+
+Nine scenarios in `tests\test_eval_runner.py` (8 unmarked + 1 `nlp`): the committed fixture
+census canary (fixture drift fails here, not at demo time); scenario-loader strictness
+(`extra="forbid"`, backward-only refs, tz-aware timestamps, `path:line` context, duplicate-id
+rejection); `check_expected` membership arithmetic; the product-DB hard refusal by NAME against
+a TEST-NET host (no dial-out) + the `scratch_uri` shim identity; the provision/drop round-trip
+(migrated to exactly the ledger's five); the `drift_observer` seam (default `None`, happy path,
+refusal path — attaching it perturbs nothing the Set C floor asserts); and the `run_scenarios`
+end-to-end in-process on scratch settings (`nlp` — drives the real write pass): report
+structure, honest-`None` ratios, keyless USD `None`, JSON-serializable artifact, and the
+no-eval-tables proof. Never asserts on prose.
+
+## Set I — the judge layer *(added 2026-08-07 with eval-harness.md stage 3)*
+
+Fourteen scenarios in `tests\test_set_i_judge.py` (13 unmarked + 1 `nlp`) — the stage-3
+MECHANICS with the deterministic fake judge, never judged signal (which is real-mode-only and
+quotable only past the agreement bar):
+
+- **The ruling as a regression test:** real mode loads WITHOUT `LONGMEM_MODEL_JUDGE` (never in
+  the required-roles list); both modes load it when present; judge prices and the
+  `LONGMEM_JUDGE_MAX_TOKENS` knob parse with loud `ConfigError`s.
+- **The thinking knob:** value validation (`""`/`"disabled"` only), the exact request-kwargs
+  shapes (`""` ⇒ `{}` — the pre-B2 call byte-for-byte), and the process-env override allowlist
+  for all three new keys.
+- **Fake-judge determinism** (byte-identical payloads, all four categories validate under the
+  verdict models); **verdict validation + per-item `judge_failed` degradation** (Malformed
+  carries its 7/3 token spend, Failing carries zero, the run continues); **rubric constants**
+  (four categories, unique version tags, the JSON-only output contract).
+- **Position-swap tie arithmetic** (un-swap, disagreement ⇒ tie, score averaging);
+  **hand-computed Cohen's kappa** (po 0.7 / pe 0.5 ⇒ exactly 0.4; perfect ⇒ 1.0; degenerate
+  marginals and empty inputs ⇒ honest `None`); **Pareto non-domination** incl. `None`-metric
+  incomparability.
+- **The `--judged` fake-mode gate** (exit 2 BEFORE any provisioning or file access);
+  **arm-overlay loading** (env-dict merge through `load_settings`; mode/database/key/judge
+  overrides refused; committed arm files as a canary); **the gold emit → label → agreement
+  round trip** (verdicts stripped — labels are blind; `judge_failed` skipped; hand-filled
+  labels reproduce the hand-computed kappa and the bar's exit codes); **judged fixture census**
+  (`judged.jsonl`: 8 scenarios, 24 sf + 24 abstention, every abstention trio carrying a
+  true-premise control for kappa balance).
+- **The compare plumbing end-to-end** (`nlp` — scratch settings, fake providers + fake judge):
+  stamped arm blocks, judged summaries incl. reconstruction-faithfulness on the aged probe's
+  retellings, deterministic pairwise verdicts, the Pareto table with honest-`None` USD,
+  `plumbing_only` label, JSON-serializable report. Never asserts on prose.
 
 ## Route contracts *(added as each route shipped; consolidated here 2026-07-28)*
 

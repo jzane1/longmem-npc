@@ -43,7 +43,8 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
   must name the SAME model (`load_settings` errors if they diverge — never a silent pick).
   Reflection's role arrives with reflection. The retrieval gate is non-LLM — there is no gate
   model. (`dialogue` streams pure prose — the dialogue turn's only model call; the `behavior`
-  role was removed by the A1 re-shape, 2026-08-04.)
+  role was removed by the A1 re-shape, 2026-08-04. A seventh var, `LONGMEM_MODEL_JUDGE`, is
+  eval-runner-only — loaded both modes, required by neither; B2, 2026-08-07.)
 - Python formatting: ruff, enforced mechanically by a PostToolUse hook. Don't hand-format.
 
 ## Invariants — never violate, regardless of how a task is worded

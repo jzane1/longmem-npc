@@ -64,6 +64,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Scope consolidation + road-to-completion rulings — 2026-08-04](#scope-consolidation--road-to-completion-rulings--2026-08-04)
 - [A1 split-brain removal + weights-on-speech — spec forks + build record — 2026-08-04](#a1-split-brain-removal--weights-on-speech--spec-forks--build-record--2026-08-04)
 - [Eval-harness stage 2 — session rulings + build record — 2026-08-05](#eval-harness-stage-2--session-rulings--build-record--2026-08-05)
+- [Eval-harness stage 3 — session rulings + build record — 2026-08-07](#eval-harness-stage-3--session-rulings--build-record--2026-08-07)
 
 ## Primary decisions
 
@@ -2609,3 +2610,96 @@ byte-identical).
 keyless 61, walkers 42 + 56, fake e2e 6/6 twice, plumbing 7/7 + the exit-2 refusal, the
 TEST-NET no-dial-out refusal proof, live `longmem` pristine, ledger exactly 001–005, no
 scratch DB left behind).
+## Eval-harness stage 3 — session rulings + build record — 2026-08-07
+
+**Context.** Phase B2 of the road-to-completion roadmap: eval-harness stage 3 — the judge
+layer — built to the 2026-07-29 spec's stage-3 contract paragraph with one API-forced
+correction (below). Four forks settled at plan approval (the AskUserQuestion batch; three
+recommended options taken, one re-recommended and taken).
+
+1. **The judge model is Opus 4.8** (`LONGMEM_MODEL_JUDGE=claude-opus-4-8`, fork 3). The
+   spec's sonnet-class recommendation collided with the judge's FIRST real use — the queued
+   haiku-vs-sonnet-5 prose check — where a sonnet judge would grade its own model's prose.
+   An Opus judge grades neither compare arm's class; verdict calls are short JSON, so the
+   higher rate stays small in absolute terms. **Rejected:** sonnet-class (self-preference on
+   the sonnet arm, mitigated only by position-swap/tie); haiku-class (self-grades the haiku
+   arm instead, and a weaker judge risks failing the kappa bar).
+
+2. **The dialogue thinking knob is built NOW** (`LONGMEM_DIALOGUE_THINKING`; the queued "B2
+   thinking-off variants — measure or drop" resolves to MEASURE). `compare` is specced as
+   "A/B over two env overlays," but thinking-off had no lever in code — the real prose
+   provider never sent a `thinking` parameter. The knob (`""` = the parameter omitted, the
+   pre-B2 request byte-for-byte; `"disabled"` = thinking off — sonnet-5 accepts it) makes
+   the variant expressible as a pure env overlay; committed arm file
+   `data\eval\arms\sonnet5-thinking-off.json`. **Rejected:** deferring the variants (leaves
+   the queued measurement blocked on another scoped task); dropping them (the lever is the
+   answer to "does sonnet-5 prose justify its latency?" if the pairwise verdict favors it).
+
+3. **Sequencing: build + verify + real judged smoke + emit-gold THIS session; Jack labels
+   offline; `agreement` + the real haiku-vs-sonnet `compare` open the next session.** The
+   gold set needs 78 hand labels before judged numbers are quotable, and the verbs are
+   built and fake-tested now either way. **Rejected:** everything-this-session (blocks
+   mid-session on Jack's labeling availability); build-only (defers the one real smoke whose
+   artifact IS the gold-candidate source).
+
+4. **The three remaining spec knobs as recommended:** agreement bar kappa >= 0.6 per
+   category, shipped as `agreement --kappa-bar` (default 0.6) — an undefined kappa
+   (degenerate marginals) honestly fails the bar (fork 5); prose-quality dimensions
+   naturalness / character-consistency / memory-grounding / brevity, each 1-5, plus an
+   overall a/b/tie preference (fork 9); gold-set size ~20-30 items/category via
+   `emit-gold --limit-per-category` default 30 (fork 12).
+
+**The API-forced spec correction (dated in place in `eval-harness.md`).** The stage-3
+contract specced the real judge at "temperature 0" — unimplementable on the ruled
+Opus-4.8-class judge: the 4.7+ API rejects `temperature`/`top_p`/`top_k` outright (400) and
+`budget_tokens` with them. `RealJudgeProvider` runs `thinking={"type": "adaptive"}` (verdict
+quality matters for the kappa bar; verdicts are short so the thinking spend is small) with NO
+sampling parameters; the rubric's JSON-only output contract carries determinism instead. The
+same pass corrects the spec's stale "seven-role" wording (written before A1 removed the
+behavior role): real mode requires six roles, the judge never among them — the substance of
+the 2026-07-29 eval-runner-only ruling is unchanged and now enforced by Set I's config
+regression test.
+
+**Build latitude (the stage-3 [SETTLE-AT-BUILD] shapes, recorded with rationale in the
+spec's settled-shapes paragraph):** prose capture is judged-runs-only — the plain `run`
+artifact stays byte-untouched (proven against stage 2's own comparison basis), with the one
+all-runs addition being the `models` provenance block (without it two compare arms are
+indistinguishable after the fact; `drift-validate` deliberately unstamped — its floor is
+byte-level); faithfulness judges only `live_write_cause == "reconstruction"` memories
+(others counted `skipped_not_reconstructed`) and sees ALL merged-span gist facts — no
+lemma-measurability filter, which is a lexical-metric artifact (the judge does semantic
+support); `LONGMEM_JUDGE_MAX_TOKENS` is a Settings/env knob (default 2048), not an
+`agent_knob` — service-scoped eval config, not per-agent policy; a compare arm is a JSON
+file `{"name", "env"}` whose overlay may vary the six role vars, the thinking knob, and
+prices — mode, database, API keys, and the judge are refused (an arm varies the system
+under test, never the instrument), and each arm carries its OWN dialogue prices, honoring
+the 2026-07-29 cross-model USD caveat by construction (sonnet-5's intro pricing through
+2026-08-31 is noted in the committed arm files; the billed rate is Jack's env choice);
+judged outcomes never change `run`/`compare` exit codes (structural-checks-only 0/1; 2 =
+the gate refusal, the drift-validate pattern); `emit-gold` strips verdicts (blind labeling;
+`item_id` joins back) and skips `judge_failed` items; pairwise prose is two calls per pair —
+true order + position-swapped — disagreement => tie, per-arm scores averaged over both
+positions, `degraded_either` flagged; Cohen's kappa is hand-rolled pure arithmetic (no
+sklearn dependency) with honest-None on empty/degenerate denominators; the `JudgeProvider`
+protocol carries `category`/`n_facts` structurally so the deterministic fake emits
+shape-conformant verdicts (the `ReconstructionItem` precedent — a mild wart, accepted).
+
+**The real judged smoke (the session's one intended real spend, ~$0.58 of the $2 budget).**
+`run --judged` over `smoke.jsonl` + `judged.jsonl` (12 scenarios, 62 turns, 44 observes,
+0 degraded, 6/6 structural checks): **0 `judge_failed` across all 78 verdict items** —
+selective-forgetting 18/24 pass, abstention 23/24, reconstruction-faithfulness 88/89 facts
+supported with 63 fabricated-claim flags; 7 never-reconstructed memories honestly skipped;
+judge spend 36,784/8,574 tokens ($0.398), ~2.8 s per verdict. *Pre-agreement readings —
+quotable only past the kappa bar.* The instrument's first run already earned it: lexical
+gist-precision 0.765 vs the judge's semantic support 0.9888 (the paraphrase-slack gap the
+spec predicted), and 63 judged embellishment flags where the lexical entity-detector saw 2.
+Gold candidates emitted blind to `data\eval\gold\candidates-2026-08-07.jsonl` (78 rows:
+24 sf / 24 abstention / 30 faithfulness facts of 89, fork-12 cap; prose-pairwise gold
+arrives with the first real compare) — Jack labels from the gold file only; the artifact
+holds the verdicts.
+
+**Floor:** the twenty-third `floors.md` row — independent floor-verifier pass, 12/12 (suite
+86 + keyless 74; walkers 53/56/42/51 with the other three byte-identical by git diff; fake
+e2e 6/6 twice identical with the plain artifact judged-free; the exit-2 gate code-confirmed
+BEFORE provisioning; plumbing + compare + agreement all exercised; the real artifact re-read
+number-for-number; gold blind; `longmem` pristine, ledger 001-005, no scratch residue).
