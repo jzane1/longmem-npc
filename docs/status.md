@@ -1,29 +1,20 @@
 # longmem-npc — Status
 
 **Last updated:** 2026-08-07
-**Phase:** **Road to completion — Phases A, B1 and B2 are DONE. The next working session
-opens with Jack's gold labels → `agreement` vs the 0.6 kappa bar → the FIRST REAL `compare`
-(haiku vs sonnet-5 ± thinking-off, the queued 2026-07-29 check), then starts B3 (the
-fixed-gist ablation).** **Jack's offline task: hand-label the 78 blind rows in
-`data\eval\gold\candidates-2026-08-07.jsonl`** (fill each `"label"`: sf/abstention
-`pass|fail`, faithfulness `supported|unsupported` — from the gold file only, blind).
-The scope was consolidated 2026-08-04 into the phased roadmap below (dated "Scope consolidation
-+ road-to-completion rulings" entry in `decisions.md`), and **A1 landed the same day** — the
-split-brain removal + weights-on-speech re-shape, floor-verified (the dated A1 entry in
-`decisions.md` records the four spec rulings + the seam contracts). The system is BUILT end to
-end on the FINAL seam — backend (one streaming prose call; a dialogue turn persists nothing;
-real mode six model roles), C# client (`NpcMemory.Core` + console harness, interop gate 24/24),
-Unity adapter + gray-box scene, The Ledger at `GET /ledger`, and eval-harness stages 1–3
-(the metric layer + the runner + the judge layer: `run --judged` / `drift-validate` /
-`compare` / `emit-gold` / `agreement` live; judge = Opus 4.8, eval-runner-only) —
-**twenty-three floors stand verified** (`docs\floors.md`), schema frozen at migrations
-001–005.
-The pending Unity Play-mode proof is **CLOSED (2026-08-05)**: fake-mode 8/8 GREEN through the
-bridge (clean in-engine compile, `longmem` pristine, scene not saved; fake-only by ruling —
-dated resolution notes on floors rows 19/21). The research
-track, the behavior/action side of split-brain (with reputation), graph memory, and the other
-cuts listed below are OUT by ruling. *(The pre-2026-08-04 phase narrative and the superseded
-queues/ledgers moved verbatim to `docs\session-log.md`'s archive.)*
+**Phase:** **Road to completion — Phases A and B1–B2 are DONE; next up: B3** (the roadmap
+below, consolidated 2026-08-04 — the dated "Scope consolidation + road-to-completion rulings"
+entry in `decisions.md`). **The next working session opens with Jack's gold labels →
+`agreement` vs the 0.6 kappa bar → the FIRST REAL `compare` (haiku vs sonnet-5 ± thinking-off,
+the queued 2026-07-29 check), then starts B3 (the fixed-gist ablation).** **Jack's offline
+task: hand-label the 78 blind rows in `data\eval\gold\candidates-2026-08-07.jsonl`** (fill
+each `"label"`: sf/abstention `pass|fail`, faithfulness `supported|unsupported` — from the
+gold file only, blind).
+The system is BUILT end to end on the final A1 seam — backend, C# client + console harness,
+Unity adapter + gray-box scene, The Ledger, eval-harness stages 1–3 — schema frozen at
+migrations 001–005. What is proven lives in `docs\floors.md`, why in `decisions.md`, the
+narrative in `session-log.md`; this file carries only what is live. *(Pruned back to that rule
+2026-08-07 — the audit found ruling-narrative re-accumulating here; the detail lives verbatim
+in those registers.)*
 
 This is the *living* file — update it at the end of every working session. `architecture.md`
 changes only when design changes; `decisions.md` is append-only.
@@ -81,36 +72,19 @@ believability didn't regress (the point of doing Phase B first).
 ### Phase A — Re-shape the dialogue seam — DONE
 
 - **A1. Split-brain removal + weights-on-speech.** ✅ **LANDED 2026-08-04, floor-verified**
-  (the twenty-first floor row; the dated A1 entry in `decisions.md` records the four spec
-  rulings — post-cut re-rank at the seam, recent-actions removed whole, provisioning stripped,
-  init-side `weight_overrides` removed — and the seam contracts: `items` = the raw retrieval
-  echo, `dialogue_view` = the weight-ranked prose view, loader-turn parity at all-1.0). One
-  pending proof: the Unity Play-mode gate re-run (see the phase header). Original scope, as
-  planned: strip the behavior call end to end: action
-  directive, reputation (delta emission + the in-place apply + wire fields + boundary snapshot +
-  C#/Unity callbacks), the divergence record, the `behavior` model role (real mode 7 → 6 roles).
-  Move `weight_overrides` to re-rank the view feeding the **prose** prompt — the surviving
-  hidden-weights idea (deliberately inverts the 2026-07-21 speak-honest/act-weighted design;
-  ruled). `agents.reputation` stays in the schema (applied migrations are immutable) but goes
-  unread. CLAUDE.md's role-count + reputation-carve-out wording updates in THIS session.
-  Re-verify the re-opened floors (dialogue/CLI walkers, suite, interop gate). *Why first: every
-  later measurement, client byte, and demo beat targets the final seam.*
+  (the twenty-first floor row; the dated A1 entry in `decisions.md` records the spec rulings,
+  the seam contracts, and the full strip list; the Unity Play-mode re-run closed 2026-08-05 —
+  dated resolution notes on floors rows 19/21). *Why first: every later measurement, client
+  byte, and demo beat targets the final seam.*
 
 ### Phase B — Finish the measurement rig (~3 sessions)
 
 - **B1. Eval-harness stage 2.** ✅ **LANDED 2026-08-05, floor-verified** (the twenty-second
-  floor row; the dated stage-2 entry in `decisions.md` records the session rulings — fake-only
-  gate re-run, drift-validate's real-mode gate + `--plumbing`, the ruled real run's numbers,
-  membership-only expected-IDs — and the build latitude). As planned: the runner —
-  `provision_scratch`/`drop_scratch`, scenario schema + JSONL loader, the `run` +
-  `drift-validate` verbs, the `drift_observer` capture seam (spec: `eval-harness.md`).
-- **B2. Eval-harness stage 3** — ✅ **LANDED 2026-08-07, floor-verified** (the twenty-third
-  floor row; the dated stage-3 entry in `decisions.md` records the session rulings — Opus
-  4.8 judge, the thinking knob built now, smoke+gold sequencing, kappa bar 0.6 / prose
-  dimensions / gold size as recommended — and the build latitude). As planned: the judge
-  layer — eval-runner-only judge role, four versioned rubrics, `emit-gold`/`agreement`,
-  `compare` with the Pareto table. The real judged smoke ran (~$0.58; 0 judge_failed in 78
-  verdicts, pre-agreement) and emitted the 78-row blind gold file. **Deliberately deferred
+  floor row; the dated stage-2 entry in `decisions.md` records the session rulings and build
+  latitude; spec: `eval-harness.md`).
+- **B2. Eval-harness stage 3.** ✅ **LANDED 2026-08-07, floor-verified** (the twenty-third
+  floor row; the dated stage-3 entry in `decisions.md` records the session rulings and build
+  latitude). The real judged smoke emitted the 78-row blind gold file. **Deliberately deferred
   to next session (ruled):** the first real use — `agreement` on Jack's labels, then the
   queued haiku-vs-sonnet-5 (± thinking-off) `compare`.
 - **B3. Eval-harness stage 4** — the fixed-gist ON/OFF ablation → **R7's deciding data → Jack's

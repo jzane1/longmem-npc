@@ -1414,6 +1414,14 @@ session.
     means re-buying the ~$0.58 judged smoke (surfaced, not acted on); (iv) Jack's in-progress
     gold labels were never touched and no per-row judge verdicts were surfaced anywhere in the
     audit output (blind preserved).
+  - *Post-report, same session:* Jack took the one judgment finding — `status.md` pruned back
+    to live-state-only (−26 net lines of re-accumulated ruling-narrative: the phase header
+    compressed to queue + pointers, the DONE A/B roadmap bullets shrunk to landed-pointers with
+    their *Why* rationale lines kept — ruling 7 of the 2026-08-04 scope entry names the roadmap
+    as the rationale's recorded home — and A1's stale "pending Unity proof" cross-reference
+    fixed in passing; every removed fact was verified present in `decisions.md` / `floors.md` /
+    this file before cutting). An application of the standing 2026-07-28 live-state-only rule,
+    not a new ruling — no decision-register entry. All eight audit findings now closed.
   - Nothing blocked; nothing abandoned.
 
 
