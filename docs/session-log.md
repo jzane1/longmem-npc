@@ -1424,6 +1424,59 @@ session.
     not a new ruling — no decision-register entry. All eight audit findings now closed.
   - Nothing blocked; nothing abandoned.
 
+- **2026-08-12 — The measurement line executed end to end under the gold-label workaround
+  (Fable 5, one long autonomous run; plan approved + four forks ruled by Jack at spec).**
+  - **The occasion:** Jack ruled he cannot make time to hand-label the 78 blind gold rows and
+    directed a workaround that keeps the line moving. Plan-mode exploration found a second,
+    independent blocker no labeler could fix: the judge-side marginals on the emitted
+    candidates are degenerate (rf 30/30 `supported`, abstention 23/24), so kappa was
+    undefined-or-zero by arithmetic regardless of who labeled. Both problems were ruled on at
+    plan approval (single blind model pass; a constructed-truth set; scope through B3;
+    fork 11 = exclude) — the two dated 2026-08-12 rulings entries plus the stage-4 build
+    record in `decisions.md`.
+  - **Landed (eight commits):** the rulings entry + the single-copy judged artifact preserved
+    tracked; the blind Fable-5 reference pass on all 78 naturals + the first `agreement`
+    (sf kappa 0.75 PASS, abstention 1.0 PASS — same single failure flagged by both raters —
+    rf honestly degenerate); the `judge-gold` verb (sixth) + Set I tests; the 34-row
+    constructed-truth set (authored by an isolated subagent, reviewed row-by-row, one
+    transcription slip caught in review) → the real Opus judge discriminated **every known
+    case correctly (rf kappa 1.0 n 18, abstention 1.0 n 16)** — every category now clears the
+    bar on at least one instrument, per-category quotability recorded; BOTH queued compares
+    (sonnet-5 prose judge-preferred 46–7 and 41–9 thinking-off; haiku alone under the 1 s bar
+    at 943 ms p50 vs 2626/2086 ms, ~20% cheaper; artifacts: A preserved tracked, B gitignored
+    with numbers quoted here per fork 7 — run B's accuracies 0.901/0.9738 vs run A's tied
+    0.9688s are single-run judged variance, stated as such); the pairwise gold round (30 rows,
+    position-shuffled blind labeling un-swapped at merge) whose `agreement` **failed the bar
+    honestly — kappa 0.37**, decomposed in the provenance sidecar (2 tie-protocol mismatches +
+    3 close-pair flips against 25/3/2 marginals) — pairwise judged numbers stay unquotable;
+    **B3 built, floor-verified (the twenty-fourth row, 7/7), and run real: R7's deciding data
+    — the drift budget is blind to the gist constraint (0 over-budget both arms, mean paired
+    |Δ| 0.056) while gist-precision drops 0.8335 → 0.7036.** Docs: stage-4 BUILT banner,
+    fork 11 ruled in the table, floors row 24, status re-pointed at the two open rulings.
+  - **Honest notes:** (i) the first compare-B attempt CRASHED ~6 min in — the real write model
+    emitted typology `observed|told`, nothing clamps model-emitted typology to vocabulary, and
+    the `memories_typology_check` CheckViolation killed the run (no artifact; scratch DBs
+    dropped cleanly by the `finally`); the retry passed; the robustness fork (clamp / re-ask /
+    degrade-per-observe) is chipped for its own scoped task and carried in `status.md`;
+    (ii) the intended fake dry-run of `judge-gold` ran REAL by the `.env` real-mode trap
+    (`--plumbing` permits fake, never forces it) — $0.16, join clean, kept as the real
+    measurement (recorded in the validation entry); (iii) `verify_reconstruction.py` first
+    failed with a 30 s `PoolTimeout` that turned out to be `longmem_test` MISSING entirely
+    (dropped at some point since the 2026-08-07 audit; psycopg_pool masks
+    database-does-not-exist) — recreated + migrated, walker 42/42 green; the walkers'
+    carried-item note in `status.md` records the bite; (iv) the heredoc backslash trap bit a
+    SIXTH time writing floors row 24 (`\r`/`\a`/`\t` costumes, the collapse CONSUMING the next
+    letter — `app<CR>econstruction`), and the lone CR additionally made `text=auto` refuse LF
+    normalization so one commit carried a CRLF blob; caught by the byte-audit ritual, repaired
+    via Write-tool scripts, blob re-normalized (zero-CR-at-HEAD restored, follow-up commit);
+    (v) total real spend ≈ $6.10 (constructed round $0.16 + compare A ≈ $2.5 + the crashed
+    partial + retry ≈ $3 + the judge-free ablation ≈ $0.4), inside the plan's $5–6.50 estimate
+    plus the crash's partial loss.
+  - **Blocked / for Jack:** R7's ruling (deciding data delivered); the dialogue-model
+    re-ruling (deciding data delivered; pairwise quotability caveat stated); the typology
+    robustness fork (chipped); pairwise gold quotability (needs Jack's labels or a
+    tie-aware two-pass reference protocol — surfaced, not self-ruled). Nothing abandoned.
+
 
 ---
 

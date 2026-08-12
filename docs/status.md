@@ -1,20 +1,23 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-08-07
-**Phase:** **Road to completion — Phases A and B1–B2 are DONE; next up: B3** (the roadmap
-below, consolidated 2026-08-04 — the dated "Scope consolidation + road-to-completion rulings"
-entry in `decisions.md`). **The next working session opens with Jack's gold labels →
-`agreement` vs the 0.6 kappa bar → the FIRST REAL `compare` (haiku vs sonnet-5 ± thinking-off,
-the queued 2026-07-29 check), then starts B3 (the fixed-gist ablation).** **Jack's offline
-task: hand-label the 78 blind rows in `data\eval\gold\candidates-2026-08-07.jsonl`** (fill
-each `"label"`: sf/abstention `pass|fail`, faithfulness `supported|unsupported` — from the
-gold file only, blind).
+**Last updated:** 2026-08-12
+**Phase:** **Road to completion — Phases A and B (B1–B3) are DONE.** (The roadmap below,
+consolidated 2026-08-04.) The 2026-08-12 session executed the full measurement line under the
+gold-label workaround ruling (Jack could not hand-label; the dated entries in `decisions.md`):
+reference labels + `agreement`, the constructed-truth `judge-gold` round, BOTH queued compares,
+the pairwise gold round, and the B3 ablation build + its real run. **Two rulings now await
+Jack, with their deciding data delivered: (1) R7 — the ablation proved the drift budget blind
+to the gist constraint (0 over-budget in both arms; gist-precision 0.8335 ON → 0.7036 OFF);
+(2) the dialogue model — sonnet-5 prose is judge-preferred 46–7 (and 41–9 thinking-off) but
+haiku alone meets the 1 s perceived-latency bar (943 ms vs 2626/2086 ms p50) at ~20% less
+cost; pairwise verdicts are NOT yet quotable (reference-label kappa 0.37 < 0.6 — the honest
+gap). After those rulings: Phase C1.** A production robustness gap found by the real runs is
+chipped for its own scoped task: model-emitted typology isn't clamped to vocabulary, and one
+malformed value (`observed|told`) killed a compare run at the DB check constraint.
 The system is BUILT end to end on the final A1 seam — backend, C# client + console harness,
-Unity adapter + gray-box scene, The Ledger, eval-harness stages 1–3 — schema frozen at
+Unity adapter + gray-box scene, The Ledger, eval-harness stages 1–4 — schema frozen at
 migrations 001–005. What is proven lives in `docs\floors.md`, why in `decisions.md`, the
-narrative in `session-log.md`; this file carries only what is live. *(Pruned back to that rule
-2026-08-07 — the audit found ruling-narrative re-accumulating here; the detail lives verbatim
-in those registers.)*
+narrative in `session-log.md`; this file carries only what is live.
 
 This is the *living* file — update it at the end of every working session. `architecture.md`
 changes only when design changes; `decisions.md` is append-only.
@@ -40,7 +43,7 @@ on-screen eval numbers are what survive the interview. The demo records real-pro
 
 ## Verified floors
 
-**Twenty-three floors stand verified.** The full table — layer, what it was verified against,
+**Twenty-four floors stand verified.** The full table — layer, what it was verified against,
 and the date — lives in **`docs\floors.md`** (moved there 2026-07-28 so this living file stays
 small enough to auto-load). That file states the counting convention; cite it rather than a
 number in prose.
@@ -53,9 +56,20 @@ re-openable: re-verifying one is a step, never an argument against a design impr
 - **R7 — the self-referential drift budget (logged 2026-07-22).** The reconstruction drift
   budget is cosine candidate-vs-anchor < 0.35; it cannot catch a retelling that stays under
   budget while dropping or contradicting a gist fact, or fabricating a never-observed detail.
-  Challenges the 2026-07-17 drift-metric/threshold ruling. **Now sequenced concretely: Phase
-  B3's fixed-gist ON/OFF ablation produces the deciding data** (the ablation survives the
-  research cut by explicit ruling); any metric/threshold change waits on it.
+  Challenges the 2026-07-17 drift-metric/threshold ruling. **The deciding data is DELIVERED
+  (2026-08-12, the stage-4 ablation's first real run): the budget is blind by construction —
+  unconstrained retellings drifted no further (mean paired |Δ| 0.056, 0 over-budget in either
+  arm) while gist-precision dropped 0.8335 → 0.7036.** The ruling — metric change, threshold
+  change, or the layered answer (budget for embedding drift + gist-precision/judged
+  faithfulness for content) — is Jack's; every candidate instrument now exists and is
+  validated (the dated stage-4 entry in `decisions.md`).
+- **The dialogue-model re-ruling (queued 2026-07-29, data delivered 2026-08-12).** Both
+  compares ran: sonnet-5 prose is judge-preferred 46–7 (thinking-on) and 41–9 (thinking-off),
+  every prose dimension higher; haiku alone meets the 1 s perceived-first-word bar (943 ms
+  p50 vs 2626 / 2086 ms) at ~20% less cost, equal-or-mixed judged accuracy (0.9688/0.9688 run
+  A; 0.901/0.9738 run B — single-run judged variance). Caveat for the ruling: pairwise
+  verdicts are NOT quotable yet (reference-label kappa 0.37 < 0.6; direction agrees across
+  instruments). Haiku stands until Jack rules otherwise.
 
 **Recently closed** (pointers; full trail in `decisions.md`): the 2026-08-04 scope rulings
 (below); haiku ships as the dialogue role + quote embargo lifted (2026-07-29); reconstruction's
@@ -84,11 +98,15 @@ believability didn't regress (the point of doing Phase B first).
   latitude; spec: `eval-harness.md`).
 - **B2. Eval-harness stage 3.** ✅ **LANDED 2026-08-07, floor-verified** (the twenty-third
   floor row; the dated stage-3 entry in `decisions.md` records the session rulings and build
-  latitude). The real judged smoke emitted the 78-row blind gold file. **Deliberately deferred
-  to next session (ruled):** the first real use — `agreement` on Jack's labels, then the
-  queued haiku-vs-sonnet-5 (± thinking-off) `compare`.
-- **B3. Eval-harness stage 4** — the fixed-gist ON/OFF ablation → **R7's deciding data → Jack's
-  ruling**; a tuning follow-up only if the ruling changes the metric.
+  latitude). The real judged smoke emitted the 78-row blind gold file. The deferred first real
+  use ran 2026-08-12 under the workaround ruling: `agreement` (sf 0.75 / abst 1.0 / rf
+  degenerate-then-fixed-by-construction), the constructed-truth round (judge discrimination
+  kappa 1.0/1.0), and both queued compares.
+- **B3. Eval-harness stage 4.** ✅ **LANDED 2026-08-12, floor-verified** (the twenty-fourth
+  floor row; the dated workaround + build-record entries in `decisions.md`; stage-4 BUILT
+  banner in `eval-harness.md`). The fixed-gist ablation's first real run delivered **R7's
+  deciding data → Jack's ruling is the open item**; a tuning follow-up only if the ruling
+  changes the metric.
 
 *Why before components: three cheap sessions, additive forever after (new components just add
 scenario files), before/after believability numbers for every Phase C landing, and R7 settled
@@ -187,6 +205,14 @@ not vendored).
   migrate, nor drop, and three assertions in `verify_fact_correction.py` are DB-global counts.
   Giving them the suite's pid-scoped mechanism plus a `tests\run-walkers.ps1` runner is the
   right fix; it is a medium refactor of the verification apparatus itself, so it wants its own
-  scoped task rather than riding an audit. *(The other three 2026-07-28 carried items — the
-  auth honesty paragraph, the Unity MCP pin, the DLL staleness check — are now scheduled:
-  Phase F.)*
+  scoped task rather than riding an audit. *(Bite recorded 2026-08-12: the DB was found
+  MISSING — dropped at some point since the 2026-08-07 audit — and psycopg_pool masked
+  "database does not exist" as a 30 s `PoolTimeout`; recreated + migrated 001–005 in-session.)*
+  *(The other three 2026-07-28 carried items — the auth honesty paragraph, the Unity MCP pin,
+  the DLL staleness check — are now scheduled: Phase F.)*
+- **Write-path typology robustness (found 2026-08-12, chipped for its own task):** the real
+  write model can emit an out-of-vocabulary typology union (`observed|told`); nothing clamps
+  it before INSERT, so the `memories_typology_check` constraint fires and the exception kills
+  the whole run (it cost one compare run ~6 min of real spend; the retry passed). The fork —
+  clamp vs re-ask vs degrade-per-observe — is Jack's; production write-path code, settle at
+  spec.
