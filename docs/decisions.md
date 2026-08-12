@@ -71,6 +71,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Gold-label workaround + measurement-line rulings — 2026-08-12](#gold-label-workaround--measurement-line-rulings--2026-08-12)
 - [Judge validation numbers — the agreement bar rules — 2026-08-12](#judge-validation-numbers--the-agreement-bar-rules--2026-08-12)
 - [Eval-harness stage 4 — build record + R7's deciding data — 2026-08-12](#eval-harness-stage-4--build-record--r7s-deciding-data--2026-08-12)
+- [R7 resolved — the drift budget is a topic guard, not a fact guard — 2026-08-12](#r7-resolved--the-drift-budget-is-a-topic-guard-not-a-fact-guard--2026-08-12)
 
 ## Primary decisions
 
@@ -2876,3 +2877,33 @@ altering fixed facts. The candidate resolutions (metric change, threshold change
 layered answer — budget for embedding drift + gist-precision/judged faithfulness for
 content) are Jack's to weigh; every option's measurement instrument now exists and is
 validated.
+
+*(Ruled the same day — the entry below.)*
+
+## R7 resolved — the drift budget is a topic guard, not a fact guard — 2026-08-12
+
+**Ruled (Jack, on the stage-4 ablation's deciding data — the entry above).** The drift-budget
+check STAYS, mechanism and threshold unchanged (cosine candidate-vs-anchor, refuse past 0.35,
+the 2026-07-17 ruling's machinery intact) — but its CLAIM is re-scoped to what the ablation
+measured it to be: **a guard against wholesale nonsense and topic-swaps** (departure from the
+anchor's embedding neighborhood), never a guard for factual faithfulness. **Factual
+faithfulness is policed by the fact-survival measurement (the fixed gist constraint at
+generation + gist-precision at the metric read) and by the LLM judge (the judged faithfulness
+category, past the agreement bar).** Cheapest resolution; nothing changes at runtime; the
+documentation now states what each guard really covers.
+
+**Propagated the same day:** `architecture.md` §7's drift-budget paragraph (the scope-of-the-
+guard sentence with the ablation numbers), `reconstruction.md`'s "Write-back & drift budget"
+scope note, the `drift_budget_threshold` knob comment in `app\config.py` (the integrator-facing
+claim), the stage-4 banner in `eval-harness.md` (ruling recorded, "no tuning follow-up — the
+ruling changes documentation, not the metric"), and `status.md` (R7 moved from open questions
+to recently-closed). The 2026-07-17 drift-metric/threshold ruling is NOT superseded
+mechanically — only its implied coverage claim is corrected.
+
+**Rejected:** changing the metric (e.g., fact-survival gating write-backs at runtime — buys
+fact-level refusal at the cost of a lexical gate on every write-back, redundant with the gist
+constraint already steering generation); tightening the threshold (the ablation shows
+unconstrained retellings sit FAR under 0.35 — no threshold separates them, so tightening only
+manufactures false refusals on faithful retellings); dropping the budget (it still catches the
+failure class it was built for — wholesale nonsense, topic-swaps, and the degenerate-embedding
+fail-closed path).

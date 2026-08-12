@@ -1476,6 +1476,15 @@ session.
     re-ruling (deciding data delivered; pairwise quotability caveat stated); the typology
     robustness fork (chipped); pairwise gold quotability (needs Jack's labels or a
     tie-aware two-pass reference protocol — surfaced, not self-ruled). Nothing abandoned.
+  - *Post-wrap, same session:* **Jack ruled R7 on the delivered data** — the budget keeps its
+    mechanism and 0.35 threshold and is re-scoped as a TOPIC guard (wholesale
+    nonsense/topic-swaps); factual faithfulness is policed by fact-survival (gist constraint +
+    gist-precision) and the LLM judge; nothing changes at runtime. The dated "R7 resolved"
+    entry in `decisions.md` records it with the rejected alternatives; propagated to
+    `architecture.md` §7, `reconstruction.md`, the knob comment in `app\config.py`, the
+    stage-4 banner, and `status.md` (R7 → recently-closed; no tuning follow-up — the ruling
+    changed documentation, not the metric). The dialogue-model re-ruling remains the one open
+    item before Phase C1.
 
 
 ---

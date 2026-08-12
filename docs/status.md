@@ -5,13 +5,13 @@
 consolidated 2026-08-04.) The 2026-08-12 session executed the full measurement line under the
 gold-label workaround ruling (Jack could not hand-label; the dated entries in `decisions.md`):
 reference labels + `agreement`, the constructed-truth `judge-gold` round, BOTH queued compares,
-the pairwise gold round, and the B3 ablation build + its real run. **Two rulings now await
-Jack, with their deciding data delivered: (1) R7 — the ablation proved the drift budget blind
-to the gist constraint (0 over-budget in both arms; gist-precision 0.8335 ON → 0.7036 OFF);
-(2) the dialogue model — sonnet-5 prose is judge-preferred 46–7 (and 41–9 thinking-off) but
-haiku alone meets the 1 s perceived-latency bar (943 ms vs 2626/2086 ms p50) at ~20% less
-cost; pairwise verdicts are NOT yet quotable (reference-label kappa 0.37 < 0.6 — the honest
-gap). After those rulings: Phase C1.** A production robustness gap found by the real runs is
+the pairwise gold round, and the B3 ablation build + its real run. **R7 is RESOLVED (ruled
+2026-08-12, same day: the budget keeps its mechanism and threshold and is re-scoped as a
+topic guard — docs updated everywhere the claim lived). One ruling still awaits Jack, deciding
+data delivered: the dialogue model — sonnet-5 prose is judge-preferred 46–7 (and 41–9
+thinking-off) but haiku alone meets the 1 s perceived-latency bar (943 ms vs 2626/2086 ms p50)
+at ~20% less cost; pairwise verdicts are NOT yet quotable (reference-label kappa 0.37 < 0.6 —
+the honest gap). After that ruling: Phase C1.** A production robustness gap found by the real runs is
 chipped for its own scoped task: model-emitted typology isn't clamped to vocabulary, and one
 malformed value (`observed|told`) killed a compare run at the DB check constraint.
 The system is BUILT end to end on the final A1 seam — backend, C# client + console harness,
@@ -53,16 +53,6 @@ re-openable: re-verifying one is a step, never an argument against a design impr
 
 ## Open questions needing Jack's ruling
 
-- **R7 — the self-referential drift budget (logged 2026-07-22).** The reconstruction drift
-  budget is cosine candidate-vs-anchor < 0.35; it cannot catch a retelling that stays under
-  budget while dropping or contradicting a gist fact, or fabricating a never-observed detail.
-  Challenges the 2026-07-17 drift-metric/threshold ruling. **The deciding data is DELIVERED
-  (2026-08-12, the stage-4 ablation's first real run): the budget is blind by construction —
-  unconstrained retellings drifted no further (mean paired |Δ| 0.056, 0 over-budget in either
-  arm) while gist-precision dropped 0.8335 → 0.7036.** The ruling — metric change, threshold
-  change, or the layered answer (budget for embedding drift + gist-precision/judged
-  faithfulness for content) — is Jack's; every candidate instrument now exists and is
-  validated (the dated stage-4 entry in `decisions.md`).
 - **The dialogue-model re-ruling (queued 2026-07-29, data delivered 2026-08-12).** Both
   compares ran: sonnet-5 prose is judge-preferred 46–7 (thinking-on) and 41–9 (thinking-off),
   every prose dimension higher; haiku alone meets the 1 s perceived-first-word bar (943 ms
@@ -71,7 +61,12 @@ re-openable: re-verifying one is a step, never an argument against a design impr
   verdicts are NOT quotable yet (reference-label kappa 0.37 < 0.6; direction agrees across
   instruments). Haiku stands until Jack rules otherwise.
 
-**Recently closed** (pointers; full trail in `decisions.md`): the 2026-08-04 scope rulings
+**Recently closed** (pointers; full trail in `decisions.md`): **R7 — resolved 2026-08-12 on
+the stage-4 ablation's data** (the drift budget keeps its mechanism and 0.35 threshold and is
+re-scoped as a TOPIC guard — wholesale nonsense/topic-swaps; factual faithfulness is policed
+by gist-precision (fact survival) and the judged faithfulness category; nothing changes at
+runtime, the claim is corrected in `architecture.md` §7, `reconstruction.md`, the
+`drift_budget_threshold` knob comment, and the stage-4 banner); the 2026-08-04 scope rulings
 (below); haiku ships as the dialogue role + quote embargo lifted (2026-07-29); reconstruction's
 model class — Haiku stands (2026-07-28; re-measured on Haiku 2026-07-29); escalation failure
 path + trigger tuning (2026-07-22/23).
@@ -104,9 +99,9 @@ believability didn't regress (the point of doing Phase B first).
   kappa 1.0/1.0), and both queued compares.
 - **B3. Eval-harness stage 4.** ✅ **LANDED 2026-08-12, floor-verified** (the twenty-fourth
   floor row; the dated workaround + build-record entries in `decisions.md`; stage-4 BUILT
-  banner in `eval-harness.md`). The fixed-gist ablation's first real run delivered **R7's
-  deciding data → Jack's ruling is the open item**; a tuning follow-up only if the ruling
-  changes the metric.
+  banner in `eval-harness.md`). The fixed-gist ablation's first real run delivered R7's
+  deciding data, and **R7 was ruled the same day** (topic-guard re-scope; no tuning follow-up —
+  the ruling changed documentation, not the metric).
 
 *Why before components: three cheap sessions, additive forever after (new components just add
 scenario files), before/after believability numbers for every Phase C landing, and R7 settled

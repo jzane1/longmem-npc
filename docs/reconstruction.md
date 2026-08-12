@@ -195,6 +195,13 @@ format and quantum knob — suggested `{identity_version}|b{index}` with
 
 ## Write-back & drift budget
 
+> **Scope note (R7 resolved 2026-08-12; the dated entry in `decisions.md`):** the budget below
+> is a **topic guard** against wholesale nonsense and topic-swaps, not a fact guard — the
+> stage-4 ablation measured it blind to fact-level drift (unconstrained retellings sailed
+> equally far under the threshold while gist-precision dropped 0.834 → 0.704). Factual
+> faithfulness is policed by the fixed gist constraint + gist-precision (fact survival) and
+> the judged faithfulness category. Mechanism and threshold unchanged by the ruling.
+
 On a cache miss, after the call returns a candidate retelling:
 
 1. **Drift check.** Embed the candidate and the **anchor** and measure distance. The anchor is

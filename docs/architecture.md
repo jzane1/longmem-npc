@@ -325,7 +325,15 @@ write, purge — must evict all cache rows for that memory_id.**
 
 **Drift budget:** on each reconstruction-driven write-back, embed the candidate and measure distance
 from the anchor; past threshold, **refuse the write and keep the prior head**. Event-driven writes
-(both diegetic paths) are exempt from the budget. **The anchor needs no pointer:** it is the latest
+(both diegetic paths) are exempt from the budget. **Scope of the guard (R7 resolved 2026-08-12,
+measured by the stage-4 ablation):** the budget is a **topic guard** — it catches wholesale
+nonsense and topic-swaps (embedding-neighborhood departure), and is **blind by construction to
+fact-level drift**: retellings generated without the gist constraint drifted no further (0
+over-budget in both arms, mean paired |Δ| 0.056) while gist-precision dropped 0.834 → 0.704.
+Factual faithfulness is policed by the other two guards — the **fixed gist constraint +
+gist-precision** (fact survival, the judge-free metric read) and the **judged faithfulness
+category** (semantic support, past the agreement bar). Mechanism and threshold unchanged.
+**The anchor needs no pointer:** it is the latest
 chain row whose `write_cause` is `original`, `authorial_correction`, or `update_with_resentment`.
 Re-anchoring by cause: authorial → the corrected head (the authorial-correction row);
 update-with-resentment → the new head;

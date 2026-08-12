@@ -241,12 +241,15 @@ Footer updated: the binding promise is now the binding.
   kill-switch caveat: flip it at provisioning boundaries, never mid-scene). The corpus is
   `data\eval\corpora\ablation-fixture.jsonl` (3 scenarios × 8 observes, observe/as_of only,
   both decay classes pinned equal + `decay_k_importance` 0.0 so bands are deterministic and
-  identical across arms). **The first real run (R7's deciding data, ruling OPEN):** 24/24
+  identical across arms). **The first real run (R7's deciding data):** 24/24
   paired and drift-checked, 0 band mismatches, drift p50/p95/max ON 0.05/0.16/0.1748 vs OFF
   0.04/0.15/0.1594, **0 over-budget in either arm**, mean paired |Δ| 0.056 — the budget is
   blind to the constraint — while **gist-precision drops 0.8335 → 0.7036** with the
   constraint removed (lexical fabrication 0.0 both arms; that detector's known bluntness is
-  the stage-3 63-vs-2 finding).
+  the stage-3 63-vs-2 finding). **R7 resolved 2026-08-12 on this data** (the dated entry in
+  `decisions.md`): the budget keeps its mechanism and threshold and is re-scoped as a topic
+  guard; fact-policing belongs to gist-precision + the judged faithfulness category. No
+  tuning follow-up — the ruling changes documentation, not the metric.
 
 ## Settle-at-build forks
 

@@ -126,7 +126,11 @@ SERVICE_DEFAULTS: dict[str, float] = {
     # level (the band's midpoint strength), so same key => same input.
     "reconstruction_band_quantum": 0.25,
     # Drift budget: refuse a reconstruction write-back whose embedding's
-    # cosine distance from the anchor exceeds this (ruled 2026-07-17).
+    # cosine distance from the anchor exceeds this (ruled 2026-07-17). Scope
+    # (R7 resolved 2026-08-12): a TOPIC guard — catches wholesale nonsense /
+    # topic-swaps; measured blind to fact-level drift (stage-4 ablation).
+    # Factual faithfulness is policed by the gist constraint + gist-precision
+    # and the judged faithfulness category, never by this threshold.
     "drift_budget_threshold": 0.35,
     # Fixed-gist constraint switch (eval-harness stage 4, ruled 2026-08-12):
     # 0.0 => original-anchored retellings run WITHOUT the gist block (the
