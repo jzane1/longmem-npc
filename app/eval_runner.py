@@ -1,6 +1,6 @@
 """eval_runner.py — the eval harness runner (eval-harness.md stages 2-3).
 
-Six verbs (PowerShell, from the repo root):
+Seven verbs (PowerShell, from the repo root):
 
     python -m app.eval_runner run --scenarios data\\eval\\scenarios\\smoke.jsonl [--judged]
     python -m app.eval_runner drift-validate --corpus data\\eval\\corpora\\drift-fixture.jsonl
@@ -8,6 +8,7 @@ Six verbs (PowerShell, from the repo root):
     python -m app.eval_runner emit-gold --artifact data\\eval\\runs\\run_....json --out data\\eval\\gold\\candidates.jsonl
     python -m app.eval_runner agreement --gold data\\eval\\gold\\candidates.jsonl --artifact data\\eval\\runs\\run_....json
     python -m app.eval_runner judge-gold --gold-in data\\eval\\gold\\constructed.jsonl [--plumbing]
+    python -m app.eval_runner ablation --corpus data\\eval\\corpora\\ablation-fixture.jsonl [--plumbing]
 
 `run` replays authored scenarios literally through `SessionRunner` — REPL
 parity: `as_of` sets the session attribute, a decay-basis re-freeze is an
@@ -71,6 +72,19 @@ protocol, which only `compare` runs); faithfulness rows must be single-fact
 (`...:fact0` item_ids — the artifact item carries the base id so the
 agreement fan-out re-derives the row's id). Same real-mode gate as
 `run --judged` (`--plumbing` for offline mechanics); no database.
+
+`ablation` (stage 4, ruled 2026-08-12) runs one observe/as_of corpus through
+the drift-validate replay core TWICE — two pid-scoped scratch DBs, same
+models, same instrument — with arm B's agent config carrying
+`reconstruction_gist_constraint: 0.0` (original-anchored retellings run
+without the gist block; correction-anchored chains are excluded from the
+corpus outright, fork 11). Judge-free: per-item cosine drift rides the
+observer seam and gist-precision/fabrication ride the stage-1 metric read.
+The report pairs arms on (scenario_id, memory_ref) — memory UUIDs differ
+across scratch DBs — and closes with mean paired |delta| beside per-arm
+gist-precision and fabrication: R7's deciding data. Exit 0 = every ref
+paired and drift-checked in both arms; 1 otherwise; 2 = the mode gate
+(real required; `--plumbing` for offline mechanics).
 
 Nothing eval-related persists in Postgres (ruled: no migration); scratch
 databases are provisioned and dropped per invocation. Windows: both verbs run
@@ -835,6 +849,78 @@ def _cmd_run(args: argparse.Namespace) -> int:
 # ---------------------------------------------------------------------------
 
 
+async def replay_aged_probe(
+    pool: AsyncConnectionPool,
+    providers: Providers,
+    settings: Settings,
+    scenario: Scenario,
+    *,
+    age_days: float,
+    probe: str,
+    max_items: int | None,
+    fallback_start: datetime,
+) -> dict:
+    """The drift-validate / ablation shared core (extracted for stage 4,
+    2026-08-12 — behavior byte-identical to the pre-extraction loop): replay
+    one corpus scenario's observes, age the session past the last authored
+    moment, re-freeze the basis, and probe once with the capture seam
+    attached. Returns agent_id, memory_ids, the ingests, the probe turn, and
+    the observer samples; the caller shapes its own report."""
+    agent_id = await db.insert_agent(
+        pool,
+        name=scenario.agent.name,
+        seed_identity=scenario.agent.seed_identity,
+        rigidity=scenario.agent.rigidity,
+        diagnosticity_goal=scenario.agent.diagnosticity_goal,
+        config=scenario.agent.config,
+    )
+    runner = await SessionRunner.create(
+        agent_id,
+        settings=settings,
+        providers=providers,
+        pool=pool,
+        phase_tag="eval-runner",
+        warm_nlp=True,
+    )
+    memory_ids: list[UUID] = []
+    observes: list[IngestResult] = []
+    for event in scenario.events:
+        if isinstance(event, ObserveStep):
+            ingest = await runner.observe(event.text)
+            memory_ids.append(ingest.memory_id)
+            observes.append(ingest)
+        else:  # AsOfStep — assert_corpus_shape admits nothing else
+            runner.as_of = event.at
+    last = runner.as_of if runner.as_of is not None else fallback_start
+    runner.as_of = last + timedelta(days=age_days)
+    await runner.scene()  # re-freeze the decay/theta basis, aged
+
+    samples: list[tuple[UUID, float, bool]] = []
+
+    def observer(
+        memory_id: UUID,
+        distance: float,
+        refused: bool,
+        _samples: list = samples,
+    ) -> None:
+        _samples.append((memory_id, distance, refused))
+
+    k = len(memory_ids) if max_items is None else min(len(memory_ids), max_items)
+    reconstruction.drift_observer = observer
+    try:
+        turn = await runner.utterance(probe, k=k)
+    finally:
+        reconstruction.drift_observer = None
+    await runner.close()
+    return {
+        "agent_id": agent_id,
+        "memory_ids": memory_ids,
+        "observes": observes,
+        "turn": turn,
+        "samples": samples,
+    }
+
+
 async def drift_validate(
     settings: Settings,
     corpus: list[Scenario],
@@ -855,56 +941,22 @@ async def drift_validate(
     started = datetime.now(timezone.utc)
     try:
         for scenario in corpus:
-            agent_id = await db.insert_agent(
+            replay = await replay_aged_probe(
                 pool,
-                name=scenario.agent.name,
-                seed_identity=scenario.agent.seed_identity,
-                rigidity=scenario.agent.rigidity,
-                diagnosticity_goal=scenario.agent.diagnosticity_goal,
-                config=scenario.agent.config,
+                providers,
+                settings,
+                scenario,
+                age_days=age_days,
+                probe=probe,
+                max_items=max_items,
+                fallback_start=started,
             )
-            runner = await SessionRunner.create(
-                agent_id,
-                settings=settings,
-                providers=providers,
-                pool=pool,
-                phase_tag="eval-runner",
-                warm_nlp=True,
-            )
-            memory_ids: list[UUID] = []
-            for event in scenario.events:
-                if isinstance(event, ObserveStep):
-                    ingest = await runner.observe(event.text)
-                    memory_ids.append(ingest.memory_id)
-                    all_observes.append(ingest)
-                else:  # AsOfStep — assert_corpus_shape admits nothing else
-                    runner.as_of = event.at
-            last = runner.as_of if runner.as_of is not None else started
-            runner.as_of = last + timedelta(days=age_days)
-            await runner.scene()  # re-freeze the decay/theta basis, aged
-
-            samples: list[tuple[UUID, float, bool]] = []
-
-            def observer(
-                memory_id: UUID,
-                distance: float,
-                refused: bool,
-                _samples: list = samples,
-            ) -> None:
-                _samples.append((memory_id, distance, refused))
-
-            k = (
-                len(memory_ids)
-                if max_items is None
-                else min(len(memory_ids), max_items)
-            )
-            reconstruction.drift_observer = observer
-            try:
-                turn = await runner.utterance(probe, k=k)
-            finally:
-                reconstruction.drift_observer = None
-            all_turns.append(turn)
-            await runner.close()
+            agent_id = replay["agent_id"]
+            memory_ids = replay["memory_ids"]
+            samples = replay["samples"]
+            all_observes.extend(replay["observes"])
+            all_turns.append(replay["turn"])
+            turn = replay["turn"]
 
             threshold = agent_knob(
                 scenario.agent.config, "drift_budget_threshold", settings
@@ -1046,6 +1098,354 @@ def _cmd_drift_validate(args: argparse.Namespace) -> int:
     if args.out is not None:
         print(f"\ndrift artifact: {_write_artifact(report, args.out)}")
     return 0 if report["over_budget_count"] == 0 else 1
+
+
+# ---------------------------------------------------------------------------
+# The `ablation` verb (stage 4, ruled 2026-08-12): fixed-gist ON vs OFF over
+# the same corpus on two scratch DBs — R7's deciding data. Judge-free by
+# design: per-item drift rides the observer seam, gist-precision/fabrication
+# ride the stage-1 metric read. Correction-anchored chains are excluded from
+# the corpus outright (fork 11 + assert_corpus_shape admits no `correct`
+# events).
+# ---------------------------------------------------------------------------
+
+
+def _knob_off_scenario(scenario: Scenario) -> Scenario:
+    """The OFF arm's copy: the agent config carries the 0 knob — persisted by
+    insert_agent, read back inside reconstruction.serve(); no runner
+    signature changes anywhere (the stage-4 contract's kill-switch shape)."""
+    agent = scenario.agent.model_copy(
+        update={
+            "config": {
+                **scenario.agent.config,
+                "reconstruction_gist_constraint": 0.0,
+            }
+        }
+    )
+    return scenario.model_copy(update={"agent": agent})
+
+
+async def _ablation_arm(
+    settings: Settings,
+    corpus: list[Scenario],
+    *,
+    arm_name: str,
+    knob_off: bool,
+    age_days: float,
+    probe: str,
+) -> dict:
+    """One arm: the drift-validate replay core per scenario, then the
+    judge-free metric read per observed memory."""
+    pool = build_pool(settings.database_uri)
+    await pool.open()
+    providers = build_providers(settings)
+    retrieval = RetrievalService(pool, providers, settings)
+    all_turns: list[DialogueTurnResult] = []
+    all_observes: list[IngestResult] = []
+    scenario_blocks: list[dict] = []
+    started = datetime.now(timezone.utc)
+    try:
+        for authored in corpus:
+            scenario = _knob_off_scenario(authored) if knob_off else authored
+            replay = await replay_aged_probe(
+                pool,
+                providers,
+                settings,
+                scenario,
+                age_days=age_days,
+                probe=probe,
+                max_items=None,
+                fallback_start=started,
+            )
+            all_turns.append(replay["turn"])
+            all_observes.extend(replay["observes"])
+            by_id: dict[UUID, tuple[float, bool]] = {
+                memory_id: (distance, refused)
+                for memory_id, distance, refused in replay["samples"]
+            }
+            items: list[dict] = []
+            for ref, memory_id in enumerate(replay["memory_ids"]):
+                metrics = await retrieval.reconstruction_metrics(memory_id)
+                sample = by_id.get(memory_id)
+                items.append(
+                    {
+                        "memory_ref": ref,
+                        "memory_id": str(memory_id),
+                        "distance": (
+                            round(sample[0], 6) if sample is not None else None
+                        ),
+                        "over_budget": sample[1] if sample is not None else None,
+                        "reconstructed": (metrics.live_write_cause == "reconstruction"),
+                        "cache_bands": metrics.cache_bands,
+                        "band": (
+                            metrics.cache_bands[0]
+                            if len(metrics.cache_bands) == 1
+                            else None
+                        ),
+                        "gist_precision": metrics.gist_precision,
+                        "fabrication_rate": metrics.fabrication_rate,
+                        "fabricated_entities": metrics.fabricated_entities,
+                        "live_write_cause": metrics.live_write_cause,
+                    }
+                )
+            scenario_blocks.append(
+                {
+                    "scenario_id": scenario.scenario_id,
+                    "agent_id": str(replay["agent_id"]),
+                    "observes": len(replay["memory_ids"]),
+                    "items_checked": len(replay["samples"]),
+                    "items": items,
+                }
+            )
+    finally:
+        await pool.close()
+    distances = [
+        item["distance"]
+        for block in scenario_blocks
+        for item in block["items"]
+        if item["distance"] is not None
+    ]
+    return {
+        "name": arm_name,
+        "knob": {"reconstruction_gist_constraint": 0.0 if knob_off else 1.0},
+        "started_at": started.isoformat(),
+        "finished_at": datetime.now(timezone.utc).isoformat(),
+        "scenarios": scenario_blocks,
+        "items_checked_total": len(distances),
+        "over_budget_count": sum(
+            1
+            for block in scenario_blocks
+            for item in block["items"]
+            if item["over_budget"]
+        ),
+        "distance": {
+            "p50": percentile(distances, 0.5),
+            "p95": percentile(distances, 0.95),
+            "max": max(distances) if distances else None,
+        },
+        "latency_ms": _latency_block(all_turns),
+        "cost": _cost_totals(settings, all_turns, all_observes),
+    }
+
+
+def _ablation_pairs(arm_on: dict, arm_off: dict) -> tuple[list[dict], int]:
+    """Pair the arms on (scenario_id, memory_ref) — memory UUIDs differ
+    across scratch DBs, so both are carried as provenance, never as the
+    join key (the stage-4 contract's `memory_id` read the only way it can
+    work)."""
+    index_off = {
+        (block["scenario_id"], item["memory_ref"]): item
+        for block in arm_off["scenarios"]
+        for item in block["items"]
+    }
+    paired: list[dict] = []
+    unpaired_refs = 0
+    for block in arm_on["scenarios"]:
+        for item_on in block["items"]:
+            item_off = index_off.get((block["scenario_id"], item_on["memory_ref"]))
+            if item_off is None:
+                unpaired_refs += 1
+                continue
+            both = item_on["distance"] is not None and item_off["distance"] is not None
+            paired.append(
+                {
+                    "scenario_id": block["scenario_id"],
+                    "memory_ref": item_on["memory_ref"],
+                    "memory_id_on": item_on["memory_id"],
+                    "memory_id_off": item_off["memory_id"],
+                    "band_on": item_on["band"],
+                    "band_off": item_off["band"],
+                    "distance_on": item_on["distance"],
+                    "distance_off": item_off["distance"],
+                    "delta_abs": (
+                        round(abs(item_on["distance"] - item_off["distance"]), 6)
+                        if both
+                        else None
+                    ),
+                    "over_budget_on": item_on["over_budget"],
+                    "over_budget_off": item_off["over_budget"],
+                    "reconstructed_on": item_on["reconstructed"],
+                    "reconstructed_off": item_off["reconstructed"],
+                    "gist_precision_on": item_on["gist_precision"],
+                    "gist_precision_off": item_off["gist_precision"],
+                    "fabrication_rate_on": item_on["fabrication_rate"],
+                    "fabrication_rate_off": item_off["fabrication_rate"],
+                }
+            )
+    return paired, unpaired_refs
+
+
+def _mean(values: list[float]) -> float | None:
+    return round(sum(values) / len(values), 6) if values else None
+
+
+def _ablation_summary(paired: list[dict]) -> dict:
+    """Honest-None aggregates over the paired rows (the harness principle)."""
+    checked = [row for row in paired if row["delta_abs"] is not None]
+    return {
+        "n_paired": len(paired),
+        "n_checked_both": len(checked),
+        "mean_abs_delta": _mean([row["delta_abs"] for row in checked]),
+        "band_mismatches": sum(
+            1 for row in paired if row["band_on"] != row["band_off"]
+        ),
+        "over_budget_on": sum(1 for row in paired if row["over_budget_on"]),
+        "over_budget_off": sum(1 for row in paired if row["over_budget_off"]),
+        "gist_precision_mean_on": _mean(
+            [
+                row["gist_precision_on"]
+                for row in paired
+                if row["gist_precision_on"] is not None
+            ]
+        ),
+        "gist_precision_mean_off": _mean(
+            [
+                row["gist_precision_off"]
+                for row in paired
+                if row["gist_precision_off"] is not None
+            ]
+        ),
+        "fabrication_rate_mean_on": _mean(
+            [
+                row["fabrication_rate_on"]
+                for row in paired
+                if row["fabrication_rate_on"] is not None
+            ]
+        ),
+        "fabrication_rate_mean_off": _mean(
+            [
+                row["fabrication_rate_off"]
+                for row in paired
+                if row["fabrication_rate_off"] is not None
+            ]
+        ),
+    }
+
+
+async def ablation_run(
+    settings_on: Settings,
+    settings_off: Settings,
+    corpus: list[Scenario],
+    *,
+    age_days: float,
+    probe: str,
+) -> dict:
+    """The two-arm rig, sequential in-process (the compare shape): same
+    corpus, same models, same instrument — only the knob differs."""
+    arm_on = await _ablation_arm(
+        settings_on,
+        corpus,
+        arm_name="gist-on",
+        knob_off=False,
+        age_days=age_days,
+        probe=probe,
+    )
+    arm_off = await _ablation_arm(
+        settings_off,
+        corpus,
+        arm_name="gist-off",
+        knob_off=True,
+        age_days=age_days,
+        probe=probe,
+    )
+    paired, unpaired_refs = _ablation_pairs(arm_on, arm_off)
+    summary = _ablation_summary(paired)
+    summary["unpaired_refs"] = unpaired_refs
+    summary["pairs_missing_a_distance"] = (
+        summary["n_paired"] - summary["n_checked_both"]
+    )
+    return {
+        "verb": "ablation",
+        "started_at": arm_on["started_at"],
+        "finished_at": arm_off["finished_at"],
+        "provider_mode": settings_on.provider_mode,
+        "age_days": age_days,
+        "probe": probe,
+        "models": _models_block(settings_on),
+        "arms": [arm_on, arm_off],
+        "paired": paired,
+        "paired_summary": summary,
+        "plumbing_only": settings_on.provider_mode != "real",
+    }
+
+
+def _print_ablation_report(report: dict) -> None:
+    plumbing = " [PLUMBING ONLY — fake providers]" if report["plumbing_only"] else ""
+    summary = report["paired_summary"]
+    print(
+        f"\nablation — {summary['n_paired']} paired item(s), "
+        f"{summary['n_checked_both']} drift-checked in both arms{plumbing}"
+    )
+    for arm in report["arms"]:
+        dist = arm["distance"]
+        print(
+            f"  {arm['name']:<9} distance p50 {dist['p50']}  p95 {dist['p95']}  "
+            f"max {dist['max']}  over-budget {arm['over_budget_count']}"
+        )
+    print(
+        f"  mean paired |delta| {summary['mean_abs_delta']}  "
+        f"band mismatches {summary['band_mismatches']}"
+    )
+    print(
+        f"  gist-precision mean on {summary['gist_precision_mean_on']} / "
+        f"off {summary['gist_precision_mean_off']}  "
+        f"fabrication mean on {summary['fabrication_rate_mean_on']} / "
+        f"off {summary['fabrication_rate_mean_off']}"
+    )
+    if summary["unpaired_refs"] or summary["pairs_missing_a_distance"]:
+        print(
+            f"  ({summary['unpaired_refs']} unpaired ref(s), "
+            f"{summary['pairs_missing_a_distance']} pair(s) missing a "
+            "distance — investigate before quoting)"
+        )
+
+
+def _cmd_ablation(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    if settings.provider_mode != "real" and not args.plumbing:
+        print(
+            "ablation requires real provider mode — the construct is real "
+            "retellings with and without the gist constraint. Pass "
+            "--plumbing to run the mechanics offline in fake mode (report "
+            "labeled plumbing_only).",
+            file=sys.stderr,
+        )
+        return 2
+    corpus = load_scenarios(args.corpus)
+    for scenario in corpus:
+        assert_corpus_shape(scenario)
+    base_uri = args.database_uri or settings.database_uri
+    name_on = pid_scoped_name("longmem_eval_abl_on")
+    name_off = pid_scoped_name("longmem_eval_abl_off")
+    uri_on = provision_scratch(base_uri, name_on)
+    uri_off = provision_scratch(base_uri, name_off)
+    try:
+        report = asyncio.run(
+            ablation_run(
+                replace(settings, database_uri=uri_on),
+                replace(settings, database_uri=uri_off),
+                corpus,
+                age_days=args.age_days,
+                probe=args.probe,
+            ),
+            loop_factory=asyncio.SelectorEventLoop,
+        )
+    finally:
+        if args.keep_db:
+            print(f"scratch databases kept: {name_on}, {name_off}")
+        else:
+            drop_scratch(base_uri, name_on)
+            drop_scratch(base_uri, name_off)
+    report["corpus"] = str(args.corpus)
+    report["database_names"] = [name_on, name_off]
+    _print_ablation_report(report)
+    out = _write_artifact(report, args.out or _default_artifact_path("ablation"))
+    print(f"ablation artifact: {out}")
+    summary = report["paired_summary"]
+    complete = (
+        summary["unpaired_refs"] == 0 and summary["pairs_missing_a_distance"] == 0
+    )
+    return 0 if complete else 1
 
 
 # ---------------------------------------------------------------------------
@@ -1985,6 +2385,43 @@ def main() -> None:
         help="allow fake provider mode; the report is labeled plumbing_only",
     )
     judge_gold_parser.set_defaults(func=_cmd_judge_gold)
+
+    ablation_parser = verbs.add_parser(
+        "ablation",
+        help="fixed-gist ON vs OFF over one corpus on two scratch DBs "
+        "(stage 4 — R7's deciding data; judge-free)",
+    )
+    ablation_parser.add_argument(
+        "--corpus", type=Path, required=True, help="corpus JSONL (observe/as_of only)"
+    )
+    ablation_parser.add_argument(
+        "--age-days",
+        type=float,
+        default=30.0,
+        help="how far past the last authored moment the probe ages (default 30)",
+    )
+    ablation_parser.add_argument(
+        "--probe",
+        default=DEFAULT_PROBE,
+        help="probe utterance (coverage comes from k, not wording)",
+    )
+    ablation_parser.add_argument(
+        "--out",
+        type=Path,
+        help="artifact path (default: data\\eval\\runs\\ablation_<utc>_<pid>.json)",
+    )
+    ablation_parser.add_argument("--database-uri", help="override .env DATABASE_URI")
+    ablation_parser.add_argument(
+        "--keep-db",
+        action="store_true",
+        help="skip the scratch drops for post-mortem inspection",
+    )
+    ablation_parser.add_argument(
+        "--plumbing",
+        action="store_true",
+        help="allow fake provider mode; the report is labeled plumbing_only",
+    )
+    ablation_parser.set_defaults(func=_cmd_ablation)
 
     args = parser.parse_args()
     sys.exit(args.func(args))

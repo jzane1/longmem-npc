@@ -128,6 +128,13 @@ SERVICE_DEFAULTS: dict[str, float] = {
     # Drift budget: refuse a reconstruction write-back whose embedding's
     # cosine distance from the anchor exceeds this (ruled 2026-07-17).
     "drift_budget_threshold": 0.35,
+    # Fixed-gist constraint switch (eval-harness stage 4, ruled 2026-08-12):
+    # 0.0 => original-anchored retellings run WITHOUT the gist block (the
+    # ablation's OFF arm — R7's deciding data). Correction-anchored chains
+    # ignore the switch (fork 11: their gist IS the corrected head; blanking
+    # it would delete the correction). The gate_enabled kill-switch shape;
+    # production stays 1.0.
+    "reconstruction_gist_constraint": 1.0,
     # --- mid-dialogue gate (mid-dialogue-gate.md; build rulings 2026-07-19) --
     # Non-LLM: no gate model role, no pricing entry. All floats (agent_knob
     # contract); integer-valued knobs are cast at the call site.

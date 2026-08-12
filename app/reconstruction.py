@@ -91,6 +91,21 @@ _SYSTEM_TASK = (
     "point. Return ONLY a JSON object mapping each memory_id to its "
     "retelling string. No other text."
 )
+# The stage-4 ablation's OFF-arm task (ruled 2026-08-12): the same contract
+# with the gist sentence removed — items carry no 'gist' key, so the
+# retelling is unconstrained by fixed facts. Eval-only in practice; the
+# production default keeps the constraint (reconstruction_gist_constraint
+# 1.0).
+_SYSTEM_TASK_NO_GIST = (
+    "[task]\n"
+    "You are the reconstructive memory of a game character. Retell each "
+    "remembered event as the character currently holds it, in first person. "
+    "Per item: 'detail' is the fragmentary detail still available (it may "
+    "be thin — fill gaps plausibly, in character); 'current_telling' is how "
+    "the character currently tells it, the starting point. Return ONLY a "
+    "JSON object mapping each memory_id to its retelling string. No other "
+    "text."
+)
 _BLOCK_IDENTITY = "[identity]\n{document}"
 
 
@@ -167,13 +182,21 @@ def build_reconstruction_item(
     source: db.ReconstructionSource,
     level: float,
     current_telling: str,
+    *,
+    gist_constraint: bool = True,
 ) -> ReconstructionItem:
     """The per-memory call inputs, anchor-cause-aware (constraint follows
     the anchor — ruled 2026-07-17, authorial-correction.md): on an
     `authorial_correction`-anchored chain the corrected head IS the fixed
     facts (the gist slot), with no observation-derived detail re-injected;
     original-anchored chains build byte-identically to the pre-correction
-    stage. Pure — walker-assertable without a database or model call."""
+    stage. Pure — walker-assertable without a database or model call.
+
+    `gist_constraint=False` (stage-4 ablation OFF arm, ruled 2026-08-12)
+    blanks the gist on ORIGINAL-anchored items only; a correction-anchored
+    chain keeps the corrected head regardless (fork 11 — blanking it would
+    delete the correction). The default keeps every existing call
+    byte-identical."""
     if source.anchor_cause == "authorial_correction":
         return ReconstructionItem(
             memory_id=memory_id,
@@ -184,33 +207,39 @@ def build_reconstruction_item(
     gist, segments = split_gist_detail(source.observation_text, source.spans)
     return ReconstructionItem(
         memory_id=memory_id,
-        gist=gist,
+        gist=gist if gist_constraint else "",
         thinned_detail=thin_detail(segments, level),
         current_telling=current_telling,
     )
 
 
 def assemble_reconstruction_prompt(
-    identity_document: str, items: list[ReconstructionItem]
+    identity_document: str,
+    items: list[ReconstructionItem],
+    *,
+    include_gist_constraint: bool = True,
 ) -> tuple[str, str]:
     """(system_prompt, user_content), byte-stable for identical inputs. The
     identity block is omitted for an empty document (NULL-seed rule); items
-    arrive sorted by memory_id (the seam sorts) so the JSON is deterministic."""
+    arrive sorted by memory_id (the seam sorts) so the JSON is deterministic.
+
+    `include_gist_constraint=False` (stage-4 ablation OFF arm, ruled
+    2026-08-12) swaps the task block for `_SYSTEM_TASK_NO_GIST` and omits
+    the `"gist"` key from every item — the retelling runs unconstrained.
+    The default reproduces the pre-stage-4 prompt byte-for-byte."""
     blocks: list[str] = []
     if identity_document:
         blocks.append(_BLOCK_IDENTITY.format(document=identity_document))
-    blocks.append(_SYSTEM_TASK)
-    user_content = json.dumps(
-        [
-            {
-                "memory_id": item.memory_id,
-                "gist": item.gist,
-                "detail": item.thinned_detail,
-                "current_telling": item.current_telling,
-            }
-            for item in items
-        ]
-    )
+    blocks.append(_SYSTEM_TASK if include_gist_constraint else _SYSTEM_TASK_NO_GIST)
+    payload: list[dict] = []
+    for item in items:
+        entry: dict = {"memory_id": item.memory_id}
+        if include_gist_constraint:
+            entry["gist"] = item.gist
+        entry["detail"] = item.thinned_detail
+        entry["current_telling"] = item.current_telling
+        payload.append(entry)
+    user_content = json.dumps(payload)
     return "\n\n".join(blocks), user_content
 
 
@@ -298,6 +327,14 @@ class ReconstructionService:
         threshold = agent_knob(config, "drift_budget_threshold", self._settings)
         k_importance = agent_knob(config, "decay_k_importance", self._settings)
         neutral = agent_knob(config, "importance_neutral", self._settings)
+        # Stage-4 ablation switch (ruled 2026-08-12), the gate_enabled
+        # truthiness convention. Deliberately NOT in compose_cache_key: arms
+        # live on separate scratch DBs; a live mid-process flip could serve
+        # stale-keyed text (the kill-switch caveat, documented in
+        # eval-harness.md).
+        gist_constraint = (
+            agent_knob(config, "reconstruction_gist_constraint", self._settings) != 0.0
+        )
 
         # Scene-frozen basis: every text-affecting decay evaluation below
         # uses this, never the per-call as_of (which scores may follow).
@@ -376,47 +413,78 @@ class ReconstructionService:
                     degraded_reasons.append(
                         f"no reconstruction source for {slot.row.memory_id}"
                     )
-            items: list[ReconstructionItem] = []
-            for slot in sorted(call_slots, key=lambda s: str(s.row.memory_id)):
-                items.append(
-                    build_reconstruction_item(
-                        str(slot.row.memory_id),
-                        sources[slot.row.memory_id],
-                        band_level(slot.band, quantum),
-                        slot.row.content,
-                    )
-                )
-            system_prompt, user_content = assemble_reconstruction_prompt(
-                document, items
-            )
+            # Fixed-gist ablation partition (stage 4, ruled 2026-08-12): with
+            # the knob OFF, original-anchored misses retell WITHOUT the gist
+            # block while correction-anchored misses still retell normally
+            # (fork 11 — their gist IS the corrected head). Default ON is a
+            # single group, byte-identical to the pre-stage-4 call.
+            if gist_constraint:
+                groups: list[tuple[bool, list[_Slot]]] = [(True, call_slots)]
+            else:
+                groups = [
+                    (
+                        False,
+                        [
+                            s
+                            for s in call_slots
+                            if sources[s.row.memory_id].anchor_cause
+                            != "authorial_correction"
+                        ],
+                    ),
+                    (
+                        True,
+                        [
+                            s
+                            for s in call_slots
+                            if sources[s.row.memory_id].anchor_cause
+                            == "authorial_correction"
+                        ],
+                    ),
+                ]
             retellings: dict[str, str] = {}
             call_ok = False
-            if items:
+            if call_slots and on_reconstruct is not None:
                 # The pre-serve callback (mid-dialogue-gate.md fork 5,
                 # 2026-07-19): fired ONCE, the moment a real blocking
                 # retelling call is about to run — the caller can show
                 # "(reconstructing…)" DURING the pause (latency becomes
                 # characterization, architecture §7). Absent parameter =>
                 # behavior byte-identical to the pre-gate floor.
-                if on_reconstruct is not None:
-                    on_reconstruct()
-                try:  # single attempt (ruled): read latency, not a lost write
+                on_reconstruct()
+            for include_gist, group in groups:
+                if not group:
+                    continue
+                items: list[ReconstructionItem] = []
+                for slot in sorted(group, key=lambda s: str(s.row.memory_id)):
+                    items.append(
+                        build_reconstruction_item(
+                            str(slot.row.memory_id),
+                            sources[slot.row.memory_id],
+                            band_level(slot.band, quantum),
+                            slot.row.content,
+                            gist_constraint=include_gist,
+                        )
+                    )
+                system_prompt, user_content = assemble_reconstruction_prompt(
+                    document, items, include_gist_constraint=include_gist
+                )
+                try:  # single attempt per group (ruled): read latency, not a lost write
                     result = await asyncio.to_thread(
                         self._providers.reconstruction.reconstruct,
                         system_prompt=system_prompt,
                         user_content=user_content,
                         items=items,
                     )
-                    retellings = result.retellings
-                    input_tokens = result.input_tokens
-                    output_tokens = result.output_tokens
+                    retellings.update(result.retellings)
+                    input_tokens += result.input_tokens
+                    output_tokens += result.output_tokens
                     call_ok = True
                 except ProviderCallError as exc:
                     degraded_reasons.append(f"reconstruction call failed: {exc}")
                 except MalformedOutputError as exc:
                     degraded_reasons.append(f"reconstruction output malformed: {exc}")
-                    input_tokens = exc.input_tokens  # the spend happened
-                    output_tokens = exc.output_tokens
+                    input_tokens += exc.input_tokens  # the spend happened
+                    output_tokens += exc.output_tokens
 
             # --- drift check + persistence, per miss -----------------------
             if call_ok:
