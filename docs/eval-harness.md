@@ -290,6 +290,24 @@ are blind; `item_id` joins back to the artifact) and skips `judge_failed` items;
 prose is two calls per pair — true order plus position-swapped — combined with disagreement ⇒
 tie and per-arm scores averaged over both positions, `degraded_either` flagged.
 
+**Stage-3 addendum — the `judge-gold` verb (BUILT 2026-08-12, the dated workaround entry in
+`decisions.md`).** The first `agreement` run exposed a structural gap no labeler could fix:
+when the system under test rarely fails, the natural gold set's judge-side marginals go
+degenerate (rf 30/30 `supported`) and Cohen's kappa is undefined-or-zero by arithmetic — the
+"rebalance the gold set" case named in `cohen_kappa`'s docstring. The sixth verb closes it:
+`judge-gold --gold-in <constructed.jsonl> [--out] [--plumbing]` judges **gold-shaped rows
+fresh** — rows authored with labels known by construction (perturbed tellings, premise-
+swallowing replies, and their faithful/correct counterparts, class-balanced by design) — and
+writes an artifact-shaped JSON that `agreement` scores; that kappa measures judge
+**discrimination on known cases**. A present `label` is never shown to the judge (`_judge_one`
+receives display-field kwargs only). prose_pairwise rows are refused (pairwise needs the
+position-swap protocol only `compare` provides); faithfulness rows must be single-fact
+(`...:fact0` item_ids — the artifact item carries the base id, so the agreement fan-out
+re-derives the row's id); duplicate ids, rubric-version mismatches, and missing display fields
+refuse the whole run (exit 2) before any judge spend. Same real-mode gate as `run --judged`;
+providers yes, database no. Judge accounting rides the artifact
+(`judged.judge_tokens` + USD when priced).
+
 ## Done-when (stage 1 — the build's floor)
 
 - Given a memory with gist spans and a live head, `GET /v1/memories/{id}/reconstruction-metrics`

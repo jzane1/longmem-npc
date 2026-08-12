@@ -1,12 +1,13 @@
 """eval_runner.py — the eval harness runner (eval-harness.md stages 2-3).
 
-Five verbs (PowerShell, from the repo root):
+Six verbs (PowerShell, from the repo root):
 
     python -m app.eval_runner run --scenarios data\\eval\\scenarios\\smoke.jsonl [--judged]
     python -m app.eval_runner drift-validate --corpus data\\eval\\corpora\\drift-fixture.jsonl
     python -m app.eval_runner compare --scenarios ... --arm-a data\\eval\\arms\\haiku.json --arm-b data\\eval\\arms\\sonnet5.json
     python -m app.eval_runner emit-gold --artifact data\\eval\\runs\\run_....json --out data\\eval\\gold\\candidates.jsonl
     python -m app.eval_runner agreement --gold data\\eval\\gold\\candidates.jsonl --artifact data\\eval\\runs\\run_....json
+    python -m app.eval_runner judge-gold --gold-in data\\eval\\gold\\constructed.jsonl [--plumbing]
 
 `run` replays authored scenarios literally through `SessionRunner` — REPL
 parity: `as_of` sets the session attribute, a decay-basis re-freeze is an
@@ -55,9 +56,21 @@ perceived_first_word p50/p95 vs USD/100 turns, non-dominated rows marked).
 
 `emit-gold` projects a judged artifact into blind gold-candidate JSONL
 (verdicts stripped; `label: null` for hand-filling); `agreement` joins a
-hand-labeled gold file back against an artifact's verdicts and reports raw %
+labeled gold file back against an artifact's verdicts and reports raw %
 + Cohen's kappa per category against the quotability bar (default 0.6). Both
 are offline file operations — no database, no providers, no mode gate.
+
+`judge-gold` judges gold-shaped rows FRESH (the constructed-truth meta-eval
+path, ruled 2026-08-12): rows authored with labels known by construction go
+to the judge one at a time, and the artifact-shaped output joins back
+through `agreement` — that kappa measures judge DISCRIMINATION on known
+cases, the class-balance fix the natural gold set cannot provide when the
+system under test rarely fails. A present `label` is never shown to the
+judge. prose_pairwise rows are refused (pairwise needs the position-swap
+protocol, which only `compare` runs); faithfulness rows must be single-fact
+(`...:fact0` item_ids — the artifact item carries the base id so the
+agreement fan-out re-derives the row's id). Same real-mode gate as
+`run --judged` (`--plumbing` for offline mechanics); no database.
 
 Nothing eval-related persists in Postgres (ruled: no migration); scratch
 databases are provisioned and dropped per invocation. Windows: both verbs run
@@ -70,6 +83,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import re
 import sys
 import time
 from dataclasses import replace
@@ -1508,6 +1522,176 @@ def _cmd_emit_gold(args: argparse.Namespace) -> int:
     return 0
 
 
+# ---------------------------------------------------------------------------
+# The `judge-gold` verb (constructed-truth meta-eval, ruled 2026-08-12):
+# providers yes, database no. Input rows are gold-shaped; their labels are
+# constructed truth and are NEVER shown to the judge — _judge_one receives
+# only display-field template kwargs.
+# ---------------------------------------------------------------------------
+
+_RF_GOLD_ID = re.compile(r"^(?P<base>.+):fact0$")
+
+_PAIRWISE_REFUSAL = (
+    "judge-gold refuses prose_pairwise rows — pairwise needs the "
+    "position-swap protocol, which only a compare run (two live arms) "
+    "provides."
+)
+
+
+def _prepare_judge_gold_rows(
+    rows: list[GoldItem],
+) -> list[tuple[str, str, dict, int, dict]]:
+    """Validate gold-shaped input rows and map each to its judge call:
+    (artifact item_id, category, template kwargs, n_facts, display fields).
+
+    Any shape problem — a prose_pairwise row, a missing display field, a
+    faithfulness id without the `:fact0` suffix, a rubric-version mismatch,
+    or a duplicate id — raises ValueError naming the row; input-shape errors
+    refuse the whole run loudly before any judge spend."""
+    prepared: list[tuple[str, str, dict, int, dict]] = []
+    seen: set[str] = set()
+    for row in rows:
+        if row.category == "prose_pairwise":
+            raise ValueError(f"{row.item_id}: {_PAIRWISE_REFUSAL}")
+        expected_version = RUBRICS[row.category].rubric_version
+        if row.rubric_version != expected_version:
+            raise ValueError(
+                f"{row.item_id}: rubric_version {row.rubric_version!r} != "
+                f"{expected_version!r} for category {row.category}"
+            )
+        if row.category in ("selective_forgetting", "abstention"):
+            missing = [
+                field
+                for field in ("question", "reply", "reference")
+                if getattr(row, field) is None
+            ]
+            if row.category == "abstention" and row.expected_behavior is None:
+                missing.append("expected_behavior")
+            if missing:
+                raise ValueError(f"{row.item_id}: missing {', '.join(missing)}")
+            template_kwargs = {
+                "question": row.question,
+                "reply": row.reply,
+                "reference": row.reference,
+            }
+            if row.category == "selective_forgetting":
+                template_kwargs["superseded"] = row.superseded or "(none)"
+            else:
+                template_kwargs["expected_behavior"] = row.expected_behavior
+            item_id = row.item_id
+            n_facts = 0
+            display = {
+                "question": row.question,
+                "reply": row.reply,
+                "reference": row.reference,
+                "superseded": row.superseded,
+                "expected_behavior": row.expected_behavior or "answer",
+            }
+        else:  # reconstruction_faithfulness — the only remaining category
+            if row.fact is None or row.telling is None:
+                raise ValueError(f"{row.item_id}: missing fact/telling")
+            match = _RF_GOLD_ID.match(row.item_id)
+            if match is None:
+                raise ValueError(
+                    f"{row.item_id}: faithfulness rows must be single-fact "
+                    "with a ':fact0' item_id suffix (the artifact carries "
+                    "the base id; agreement re-derives ':fact0')"
+                )
+            item_id = match.group("base")
+            template_kwargs = {"telling": row.telling, "facts": f"1. {row.fact}"}
+            n_facts = 1
+            display = {"facts": [row.fact], "telling": row.telling}
+        if item_id in seen:
+            raise ValueError(
+                f"{row.item_id}: duplicate item id — the agreement join "
+                "index would silently overwrite"
+            )
+        seen.add(item_id)
+        prepared.append((item_id, row.category, template_kwargs, n_facts, display))
+    return prepared
+
+
+def _cmd_judge_gold(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    if settings.provider_mode != "real" and not args.plumbing:
+        print(_JUDGED_GATE_MESSAGE, file=sys.stderr)
+        return 2
+    try:
+        judge = build_judge_provider(settings)
+    except ConfigError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    try:
+        rows = load_gold(args.gold_in)
+        prepared = _prepare_judge_gold_rows(rows)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    started = datetime.now(timezone.utc)
+    items: list[dict] = []
+    for item_id, category, template_kwargs, n_facts, display in prepared:
+        fragment = _judge_one(judge, category, template_kwargs, n_facts=n_facts)
+        items.append({"item_id": item_id, "category": category, **display, **fragment})
+    finished = datetime.now(timezone.utc)
+    judge_in = sum(i["input_tokens"] for i in items)
+    judge_out = sum(i["output_tokens"] for i in items)
+    prices = settings.prices
+    judge_usd = (
+        round(
+            (judge_in * prices["judge_in"] + judge_out * prices["judge_out"]) / 1e6, 6
+        )
+        if "judge_in" in prices and "judge_out" in prices
+        else None
+    )
+    categories = sorted({i["category"] for i in items})
+    report = {
+        "verb": "judge-gold",
+        "started_at": started.isoformat(),
+        "finished_at": finished.isoformat(),
+        "provider_mode": settings.provider_mode,
+        "models": _models_block(settings),
+        "gold_in": str(args.gold_in),
+        "plumbing_only": settings.provider_mode != "real",
+        "judged": {
+            "rubric_versions": {c: RUBRICS[c].rubric_version for c in categories},
+            "summary": _judged_summary(items),
+            "items": items,
+            "judge_ms_total": round(sum(i["judge_ms"] for i in items), 2),
+            "judge_tokens": {
+                "input_tokens": judge_in,
+                "output_tokens": judge_out,
+                "usd": judge_usd,
+            },
+        },
+    }
+    label = " [PLUMBING ONLY — fake providers]" if report["plumbing_only"] else ""
+    print(f"\njudge-gold — {len(items)} row(s) judged{label}:")
+    for category, block in report["judged"]["summary"].items():
+        if "pass_rate" in block:
+            print(
+                f"  {category:<28} {block['passed']}/"
+                f"{block['passed'] + block['failed']} pass, "
+                f"{block['judge_failed']} judge_failed"
+            )
+        else:
+            print(
+                f"  {category:<28} {block['facts_supported']}/"
+                f"{block['facts_total']} facts supported, "
+                f"{block['judge_failed']} judge_failed"
+            )
+    failed_total = sum(1 for i in items if i["judge_failed"])
+    if failed_total:
+        print(
+            f"  ({failed_total} judge_failed row(s) carry no verdict — "
+            "agreement will count them unmatched)"
+        )
+    usd_text = f" (${judge_usd})" if judge_usd is not None else ""
+    print(f"  judge tokens {judge_in}/{judge_out}{usd_text}")
+    out = _write_artifact(report, args.out or _default_artifact_path("judge-gold"))
+    print(f"judge-gold artifact: {out}")
+    return 0
+
+
 def _judge_label_index(artifact: dict) -> dict[str, tuple[str, str]]:
     """item_id -> (category, judge label) for agreement joining."""
     labels: dict[str, tuple[str, str]] = {}
@@ -1778,6 +1962,29 @@ def main() -> None:
         "--out", type=Path, help="also write the agreement report JSON"
     )
     agreement_parser.set_defaults(func=_cmd_agreement)
+
+    judge_gold_parser = verbs.add_parser(
+        "judge-gold",
+        help="judge gold-shaped rows fresh (constructed-truth meta-eval); "
+        "writes an artifact agreement can score",
+    )
+    judge_gold_parser.add_argument(
+        "--gold-in",
+        type=Path,
+        required=True,
+        help="gold-shaped JSONL; labels, if present, are never shown to the judge",
+    )
+    judge_gold_parser.add_argument(
+        "--out",
+        type=Path,
+        help="artifact path (default: data\\eval\\runs\\judge-gold_<utc>_<pid>.json)",
+    )
+    judge_gold_parser.add_argument(
+        "--plumbing",
+        action="store_true",
+        help="allow fake provider mode; the report is labeled plumbing_only",
+    )
+    judge_gold_parser.set_defaults(func=_cmd_judge_gold)
 
     args = parser.parse_args()
     sys.exit(args.func(args))

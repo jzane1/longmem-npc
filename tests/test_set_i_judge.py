@@ -48,6 +48,7 @@ from app.eval_judge import (
 )
 from app.eval_runner import (
     _cmd_agreement,
+    _cmd_judge_gold,
     _cmd_run,
     _gold_candidates,
     _judge_label_index,
@@ -818,3 +819,201 @@ def test_compare_plumbing_end_to_end(scene):
         assert row["usd_per_100_turns"] is None  # keyless -> honest None
         assert row["non_dominated"] is True  # None cost -> incomparable
     json.dumps(report)
+
+
+# ---------------------------------------------------------------------------
+# judge-gold (the constructed-truth meta-eval verb, ruled 2026-08-12)
+# ---------------------------------------------------------------------------
+
+
+def _judge_gold_args(**overrides) -> argparse.Namespace:
+    defaults = dict(gold_in=Path("never-read.jsonl"), out=None, plumbing=True)
+    defaults.update(overrides)
+    return argparse.Namespace(**defaults)
+
+
+def _gold_row(**fields) -> str:
+    return gold_line(GoldItem.model_validate(fields)) + "\n"
+
+
+def test_judge_gold_gate_and_input_refusals(monkeypatch, tmp_path):
+    """Fake mode without --plumbing refuses exit 2 BEFORE any file access;
+    prose_pairwise rows, malformed faithfulness ids, duplicate ids,
+    rubric-version mismatches, and missing display fields all refuse exit 2
+    before any judge call."""
+    import app.eval_runner as runner_module
+
+    fake_settings = Settings(database_uri=UNREACHABLE_URI, provider_mode="fake")
+    monkeypatch.setattr(runner_module, "load_settings", lambda: fake_settings)
+
+    def _explode(*_args, **_kwargs):
+        raise AssertionError("the gate must fire before the input is read")
+
+    monkeypatch.setattr(runner_module, "load_gold", _explode)
+    assert _cmd_judge_gold(_judge_gold_args(plumbing=False)) == 2
+    monkeypatch.undo()
+    monkeypatch.setattr(runner_module, "load_settings", lambda: fake_settings)
+
+    def refuses(*lines: str) -> bool:
+        path = tmp_path / "in.jsonl"
+        path.write_text("".join(lines), encoding="utf-8")
+        return _cmd_judge_gold(_judge_gold_args(gold_in=path)) == 2
+
+    assert refuses(
+        _gold_row(
+            item_id="cmp:x:1",
+            category="prose_pairwise",
+            rubric_version="pp-v1",
+            question="q",
+            reply_a="a",
+            reply_b="b",
+        )
+    )
+    assert refuses(
+        _gold_row(
+            item_id="ct:rf:001:fact2",  # single-fact rows must end :fact0
+            category="reconstruction_faithfulness",
+            rubric_version="rf-v1",
+            fact="f",
+            telling="t",
+        )
+    )
+    assert refuses(
+        _gold_row(
+            item_id="ct:rf:002:fact0",
+            category="reconstruction_faithfulness",
+            rubric_version="rf-v1",
+            fact="f",
+            telling="t",
+        )
+        * 2  # same id twice -> duplicate join key
+    )
+    assert refuses(
+        _gold_row(
+            item_id="ct:sf:001",
+            category="selective_forgetting",
+            rubric_version="sf-v0",  # stale version tag
+            question="q",
+            reply="r",
+            reference="ref",
+        )
+    )
+    assert refuses(
+        _gold_row(
+            item_id="ct:abst:001",  # abstention without expected_behavior
+            category="abstention",
+            rubric_version="abst-v1",
+            question="q",
+            reply="r",
+            reference="ref",
+        )
+    )
+
+
+def test_judge_gold_plumbing_roundtrip(monkeypatch, tmp_path):
+    """--plumbing happy path on the fake judge: artifact shape, rf base-id
+    fan-in, label-index keys == input item_ids, and agreement joins with
+    0 unmatched / 0 unlabeled. Never asserts which verdict the fake
+    produced."""
+    import app.eval_runner as runner_module
+
+    fake_settings = Settings(database_uri=UNREACHABLE_URI, provider_mode="fake")
+    monkeypatch.setattr(runner_module, "load_settings", lambda: fake_settings)
+
+    rows = [
+        GoldItem(
+            item_id="ct:sf:001",
+            category="selective_forgetting",
+            rubric_version="sf-v1",
+            question="q1",
+            reply="r1",
+            reference="ref1",
+            superseded="old1",
+            label="pass",
+        ),
+        GoldItem(
+            item_id="ct:sf:002",  # superseded=None exercises the "(none)" fill
+            category="selective_forgetting",
+            rubric_version="sf-v1",
+            question="q2",
+            reply="r2",
+            reference="ref2",
+            label="fail",
+        ),
+        GoldItem(
+            item_id="ct:abst:001",
+            category="abstention",
+            rubric_version="abst-v1",
+            question="q3",
+            reply="r3",
+            reference="ref3",
+            expected_behavior="abstain",
+            label="fail",
+        ),
+        GoldItem(
+            item_id="ct:abst:002",
+            category="abstention",
+            rubric_version="abst-v1",
+            question="q4",
+            reply="r4",
+            reference="ref4",
+            expected_behavior="answer",
+            label="pass",
+        ),
+        GoldItem(
+            item_id="ct:rf:001:fact0",
+            category="reconstruction_faithfulness",
+            rubric_version="rf-v1",
+            fact="fact A",
+            telling="telling A",
+            label="supported",
+        ),
+        GoldItem(
+            item_id="ct:rf:002:fact0",
+            category="reconstruction_faithfulness",
+            rubric_version="rf-v1",
+            fact="fact B",
+            telling="telling B",
+            label="unsupported",
+        ),
+    ]
+    gold_in = tmp_path / "constructed.jsonl"
+    gold_in.write_text("".join(gold_line(r) + "\n" for r in rows), encoding="utf-8")
+    out = tmp_path / "artifact.json"
+    assert _cmd_judge_gold(_judge_gold_args(gold_in=gold_in, out=out)) == 0
+
+    artifact = json.loads(out.read_text(encoding="utf-8"))
+    assert artifact["verb"] == "judge-gold"
+    assert artifact["plumbing_only"] is True
+    assert artifact["provider_mode"] == "fake"
+    assert "models" in artifact and "gold_in" in artifact
+    judged = artifact["judged"]
+    assert judged["judge_tokens"]["usd"] is None  # keyless: unpriced
+    items = judged["items"]
+    assert len(items) == 6
+    rf_items = [i for i in items if i["category"] == "reconstruction_faithfulness"]
+    assert {i["item_id"] for i in rf_items} == {"ct:rf:001", "ct:rf:002"}
+    for item in rf_items:
+        assert len(item["facts"]) == 1  # single-fact by the verb's contract
+    for item in items:
+        assert item["judge_failed"] is False
+        validate_verdict(
+            item["category"],
+            item["verdict"],
+            n_facts=len(item.get("facts", [])),
+        )
+    # The join contract: every input row id resolves in the label index.
+    assert set(_judge_label_index(artifact)) == {r.item_id for r in rows}
+
+    agreement_out = tmp_path / "agreement.json"
+    _cmd_agreement(
+        argparse.Namespace(gold=gold_in, artifact=out, kappa_bar=0.6, out=agreement_out)
+    )  # exit code depends on the fake's verdicts — structural checks only
+    report = json.loads(agreement_out.read_text(encoding="utf-8"))
+    assert report["unmatched"] == 0
+    assert report["unlabeled"] == 0
+    assert {c: v["n"] for c, v in report["categories"].items()} == {
+        "selective_forgetting": 2,
+        "abstention": 2,
+        "reconstruction_faithfulness": 2,
+    }
