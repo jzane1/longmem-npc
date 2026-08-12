@@ -68,6 +68,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Eval-harness stage 2 — session rulings + build record — 2026-08-05](#eval-harness-stage-2--session-rulings--build-record--2026-08-05)
 - [Eval-harness stage 3 — session rulings + build record — 2026-08-07](#eval-harness-stage-3--session-rulings--build-record--2026-08-07)
 - [Unity state is ordinary repo state — 2026-08-07](#unity-state-is-ordinary-repo-state--2026-08-07)
+- [Gold-label workaround + measurement-line rulings — 2026-08-12](#gold-label-workaround--measurement-line-rulings--2026-08-12)
 
 ## Primary decisions
 
@@ -2726,3 +2727,70 @@ proofs that the gate run itself perturbed nothing — not a standing keep-the-sc
 rule; they are superseded only to the extent anyone read them as one. Gate re-runs still
 avoid *incidental* scene writes during verification, but a deliberate, inspected scene save
 is now ordinary work.
+
+## Gold-label workaround + measurement-line rulings — 2026-08-12
+
+**Context.** The queued session-opener was Jack's offline hand-labeling of the 78 blind gold
+rows. Jack ruled he cannot make time for it and directed a workaround that keeps the line
+moving. Plan-approval exploration also surfaced an independent structural blocker no labeler
+could have fixed: the judge's own verdicts on the emitted candidates are one-sided
+(reconstruction-faithfulness 30/30 `supported`, abstention 23/24 `pass`), so Cohen's kappa for
+those two categories is undefined-or-zero by arithmetic **regardless of who labels** — the
+hand-labeling plan would have hit this wall too; `cohen_kappa`'s honest-None comment names the
+fix ("class balance in the gold set"). Four forks settled at plan approval (the
+AskUserQuestion batch; three recommended options taken, one alternative chosen).
+
+1. **Reference labels come from a single careful model pass** (one fresh-context Claude
+   Fable 5 subagent; blind — it receives the gold file and the rubric texts only, never the
+   artifact, the verdicts, or the aggregate verdict distributions). The gold set's epistemic
+   status changes from human-labeled to strong-model-labeled: `agreement` now measures
+   judge-vs-reference-model concordance, not judge-vs-human, and the docs' "hand labels"
+   wording is re-worded source-neutrally ("reference labels"). Jack's standing right to
+   relabel is explicit — any row he later re-labels wins, and `agreement` re-runs in seconds.
+   Rater class: Fable 5, because Opus is the judge's own class (self-agreement inflation) and
+   haiku/sonnet-5 are the compare arms — the fork-3 logic applied to the rater. The
+   2026-07-22 "hand-labeled gold set" intent (proven rigor for the LLM judge) is carried
+   forward by ruling 2's constructed-truth rows, whose labels are independent of any model's
+   judgment. **Rejected:** a three-rater panel with majority vote + inter-rater kappa (Jack
+   chose the single pass); parking `agreement` until Jack can label (quotability blocked
+   indefinitely).
+
+2. **Class balance comes from a constructed-truth gold set** — a second, clearly-separated
+   gold file of authored rows whose true labels are known **by construction**: perturbed
+   tellings that contradict or fabricate against their gist fact (`unsupported`) beside
+   faithful paraphrases (`supported`); replies that swallow a false premise (`fail`) beside
+   correct abstentions/answers (`pass`). Class-BALANCED by design — one-sided construction
+   would re-create the degenerate-kappa trap. A new small `judge-gold` verb (the sixth:
+   gold-shaped rows in, real-judge verdicts out in an artifact-shaped JSON `agreement` can
+   consume) grades them fresh; the resulting kappa measures **judge discrimination on known
+   cases**, a stronger claim than concordance. Selective-forgetting is skipped — its natural
+   marginals (18/6) already support a defined kappa. **Rejected:** naturals-only
+   (rf/abstention stay unquotable until the system produces natural failures — the system
+   passing is exactly what starves the gold set); re-emitting more facts (all 89 are still
+   88/1 — no balance to be had).
+
+3. **Scope: the full line runs in one autonomous pass** — labels → `agreement` → the
+   constructed-truth round → BOTH queued compares (haiku vs sonnet-5, haiku vs
+   sonnet-5-thinking-off; each vs the incumbent is the reading of the queued "± thinking-off"
+   check) → the pairwise gold round → the B3 stage-4 ablation build. Stop-and-report on any
+   bar failure, spec conflict, or ruling-shaped question. **R7's ruling and the
+   dialogue-model re-ruling remain Jack's — this run delivers deciding data only.**
+   **Rejected:** stopping after the compares (B3 held for its own session); agreement-only.
+
+4. **Fork 11 (stage 4): correction-anchored chains are excluded from the ablation arms** —
+   the spec's own recommendation — and at runtime a correction-anchored miss still
+   reconstructs normally with the knob at 0 (blanking its gist would delete the correction
+   itself). **Rejected:** a third arm measuring exactly that OFF behavior (answers a question
+   R7 doesn't need, at ~+50% runtime); skipping those misses when OFF (correction chains
+   would never reconstruct while the knob is 0, making the OFF arm less comparable).
+
+**Preservation consequence:** the only real judged artifact —
+`data\eval\runs\run_20260807T193049Z_pid_31688.json`, the file the gold labels join against —
+was gitignored and single-copy (flagged at the 2026-08-07 wrap; losing it orphans the labels).
+A curated copy now lives tracked at `data\eval\gold\run-2026-08-07-judged-artifact.json`;
+`data\eval\runs\` itself stays gitignored (fork 7 stands).
+
+**Supersession note:** this entry supersedes the 2026-08-07 stage-3 entry's sequencing clause
+"Jack labels offline" (ruling 3 there). The substance of that ruling — labeling is blind, from
+the gold file only, verdicts live in the artifact — is unchanged and enforced by the labeling
+protocol above.
