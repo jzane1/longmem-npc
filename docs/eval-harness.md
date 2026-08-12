@@ -229,6 +229,25 @@ Footer updated: the binding promise is now the binding.
   paired |Δ| beside gist-precision and fabrication per arm. Real-mode for signal; the
   fake-mode run is the plumbing gate only.
 
+  **BUILT 2026-08-12** (the dated workaround + build entries in `decisions.md`; the
+  twenty-fourth `floors.md` row — independent floor-verifier pass, 7/7). As specced, with
+  three recorded physical shapes: at runtime with the knob at 0, a correction-anchored miss
+  still reconstructs normally — serve() partitions the call slots into a no-gist group and a
+  normal group (fork 11's ruling applied to the runtime path, not only arm composition); the
+  paired report keys on `(scenario_id, memory_ref)` — per-arm memory UUIDs differ across
+  scratch DBs, so both are carried as provenance and the contract's `memory_id` wording reads
+  through the ref; and the knob is deliberately NOT in `compose_cache_key` — arms live on
+  separate scratch DBs, and a live mid-process flip could serve stale-keyed text (the
+  kill-switch caveat: flip it at provisioning boundaries, never mid-scene). The corpus is
+  `data\eval\corpora\ablation-fixture.jsonl` (3 scenarios × 8 observes, observe/as_of only,
+  both decay classes pinned equal + `decay_k_importance` 0.0 so bands are deterministic and
+  identical across arms). **The first real run (R7's deciding data, ruling OPEN):** 24/24
+  paired and drift-checked, 0 band mismatches, drift p50/p95/max ON 0.05/0.16/0.1748 vs OFF
+  0.04/0.15/0.1594, **0 over-budget in either arm**, mean paired |Δ| 0.056 — the budget is
+  blind to the constraint — while **gist-precision drops 0.8335 → 0.7036** with the
+  constraint removed (lexical fabrication 0.0 both arms; that detector's known bluntness is
+  the stage-3 63-vs-2 finding).
+
 ## Settle-at-build forks
 
 Ruled at stage-1 plan approval or settled at build as authorized; later-stage forks stay open
@@ -246,7 +265,7 @@ until their stage builds.
 | 8 | conftest adoption of `provision_scratch` | **Deferred** (ruled at stage-2 build) — the suite's fixture spine stays byte-untouched; the shim keeps conftest + all seven walkers unmodified |
 | 9 | Prose-quality rubric dimensions | **Naturalness / character-consistency / memory-grounding / brevity, each 1–5** (ruled 2026-08-07; built as pp-v1) — plus an overall a/b/tie preference, position-swapped |
 | 10 | `drift-validate` corpus schema | **Subset of the scenario schema — one loader** (built, stage 2): observe/as_of only, `assert_corpus_shape` states the restriction |
-| 11 | Ablation OFF semantics on correction-anchored chains | Recommendation: exclude from ablation arms (stage 4); a third arm measuring exactly that is the alternative |
+| 11 | Ablation OFF semantics on correction-anchored chains | **Exclude from ablation arms** (ruled 2026-08-12, built stage 4) — the corpus is observe/as_of-only by construction, and at runtime a knob-0 correction-anchored miss still reconstructs normally (blanking its gist would delete the correction). Rejected: a third arm measuring exactly that (~+50% runtime for a question R7 doesn't need); skipping those misses when OFF (correction chains would never reconstruct while the knob is 0) |
 | 12 | Gold-set size | **~20–30 items/category** (ruled 2026-08-07) — `emit-gold --limit-per-category` defaults to 30; candidates emitted from the stage-3 real smoke, prose-pairwise gold arrives with the first real compare |
 
 Stage-1 physical shapes settled at build (the [SETTLE-AT-BUILD] latitude): the wire payload

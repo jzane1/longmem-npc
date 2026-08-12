@@ -70,6 +70,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Unity state is ordinary repo state — 2026-08-07](#unity-state-is-ordinary-repo-state--2026-08-07)
 - [Gold-label workaround + measurement-line rulings — 2026-08-12](#gold-label-workaround--measurement-line-rulings--2026-08-12)
 - [Judge validation numbers — the agreement bar rules — 2026-08-12](#judge-validation-numbers--the-agreement-bar-rules--2026-08-12)
+- [Eval-harness stage 4 — build record + R7's deciding data — 2026-08-12](#eval-harness-stage-4--build-record--r7s-deciding-data--2026-08-12)
 
 ## Primary decisions
 
@@ -2832,3 +2833,46 @@ set became the real run — the live `.env` runs real mode and `--plumbing` *per
 never forces it. The mechanics had already been fake-verified by Set I's plumbing round-trip
 test, the join check came back clean, and the spend ($0.16) sat inside the round's budget, so
 the result stands as the real measurement rather than being re-bought.
+
+## Eval-harness stage 4 — build record + R7's deciding data — 2026-08-12
+
+**Context.** B3 of the roadmap, built the same session as the workaround entry above (scope
+ruling 3 there authorized the full line). Spec: the stage-4 contract paragraph in
+`eval-harness.md`; fork 11 ruled in the workaround entry (ruling 4). Floor: the twenty-fourth
+`floors.md` row — independent floor-verifier pass, 7/7, every real-artifact aggregate
+recomputed from the raw rows.
+
+**Build latitude (the [SETTLE-AT-BUILD] shapes, recorded with rationale):** the runtime
+knob-0 path for a correction-anchored miss is the PARTITION — serve() splits call slots into
+a no-gist group and a normal group, so those chains always retell from the corrected head
+(fork 11 applied to runtime, not only arm composition; the cheap skip-those-misses
+alternative would leave correction chains never reconstructing while the knob is 0); the
+paired report keys on `(scenario_id, memory_ref)` with both arms' memory UUIDs carried as
+provenance — per-arm UUIDs differ across scratch DBs, so the contract's `memory_id` pairing
+is only realizable through the ref; the knob is deliberately NOT in `compose_cache_key`
+(arms live on separate scratch DBs; a live mid-process flip could serve stale-keyed text —
+flip at provisioning boundaries, never mid-scene); the drift-validate replay core was
+extracted as `replay_aged_probe` and shared (behavior preserved — stage-2 tests and the
+42-assertion reconstruction walker re-run green by the floor-verifier); the corpus
+(`ablation-fixture.jsonl`, 3 × 8 observes, two `as_of` clusters) pins BOTH decay classes to
+2160000.0 + `decay_k_importance` 0.0 so bands are deterministic and identical across arms
+(measured: bands 2 and 3, 0 mismatches in 24 pairs).
+
+**R7's deciding data (the first real run; artifact numbers quoted per fork 7, re-verified by
+the floor-verifier):** 24/24 paired and drift-checked in both arms. Cosine drift
+candidate-vs-anchor: gist-ON p50 0.05 / p95 0.16 / max 0.1748; gist-OFF p50 0.04 / p95 0.15 /
+max 0.1594; mean paired |Δ| 0.056; **zero over-budget items in either arm against the 0.35
+threshold.** Gist-precision mean: **0.8335 with the constraint ON vs 0.7036 with it OFF.**
+Lexical fabrication rate 0.0 in both arms (the stage-3 63-vs-2 finding already established
+that detector's bluntness — semantic fabrication is the judge's surface).
+
+**What the data says (the ruling itself stays OPEN — Jack's):** the drift budget is blind to
+the gist constraint. Retellings produced WITHOUT the fixed-facts constraint drift no further
+in embedding space than constrained ones — every unconstrained retelling sailed far under
+the 0.35 budget — while content-level faithfulness measurably degrades (13 points of
+gist-precision). R7's 2026-07-22 concern is confirmed by construction: the budget cannot
+catch a retelling that stays in the anchor's semantic neighborhood while dropping or
+altering fixed facts. The candidate resolutions (metric change, threshold change, or the
+layered answer — budget for embedding drift + gist-precision/judged faithfulness for
+content) are Jack's to weigh; every option's measurement instrument now exists and is
+validated.
