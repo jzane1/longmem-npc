@@ -72,6 +72,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Judge validation numbers — the agreement bar rules — 2026-08-12](#judge-validation-numbers--the-agreement-bar-rules--2026-08-12)
 - [Eval-harness stage 4 — build record + R7's deciding data — 2026-08-12](#eval-harness-stage-4--build-record--r7s-deciding-data--2026-08-12)
 - [R7 resolved — the drift budget is a topic guard, not a fact guard — 2026-08-12](#r7-resolved--the-drift-budget-is-a-topic-guard-not-a-fact-guard--2026-08-12)
+- [Dialogue model re-ruled — haiku stands, latency rules — 2026-08-12](#dialogue-model-re-ruled--haiku-stands-latency-rules--2026-08-12)
 
 ## Primary decisions
 
@@ -2907,3 +2908,37 @@ unconstrained retellings sit FAR under 0.35 — no threshold separates them, so 
 manufactures false refusals on faithful retellings); dropping the budget (it still catches the
 failure class it was built for — wholesale nonsense, topic-swaps, and the degenerate-embedding
 fail-closed path).
+
+## Dialogue model re-ruled — haiku stands, latency rules — 2026-08-12
+
+**Ruled (Jack, closing the 2026-07-29 deferral on the first real compares' data).** The
+dialogue role stays **haiku** (`claude-haiku-4-5-20251001`). Perceived time-to-first-word is
+the decisive axis, and sonnet-5 takes too long: **943 ms p50 for haiku vs 2626 ms (sonnet-5)
+and 2086 ms (sonnet-5 thinking-off)** — both sonnet variants sit far over the 1 s bar that has
+governed the dialogue seam since the B1 A/B, and ~20% dearer per 100 turns ($0.92–0.94 vs
+$1.12–1.14). This is ruled WITH sonnet-5's prose superiority on the record, not in ignorance
+of it: the Opus judge preferred sonnet-5's prose **46–7** (thinking-on) and **41–9**
+(thinking-off), higher on all four pp-v1 dimensions in both runs. Prose quality does not
+justify the latency.
+
+**What this closes:** the 2026-07-29 "Haiku dialogue" entry's ruling 3 (the deferral —
+"re-assess both once prose quality can actually be scored") is now discharged: BOTH deferred
+questions are answered by measurement. Sonnet-5 dialogue: re-assessed, rejected on latency.
+The B2 thinking-off variant: MEASURED (the 2026-08-07 knob build made it a pure env overlay);
+thinking-off recovers ~21% of sonnet's perceived latency (2626 → 2086 ms) and keeps the prose
+edge, but still runs >2× the bar — so it neither rescues sonnet-5 nor matters for haiku (the
+knob stays available for future arms). `.env` and the committed arm files already carry the
+ruled state; no config change.
+
+**Caveats on the record (stated at ruling time):** the pairwise prose verdicts are below
+their agreement bar (reference-label kappa 0.37 < 0.6 — unquotable as calibrated numbers;
+both instruments agree on DIRECTION, and the ruling's decisive axis is latency, which is
+structural instrumentation, not judged). Judged accuracy showed single-run variance across
+the two compares (0.9688/0.9688 vs 0.901/0.9738) — treated as noise, not signal, and not
+load-bearing for this ruling. Phase D1's full-system pass remains the final model-slate
+confirmation (unchanged).
+
+**Rejected:** sonnet-5 as the dialogue role (prose wins, latency loses — 2.8× the bar);
+sonnet-5-thinking-off (2.2× the bar; the halfway house pays most of the latency for none of
+the bar); re-running the compares for tighter pairwise calibration before ruling (the
+decisive axis is already quotable; more spend would not move it).

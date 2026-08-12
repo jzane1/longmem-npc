@@ -1483,8 +1483,17 @@ session.
     entry in `decisions.md` records it with the rejected alternatives; propagated to
     `architecture.md` §7, `reconstruction.md`, the knob comment in `app\config.py`, the
     stage-4 banner, and `status.md` (R7 → recently-closed; no tuning follow-up — the ruling
-    changed documentation, not the metric). The dialogue-model re-ruling remains the one open
-    item before Phase C1.
+    changed documentation, not the metric).
+  - *Second post-wrap ruling, same session:* **Jack re-ruled the dialogue model — HAIKU
+    stands, latency rules.** Perceived time-to-first-word is decisive (943 ms p50 vs
+    sonnet-5's 2626/2086 ms against the 1 s bar); sonnet-5's 46–7 / 41–9 prose preference is
+    on the record and rejected as not justifying the latency; the B2 thinking-off question is
+    closed by the same measurement (recovers ~21%, still >2× the bar). The dated "Dialogue
+    model re-ruled" entry carries the numbers, caveats (pairwise below its agreement bar —
+    direction-only; latency is structural and quotable), and rejected alternatives; the
+    2026-07-29 deferral is discharged in `architecture.md` and the harness doc. No config
+    change — `.env` and the arm files already carry the ruled state. **Phase B is fully
+    closed; the queue opens at C1 with zero open rulings.**
 
 
 ---

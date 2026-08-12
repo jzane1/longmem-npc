@@ -83,7 +83,11 @@ gist escalation, reflection, reconstruction *(re-confirmed 2026-07-28 — this
 line still said Sonnet-class for reconstruction until 2026-07-29, a propagation miss; §7 carries
 the resolution note)*, and — **ruled 2026-07-29 off the B1 A/B** — streaming dialogue prose
 (sonnet-5 held the dialogue role from the 2026-07-15 slice until then; it and the thinking-off
-variants are re-assessed once the judged-eval harness can score prose). Every model role is an
+variants are re-assessed once the judged-eval harness can score prose. **Re-assessed
+2026-08-12 on the first real compares: HAIKU CONFIRMED — latency rules.** Sonnet-5's prose is
+judge-preferred 46–7, and 41–9 with thinking off, but perceived first word is the decisive
+axis: 943 ms p50 for haiku vs 2626 / 2086 ms — both sonnet variants sit far over the 1 s bar.
+The dated entry in `decisions.md` carries the numbers and caveats). Every model role is an
 integrator knob with its own env var — nothing is hardcoded. **Six vars exist today** and real
 mode requires all six: `LONGMEM_MODEL_` + `IMPORTANCE`, `RENDER`, `TYPOLOGY`, `ESCALATION`,
 `DIALOGUE`, `RECONSTRUCTION`. *(The `BEHAVIOR` role — seven vars, 2026-07-21 to 2026-08-04 —

@@ -5,13 +5,12 @@
 consolidated 2026-08-04.) The 2026-08-12 session executed the full measurement line under the
 gold-label workaround ruling (Jack could not hand-label; the dated entries in `decisions.md`):
 reference labels + `agreement`, the constructed-truth `judge-gold` round, BOTH queued compares,
-the pairwise gold round, and the B3 ablation build + its real run. **R7 is RESOLVED (ruled
-2026-08-12, same day: the budget keeps its mechanism and threshold and is re-scoped as a
-topic guard — docs updated everywhere the claim lived). One ruling still awaits Jack, deciding
-data delivered: the dialogue model — sonnet-5 prose is judge-preferred 46–7 (and 41–9
-thinking-off) but haiku alone meets the 1 s perceived-latency bar (943 ms vs 2626/2086 ms p50)
-at ~20% less cost; pairwise verdicts are NOT yet quotable (reference-label kappa 0.37 < 0.6 —
-the honest gap). After that ruling: Phase C1.** A production robustness gap found by the real runs is
+the pairwise gold round, and the B3 ablation build + its real run. **Both queued rulings are
+RESOLVED (ruled 2026-08-12, same day, on the delivered data): R7 — the budget keeps its
+mechanism and threshold and is re-scoped as a topic guard; the dialogue model — HAIKU stands,
+latency rules (943 ms p50 vs sonnet-5's 2626/2086 ms against the 1 s bar; sonnet's 46–7 prose
+preference acknowledged and rejected as not justifying the latency). NEXT UP: PHASE C1
+(deferred write processing).** A production robustness gap found by the real runs is
 chipped for its own scoped task: model-emitted typology isn't clamped to vocabulary, and one
 malformed value (`observed|told`) killed a compare run at the DB check constraint.
 The system is BUILT end to end on the final A1 seam — backend, C# client + console harness,
@@ -53,23 +52,20 @@ re-openable: re-verifying one is a step, never an argument against a design impr
 
 ## Open questions needing Jack's ruling
 
-- **The dialogue-model re-ruling (queued 2026-07-29, data delivered 2026-08-12).** Both
-  compares ran: sonnet-5 prose is judge-preferred 46–7 (thinking-on) and 41–9 (thinking-off),
-  every prose dimension higher; haiku alone meets the 1 s perceived-first-word bar (943 ms
-  p50 vs 2626 / 2086 ms) at ~20% less cost, equal-or-mixed judged accuracy (0.9688/0.9688 run
-  A; 0.901/0.9738 run B — single-run judged variance). Caveat for the ruling: pairwise
-  verdicts are NOT quotable yet (reference-label kappa 0.37 < 0.6; direction agrees across
-  instruments). Haiku stands until Jack rules otherwise.
+*None open.*
 
-**Recently closed** (pointers; full trail in `decisions.md`): **R7 — resolved 2026-08-12 on
-the stage-4 ablation's data** (the drift budget keeps its mechanism and 0.35 threshold and is
-re-scoped as a TOPIC guard — wholesale nonsense/topic-swaps; factual faithfulness is policed
-by gist-precision (fact survival) and the judged faithfulness category; nothing changes at
-runtime, the claim is corrected in `architecture.md` §7, `reconstruction.md`, the
-`drift_budget_threshold` knob comment, and the stage-4 banner); the 2026-08-04 scope rulings
-(below); haiku ships as the dialogue role + quote embargo lifted (2026-07-29); reconstruction's
-model class — Haiku stands (2026-07-28; re-measured on Haiku 2026-07-29); escalation failure
-path + trigger tuning (2026-07-22/23).
+**Recently closed** (pointers; full trail in `decisions.md`): **the dialogue model — HAIKU
+re-ruled 2026-08-12 on the first real compares** (perceived first word is decisive: 943 ms p50
+vs sonnet-5's 2626/2086 ms against the 1 s bar; sonnet's 46–7 / 41–9 prose preference on the
+record and rejected as not justifying the latency; the thinking-off variant measured and
+closed the same way); **R7 — resolved 2026-08-12 on the stage-4 ablation's data** (the drift
+budget keeps its mechanism and 0.35 threshold and is re-scoped as a TOPIC guard — wholesale
+nonsense/topic-swaps; factual faithfulness is policed by gist-precision (fact survival) and
+the judged faithfulness category; nothing changes at runtime, the claim is corrected in
+`architecture.md` §7, `reconstruction.md`, the `drift_budget_threshold` knob comment, and the
+stage-4 banner); the 2026-08-04 scope rulings (below); haiku ships as the dialogue role +
+quote embargo lifted (2026-07-29); reconstruction's model class — Haiku stands (2026-07-28;
+re-measured on Haiku 2026-07-29); escalation failure path + trigger tuning (2026-07-22/23).
 
 ## The roadmap (re-planned 2026-08-04; ordering delegated to Claude on efficiency grounds)
 

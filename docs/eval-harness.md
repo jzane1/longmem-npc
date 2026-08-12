@@ -66,7 +66,9 @@ queued 2026-07-29 deferral) open the next session once labels exist.
    (LongMemEval 2410.10813 / LME-V2 2605.12493 premise-awareness rubric), reconstruction-
    faithfulness (LoCoMo 2402.17753 FactScore **retargeted**: gist-precision expected ~100%,
    detail-recall allowed to decay), plus a **prose-quality pairwise rubric** — the deferred
-   instrument for the sonnet-5-vs-haiku and B2 thinking-off re-assessments (ruled 2026-07-29).
+   instrument for the sonnet-5-vs-haiku and B2 thinking-off re-assessments (ruled 2026-07-29;
+   **discharged 2026-08-12** — both compares ran and Jack re-ruled HAIKU on latency, the
+   dated entry in `decisions.md`).
    FAMA stale-leakage and the MemTrace trajectory probe are deferred (scope boundary).
 4. **Judge-free metric layer** (ruled 2026-07-22): gist-precision / detail-recall from existing
    gist spans + spaCy lemmas — no judge call; binned by decay band via the reconstruction
