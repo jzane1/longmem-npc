@@ -69,6 +69,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Eval-harness stage 3 — session rulings + build record — 2026-08-07](#eval-harness-stage-3--session-rulings--build-record--2026-08-07)
 - [Unity state is ordinary repo state — 2026-08-07](#unity-state-is-ordinary-repo-state--2026-08-07)
 - [Gold-label workaround + measurement-line rulings — 2026-08-12](#gold-label-workaround--measurement-line-rulings--2026-08-12)
+- [Judge validation numbers — the agreement bar rules — 2026-08-12](#judge-validation-numbers--the-agreement-bar-rules--2026-08-12)
 
 ## Primary decisions
 
@@ -2794,3 +2795,40 @@ A curated copy now lives tracked at `data\eval\gold\run-2026-08-07-judged-artifa
 "Jack labels offline" (ruling 3 there). The substance of that ruling — labeling is blind, from
 the gold file only, verdicts live in the artifact — is unchanged and enforced by the labeling
 protocol above.
+
+## Judge validation numbers — the agreement bar rules — 2026-08-12
+
+**The instrument's meta-eval, run per the workaround entry above.** Two `agreement` runs, both
+joins clean (0 unmatched, 0 unlabeled), reports under `data\eval\runs\` with the two artifacts
+preserved tracked in `data\eval\gold\`.
+
+**Naturals** (the 78-row blind gold file, single-pass Fable-5 reference labels vs the
+2026-08-07 real smoke's Opus verdicts): **selective_forgetting kappa 0.7500** (n 24, raw
+0.9167) — PASS; **abstention kappa 1.0000** (n 24, raw 1.0000; the reference pass and the
+judge flagged the same single failure) — PASS; **reconstruction_faithfulness undefined —
+degenerate marginals** (n 30, raw 1.0000, both raters all-`supported`) — FAIL by arithmetic,
+the predicted outcome that motivated the constructed-truth ruling. Reference-label marginals:
+sf 20/4, abstention 23/1, rf 30/0.
+
+**Constructed truth** (`constructed-2026-08-12.jsonl`, 34 authored rows with labels true by
+construction — rf 9 supported / 9 unsupported spanning contradiction, reversal, quantity
+change, specifics-replacement, and omission; abstention 8 pass / 8 fail spanning invented
+answers, wrong refusals, premise corrections, and correct answers — judged fresh by Opus 4.8
+via `judge-gold`): **reconstruction_faithfulness kappa 1.0000 (n 18), abstention kappa 1.0000
+(n 16), raw 1.0000 both — the judge discriminated every known case correctly.** Judge spend
+13,654/3,779 tokens ($0.16), ~34 calls.
+
+**Quotability, per category (the bar rules):** sf and abstention judged numbers are quotable
+(naturals concordance ≥ 0.6, plus perfect abstention discrimination); rf judged numbers are
+quotable **on the discrimination instrument's authority** — natural-rf concordance stays
+honestly degenerate until the system produces natural failures, while the judge provably
+detects contradiction, reversal, quantity drift, replacement, and omission when they exist.
+The naturals `agreement` run exits 1 on the rf degeneracy by design; the constructed run
+exits 0. Prose-pairwise gold has no instrument yet — it arrives with the first real compare
+(fork 12), and its verdicts stay unquotable until that round's agreement passes.
+
+**Process honesty note:** the intended fake-mode dry-run of `judge-gold` on the constructed
+set became the real run — the live `.env` runs real mode and `--plumbing` *permits* fake,
+never forces it. The mechanics had already been fake-verified by Set I's plumbing round-trip
+test, the join check came back clean, and the spend ($0.16) sat inside the round's budget, so
+the result stands as the real measurement rather than being re-bought.
