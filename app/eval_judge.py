@@ -308,7 +308,9 @@ def pareto_non_dominated(rows: list[dict]) -> list[bool]:
 
 # ---------------------------------------------------------------------------
 # Gold rows (fork 12: ~20-30 items/category, emitted from the stage-3 real
-# smoke; Jack hand-fills `label`, blind — verdicts never appear in gold rows)
+# smoke; `label` fills blind — verdicts never appear in gold rows. Since the
+# 2026-08-12 workaround ruling the labeler is a blind single-pass reference
+# model; any row Jack relabels wins.)
 # ---------------------------------------------------------------------------
 
 GOLD_LABELS: dict[str, frozenset[str]] = {
@@ -357,7 +359,8 @@ class GoldItem(_StrictModel):
 
 def gold_line(item: GoldItem) -> str:
     """Serialize one gold row: None display fields dropped, `label` always
-    present (it is the field Jack fills — a missing key would hide the ask)."""
+    present (it is the field the labeler fills — a missing key would hide
+    the ask)."""
     payload = item.model_dump(exclude_none=True)
     payload["label"] = item.label
     return json.dumps(payload, ensure_ascii=False)

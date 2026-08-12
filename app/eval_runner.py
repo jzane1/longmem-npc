@@ -2344,10 +2344,10 @@ def main() -> None:
 
     agreement_parser = verbs.add_parser(
         "agreement",
-        help="hand labels vs judge verdicts: raw %% + Cohen's kappa per category",
+        help="reference labels vs judge verdicts: raw %% + Cohen's kappa per category",
     )
     agreement_parser.add_argument(
-        "--gold", type=Path, required=True, help="hand-labeled gold JSONL"
+        "--gold", type=Path, required=True, help="labeled gold JSONL"
     )
     agreement_parser.add_argument(
         "--artifact", type=Path, required=True, help="the judged artifact to score"
