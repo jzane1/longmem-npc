@@ -73,6 +73,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Eval-harness stage 4 — build record + R7's deciding data — 2026-08-12](#eval-harness-stage-4--build-record--r7s-deciding-data--2026-08-12)
 - [R7 resolved — the drift budget is a topic guard, not a fact guard — 2026-08-12](#r7-resolved--the-drift-budget-is-a-topic-guard-not-a-fact-guard--2026-08-12)
 - [Dialogue model re-ruled — haiku stands, latency rules — 2026-08-12](#dialogue-model-re-ruled--haiku-stands-latency-rules--2026-08-12)
+- [Typology robustness ruled — clamp at the parse seam — 2026-08-12](#typology-robustness-ruled--clamp-at-the-parse-seam--2026-08-12)
 
 ## Primary decisions
 
@@ -2942,3 +2943,43 @@ confirmation (unchanged).
 sonnet-5-thinking-off (2.2× the bar; the halfway house pays most of the latency for none of
 the bar); re-running the compares for tighter pairwise calibration before ruling (the
 decisive axis is already quotable; more spend would not move it).
+
+## Typology robustness ruled — clamp at the parse seam — 2026-08-12
+
+**Ruled (Jack, closing the gap the first thinking-off compare exposed).** Model-emitted
+typology is **CLAMPED to vocabulary at the write-call parse seam** before it can reach the
+insert. The crash: the write prompt lists the options as
+`typology (one of observed|told|inferred|reflected)`, and one real call echoed the option
+syntax back (`"observed|told"`); `RealWriteProvider` passed it through as a bare `str()`,
+ingest adopted it verbatim, and `memories_typology_check` — the only tooth — killed the
+whole request mid-compare (~6 min of real spend, no artifact).
+
+**The clamp's shape (build latitude, recorded):** `clamp_typology` in `app\providers.py`
+beside the new module-level `TYPOLOGY_VOCABULARY` tuple — in-vocabulary values pass through
+byte-untouched; otherwise the FIRST vocabulary member found in the string wins (the model's
+leading choice: `"observed|told"` → `observed`); a value containing no member returns None,
+which flows into ingest's **existing** undeclared-typology default path (config
+`typology_default` → `TYPOLOGY_FALLBACK`) — zero new ingest logic. A clamp-to-None also
+drops the parsed confidence (a label the vocabulary rejected has no meaningful confidence;
+ingest's default branch knob-defaults both together). Never silent — every clamp logs the
+raw value at WARNING. The clamp lives provider-side (the 2026-07-21 parse-hardening home),
+NOT in ingest: the **declared** path is already safe by wire contract (`schemas.Typology` is
+a `Literal` — an out-of-vocabulary client declaration 422s at the schema boundary and must
+stay a loud client error, never a silent rewrite of an integrator's explicit input). The
+fake provider's `TYPOLOGIES` now references the shared tuple, and the degradation suite
+asserts the wire `Literal`, the vocabulary constant, and the fake stay identical
+(migration 001's SQL copy is fixed by the applied-migration immutability rule). Verified:
+the new structural test (the real crash value among its cases), suite `-m "not nlp"` **82**,
+`verify_write_path.py` **53/53** — the write-path floor holds.
+
+**Rejected:** re-ask the model (a retry call per malformed value — write-path latency and
+cost spent on a string that is salvageable locally); degrade the observe (drops a real
+observation over a label formatting slip — the observation text, render, and importance are
+all good; only the label needed normalizing); leaving the DB constraint as the only guard
+(the status quo that cost the run).
+
+**Flagged in passing, not built (the same hazard class, one seat over):**
+`typology_confidence` is converted with `float()` in the return expression OUTSIDE the
+parse's try/except — a model emitting a non-numeric confidence (e.g. `"high"`) would still
+crash the request rather than degrade to `MalformedOutputError`. Small, unruled; carried in
+`status.md`.

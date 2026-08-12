@@ -1494,6 +1494,19 @@ session.
     2026-07-29 deferral is discharged in `architecture.md` and the harness doc. No config
     change — `.env` and the arm files already carry the ruled state. **Phase B is fully
     closed; the queue opens at C1 with zero open rulings.**
+  - *Third post-wrap ruling, same session:* **Jack ruled the typology fork CLAMP** (the chip
+    superseded — executed in-session instead). Built at the parse seam in `app\providers.py`:
+    `TYPOLOGY_VOCABULARY` + `clamp_typology` (in-vocab passes through; first vocabulary member
+    found in a malformed value wins — `observed|told` → `observed`; no member → None → ingest's
+    existing `typology_default` path; confidence dropped with an unusable label; every clamp
+    logged). The declared path stays a loud 422 by wire contract — clamping applies only to
+    model output. New structural test in the degradation suite (the real crash value among its
+    cases + the tri-source vocabulary canary); suite `-m "not nlp"` **82**;
+    `verify_write_path.py` **53/53** — the write-path floor holds. Flagged in passing, carried
+    unruled in `status.md`: `typology_confidence`'s `float()` sits outside the parse try —
+    a non-numeric confidence would still crash rather than degrade (same class, one seat
+    over). The dated "Typology robustness ruled" entry carries the shape and the rejected
+    alternatives (re-ask; degrade-the-observe; status quo).
 
 
 ---

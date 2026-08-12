@@ -31,7 +31,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import math
+import re
 import time
 from collections.abc import Iterator
 from dataclasses import dataclass, field
@@ -44,6 +46,44 @@ from app.config import (
     ConfigError,
     Settings,
 )
+
+
+logger = logging.getLogger(__name__)
+
+# The typology vocabulary — one tuple, mirrored three ways: the wire Literal
+# (schemas.Typology), the fake provider's hash-pick, and migration 001's
+# memories_typology_check. The degradation suite asserts the Python copies
+# stay identical; the SQL copy is fixed by the applied-migration immutability
+# rule.
+TYPOLOGY_VOCABULARY = ("observed", "told", "inferred", "reflected")
+
+
+def clamp_typology(raw: str) -> str | None:
+    """Clamp a model-emitted typology to the vocabulary (ruled 2026-08-12).
+
+    The write prompt lists the options as `observed|told|inferred|reflected`,
+    and a real call echoed the option syntax back (`"observed|told"`) —
+    un-clamped, that value reaches `memories_typology_check` and the
+    CheckViolation kills the whole request (it cost a compare run on
+    2026-08-12). In-vocabulary values pass through untouched; otherwise the
+    FIRST vocabulary member found in the string wins (the model's leading
+    choice); a string containing none returns None, which flows into
+    ingest's existing undeclared-typology default path (config
+    `typology_default` -> TYPOLOGY_FALLBACK). Never silent: every clamp
+    logs the raw value.
+    """
+    if raw in TYPOLOGY_VOCABULARY:
+        return raw
+    for token in re.findall(r"[a-z]+", raw.lower()):
+        if token in TYPOLOGY_VOCABULARY:
+            logger.warning("write-call typology %r clamped to %r", raw, token)
+            return token
+    logger.warning(
+        "write-call typology %r contains no vocabulary member; deferring to "
+        "the undeclared-typology default path",
+        raw,
+    )
+    return None
 
 
 class ProviderCallError(RuntimeError):
@@ -251,7 +291,7 @@ def _stable_unit_float(text: str, salt: str) -> float:
 class FakeWriteProvider:
     """Echo render + hash-derived scores. Deterministic, keyless."""
 
-    TYPOLOGIES = ("observed", "told", "inferred", "reflected")
+    TYPOLOGIES = TYPOLOGY_VOCABULARY
 
     def render_and_score(
         self,
@@ -679,11 +719,20 @@ class RealWriteProvider:
                 input_tokens=input_tokens,
                 output_tokens=output_tokens,
             ) from exc
+        # Clamp the model-emitted label to vocabulary (ruled 2026-08-12); a
+        # clamp-to-None also drops the confidence — a label the vocabulary
+        # rejected has no meaningful confidence, and ingest's default branch
+        # knob-defaults both together.
+        clamped = clamp_typology(str(typology)) if typology is not None else None
         return WriteCallResult(
             rendered_content=rendered,
             importance_raw=importance,
-            typology=str(typology) if typology is not None else None,
-            typology_confidence=float(confidence) if confidence is not None else None,
+            typology=clamped,
+            typology_confidence=(
+                float(confidence)
+                if confidence is not None and clamped is not None
+                else None
+            ),
             input_tokens=input_tokens,
             output_tokens=output_tokens,
         )

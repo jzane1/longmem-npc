@@ -10,9 +10,10 @@ RESOLVED (ruled 2026-08-12, same day, on the delivered data): R7 — the budget 
 mechanism and threshold and is re-scoped as a topic guard; the dialogue model — HAIKU stands,
 latency rules (943 ms p50 vs sonnet-5's 2626/2086 ms against the 1 s bar; sonnet's 46–7 prose
 preference acknowledged and rejected as not justifying the latency). NEXT UP: PHASE C1
-(deferred write processing).** A production robustness gap found by the real runs is
-chipped for its own scoped task: model-emitted typology isn't clamped to vocabulary, and one
-malformed value (`observed|told`) killed a compare run at the DB check constraint.
+(deferred write processing).** The robustness gap the real runs exposed — model-emitted
+typology reaching the DB check unclamped (`observed|told` killed a compare run) — was **ruled
+CLAMP and built the same day** (the dated entry in `decisions.md`; suite 82, write-path
+walker 53/53).
 The system is BUILT end to end on the final A1 seam — backend, C# client + console harness,
 Unity adapter + gray-box scene, The Ledger, eval-harness stages 1–4 — schema frozen at
 migrations 001–005. What is proven lives in `docs\floors.md`, why in `decisions.md`, the
@@ -201,9 +202,10 @@ not vendored).
   "database does not exist" as a 30 s `PoolTimeout`; recreated + migrated 001–005 in-session.)*
   *(The other three 2026-07-28 carried items — the auth honesty paragraph, the Unity MCP pin,
   the DLL staleness check — are now scheduled: Phase F.)*
-- **Write-path typology robustness (found 2026-08-12, chipped for its own task):** the real
-  write model can emit an out-of-vocabulary typology union (`observed|told`); nothing clamps
-  it before INSERT, so the `memories_typology_check` constraint fires and the exception kills
-  the whole run (it cost one compare run ~6 min of real spend; the retry passed). The fork —
-  clamp vs re-ask vs degrade-per-observe — is Jack's; production write-path code, settle at
-  spec.
+- **Write-path `typology_confidence` parse seat (flagged 2026-08-12 while building the
+  typology clamp, unruled):** the confidence value is `float()`-converted outside the write
+  parse's try/except, so a model emitting a non-numeric confidence (e.g. `"high"`) would
+  still crash the request instead of degrading to `MalformedOutputError`. Same hazard class
+  as the (now closed) typology gap, one seat over; small fix, wants its own ruling on
+  degrade-vs-default semantics. *(The typology gap itself was ruled CLAMP and built
+  2026-08-12 — the dated entry in `decisions.md`; suite 82, write-path walker 53/53.)*

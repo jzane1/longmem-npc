@@ -551,3 +551,33 @@ def test_correction_nlp_failure_all_or_nothing(scene, monkeypatch):
         assert await ctx.chain(m) == chain_before  # still nothing written
 
     run_structural(scene, scenario)
+
+
+def test_typology_clamp_vocabulary_and_semantics():
+    """The 2026-08-12 clamp ruling (a real write call echoed the prompt's
+    option syntax back as `observed|told` and the DB check killed the whole
+    request): in-vocabulary values pass through; a malformed value salvages
+    the FIRST vocabulary member it contains; a value containing none falls
+    to None — ingest's existing undeclared-typology default path. The
+    vocabulary constant must match the wire Literal and the fake provider
+    (migration 001's check mirrors it by the applied-migration immutability
+    rule)."""
+    from typing import get_args
+
+    from app.providers import (
+        TYPOLOGY_VOCABULARY,
+        FakeWriteProvider,
+        clamp_typology,
+    )
+    from app.schemas import Typology
+
+    assert TYPOLOGY_VOCABULARY == tuple(get_args(Typology))
+    assert FakeWriteProvider.TYPOLOGIES == TYPOLOGY_VOCABULARY
+    for member in TYPOLOGY_VOCABULARY:
+        assert clamp_typology(member) == member
+    assert clamp_typology("observed|told") == "observed"  # the real crash value
+    assert clamp_typology("told|observed") == "told"  # first member wins
+    assert clamp_typology("Reflected.") == "reflected"  # case + punctuation
+    assert clamp_typology("one of observed|told") == "observed"
+    assert clamp_typology("hearsay") is None
+    assert clamp_typology("") is None
