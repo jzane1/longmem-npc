@@ -1508,6 +1508,52 @@ session.
     over). The dated "Typology robustness ruled" entry carries the shape and the rejected
     alternatives (re-ask; degrade-the-observe; status quo).
 
+- **2026-08-12 (second session) — Phase C1: deferred write processing, spec-to-floor in one
+  pass.**
+  - **Landed:** the full C1 target (`deferred-writes.md`; migration 006; the three dated C1
+    entries in `decisions.md`). Spec first: three explorers + a plan agent under plan mode;
+    the four forks + the carried `typology_confidence` seat presented as an AskUserQuestion
+    batch with recommendations — **Jack took all five recommended options first pass** (the
+    A1 precedent holds). Build: migration 006 (both write_cause CHECKs widened for
+    `'enrichment'`; pending/attempts/triggers bookkeeping on `memories`; the
+    `memory_enrichment_runs` per-attempt instrumentation table — a background worker has no
+    response payload to ride); four `SERVICE_DEFAULTS` knobs (kill-switch landing 0.0);
+    the ingest seam's extract-only refactor (write-call / typology / escalation / span
+    stages promoted module-level; sync path byte-unchanged — `verify_write_path.py` 53/53
+    untouched is the parity proof) + the deferred branch (NLP + embedding + insert stay
+    synchronous; scalars land NULL under `enrichment_pending`; the five non-importance
+    triggers persisted); `app\deferred.py` (skip-locked claims, one attempt per row per
+    drain pass, orphan sweep, terminal fill byte-equivalent to the sync scoring-failed
+    end-state; started at BOTH construction sites); completion by supersession
+    (`'enrichment'` joins the drift-anchor set; cache eviction on every completion shape);
+    the `salvage_confidence` seat fix; wire deltas mirrored in `Models.cs`; the Ledger
+    badge; the load driver's `observe_total` series. Two invariant amendments propagated
+    (CLAUDE.md, architecture, read-path, test-suite Set C): the one-shot NULL→value
+    completion carve-out beside `pinned`, and deferred-enrichment completion as
+    byte-identity's third sanctioned cause.
+  - **Verified:** suite grew 95 → **108** (Set K: 12 unmarked + 1 nlp; subset 94, ×2 green);
+    all EIGHT walkers passed on fresh `longmem_test` — including the new
+    `verify_deferred_writes.py` **51/51** and the gate walker's mechanical ledger-pin bump
+    to 006; migrate idempotency (001→006 + clean re-run); both C# builds 0-warning; the
+    24-check console harness gate; independent floor-verifier **PASS → floors row 25,
+    verdict returned 2026-08-13** (the laptop closed overnight mid-dispatch; re-dispatched
+    next morning and the verifier re-ran the full slate itself, including its own 10/10
+    migration-shape probe and a live product-DB pristine re-check after its runs). Its one
+    non-failing flag, recorded honestly: four docs had pre-recorded the pass ahead of the
+    verdict — a wording-habit note for future landings (write the claim after the verdict,
+    not before).
+  - **Build-latitude findings** (recorded in the build-record entry): the first Set K run
+    caught same-drain re-claiming (a failed row burned its whole budget back-to-back —
+    fixed with a per-pass exclusion list; the poll loop is the retry spacing); escalation
+    novels write components + spans, never memory entities (sync parity — the approved
+    plan's entity-union sketch was corrected against the actual sync semantics); the
+    stale-comment carried note at `ingest.py:234` was found already fixed. **Blocked:**
+    nothing. **Abandoned:** nothing — though three migration pins took their routine +006
+    bumps (the eval-runner's ledger count and table census — the census one surfaced only on
+    the FULL suite run, it is nlp-marked — and the gate walker's ledger list).
+  - The walkers' shared fixed-name scratch DB stays a carried item (re-provisioned
+    per-walker this session without incident).
+
 
 ---
 

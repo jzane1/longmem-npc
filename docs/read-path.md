@@ -55,6 +55,15 @@ it are in [decisions.md](decisions.md); the schema it reads is frozen in
 > dedup, the unchanged formula, the tokenless no-op, and the kill-switch; criterion [9]'s
 > serving assertion was **sharpened** (the probe-level exclusion is now asserted on the probe
 > itself; the lexical reach of an embed-degraded row is asserted honestly).
+>
+> **The un-enriched window (Phase C1, ruled & built 2026-08-12 — `deferred-writes.md`): ZERO
+> retrieval changes.** A deferred-mode pending row rides shapes this spec already rules: the
+> embedding is written inline (ruling 1), so the row is vector- **and** lexically-reachable
+> from t = 0; its NULL `importance_raw` takes the `importance_neutral` fallback (the payload's
+> `importance_raw` carries the effective value, as always); the raw observation text serves
+> verbatim until the worker's completion supersedes it (`read_mode` stays honest). Scoring
+> stays byte-identical — the parity contract above is untouched, and the window adds no
+> filter, no penalty, no new rung.
 
 ## Principles this build honors
 

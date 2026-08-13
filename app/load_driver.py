@@ -249,6 +249,12 @@ def _aggregate(
         ],
         "dialogue_total": [t.instrumentation.prose_stream_ms for t in turns],
         "turn_total": [t.instrumentation.total_ms for t in turns],
+        # Observe latency series (added with the deferred-write build,
+        # 2026-08-12 — C1 changes observe latency and no series existed).
+        # Deferred-token caveat: with `deferred_writes_enabled` on, the
+        # write/escalation rows below sum SEAM tokens and will read ~0; the
+        # deferred spend's source of truth is memory_enrichment_runs.
+        "observe_total": [o.instrumentation.total_ms for o in observes],
     }
     latency = {
         name: {"p50": percentile(values, 0.5), "p95": percentile(values, 0.95)}

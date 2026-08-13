@@ -5,13 +5,20 @@ builder). The observe insert is ONE transaction: memories row + `original`
 memory_details head + `original` memory_fact_versions head (migration 002,
 fact-level-correction.md) + memory_gist_spans + any new identity_components
 land together or not at all (write-path.md §pipeline step d). Nothing here
-ever UPDATEs stored content; the only in-place write is the runtime scalar
-`set_pinned` (`memories.pinned`, write-path v1) — outside the memory-content
-non-destructive invariant. (`apply_reputation_delta` was the second sanctioned
-scalar until the A1 re-shape, 2026-08-04, removed the reputation system; the
-`agents.reputation` column stays in the schema, unwritten and unread.) The
-only DELETE is `apply_authorial_correction`'s cache eviction — derived rows,
-not memory content (the standing eviction invariant, authorial-correction.md).
+ever UPDATEs stored content; the in-place writes are the runtime scalar
+`set_pinned` (`memories.pinned`, write-path v1) and, since the deferred-write
+build (migration 006, ruled 2026-08-12), the ONE-SHOT NULL->value completion
+of a deferred row's chainless write-time scalars (importance/typology columns
++ the enrichment bookkeeping flags) in `apply_enrichment` /
+`record_enrichment_failure` — the original write finishing, guarded by
+`enrichment_pending`, never a mutation of a stored value — both outside the
+memory-content non-destructive invariant. (`apply_reputation_delta` was a
+sanctioned scalar until the A1 re-shape, 2026-08-04, removed the reputation
+system; the `agents.reputation` column stays in the schema, unwritten and
+unread.) The only DELETEs are the reconstruction-cache evictions in
+`apply_authorial_correction` and `apply_enrichment` — derived rows, not
+memory content (the standing eviction invariant, authorial-correction.md:
+any chain writer outside the reconstruction path evicts).
 
 Two chains under one memory_id since migration 002: the telling chain
 (memory_details) and the fact chain (memory_fact_versions — basis text +
@@ -43,6 +50,7 @@ content-addressed and immutable once written).
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
@@ -154,17 +162,24 @@ class SpanPlan:
 
 @dataclass
 class InsertPlan:
-    """Everything the atomic observe insert writes — all write-time facts."""
+    """Everything the atomic observe insert writes — all write-time facts.
+
+    Since the deferred-write build (migration 006, ruled 2026-08-12) the
+    scalar fields the write call produces are Optional: a deferred-mode
+    insert stores them NULL as the pending marker (raw text is the head;
+    retrieval's importance-NULL neutral fallback covers scoring) and the
+    worker's one-shot completion fills them. Sync inserts still populate
+    every field."""
 
     agent_id: UUID
     observation_text: str
     rendered_content: str  # the `original` detail head (render seam ruling)
     valid_at: datetime
-    importance_raw: float
+    importance_raw: float | None
     scoring_failed: bool
-    typology: str
-    typology_confidence: float
-    typology_source: str
+    typology: str | None
+    typology_confidence: float | None
+    typology_source: str | None
     provenance: str
     pinned: bool
     decay_class: str
@@ -180,6 +195,11 @@ class InsertPlan:
     new_components: list[NewComponent] = field(default_factory=list)
     spans: list[SpanPlan] = field(default_factory=list)
     escalation_failed: bool = False  # gist-escalation double-failure soft-degrade (005)
+    # Deferred write processing (migration 006): pending marker + the
+    # persisted non-importance trigger names (their raw material is not
+    # recoverable from the DB; the worker reads them, never clears them).
+    enrichment_pending: bool = False
+    enrichment_pending_triggers: list[str] | None = None
 
 
 @dataclass(frozen=True)
@@ -228,9 +248,10 @@ async def insert_observation(
                     "typology_confidence, "
                     "typology_source, provenance, pinned, decay_class, "
                     "decay_class_unknown, valid_at, location_name, location_embedding, "
-                    "event_time, affect_valence, affect_arousal, affect_detail) "
+                    "event_time, affect_valence, affect_arousal, affect_detail, "
+                    "enrichment_pending, enrichment_pending_triggers) "
                     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
-                    "%s, %s, %s, %s, %s) RETURNING memory_id",
+                    "%s, %s, %s, %s, %s, %s, %s) RETURNING memory_id",
                     (
                         plan.agent_id,
                         plan.observation_text,
@@ -253,6 +274,8 @@ async def insert_observation(
                         Jsonb(plan.affect_detail)
                         if plan.affect_detail is not None
                         else None,
+                        plan.enrichment_pending,
+                        plan.enrichment_pending_triggers,
                     ),
                 )
                 memory_id = (await cur.fetchone())[0]
@@ -586,7 +609,7 @@ async def fetch_memory_chain(pool: AsyncConnectionPool, memory_id: UUID) -> dict
             "SELECT memory_id, agent_id, observation_text, provenance, typology, "
             "decay_class, pinned, scoring_failed, escalation_failed, "
             "decay_class_unknown, created_at, valid_at, invalid_at, "
-            "location_name, event_time "
+            "location_name, event_time, enrichment_pending, enrichment_attempts "
             "FROM memories WHERE memory_id = %s",
             (memory_id,),
         )
@@ -614,6 +637,20 @@ async def fetch_memory_chain(pool: AsyncConnectionPool, memory_id: UUID) -> dict
             (memory_id,),
         )
         spans = await cur.fetchall()
+        # Deferred-write state (migration 006): pending flag + attempts on
+        # the memories row above; the per-attempt run log rides beside the
+        # chains (the unscored inspector read is the run log's surface).
+        await cur.execute(
+            "SELECT attempt, outcome, error, triggers, escalation_failed, "
+            "embedding_repaired, write_ms, escalation_ms, embed_ms, insert_ms, "
+            "total_ms, write_input_tokens, write_output_tokens, "
+            "escalation_input_tokens, escalation_output_tokens, "
+            "embedding_tokens, created_at "
+            "FROM memory_enrichment_runs WHERE memory_id = %s "
+            "ORDER BY created_at, attempt",
+            (memory_id,),
+        )
+        runs = await cur.fetchall()
     return {
         "memory_id": mem[0],
         "agent_id": mem[1],
@@ -630,6 +667,30 @@ async def fetch_memory_chain(pool: AsyncConnectionPool, memory_id: UUID) -> dict
         "invalid_at": mem[12],
         "location_name": mem[13],
         "event_time": mem[14],
+        "enrichment_pending": mem[15],
+        "enrichment_attempts": mem[16],
+        "enrichment_runs": [
+            {
+                "attempt": r[0],
+                "outcome": r[1],
+                "error": r[2],
+                "triggers": r[3] or [],
+                "escalation_failed": r[4],
+                "embedding_repaired": r[5],
+                "write_ms": r[6],
+                "escalation_ms": r[7],
+                "embed_ms": r[8],
+                "insert_ms": r[9],
+                "total_ms": r[10],
+                "write_input_tokens": r[11],
+                "write_output_tokens": r[12],
+                "escalation_input_tokens": r[13],
+                "escalation_output_tokens": r[14],
+                "embedding_tokens": r[15],
+                "created_at": r[16],
+            }
+            for r in runs
+        ],
         "details": [
             {
                 "detail_id": d[0],
@@ -861,13 +922,16 @@ async def fetch_reconstruction_sources(
         for row in await cur.fetchall():
             spans.setdefault(row[0], []).append((row[1], row[2]))
         # The drift anchor: latest chain row with an anchoring write_cause
-        # (original | authorial_correction | update_with_resentment);
-        # rationalization and reconstruction rows never re-anchor.
+        # (original | authorial_correction | update_with_resentment |
+        # enrichment — the deferred worker's canonical render re-anchors,
+        # migration 006); rationalization and reconstruction rows never
+        # re-anchor.
         await cur.execute(
             "SELECT DISTINCT ON (memory_id) memory_id, content, write_cause "
             "FROM memory_details WHERE memory_id = ANY(%s) "
             "AND write_cause IN "
-            "('original', 'authorial_correction', 'update_with_resentment') "
+            "('original', 'authorial_correction', 'update_with_resentment', "
+            "'enrichment') "
             "ORDER BY memory_id, created_at DESC",
             (memory_ids,),
         )
@@ -1038,3 +1102,518 @@ async def apply_authorial_correction(
         superseded_fact_version_id=superseded_fact,
         evicted_cache_rows=evicted,
     )
+
+
+# ---------------------------------------------------------------------------
+# Deferred write processing (migration 006; deferred-writes.md, ruled
+# 2026-08-12). The claim/complete SQL for app\deferred.py's worker — the
+# worker itself holds no SQL (repo hygiene). Concurrency contract: FOR UPDATE
+# SKIP LOCKED serializes claims inside the lock window; a claimed row stays
+# `enrichment_pending` while worked, so a second process CAN re-claim it
+# mid-flight — the completion guard (WHERE enrichment_pending) makes the
+# loser a no-op. Worst case is duplicate model spend, never duplicate rows.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class EnrichmentClaim:
+    """One claimed pending row; `attempt` is the post-increment number."""
+
+    memory_id: UUID
+    agent_id: UUID
+    attempt: int
+
+
+@dataclass(frozen=True)
+class EnrichmentSpanRow:
+    """A stored gist span, read back for the worker's add-only dedupe and
+    the escalation call's candidate rebuild."""
+
+    start_char: int
+    end_char: int
+    matched_component_id: UUID | None
+    matched_category: str | None
+
+
+@dataclass(frozen=True)
+class EnrichmentSource:
+    """Everything one enrichment attempt reads before its model calls."""
+
+    observation_text: str
+    valid_at: datetime
+    typology: str | None
+    typology_source: str | None
+    typology_confidence: float | None
+    pending_triggers: list[str]
+    detail_id: UUID  # the live telling head
+    detail_write_cause: str  # 'original' => prose supersede is eligible
+    fact_version_id: UUID  # the live fact head
+    fact_entities: list[str]
+    fact_has_embedding: bool
+    spans: list[EnrichmentSpanRow]
+
+
+@dataclass(frozen=True)
+class FactDelta:
+    """The fact-chain supersede payload: the merged FULL entity set and, when
+    the attempt repaired a NULL embedding, the new vector (None = carry the
+    superseded row's embedding server-side, no vector round-trip)."""
+
+    entities: list[str] | None
+    embedding: list[float] | None
+
+
+@dataclass(frozen=True)
+class EnrichmentRunRecord:
+    """Per-attempt instrumentation destined for memory_enrichment_runs — a
+    background worker has no response payload to ride, so the seam's timing
+    and token accounting persist here (instrument-at-the-seam)."""
+
+    attempt: int
+    triggers: list[str]
+    escalation_failed: bool
+    embedding_repaired: bool
+    write_ms: float
+    escalation_ms: float
+    embed_ms: float
+    elapsed_before_ms: float  # attempt wall time before the completion txn
+    write_input_tokens: int
+    write_output_tokens: int
+    escalation_input_tokens: int
+    escalation_output_tokens: int
+    embedding_tokens: int
+
+
+@dataclass(frozen=True)
+class EnrichmentApplied:
+    """Row-level outcome of `apply_enrichment`. Prose/fact fields are None on
+    the paths that ruled them out (facts-only / no delta)."""
+
+    detail_id: UUID | None
+    superseded_detail_id: UUID | None
+    fact_version_id: UUID | None
+    superseded_fact_version_id: UUID | None
+    gist_span_ids: list[UUID]
+    new_component_ids: list[UUID]
+    evicted_cache_rows: int
+
+
+class _NotPendingError(Exception):
+    """Internal: aborts (rolls back) the completion transaction when the
+    pending guard finds the row already completed — the losing side of a
+    duplicate claim, or a re-drain of finished work."""
+
+
+async def _insert_run_row(
+    cur,
+    *,
+    memory_id: UUID,
+    attempt: int,
+    outcome: str,
+    error: str | None,
+    run: EnrichmentRunRecord | None,
+    insert_ms: float | None,
+    total_ms: float | None,
+) -> None:
+    await cur.execute(
+        "INSERT INTO memory_enrichment_runs (memory_id, attempt, outcome, "
+        "error, triggers, escalation_failed, embedding_repaired, write_ms, "
+        "escalation_ms, embed_ms, insert_ms, total_ms, write_input_tokens, "
+        "write_output_tokens, escalation_input_tokens, "
+        "escalation_output_tokens, embedding_tokens) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
+        "%s, %s, %s)",
+        (
+            memory_id,
+            attempt,
+            outcome,
+            error,
+            (run.triggers if run else None),
+            (run.escalation_failed if run else False),
+            (run.embedding_repaired if run else False),
+            (run.write_ms if run else None),
+            (run.escalation_ms if run else None),
+            (run.embed_ms if run else None),
+            insert_ms,
+            total_ms,
+            (run.write_input_tokens if run else 0),
+            (run.write_output_tokens if run else 0),
+            (run.escalation_input_tokens if run else 0),
+            (run.escalation_output_tokens if run else 0),
+            (run.embedding_tokens if run else 0),
+        ),
+    )
+
+
+async def claim_enrichment_batch(
+    pool: AsyncConnectionPool,
+    *,
+    batch_size: int,
+    max_attempts: int,
+    exclude: list[UUID] | None = None,
+) -> list[EnrichmentClaim]:
+    """Claim up to batch_size pending rows, oldest first, incrementing their
+    attempt counters in the same short transaction (a crash mid-work
+    deliberately consumes the attempt). SKIP LOCKED keeps concurrent drains
+    from double-claiming inside the lock window. Rows at or past max_attempts
+    are never claimed here — `fetch_exhausted_pending` sweeps them.
+    `exclude` lets one drain pass skip rows it already attempted (a failed
+    row stays pending and would otherwise be re-claimed immediately,
+    burning the attempt budget with zero retry spacing — the poll loop is
+    the spacing)."""
+    async with pool.connection() as conn:
+        async with conn.transaction():
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "SELECT memory_id, agent_id, enrichment_attempts "
+                    "FROM memories "
+                    "WHERE enrichment_pending AND enrichment_attempts < %s "
+                    "AND NOT (memory_id = ANY(%s)) "
+                    "ORDER BY created_at LIMIT %s FOR UPDATE SKIP LOCKED",
+                    (max_attempts, exclude or [], batch_size),
+                )
+                rows = await cur.fetchall()
+                if not rows:
+                    return []
+                await cur.execute(
+                    "UPDATE memories "
+                    "SET enrichment_attempts = enrichment_attempts + 1 "
+                    "WHERE memory_id = ANY(%s)",
+                    ([r[0] for r in rows],),
+                )
+    return [
+        EnrichmentClaim(memory_id=r[0], agent_id=r[1], attempt=r[2] + 1) for r in rows
+    ]
+
+
+async def fetch_exhausted_pending(
+    pool: AsyncConnectionPool, *, max_attempts: int, limit: int
+) -> list[EnrichmentClaim]:
+    """Orphan recovery: rows still pending with their attempt budget spent —
+    a process died between claiming the final attempt and recording its
+    outcome. The worker terminal-fills these WITHOUT further model calls."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT memory_id, agent_id, enrichment_attempts FROM memories "
+            "WHERE enrichment_pending AND enrichment_attempts >= %s "
+            "ORDER BY created_at LIMIT %s",
+            (max_attempts, limit),
+        )
+        rows = await cur.fetchall()
+    return [EnrichmentClaim(memory_id=r[0], agent_id=r[1], attempt=r[2]) for r in rows]
+
+
+async def fetch_enrichment_source(
+    pool: AsyncConnectionPool, memory_id: UUID
+) -> EnrichmentSource | None:
+    """Read-only pre-attempt snapshot: the memories scalars, the live heads
+    of both chains, and the stored gist spans. Returns None when the row is
+    gone or no longer pending (a concurrent drain finished it — skip
+    silently)."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT m.observation_text, m.valid_at, m.typology, "
+            "m.typology_source, m.typology_confidence, "
+            "m.enrichment_pending_triggers, m.enrichment_pending, "
+            "d.detail_id, d.write_cause, "
+            "f.fact_version_id, f.entities, f.embedding IS NOT NULL "
+            "FROM memories m "
+            "JOIN memory_details d "
+            "ON d.memory_id = m.memory_id AND d.invalid_at IS NULL "
+            "JOIN memory_fact_versions f "
+            "ON f.memory_id = m.memory_id AND f.invalid_at IS NULL "
+            "WHERE m.memory_id = %s",
+            (memory_id,),
+        )
+        row = await cur.fetchone()
+        if row is None or not row[6]:
+            return None
+        await cur.execute(
+            "SELECT start_char, end_char, matched_component_id, "
+            "matched_category FROM memory_gist_spans WHERE memory_id = %s "
+            "ORDER BY start_char, end_char",
+            (memory_id,),
+        )
+        span_rows = await cur.fetchall()
+    return EnrichmentSource(
+        observation_text=row[0],
+        valid_at=row[1],
+        typology=row[2],
+        typology_source=row[3],
+        typology_confidence=row[4],
+        pending_triggers=row[5] or [],
+        detail_id=row[7],
+        detail_write_cause=row[8],
+        fact_version_id=row[9],
+        fact_entities=row[10] or [],
+        fact_has_embedding=row[11],
+        spans=[
+            EnrichmentSpanRow(
+                start_char=s[0],
+                end_char=s[1],
+                matched_component_id=s[2],
+                matched_category=s[3],
+            )
+            for s in span_rows
+        ],
+    )
+
+
+async def apply_enrichment(
+    pool: AsyncConnectionPool,
+    *,
+    memory_id: UUID,
+    completed_at: datetime,
+    importance_raw: float,
+    typology: str | None,
+    typology_confidence: float | None,
+    typology_source: str | None,
+    escalation_failed: bool,
+    rendered_content: str | None,
+    raw_detail_id: UUID | None,
+    fact_delta: FactDelta | None,
+    new_components: list[NewComponent],
+    spans: list[SpanPlan],
+    run: EnrichmentRunRecord,
+) -> EnrichmentApplied | Literal["not_pending"]:
+    """The ONE completion transaction (all model calls happen before it):
+
+    (a) the guarded one-shot scalar fill — COALESCE keeps any value already
+        present (a declared typology is never overwritten) and the
+        `WHERE enrichment_pending` guard makes a duplicate claim's loser (or
+        a re-drain) a rolled-back no-op;
+    (b) new identity_components from escalation novels;
+    (c) the prose supersede, CAS on the captured raw `original` head — a
+        rowcount of 0 (or raw_detail_id None: the head had already moved at
+        fetch time) SKIPS the supersede, the ruled facts-only path;
+    (d) the fact supersede, only when the caller passes a delta (entities
+        grew or an embedding was repaired) — basis_text (and, un-repaired,
+        the embedding) carried server-side from the superseded row;
+    (e) add-only span appends (caller pre-dedupes against stored spans);
+    (f) cache eviction — ALWAYS, on both the supersede and the facts-only
+        path: enrichment is a chain writer, the eviction invariant binds;
+    (g) the run-log row, same transaction (completion and its accounting
+        land together)."""
+    t_txn = time.perf_counter()
+    detail_id: UUID | None = None
+    superseded_detail: UUID | None = None
+    fact_version_id: UUID | None = None
+    superseded_fact: UUID | None = None
+    gist_span_ids: list[UUID] = []
+    new_component_ids: list[UUID] = []
+    try:
+        async with pool.connection() as conn:
+            async with conn.transaction():
+                async with conn.cursor() as cur:
+                    # (a) the one-shot scalar fill, guarded
+                    await cur.execute(
+                        "UPDATE memories SET "
+                        "importance_raw = COALESCE(importance_raw, %s), "
+                        "typology = COALESCE(typology, %s), "
+                        "typology_confidence = "
+                        "COALESCE(typology_confidence, %s), "
+                        "typology_source = COALESCE(typology_source, %s), "
+                        "escalation_failed = escalation_failed OR %s, "
+                        "enrichment_pending = false "
+                        "WHERE memory_id = %s AND enrichment_pending",
+                        (
+                            importance_raw,
+                            typology,
+                            typology_confidence,
+                            typology_source,
+                            escalation_failed,
+                            memory_id,
+                        ),
+                    )
+                    if cur.rowcount != 1:
+                        raise _NotPendingError
+                    # (b) escalation-novel components
+                    for comp in new_components:
+                        await cur.execute(
+                            "INSERT INTO identity_components (agent_id, "
+                            "canonical, aliases, category) "
+                            "SELECT agent_id, %s, %s, %s FROM memories "
+                            "WHERE memory_id = %s RETURNING component_id",
+                            (comp.canonical, comp.aliases, comp.category, memory_id),
+                        )
+                        new_component_ids.append((await cur.fetchone())[0])
+                    # (c) prose supersede (CAS on the raw head)
+                    if rendered_content is not None and raw_detail_id is not None:
+                        await cur.execute(
+                            "UPDATE memory_details SET invalid_at = %s "
+                            "WHERE detail_id = %s AND invalid_at IS NULL",
+                            (completed_at, raw_detail_id),
+                        )
+                        if cur.rowcount == 1:
+                            superseded_detail = raw_detail_id
+                            await cur.execute(
+                                "INSERT INTO memory_details (memory_id, "
+                                "content, write_cause, valid_at) "
+                                "VALUES (%s, %s, 'enrichment', %s) "
+                                "RETURNING detail_id",
+                                (memory_id, rendered_content, completed_at),
+                            )
+                            detail_id = (await cur.fetchone())[0]
+                    # (d) fact supersede, only on a real delta
+                    if fact_delta is not None:
+                        await cur.execute(
+                            "UPDATE memory_fact_versions SET invalid_at = %s "
+                            "WHERE memory_id = %s AND invalid_at IS NULL "
+                            "RETURNING fact_version_id",
+                            (completed_at, memory_id),
+                        )
+                        fact_row = await cur.fetchone()
+                        if fact_row is None:
+                            # One-live-fact-head invariant: absence is a
+                            # broken store — fail loud, roll back (the
+                            # correction precedent).
+                            raise RuntimeError(
+                                f"no live fact head for {memory_id}; the "
+                                "store violates the one-live-fact-head "
+                                "invariant"
+                            )
+                        superseded_fact = fact_row[0]
+                        if fact_delta.embedding is not None:
+                            await cur.execute(
+                                "INSERT INTO memory_fact_versions (memory_id, "
+                                "basis_text, embedding, entities, write_cause, "
+                                "valid_at) "
+                                "SELECT memory_id, basis_text, %s, %s, "
+                                "'enrichment', %s FROM memory_fact_versions "
+                                "WHERE fact_version_id = %s "
+                                "RETURNING fact_version_id",
+                                (
+                                    _vector(fact_delta.embedding),
+                                    fact_delta.entities,
+                                    completed_at,
+                                    superseded_fact,
+                                ),
+                            )
+                        else:
+                            await cur.execute(
+                                "INSERT INTO memory_fact_versions (memory_id, "
+                                "basis_text, embedding, entities, write_cause, "
+                                "valid_at) "
+                                "SELECT memory_id, basis_text, embedding, %s, "
+                                "'enrichment', %s FROM memory_fact_versions "
+                                "WHERE fact_version_id = %s "
+                                "RETURNING fact_version_id",
+                                (
+                                    fact_delta.entities,
+                                    completed_at,
+                                    superseded_fact,
+                                ),
+                            )
+                        fact_version_id = (await cur.fetchone())[0]
+                    # (e) add-only span appends
+                    for span in spans:
+                        if isinstance(span.component_ref, int):
+                            component_id = new_component_ids[span.component_ref]
+                        elif span.component_ref is not None:
+                            component_id = UUID(str(span.component_ref))
+                        else:
+                            component_id = None
+                        await cur.execute(
+                            "INSERT INTO memory_gist_spans (memory_id, "
+                            "start_char, end_char, matched_component_id, "
+                            "matched_category) VALUES (%s, %s, %s, %s, %s) "
+                            "RETURNING span_id",
+                            (
+                                memory_id,
+                                span.start_char,
+                                span.end_char,
+                                component_id,
+                                span.matched_category,
+                            ),
+                        )
+                        gist_span_ids.append((await cur.fetchone())[0])
+                    # (f) cache eviction — every completion shape
+                    await cur.execute(
+                        "DELETE FROM reconstruction_cache WHERE memory_id = %s",
+                        (memory_id,),
+                    )
+                    evicted = cur.rowcount
+                    # (g) the run-log row
+                    insert_ms = round((time.perf_counter() - t_txn) * 1000.0, 2)
+                    await _insert_run_row(
+                        cur,
+                        memory_id=memory_id,
+                        attempt=run.attempt,
+                        outcome=(
+                            "completed"
+                            if detail_id is not None
+                            else "completed_facts_only"
+                        ),
+                        error=None,
+                        run=run,
+                        insert_ms=insert_ms,
+                        total_ms=round(run.elapsed_before_ms + insert_ms, 2),
+                    )
+    except _NotPendingError:
+        return "not_pending"
+    return EnrichmentApplied(
+        detail_id=detail_id,
+        superseded_detail_id=superseded_detail,
+        fact_version_id=fact_version_id,
+        superseded_fact_version_id=superseded_fact,
+        gist_span_ids=gist_span_ids,
+        new_component_ids=new_component_ids,
+        evicted_cache_rows=evicted,
+    )
+
+
+async def record_enrichment_failure(
+    pool: AsyncConnectionPool,
+    *,
+    memory_id: UUID,
+    attempt: int,
+    error: str,
+    run: EnrichmentRunRecord | None = None,
+    terminal: bool = False,
+    terminal_importance: float | None = None,
+    terminal_typology: str | None = None,
+    terminal_typology_confidence: float | None = None,
+) -> str:
+    """Record a failed attempt. When `terminal`, the same transaction applies
+    the guarded terminal fill — neutral importance + scoring_failed + the
+    config-default typology, pending cleared — landing the row byte-equivalent
+    to today's sync scoring-failed end-state (escalation_failed stays false:
+    that call never ran; the run log is the honest signal). If the guard finds
+    the row no longer pending (a concurrent drain completed it), the outcome
+    downgrades to a plain 'failed' record. Returns the outcome written."""
+    outcome = "failed"
+    async with pool.connection() as conn:
+        async with conn.transaction():
+            async with conn.cursor() as cur:
+                if terminal:
+                    await cur.execute(
+                        "UPDATE memories SET "
+                        "importance_raw = COALESCE(importance_raw, %s), "
+                        "scoring_failed = true, "
+                        "typology = COALESCE(typology, %s), "
+                        "typology_confidence = "
+                        "COALESCE(typology_confidence, %s), "
+                        "typology_source = COALESCE(typology_source, "
+                        "'inferred'), "
+                        "enrichment_pending = false "
+                        "WHERE memory_id = %s AND enrichment_pending",
+                        (
+                            terminal_importance,
+                            terminal_typology,
+                            terminal_typology_confidence,
+                            memory_id,
+                        ),
+                    )
+                    if cur.rowcount == 1:
+                        outcome = "terminal_degraded"
+                await _insert_run_row(
+                    cur,
+                    memory_id=memory_id,
+                    attempt=attempt,
+                    outcome=outcome,
+                    error=error,
+                    run=run,
+                    insert_ms=None,
+                    total_ms=(run.elapsed_before_ms if run else None),
+                )
+    return outcome

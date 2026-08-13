@@ -38,6 +38,7 @@ from psycopg_pool import AsyncConnectionPool
 from app import db, identity
 from app.config import Settings, load_settings
 from app.db import build_pool
+from app.deferred import DeferredWriteWorker
 from app.dialogue import DialogueService
 from app.ingest import IngestService, UnknownAgentError
 from app.nlp import warm_pipelines
@@ -70,12 +71,18 @@ class SessionRunner:
         dialogue: DialogueService,
         agent_id: UUID,
         phase_tag: str,
+        deferred: DeferredWriteWorker | None = None,
     ):
         self._pool = pool
         self._owns_pool = owns_pool
         self._settings = settings
         self._ingest = ingest
         self._dialogue = dialogue
+        # The deferred-write worker (deferred-writes.md, 2026-08-12): the
+        # REPL/driver construction site starts one too, so a deferred-mode
+        # `:observe` enriches without the API process. `deferred.drain()` is
+        # also the walkers' deterministic entry.
+        self.deferred = deferred
         self.agent_id = agent_id
         self.phase_tag = phase_tag  # passthrough label on observe events
         self.identity_version: str | None = None  # frozen at scene boundaries
@@ -131,6 +138,8 @@ class SessionRunner:
         ingest = IngestService(pool, providers, settings)
         retrieval = RetrievalService(pool, providers, settings)
         dialogue = DialogueService(pool, providers, settings, retrieval)
+        deferred = DeferredWriteWorker(pool, providers, settings)
+        deferred.start()
         runner = cls(
             pool=pool,
             owns_pool=owns_pool,
@@ -139,6 +148,7 @@ class SessionRunner:
             dialogue=dialogue,
             agent_id=agent_id,
             phase_tag=phase_tag,
+            deferred=deferred,
         )
         # Session start is an implicit scene start: verify the agent loudly,
         # freeze the identity version (ensured directly — no boundary event is
@@ -289,5 +299,7 @@ class SessionRunner:
         )
 
     async def close(self) -> None:
+        if self.deferred is not None:
+            await self.deferred.stop()
         if self._owns_pool:
             await self._pool.close()

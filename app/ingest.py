@@ -8,6 +8,16 @@ Pipeline per observe event (write-path.md §pipeline):
   NLP pass -> single Haiku write call -> (escalation when triggered) ->
   embedding -> atomic insert -> IngestResult.
 
+Deferred mode (deferred-writes.md, ruled 2026-08-12; knob
+`deferred_writes_enabled`, default OFF): the two LLM calls above move to
+app\\deferred.py's worker — the NLP pass, embedding, and atomic insert stay
+synchronous, the row lands `enrichment_pending` with NULL write-call scalars
+(raw observation text as the `original` head; retrieval's importance-NULL
+neutral fallback covers scoring), and the worker's one-shot completion fills
+the scalars and supersedes the head with the render ('enrichment' cause).
+The write-call / typology / escalation stages are module-level functions so
+the worker and the sync branch share ONE implementation.
+
 Degradation ladder (write):
   soft — the write always lands:
     - write-call failure / malformed output -> neutral importance +
@@ -36,6 +46,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from dataclasses import dataclass
 from uuid import UUID
 
 from psycopg_pool import AsyncConnectionPool
@@ -153,6 +164,184 @@ def _merge_components(
     return merged
 
 
+# ---------------------------------------------------------------------------
+# The write-call / typology / escalation stages — module-level since the
+# deferred-write build (extract-only move, 2026-08-12) so the sync branch and
+# app\deferred.py's worker share ONE implementation. Behavior is byte-for-byte
+# the pre-move seam's; timing stays at the call sites (the seam owns it).
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class WriteStageOutcome:
+    """The single write call's outcome under the ruled soft degradation:
+    on failure the fallbacks stand (raw text as render, neutral importance),
+    scoring_failed is set, and any accounted tokens are carried. `failure`
+    is the exception text (None on success) — the sync branch ignores it;
+    the worker records it."""
+
+    rendered_content: str
+    importance: float
+    call_typology: str | None
+    call_confidence: float | None
+    scoring_failed: bool
+    input_tokens: int
+    output_tokens: int
+    failure: str | None
+
+
+async def run_write_call(
+    providers: Providers,
+    *,
+    observation_text: str,
+    diagnosticity_goal: str,
+    declared_typology: str | None,
+    neutral_importance: float,
+) -> WriteStageOutcome:
+    """The single write model call (render + importance + typology-when-
+    absent) with its ruled soft degradation."""
+    scoring_failed = False
+    tokens_in = tokens_out = 0
+    rendered_content = observation_text  # fallback head when no render exists
+    importance = neutral_importance
+    call_typology: str | None = None
+    call_confidence: float | None = None
+    failure: str | None = None
+    try:
+        write_result: WriteCallResult = await asyncio.to_thread(
+            providers.write.render_and_score,
+            observation_text=observation_text,
+            diagnosticity_goal=diagnosticity_goal,
+            declared_typology=declared_typology,
+        )
+        rendered_content = write_result.rendered_content
+        importance = write_result.importance_raw
+        call_typology = write_result.typology
+        call_confidence = write_result.typology_confidence
+        tokens_in = write_result.input_tokens
+        tokens_out = write_result.output_tokens
+    except ProviderCallError as exc:
+        scoring_failed = True
+        failure = str(exc)
+    except MalformedOutputError as exc:
+        scoring_failed = True
+        failure = str(exc)
+        tokens_in = exc.input_tokens
+        tokens_out = exc.output_tokens
+    return WriteStageOutcome(
+        rendered_content=rendered_content,
+        importance=importance,
+        call_typology=call_typology,
+        call_confidence=call_confidence,
+        scoring_failed=scoring_failed,
+        input_tokens=tokens_in,
+        output_tokens=tokens_out,
+        failure=failure,
+    )
+
+
+def resolve_typology(
+    *,
+    declared: str | None,
+    declared_confidence: float | None,
+    call_typology: str | None,
+    call_confidence: float | None,
+    config: dict,
+    settings: Settings,
+) -> tuple[str, str, float]:
+    """The typology ladder: client declaration wins > write-call inference >
+    the agent's default (flagged upstream by scoring_failed when the call
+    degraded — never a lost write). Returns (typology, source, confidence)."""
+    if declared is not None:
+        return (
+            declared,
+            "declared",
+            declared_confidence
+            if declared_confidence is not None
+            else agent_knob(config, "typology_confidence_default", settings),
+        )
+    if call_typology is not None:
+        return (
+            call_typology,
+            "inferred",
+            call_confidence
+            if call_confidence is not None
+            else agent_knob(config, "typology_confidence_default", settings),
+        )
+    return (
+        str(config.get("typology_default", TYPOLOGY_FALLBACK)),
+        "inferred",
+        agent_knob(config, "typology_confidence_default", settings),
+    )
+
+
+async def escalate_with_retry(
+    providers: Providers,
+    *,
+    observation_text: str,
+    known_components: list[dict],
+    candidate_spans: list[GistSpanCandidate],
+    candidate_components: list[NewComponent],
+    triggers: list[str],
+) -> EscalationResult | None:
+    """Retry once; on a second failure return None so the write soft-degrades
+    to the base NLP-pass gist (ruled 2026-07-22 — the fail-loud hard-stop was
+    a temporary build-phase stance; a failed escalation must not halt a live
+    write). The degraded gist is flagged (escalation_failed) rather than
+    aborting the write."""
+    for _attempt in (1, 2):
+        try:
+            return await asyncio.to_thread(
+                providers.escalation.extract_gist,
+                observation_text=observation_text,
+                known_components=known_components,
+                candidate_spans=candidate_spans,
+                candidate_components=candidate_components,
+                triggers=triggers,
+            )
+        except (ProviderCallError, MalformedOutputError):
+            continue
+    return None
+
+
+def plan_spans(
+    observation_text: str,
+    spans: list[GistSpanCandidate],
+    new_components: list[NewComponent],
+    occupied_extra: set[tuple[int, int]] | None = None,
+) -> list[SpanPlan]:
+    """Convert candidates to insert-ready plans; novel-entity mentions become
+    spans referencing the component row created in the same transaction.
+    `occupied_extra` lets the deferred worker exclude already-stored span
+    offsets from the novel-mention scan (add-only appends); the sync path
+    passes nothing."""
+    plans = [
+        SpanPlan(
+            start_char=s.start_char,
+            end_char=s.end_char,
+            component_ref=s.matched_component_id,
+            matched_category=s.matched_category,
+        )
+        for s in spans
+    ]
+    occupied = {(p.start_char, p.end_char) for p in plans}
+    if occupied_extra:
+        occupied |= occupied_extra
+    for index, comp in enumerate(new_components):
+        for start, end in nlp._find_term_spans(observation_text, comp.canonical):
+            if (start, end) not in occupied:
+                occupied.add((start, end))
+                plans.append(
+                    SpanPlan(
+                        start_char=start,
+                        end_char=end,
+                        component_ref=index,
+                        matched_category=comp.category,
+                    )
+                )
+    return plans
+
+
 class IngestService:
     """One instance per process; both callers share it."""
 
@@ -183,64 +372,8 @@ class IngestService:
         )
         nlp_ms = _ms(time.perf_counter() - t0)
 
-        # --- single Haiku write call (soft degradation) ------------------
-        t0 = time.perf_counter()
-        scoring_failed = False
-        haiku_in = haiku_out = 0
-        rendered_content = event.observation_text  # fallback head when no render exists
-        importance = agent_knob(config, "importance_neutral", self._settings)
-        call_typology: str | None = None
-        call_confidence: float | None = None
-        try:
-            write_result: WriteCallResult = await asyncio.to_thread(
-                self._providers.write.render_and_score,
-                observation_text=event.observation_text,
-                diagnosticity_goal=agent["diagnosticity_goal"] or "",
-                declared_typology=event.typology,
-            )
-            rendered_content = write_result.rendered_content
-            importance = write_result.importance_raw
-            call_typology = write_result.typology
-            call_confidence = write_result.typology_confidence
-            haiku_in = write_result.input_tokens
-            haiku_out = write_result.output_tokens
-        except ProviderCallError:
-            scoring_failed = True
-        except MalformedOutputError as exc:
-            scoring_failed = True
-            haiku_in = exc.input_tokens
-            haiku_out = exc.output_tokens
-        haiku_ms = _ms(time.perf_counter() - t0)
-
-        # --- typology: client declaration wins ---------------------------
-        if event.typology is not None:
-            typology = event.typology
-            typology_source = "declared"
-            typology_confidence = (
-                event.typology_confidence
-                if event.typology_confidence is not None
-                else agent_knob(config, "typology_confidence_default", self._settings)
-            )
-        elif call_typology is not None:
-            typology = call_typology
-            typology_source = "inferred"
-            typology_confidence = (
-                call_confidence
-                if call_confidence is not None
-                else agent_knob(config, "typology_confidence_default", self._settings)
-            )
-        else:  # write call degraded and nothing declared: default, flagged by
-            # scoring_failed above — never a lost write.
-            typology = str(config.get("typology_default", TYPOLOGY_FALLBACK))
-            typology_source = "inferred"
-            typology_confidence = agent_knob(
-                config, "typology_confidence_default", self._settings
-            )
-
-        # --- escalation (biased loose; SOFT-DEGRADES on double failure:
-        # the write lands with the base NLP-pass gist and sets
-        # escalation_failed — the 2026-07-13 hard-stop was retired
-        # 2026-07-22, migration 005) --------------------------------------
+        # --- deferral fork (deferred-writes.md, ruled 2026-08-12) ---------
+        deferred = agent_knob(config, "deferred_writes_enabled", self._settings) != 0.0
         knobs = {
             key: agent_knob(config, key, self._settings)
             for key in (
@@ -249,30 +382,100 @@ class IngestService:
                 "escalation_min_base_spans",
             )
         }
-        triggers = nlp.evaluate_triggers(nlp_result, importance, knobs)
         spans = list(nlp_result.spans)
         new_components = list(nlp_result.novel_components)
+        triggers: list[str] = []
         escalation_ms = 0.0
         esc_in = esc_out = 0
         escalation_failed = False
-        if triggers:
-            t0 = time.perf_counter()
-            escalation = await self._escalate_with_retry(
-                event, components, nlp_result, triggers
-            )
-            escalation_ms = _ms(time.perf_counter() - t0)
-            if escalation is None:
-                # Soft-degrade (ruled 2026-07-22): the gist-escalation call
-                # failed twice; proceed with the base NLP-pass spans/components
-                # (no merge) and flag it. A degraded gist is never a lost write.
-                escalation_failed = True
-            else:
-                esc_in = escalation.input_tokens
-                esc_out = escalation.output_tokens
-                spans = _merge_spans(spans, escalation.spans)
-                new_components = _merge_components(
-                    new_components, escalation.new_components
+        pending_triggers: list[str] | None = None
+
+        if deferred:
+            # Both LLM calls move to the worker. The raw observation text IS
+            # the un-enriched `original` head; the write-call scalars land
+            # NULL (the pending marker — the worker's one-shot completion
+            # fills them, and retrieval's importance-NULL neutral fallback
+            # covers scoring meanwhile). A declared typology has nothing to
+            # defer and stores now. The non-importance triggers are
+            # evaluated here (their NLP raw material is not recoverable from
+            # the DB) and persisted for the worker; the importance trigger
+            # is the worker's to add once a model importance exists — the
+            # -inf below cannot clear a non-negative threshold knob.
+            haiku_ms = 0.0
+            haiku_in = haiku_out = 0
+            scoring_failed = False
+            rendered_content = event.observation_text
+            importance = None
+            if event.typology is not None:
+                typology, typology_source, typology_confidence = resolve_typology(
+                    declared=event.typology,
+                    declared_confidence=event.typology_confidence,
+                    call_typology=None,
+                    call_confidence=None,
+                    config=config,
+                    settings=self._settings,
                 )
+            else:
+                typology = typology_source = typology_confidence = None
+            pending_triggers = nlp.evaluate_triggers(nlp_result, float("-inf"), knobs)
+        else:
+            # --- single Haiku write call (soft degradation) ---------------
+            t0 = time.perf_counter()
+            write_outcome = await run_write_call(
+                self._providers,
+                observation_text=event.observation_text,
+                diagnosticity_goal=agent["diagnosticity_goal"] or "",
+                declared_typology=event.typology,
+                neutral_importance=agent_knob(
+                    config, "importance_neutral", self._settings
+                ),
+            )
+            haiku_ms = _ms(time.perf_counter() - t0)
+            rendered_content = write_outcome.rendered_content
+            importance = write_outcome.importance
+            scoring_failed = write_outcome.scoring_failed
+            haiku_in = write_outcome.input_tokens
+            haiku_out = write_outcome.output_tokens
+
+            # --- typology: client declaration wins ------------------------
+            typology, typology_source, typology_confidence = resolve_typology(
+                declared=event.typology,
+                declared_confidence=event.typology_confidence,
+                call_typology=write_outcome.call_typology,
+                call_confidence=write_outcome.call_confidence,
+                config=config,
+                settings=self._settings,
+            )
+
+            # --- escalation (biased loose; SOFT-DEGRADES on double failure:
+            # the write lands with the base NLP-pass gist and sets
+            # escalation_failed — the 2026-07-13 hard-stop was retired
+            # 2026-07-22, migration 005) -----------------------------------
+            triggers = nlp.evaluate_triggers(nlp_result, importance, knobs)
+            if triggers:
+                t0 = time.perf_counter()
+                escalation = await escalate_with_retry(
+                    self._providers,
+                    observation_text=event.observation_text,
+                    known_components=components,
+                    candidate_spans=list(nlp_result.spans),
+                    candidate_components=list(nlp_result.novel_components),
+                    triggers=triggers,
+                )
+                escalation_ms = _ms(time.perf_counter() - t0)
+                if escalation is None:
+                    # Soft-degrade (ruled 2026-07-22): the gist-escalation
+                    # call failed twice; proceed with the base NLP-pass
+                    # spans/components (no merge) and flag it. A degraded
+                    # gist is never a lost write.
+                    escalation_failed = True
+                else:
+                    esc_in = escalation.input_tokens
+                    esc_out = escalation.output_tokens
+                    spans = _merge_spans(spans, escalation.spans)
+                    new_components = _merge_components(
+                        new_components, escalation.new_components
+                    )
 
         # --- embedding (soft degradation: NULL embedding) -----------------
         t0 = time.perf_counter()
@@ -315,7 +518,7 @@ class IngestService:
             if name and name.lower() not in {e.lower() for e in entities}:
                 entities.append(name)
 
-        span_plans = self._plan_spans(event.observation_text, spans, new_components)
+        span_plans = plan_spans(event.observation_text, spans, new_components)
 
         # --- atomic insert -------------------------------------------------
         t0 = time.perf_counter()
@@ -346,6 +549,8 @@ class IngestService:
                 affect_detail=affect_detail,
                 new_components=new_components,
                 spans=span_plans,
+                enrichment_pending=deferred,
+                enrichment_pending_triggers=pending_triggers,
             ),
         )
         insert_ms = _ms(time.perf_counter() - t0)
@@ -360,6 +565,7 @@ class IngestService:
             typology=typology,
             typology_confidence=typology_confidence,
             typology_source=typology_source,
+            enrichment_pending=deferred,
             provenance=event.provenance,
             affect=AffectOut(valence=valence, arousal=arousal, detail=affect_detail),
             entities=entities,
@@ -385,64 +591,6 @@ class IngestService:
                 escalation_output_tokens=esc_out,
             ),
         )
-
-    async def _escalate_with_retry(
-        self,
-        event: ObserveEvent,
-        components: list[dict],
-        nlp_result: nlp.NlpResult,
-        triggers: list[str],
-    ) -> EscalationResult | None:
-        """Retry once; on a second failure return None so the write soft-degrades
-        to the base NLP-pass gist (ruled 2026-07-22 — the fail-loud hard-stop was
-        a temporary build-phase stance; a failed escalation must not halt a live
-        write). The degraded gist is flagged (escalation_failed) rather than
-        aborting the write."""
-        for _attempt in (1, 2):
-            try:
-                return await asyncio.to_thread(
-                    self._providers.escalation.extract_gist,
-                    observation_text=event.observation_text,
-                    known_components=components,
-                    candidate_spans=list(nlp_result.spans),
-                    candidate_components=list(nlp_result.novel_components),
-                    triggers=triggers,
-                )
-            except (ProviderCallError, MalformedOutputError):
-                continue
-        return None
-
-    @staticmethod
-    def _plan_spans(
-        observation_text: str,
-        spans: list[GistSpanCandidate],
-        new_components: list[NewComponent],
-    ) -> list[SpanPlan]:
-        """Convert candidates to insert-ready plans; novel-entity mentions become
-        spans referencing the component row created in the same transaction."""
-        plans = [
-            SpanPlan(
-                start_char=s.start_char,
-                end_char=s.end_char,
-                component_ref=s.matched_component_id,
-                matched_category=s.matched_category,
-            )
-            for s in spans
-        ]
-        occupied = {(p.start_char, p.end_char) for p in plans}
-        for index, comp in enumerate(new_components):
-            for start, end in nlp._find_term_spans(observation_text, comp.canonical):
-                if (start, end) not in occupied:
-                    occupied.add((start, end))
-                    plans.append(
-                        SpanPlan(
-                            start_char=start,
-                            end_char=end,
-                            component_ref=index,
-                            matched_category=comp.category,
-                        )
-                    )
-        return plans
 
     # ------------------------------------------------------------------ #
     # scene boundary — accept + instrument only (v1)

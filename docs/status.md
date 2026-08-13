@@ -1,22 +1,23 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-08-12
-**Phase:** **Road to completion — Phases A and B (B1–B3) are DONE.** (The roadmap below,
-consolidated 2026-08-04.) The 2026-08-12 session executed the full measurement line under the
-gold-label workaround ruling (Jack could not hand-label; the dated entries in `decisions.md`):
-reference labels + `agreement`, the constructed-truth `judge-gold` round, BOTH queued compares,
-the pairwise gold round, and the B3 ablation build + its real run. **Both queued rulings are
-RESOLVED (ruled 2026-08-12, same day, on the delivered data): R7 — the budget keeps its
-mechanism and threshold and is re-scoped as a topic guard; the dialogue model — HAIKU stands,
-latency rules (943 ms p50 vs sonnet-5's 2626/2086 ms against the 1 s bar; sonnet's 46–7 prose
-preference acknowledged and rejected as not justifying the latency). NEXT UP: PHASE C1
-(deferred write processing).** The robustness gap the real runs exposed — model-emitted
-typology reaching the DB check unclamped (`observed|told` killed a compare run) — was **ruled
-CLAMP and built the same day** (the dated entry in `decisions.md`; suite 82, write-path
-walker 53/53).
+**Last updated:** 2026-08-13
+**Phase:** **Road to completion — Phases A, B, and C1 are DONE.** (The roadmap below,
+consolidated 2026-08-04.) The second 2026-08-12 session landed **PHASE C1 — deferred write
+processing** in one pass: the four spec forks + the carried `typology_confidence` seat ruled
+(all recommended options taken; the three dated 2026-08-12 C1 entries in `decisions.md`),
+migration 006, the enrichment worker (`app\deferred.py`, both construction sites, default
+OFF), the un-enriched-window contract (zero retrieval changes), suite Set K (13 scenarios →
+108 total / 94-subset), and the eighth walker (`verify_deferred_writes.py`, 51/51) — the
+write-path walker's 53/53 byte-untouched is the deferred-OFF parity proof. Two invariants
+carry dated amendments (the one-shot completion carve-out; byte-identity's third sanctioned
+cause). **NEXT UP: PHASE C2 (reflection — design dossier → spec → build).**
+Earlier the same day: the full measurement line ran under the gold-label workaround ruling,
+and both queued rulings RESOLVED on the delivered data (R7 → topic guard; dialogue model →
+HAIKU stands, latency rules), plus the typology clamp (ruled + built; the dated entries in
+`decisions.md`).
 The system is BUILT end to end on the final A1 seam — backend, C# client + console harness,
-Unity adapter + gray-box scene, The Ledger, eval-harness stages 1–4 — schema frozen at
-migrations 001–005. What is proven lives in `docs\floors.md`, why in `decisions.md`, the
+Unity adapter + gray-box scene, The Ledger, eval-harness stages 1–4, deferred writes — schema
+at migrations 001–006. What is proven lives in `docs\floors.md`, why in `decisions.md`, the
 narrative in `session-log.md`; this file carries only what is live.
 
 This is the *living* file — update it at the end of every working session. `architecture.md`
@@ -43,7 +44,7 @@ on-screen eval numbers are what survive the interview. The demo records real-pro
 
 ## Verified floors
 
-**Twenty-four floors stand verified.** The full table — layer, what it was verified against,
+**Twenty-five floors stand verified.** The full table — layer, what it was verified against,
 and the date — lives in **`docs\floors.md`** (moved there 2026-07-28 so this living file stays
 small enough to auto-load). That file states the counting convention; cite it rather than a
 number in prose.
@@ -55,7 +56,10 @@ re-openable: re-verifying one is a step, never an argument against a design impr
 
 *None open.*
 
-**Recently closed** (pointers; full trail in `decisions.md`): **the dialogue model — HAIKU
+**Recently closed** (pointers; full trail in `decisions.md`): **the C1 spec forks + the
+`typology_confidence` seat — all five ruled 2026-08-12 at the C1 spec** (defer-LLM-calls-only;
+supersession via chains + the one-shot scalar sanction; worker default OFF; the byte-identity
+third cause; confidence salvage); **the dialogue model — HAIKU
 re-ruled 2026-08-12 on the first real compares** (perceived first word is decisive: 943 ms p50
 vs sonnet-5's 2626/2086 ms against the 1 s bar; sonnet's 46–7 / 41–9 prose preference on the
 record and rejected as not justifying the latency; the thinking-off variant measured and
@@ -108,10 +112,11 @@ before reflection and deferred writes build on reconstruction.*
 
 Ordered so shared machinery lands before its reusers.
 
-- **C1. Deferred write processing** (Engram-style): raw observe stored immediately,
-  gist/enrichment at the service's own timing; forks settle at spec (gist-annotation shape, the
-  un-enriched-window retrieval contract, a `write_cause` migration). Builds the deferred-work
-  machinery.
+- **C1. Deferred write processing** (Engram-style). ✅ **LANDED 2026-08-12, floor-verified
+  2026-08-13** (the twenty-fifth floor row; the three dated C1 entries in `decisions.md`
+  record the spec rulings and build latitude; spec: `deferred-writes.md`, migration 006).
+  Ships default OFF — the flip is a Phase D question. The deferred-work machinery C2 rides
+  now exists.
 - **C2. Reflection** — the biggest item (design dossier → spec → build): reflective writes
   grounded in cited memory_ids, the repetition detector, periodic evidence-conditioned identity
   refresh; its model role arrives here; idle-time scheduling rides C1's machinery.
@@ -193,7 +198,7 @@ not vendored).
 
 **Carried, not fixed** (deliberately unscheduled, awaiting its own ruling):
 
-- **The seven walkers share a fixed-name scratch DB** (`longmem_test`) they neither create,
+- **The walkers (eight since C1) share a fixed-name scratch DB** (`longmem_test`) they neither create,
   migrate, nor drop, and three assertions in `verify_fact_correction.py` are DB-global counts.
   Giving them the suite's pid-scoped mechanism plus a `tests\run-walkers.ps1` runner is the
   right fix; it is a medium refactor of the verification apparatus itself, so it wants its own
@@ -202,10 +207,6 @@ not vendored).
   "database does not exist" as a 30 s `PoolTimeout`; recreated + migrated 001–005 in-session.)*
   *(The other three 2026-07-28 carried items — the auth honesty paragraph, the Unity MCP pin,
   the DLL staleness check — are now scheduled: Phase F.)*
-- **Write-path `typology_confidence` parse seat (flagged 2026-08-12 while building the
-  typology clamp, unruled):** the confidence value is `float()`-converted outside the write
-  parse's try/except, so a model emitting a non-numeric confidence (e.g. `"high"`) would
-  still crash the request instead of degrading to `MalformedOutputError`. Same hazard class
-  as the (now closed) typology gap, one seat over; small fix, wants its own ruling on
-  degrade-vs-default semantics. *(The typology gap itself was ruled CLAMP and built
-  2026-08-12 — the dated entry in `decisions.md`; suite 82, write-path walker 53/53.)*
+- *(The `typology_confidence` parse seat flagged earlier on 2026-08-12 was **ruled SALVAGE
+  and closed the same day inside C1** — the dated entry in `decisions.md`; the typology gap
+  itself was ruled CLAMP and built that morning. Neither is carried any longer.)*

@@ -1,15 +1,17 @@
 # longmem-npc — Test suite spec
 
-**BUILT 2026-07-20 — 86 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation +
-hygiene + eval metrics + eval runner + judge; the Set A diegetic pair still lands with the
-dissonance mechanism). Count as of 2026-08-07: Set A 8, Set B 7, Set C 7, Set D 20,
-degradation 11, hygiene 2, Set G eval metrics 8, **Set H eval runner 9** (stage 2, 2026-08-05),
-**Set I judge 14** (stage 3, 2026-08-07) — grown from the 38 built on 2026-07-20 by the
-route-contract scenarios that arrived with each later route, by the gap-closing and guard
-scenarios from the full-repo audit, and by the eval harness stages 1–3. **Twelve carry the
-`nlp` marker**, so the turn-end subset runs **74**. *(Counts corrected 2026-08-07 — this header
-had not been propagated since stage 1; the stage-2 Set H section below lands with the same
-correction.)* Build rulings 2026-07-20
+**BUILT 2026-07-20 — 108 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation +
+hygiene + eval metrics + eval runner + judge + ablation + deferred writes; the Set A diegetic
+pair still lands with the dissonance mechanism). Count as of 2026-08-12: Set A 8, Set B 7,
+Set C 7, Set D 20, degradation 12, hygiene 2, Set G eval metrics 8, **Set H eval runner 9**
+(stage 2, 2026-08-05), **Set I judge 16** (stage 3, 2026-08-07; +2 with the 2026-08-12
+workaround session), **Set J ablation 6** (stage 4, 2026-08-12 — its section is `eval-harness.md`'s
+stage-4 block), **Set K deferred writes 13** (Phase C1, 2026-08-12) — grown from the 38 built on
+2026-07-20 by the route-contract scenarios that arrived with each later route, by the
+gap-closing and guard scenarios from the full-repo audit, and by the eval harness stages 1–4.
+**Fourteen carry the `nlp` marker**, so the turn-end subset runs **94**. *(Counts corrected
+2026-08-12 with the Set K landing — the 2026-08-07 header had drifted again by the stage-4 and
+workaround-session scenarios.)* Build rulings 2026-07-20
 (dated `decisions.md` entry): the suite-gate Stop hook runs the `-m "not nlp"` subset (the 7
 `nlp`-marked scenarios call the write pass at the service level and pay the lazy
 spaCy+fastcoref load; the full suite runs on demand + at floor verification); Postgres
@@ -75,8 +77,9 @@ moves scores, not rows; detail-hiding assertions land with reconstruction.)*
 - Pinned memories never grow reconstruction chain rows and always read verbatim.
 - Correction verbs evict caches, and cascade or preserve the chain per the two-verb ruling.
 - The drift bound is enforced (over-threshold candidate write is refused; prior head kept).
-- Within-scene text stability: absent a diegetic event or an authorial correction on that memory
-  (amended 2026-07-17), repeated reads within one scene are byte-identical.
+- Within-scene text stability: absent a diegetic event, an authorial correction on that memory
+  (amended 2026-07-17), or a deferred-enrichment completion (the third sanctioned cause, amended
+  2026-08-12 — `deferred-writes.md`), repeated reads within one scene are byte-identical.
 
 ## Set D — mid-dialogue gate (~8–10 scenarios) *(specced & built 2026-07-19, `mid-dialogue-gate.md` — the 51-assertion walker covers these)*
 
@@ -208,6 +211,44 @@ quotable only past the agreement bar):
   stamped arm blocks, judged summaries incl. reconstruction-faithfulness on the aged probe's
   retellings, deterministic pairwise verdicts, the Pareto table with honest-`None` USD,
   `plumbing_only` label, JSON-serializable report. Never asserts on prose.
+
+## Set K — deferred write processing *(added 2026-08-12 with Phase C1, `deferred-writes.md`)*
+
+Thirteen scenarios in `tests\test_deferred_writes.py` (12 unmarked + 1 `nlp`). Unmarked
+scenarios seed pending rows at the db layer (`Ctx.seed_pending`: NULL write-call scalars, raw
+text as the `original` head, persisted trigger names) and exercise the worker through
+`drain()` — the deterministic entry, no timers, no spaCy:
+
+- **Completion happy path:** one-shot NULL→value scalar fill, the raw head superseded by the
+  `'enrichment'` head, cache evicted, a `completed` run row — and a **re-drain is a 0-row
+  no-op with the chain byte-stable** (idempotency by the `enrichment_pending` guard).
+- **COALESCE proof:** a declared typology stored at insert survives completion untouched.
+- **Escalation novelty:** a novel component grows `identity_components` + its mention appends
+  as an add-only span; **no fact supersede** (sync parity — novels become components, never
+  memory entities).
+- **Retry-later:** a failed write call records a `failed` run row and leaves the row pending;
+  the next drain completes it. **Terminal:** the budget-spending attempt fills the row
+  byte-equivalent to the sync scoring-failed end-state (neutral importance + `scoring_failed`
+  + default typology; raw head stays live). **Orphan sweep:** a pending row with a spent
+  budget terminal-fills without model calls.
+- **Facts-only:** a retelling that superseded the raw head first → scalars fill, prose
+  supersede SKIPPED, cache still evicted, `completed_facts_only`.
+- **Embedding repair:** a NULL-embedding pending row gains an `'enrichment'` fact version
+  carrying the vector; the superseded original stays honestly NULL, `basis_text` byte-verbatim.
+- **Anchor set:** post-completion `fetch_reconstruction_sources` anchors on the enrichment
+  head. **/chain contract:** pending flag + attempts + the run log surface on the unscored
+  inspector read (wording untouched). **Window reachability:** a pending row is
+  vector-reachable with true relevance, scores under the neutral fallback, serves raw text
+  verbatim.
+- **`salvage_confidence` semantics** (the 2026-08-12 parse-seat ruling): non-numeric/NaN →
+  None, out-of-range → clamped, in-range untouched.
+- **End-to-end** (`nlp`): an enabled agent's observe lands pending with honest zero LLM
+  instrumentation → drain → enriched.
+
+The eighth walker `tests\verify_deferred_writes.py` (51 criteria) covers the migration-006
+shape, kill-switch parity, the full ladder at service level, and the worker lifecycle at both
+construction sites; the write-path walker staying byte-identical at 53/53 is the deferred-OFF
+parity evidence.
 
 ## Route contracts *(added as each route shipped; consolidated here 2026-07-28)*
 

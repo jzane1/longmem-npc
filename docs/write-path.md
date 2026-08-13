@@ -12,6 +12,13 @@ not re-derive.
 > stayed frozen.** One ruling was an explicit build-phase stance since **re-ruled 2026-07-22 to
 > soft-degrade** — the escalation failure path (see the degradation ladder; migration 005 added the
 > dedicated `escalation_failed` flag).
+>
+> **Amended 2026-08-12 (Phase C1 — `deferred-writes.md`, migration 006, the first post-freeze
+> migration since 005):** the pipeline gains a knob-gated **deferred mode** (default OFF) — the
+> two LLM calls move to an in-process worker; the NLP pass, embedding, and atomic insert stay
+> synchronous, and the sync path is byte-unchanged. The degradation ladder gains the deferred
+> rows below. The write parse also gained the `typology_confidence` salvage seat (ruled
+> 2026-08-12; the clamp's sibling).
 
 ## Principles this build honors
 
@@ -140,7 +147,11 @@ NLP confidence on an already-flagged span (confidence only ever adds calls).
 client did not declare it**. Structured output → `{ rendered_content, importance_raw, typology?,
 typology_confidence? }`. **Degradation:** on scoring failure the write **still lands** with neutral
 importance and `scoring_failed = true` (architecture §2); on unparseable structured output → log,
-apply neutral/default, the turn succeeds.
+apply neutral/default, the turn succeeds. *(Deferred mode, 2026-08-12: with
+`deferred_writes_enabled` on, this call and the escalation call are SKIPPED here and run in
+`app\deferred.py`'s worker instead — the raw text lands as the head, the scalars land NULL with
+`enrichment_pending`, and the worker's completion supersedes with the render
+(`write_cause = 'enrichment'`); `deferred-writes.md` owns the mechanism.)*
 
 **c. Embedding.** OpenAI `text-embedding-3-small` at **1536** (locked) for `observation_text` →
 `embedding`, and for the location name/description → `location_embedding`. The frozen schema stores
@@ -179,6 +190,10 @@ On write-call failure the head falls back to the raw observation text — never 
 | malformed Haiku structured output | log, ignore, apply neutral/default; the write succeeds. |
 | embedding call fails | write lands; NULL embedding (`embedding IS NULL` is the queryable signal; payload mirror `embedding_failed`). *(Ruled 2026-07-13; signal home since the 2026-07-18 freeze: the live fact head — `memory_fact_versions.embedding IS NULL`.)* |
 | escalation call fails twice | **SOFT-DEGRADE** — retry once, then proceed with the base NLP-pass gist and set `escalation_failed = true` (the write lands, never lost). *(Re-ruled 2026-07-22, retiring the 2026-07-13 fail-loud hard-stop; the flag is the dedicated `memories.escalation_failed` column, migration 005.)* |
+| model-emitted `typology_confidence` non-numeric / out-of-range | **SALVAGE** (ruled 2026-08-12, the typology clamp's sibling seat): non-numeric/NaN → None (render, importance, typology all survive; the confidence knob-defaults); out-of-range clamps into [0, 1]; WARNING logs. The client-declared value keeps its loud 422. |
+| *deferred mode:* worker write call fails (attempt) | **RETRY-LATER** (deliberately different from the sync degrade-now, ruled 2026-08-12): a `failed` run row lands in `memory_enrichment_runs`; the row stays `enrichment_pending` for a later drain pass. |
+| *deferred mode:* attempt budget spent (`deferred_max_attempts`) | **TERMINAL FILL** — neutral importance + `scoring_failed = true` + the config-default typology, pending cleared: **byte-equivalent to the sync scoring-failed end-state**. The raw head stays the live telling; nothing is chain-written. |
+| *deferred mode:* worker embedding repair fails | write already landed; the fact head stays honestly NULL — today's end-state, retried opportunistically on any later attempt of that row. |
 
 ## Model provider interfaces
 

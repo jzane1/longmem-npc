@@ -86,6 +86,44 @@ def clamp_typology(raw: str) -> str | None:
     return None
 
 
+def salvage_confidence(raw: object) -> float | None:
+    """Salvage a model-emitted typology confidence (ruled 2026-08-12).
+
+    The sibling seat to `clamp_typology`, one field over: this value used to
+    be `float()`-converted OUTSIDE the parse's try/except, so a model
+    emitting `"high"` crashed the whole request (an uncaught ValueError ->
+    500, nothing written) and a numeric out-of-range value (1.5) aborted the
+    insert at `memories_typology_confidence_check`. Salvage semantics:
+    everything parseable survives — a non-numeric (or NaN) confidence
+    becomes None while the render, importance, and typology all stand
+    (ingest knob-defaults the confidence); a numeric out-of-range one
+    clamps into [0, 1]. Never silent: every intervention logs the raw
+    value. The client-DECLARED path is untouched — an out-of-range
+    declaration stays a loud 422 at the wire model.
+    """
+    try:
+        value = float(raw)  # type: ignore[arg-type] — the point is the failure
+    except (TypeError, ValueError):
+        logger.warning(
+            "write-call typology_confidence %r is non-numeric; dropping to "
+            "None (the confidence-default knob path)",
+            raw,
+        )
+        return None
+    if math.isnan(value):
+        logger.warning("write-call typology_confidence is NaN; dropping to None")
+        return None
+    if value < 0.0 or value > 1.0:
+        clamped = min(max(value, 0.0), 1.0)
+        logger.warning(
+            "write-call typology_confidence %r out of [0, 1]; clamped to %s",
+            raw,
+            clamped,
+        )
+        return clamped
+    return value
+
+
 class ProviderCallError(RuntimeError):
     """The model call failed outright."""
 
@@ -512,6 +550,24 @@ class MalformedWriteProvider:
         )
 
 
+class FlakyWriteProvider:
+    """Fails the first `fail_times` write calls, then delegates to
+    FakeWriteProvider — the deferred worker's retry ladder (deferred-writes.md):
+    a failed attempt leaves the row pending with the attempt recorded; a later
+    drain completes it."""
+
+    def __init__(self, fail_times: int) -> None:
+        self.calls = 0
+        self._fail_times = fail_times
+        self._delegate = FakeWriteProvider()
+
+    def render_and_score(self, **kwargs) -> WriteCallResult:
+        self.calls += 1
+        if self.calls <= self._fail_times:
+            raise ProviderCallError(f"injected flaky write failure (call {self.calls})")
+        return self._delegate.render_and_score(**kwargs)
+
+
 class FailingEmbeddingProvider:
     """Embedding failure: write lands with NULL embedding (ruled 2026-07-13)."""
 
@@ -529,6 +585,34 @@ class FailingEscalationProvider:
     def extract_gist(self, **_kwargs) -> EscalationResult:
         self.calls += 1
         raise ProviderCallError(f"injected escalation failure (call {self.calls})")
+
+
+class NoveltyEscalationProvider:
+    """Echoes the candidates plus one fixed novel component whose mention (when
+    present in the observation text) gains a span via the plan_spans term
+    match — the deferred worker's entity-merge / add-only-append path needs a
+    fake whose merge is NOT a no-op (the plain echo fake changes nothing).
+    Deterministic: same fixture text -> byte-identical merge."""
+
+    NOVEL = NewComponent(canonical="ledger stone", category="object")
+
+    def extract_gist(
+        self,
+        *,
+        observation_text: str,
+        known_components: list[dict],
+        candidate_spans: list[GistSpanCandidate],
+        candidate_components: list[NewComponent],
+        triggers: list[str],
+    ) -> EscalationResult:
+        words = len(observation_text.split())
+        components = [*candidate_components, self.NOVEL]
+        return EscalationResult(
+            spans=list(candidate_spans),
+            new_components=components,
+            input_tokens=words,
+            output_tokens=len(candidate_spans) + len(components),
+        )
 
 
 class FailingProseProvider:
@@ -729,7 +813,7 @@ class RealWriteProvider:
             importance_raw=importance,
             typology=clamped,
             typology_confidence=(
-                float(confidence)
+                salvage_confidence(confidence)
                 if confidence is not None and clamped is not None
                 else None
             ),

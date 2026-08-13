@@ -181,6 +181,16 @@ Client event → NLP span/affect pass → **single Haiku call** (prose render + 
 typology classification only when the client didn't declare it) → **atomic insert**, populating all
 write-time facts from day one.
 
+*(Amended by the C1 deferred-write build, ruled & built 2026-08-12 — `deferred-writes.md`,
+migration 006: with the `deferred_writes_enabled` knob on — **default OFF** — the two LLM calls
+move to an in-process worker. The NLP pass, embedding, and atomic insert stay synchronous; the
+raw text lands as the live `original` head with the write-call scalars NULL and
+`enrichment_pending` set; the worker's one-shot completion fills the scalars and supersedes the
+head with the render, `write_cause = 'enrichment'`, which also **joins the drift-anchor set**.
+"Populating all write-time facts from day one" gains its one ruled exception: a deferred row's
+write-time window is stretched to the worker's completion, and the terminal-failure fill is
+byte-equivalent to the sync scoring-failed end-state — deferral never adds a lost-write rung.)*
+
 - **Evidence typology** — `observed | told | inferred | reflected`, with a 0–1 confidence. A default
   per-typology confidence table exists; the client may override per event; **client declaration
   wins**. `typology_source` records `declared | inferred` (distinct from provenance).
@@ -316,8 +326,10 @@ pre-warm at dialogue init; on a mid-scene miss, **block and expose a "reconstruc
 (latency becomes characterization). Async serve-verbatim-then-cache is **not** the design — if
 latency ever forces async, the swap must be explicit state (a `reconstruction_pending` read mode),
 never silent text mutation, because of the **within-scene text-stability invariant**: absent a
-diegetic event **or an authorial correction** (the second sanctioned text-change cause, ruled
-2026-07-17) on that memory, repeated reads within one scene return byte-identical text.
+diegetic event, **an authorial correction** (the second sanctioned text-change cause, ruled
+2026-07-17), **or a deferred-enrichment completion** (the third, ruled 2026-08-12 —
+`deferred-writes.md`; the window is bounded by the worker's poll interval) on that memory,
+repeated reads within one scene return byte-identical text.
 
 **Cache:** keyed `(memory_id × identity_version)`, where the version component **composes
 `identity_version` with a quantized, scene-frozen decay band** (ruled 2026-07-17; the band both
@@ -325,7 +337,8 @@ keys the cache and sets the thinning level, so same key ⇒ byte-identical text,
 re-reconstructs on thinner detail — the pre-demo drift driver while the identity document is
 seed-only static). **Cache-eviction invariant (generalized):** cache
 writes happen only in the reconstruction path; **any other writer to a chain — correction, diegetic
-write, purge — must evict all cache rows for that memory_id.**
+write, deferred-enrichment completion (2026-08-12, on every completion shape including
+facts-only), purge — must evict all cache rows for that memory_id.**
 
 **Drift budget:** on each reconstruction-driven write-back, embed the candidate and measure distance
 from the anchor; past threshold, **refuse the write and keep the prior head**. Event-driven writes
@@ -451,7 +464,13 @@ invalidation doubles as compiler-cache eviction.
   with the CLI harness. **No distribution exists without it.** *(Built 2026-07-15,
   `app\load_driver.py`: reuses the session-runner core; emits the latency p50/p95 decomposition —
   the gate term **landed 2026-07-19** (`gate_check` over gate-evaluated turns + the per-100-turn
-  gate block; `mid-dialogue-gate.md`) — and the itemized per-100-turn token/USD table.)*
+  gate block; `mid-dialogue-gate.md`) — and the itemized per-100-turn token/USD table. The
+  `observe_total` series **landed with C1**, 2026-08-12.)*
+- **Deferred-work accounting (C1, 2026-08-12):** a background worker has no response payload to
+  ride, so per-attempt timing/token accounting persists in **`memory_enrichment_runs`**
+  (migration 006) — outcome, per-stage ms, token columns — surfaced on the unscored `/chain`
+  read. The driver's cost table sums seam tokens; with deferral on, the run log is the
+  deferred-spend source of truth (`deferred-writes.md`).
 
 ## 12. Integrator surface requirements
 

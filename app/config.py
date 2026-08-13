@@ -202,6 +202,24 @@ SERVICE_DEFAULTS: dict[str, float] = {
     # 1.0 = strict lexical (the fork-2 ruling); paraphrase slack belongs to
     # the judged faithfulness category, never to this knob.
     "metric_gist_match_threshold": 1.0,
+    # --- deferred write processing (deferred-writes.md; ruled 2026-08-12) ----
+    # Kill-switch: 0.0 (the landing default) = every observe enriches
+    # synchronously — the pre-C1 path byte-for-byte. Non-zero defers the two
+    # LLM calls (write call + escalation) to the worker; the NLP pass,
+    # embedding, and insert stay synchronous. Gates DEFERRAL only — the
+    # worker always drains pending rows, so flipping back to 0.0 never
+    # strands a row. Default flips at Phase D if the numbers earn it.
+    "deferred_writes_enabled": 0.0,
+    # Worker poll interval between drain passes. Process-level: the worker
+    # has no agent context, so this reads from the service defaults (an
+    # agents.config override of it is inert by design).
+    "deferred_poll_seconds": 1.0,
+    # Rows claimed per drain batch (integer-valued, cast at the call site).
+    "deferred_batch_size": 8.0,
+    # Failed attempts before the terminal degraded completion — the row then
+    # lands in today's sync scoring-failed end-state (integer-valued, cast at
+    # the call site).
+    "deferred_max_attempts": 3.0,
 }
 
 # Prose-view weight clamp bounds (ruled at the split-brain build 2026-07-21;

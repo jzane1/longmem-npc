@@ -249,7 +249,9 @@ class RetrievalService:
             )
         scored: list[_Scored] = []
         for row in candidates:
-            # The write path never stores NULL importance; fixture rows might.
+            # NULL importance: fixture rows, and — since the deferred-write
+            # build (006, 2026-08-12) — pending un-enriched rows; the neutral
+            # knob is the window's ruled scoring fallback.
             raw = row.importance_raw if row.importance_raw is not None else neutral
             # Recency: the shared decay math; pin = decay exemption (arch §8).
             if row.pinned:

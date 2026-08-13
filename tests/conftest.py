@@ -215,6 +215,20 @@ class Ctx:
 
         return IngestService(self.pool, self.providers(**overrides), self.settings)
 
+    def worker(self, *, defaults: dict | None = None, **overrides):
+        """A deferred-write worker over this scenario's pool (Set K,
+        deferred-writes.md). Never started — tests call `drain()` directly,
+        the deterministic entry (no timers). `defaults` overrides service
+        defaults (e.g. a pinned deferred_max_attempts) on a copied Settings."""
+        from dataclasses import replace
+
+        from app.deferred import DeferredWriteWorker
+
+        settings = self.settings
+        if defaults:
+            settings = replace(settings, defaults={**settings.defaults, **defaults})
+        return DeferredWriteWorker(self.pool, self.providers(**overrides), settings)
+
     # -- fixtures -----------------------------------------------------------
     async def make_agent(
         self,
@@ -278,6 +292,53 @@ class Ctx:
             spans=[db.SpanPlan(s, e, None, "person") for (s, e) in spans],
             event_time=event_time,
             location_name=location_name,
+        )
+        return await db.insert_observation(self.pool, plan)
+
+    async def seed_pending(
+        self,
+        agent_id: UUID,
+        text: str,
+        valid_at: datetime,
+        *,
+        declared_typology: str | None = None,
+        declared_confidence: float | None = None,
+        triggers: tuple = (),
+        entities: list[str] | None = None,
+        embedding=_UNSET,
+        spans: tuple = (),
+        pinned: bool = False,
+        decay_class: str = "episodic",
+    ) -> db.InsertOutcome:
+        """A deferred-mode pending row seeded at the db layer (Set K,
+        deferred-writes.md): the raw text IS the `original` head, the
+        write-call scalars are NULL (a declared typology stores now — the
+        one-shot COALESCE proof rides on it), `enrichment_pending` is set,
+        and the persisted trigger names stand in for the NLP evaluation —
+        so the worker path never touches the spaCy loaders and Set K stays
+        unmarked."""
+        vec = embed_text(text) if embedding is _UNSET else embedding
+        plan = db.InsertPlan(
+            agent_id=agent_id,
+            observation_text=text,
+            rendered_content=text,
+            valid_at=valid_at,
+            importance_raw=None,
+            scoring_failed=False,
+            typology=declared_typology,
+            typology_confidence=(
+                declared_confidence if declared_typology is not None else None
+            ),
+            typology_source=("declared" if declared_typology is not None else None),
+            provenance="lived",
+            pinned=pinned,
+            decay_class=decay_class,
+            decay_class_unknown=False,
+            embedding=vec,
+            entities=entities,
+            spans=[db.SpanPlan(s, e, None, "person") for (s, e) in spans],
+            enrichment_pending=True,
+            enrichment_pending_triggers=list(triggers) or None,
         )
         return await db.insert_observation(self.pool, plan)
 

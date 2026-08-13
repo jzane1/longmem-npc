@@ -25,6 +25,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 
 from app.config import load_settings
 from app.db import build_pool
+from app.deferred import DeferredWriteWorker
 from app.dialogue import DialogueService
 from app.ingest import (
     CorrectionConflictError,
@@ -75,9 +76,16 @@ async def _lifespan(app: FastAPI):
     app.state.service = IngestService(pool, providers, settings)
     app.state.retrieval = RetrievalService(pool, providers, settings)
     app.state.dialogue = DialogueService(pool, providers, settings, app.state.retrieval)
+    # The deferred-write worker (deferred-writes.md, ruled 2026-08-12): one
+    # per process, stopped BEFORE the pool closes. It drains pending rows
+    # regardless of the deferral kill-switch, so flipping the knob off never
+    # strands a row.
+    app.state.deferred = DeferredWriteWorker(pool, providers, settings)
+    app.state.deferred.start()
     try:
         yield
     finally:
+        await app.state.deferred.stop()
         await pool.close()
 
 

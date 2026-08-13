@@ -149,15 +149,15 @@ python -m pytest tests -q -m "not nlp"   # 74, the turn-end subset — seconds, 
 
 Postgres unreachable ⇒ every scenario skips loudly and the run exits green, by ruling.
 
-**The walkers** (seven structural done-when scripts) need a scratch DB you create yourself:
+**The walkers** (eight structural done-when scripts) need a scratch DB you create yourself:
 
 ```powershell
 $scratch = "postgresql://longmem:change-me@localhost:5432/longmem_test"
 docker exec longmem-pg psql -U longmem -d postgres -c "CREATE DATABASE longmem_test"
 python db\migrate.py --database-uri $scratch
 python tests\verify_write_path.py --database-uri $scratch
-# ... verify_read_path, verify_cli_harness, verify_gate, verify_reconstruction,
-#     verify_authorial_correction, verify_fact_correction
+# ... verify_deferred_writes (C1, 2026-08-12), verify_read_path, verify_cli_harness,
+#     verify_gate, verify_reconstruction, verify_authorial_correction, verify_fact_correction
 docker exec longmem-pg psql -U longmem -d postgres -c "DROP DATABASE longmem_test WITH (FORCE)"
 ```
 

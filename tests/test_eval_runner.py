@@ -233,7 +233,7 @@ def test_provision_drop_roundtrip(suite_env):
         uri = provision_scratch(base, name)
         with psycopg.connect(uri, connect_timeout=3) as conn:
             applied = conn.execute("SELECT count(*) FROM schema_migrations").fetchone()
-        assert applied[0] == 5
+        assert applied[0] == 6  # 001-006 (006: deferred writes, 2026-08-12)
         drop_scratch(base, name)
         admin = scratch_uri(base, "postgres")
         with psycopg.connect(admin, connect_timeout=3, autocommit=True) as conn:
@@ -410,6 +410,10 @@ async def _assert_no_eval_rows(ctx):
         "identity_documents",
         "memories",
         "memory_details",
+        # 006 (deferred writes, 2026-08-12) added the run-log table — the
+        # mechanical census bump every migration makes here; the no-eval-rows
+        # claim this helper asserts is untouched by 006.
+        "memory_enrichment_runs",
         "memory_fact_versions",
         "memory_gist_spans",
         "reconstruction_cache",

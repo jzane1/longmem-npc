@@ -65,10 +65,11 @@ spec is no longer a plan.
 | `split-brain-streaming.md` | RETIRED 2026-08-04 (the A1 re-shape) — historical spec of the concurrent prose + behavior topology; the living seam is `architecture.md` §9 | — |
 | `unity-client.md` | SSE + provisioning + inspector reads, C# client, Unity, Ledger | — |
 | `eval-harness.md` | judged eval harness: judge-free metrics + metrics route (stage 1); runner, judge, ablation (stages 2–4) | — |
+| `deferred-writes.md` | deferred write processing: the pending window, the enrichment worker, the completion contract | 006 |
 
-**Note on `migration-01.md`:** it documents migration **001 only**. Migrations 002–005 (fact
-versions, fact entities, the lexical index, `escalation_failed`) are specced in the targets above
-and live in `db\migrations\`. For the current schema, read the SQL.
+**Note on `migration-01.md`:** it documents migration **001 only**. Migrations 002–006 (fact
+versions, fact entities, the lexical index, `escalation_failed`, deferred writes) are specced in
+the targets above and live in `db\migrations\`. For the current schema, read the SQL.
 
 ---
 

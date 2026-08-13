@@ -52,9 +52,13 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
   content in place. Never DELETE rows — the purge endpoint is the sole exception. This governs
   memory content (memories / memory_details and their chains, including the fact-version chain —
   migration 002, built 2026-07-18, docs\fact-level-correction.md); the one runtime scalar —
-  memories.pinned (pin toggle) — is deliberately updated in place and sits outside it. (A second
-  sanctioned scalar, agents.reputation, was removed by the A1 re-shape 2026-08-04; the column
-  stays in the schema, unwritten and unread — a dialogue turn persists nothing.)
+  memories.pinned (pin toggle) — is deliberately updated in place and sits outside it, and so
+  does the ONE-SHOT NULL→value completion of a deferred row's chainless write-time scalars +
+  the enrichment bookkeeping flags (ruled 2026-08-12, docs\deferred-writes.md — the original
+  write finishing under the enrichment_pending guard, never a mutation of a stored value; the
+  render itself supersedes, it never overwrites). (A second sanctioned scalar,
+  agents.reputation, was removed by the A1 re-shape 2026-08-04; the column stays in the schema,
+  unwritten and unread — a dialogue turn persists nothing.)
 - Recency decay and bi-temporal invalidation are distinct mechanisms. Never conflate them.
 - Read endpoints **that run retrieval** always return memory IDs and scores alongside prose. The
   test suite dies without this. Carve-out (ruled 2026-07-27, propagated 2026-07-28; third member
@@ -64,8 +68,11 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
   scores exist to return; they carry IDs and structured fields (the metric read: IDs + numbers)
   and are unscored *by contract*, not by omission.
 - Nothing integrator-configurable is ever hardcoded: vocabularies, thresholds, model roles, knobs.
-- Within a scene, absent a diegetic event or an authorial correction on a memory, repeated reads
-  return byte-identical text (correction added by the 2026-07-17 authorial-correction ruling).
+- Within a scene, absent a diegetic event, an authorial correction on a memory, or a
+  deferred-enrichment completion (the third sanctioned text-change cause, ruled 2026-08-12,
+  docs\deferred-writes.md — the window is bounded by the worker's poll interval), repeated
+  reads return byte-identical text (correction added by the 2026-07-17 authorial-correction
+  ruling).
 
 ## Working discipline
 - IMPORTANT: Build only what the task names. If adjacent work seems necessary, stop and report

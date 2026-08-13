@@ -148,6 +148,12 @@ class IngestResult(BaseModel):
 
     Surfaced verbatim by the route and the CLI debug view; the suite asserts
     on this structure, never on prose.
+
+    Since the deferred-write build (deferred-writes.md, ruled 2026-08-12)
+    the write-call scalars are Optional: a deferred-mode observe returns
+    them None with `enrichment_pending` true — there is no honest non-null
+    value before the worker's completion. Sync observes (the default; knob
+    `deferred_writes_enabled` 0.0) still populate every field.
     """
 
     # Identifiers
@@ -157,10 +163,10 @@ class IngestResult(BaseModel):
     gist_span_ids: list[UUID]
     new_component_ids: list[UUID]
     # Computed facts / scores
-    importance_raw: float
-    typology: Typology
-    typology_confidence: float
-    typology_source: Literal["declared", "inferred"]
+    importance_raw: float | None
+    typology: Typology | None
+    typology_confidence: float | None
+    typology_source: Literal["declared", "inferred"] | None
     provenance: Provenance
     affect: AffectOut
     entities: list[str]
@@ -172,6 +178,7 @@ class IngestResult(BaseModel):
     )
     embedding_failed: bool
     pinned: bool
+    enrichment_pending: bool = False  # deferred write awaiting the worker (006)
     # Instrumentation
     instrumentation: Instrumentation
 
@@ -613,6 +620,31 @@ class GistSpanOut(BaseModel):
     matched_category: str | None
 
 
+class EnrichmentRunOut(BaseModel):
+    """One deferred-enrichment attempt's persisted accounting
+    (memory_enrichment_runs, migration 006) — the background worker has no
+    response payload to ride, so instrument-at-the-seam surfaces here, on
+    the unscored inspector read."""
+
+    attempt: int
+    outcome: Literal["completed", "completed_facts_only", "failed", "terminal_degraded"]
+    error: str | None
+    triggers: list[str]
+    escalation_failed: bool
+    embedding_repaired: bool
+    write_ms: float | None
+    escalation_ms: float | None
+    embed_ms: float | None
+    insert_ms: float | None
+    total_ms: float | None
+    write_input_tokens: int
+    write_output_tokens: int
+    escalation_input_tokens: int
+    escalation_output_tokens: int
+    embedding_tokens: int
+    created_at: datetime
+
+
 class MemoryChainResult(BaseModel):
     """GET /v1/memories/{id}/chain — The Ledger's ground-truth-vs-telling
     read (unity-client.md fork 3, ruled 2026-07-27): the immutable
@@ -621,7 +653,10 @@ class MemoryChainResult(BaseModel):
     An unscored inspector read: no retrieval ran, so there are no scores —
     IDs and structured fields on every row keep the read-payload discipline.
     `memories.entities` is deliberately NOT echoed (frozen at the 003
-    freeze; the live fact head's entities are the current ones)."""
+    freeze; the live fact head's entities are the current ones). Since the
+    deferred-write build (006) the pending flag, attempt counter, and the
+    per-attempt run log ride here — the deferred window's inspector
+    surface."""
 
     memory_id: UUID
     agent_id: UUID
@@ -638,6 +673,9 @@ class MemoryChainResult(BaseModel):
     invalid_at: datetime | None
     location_name: str | None
     event_time: datetime | None
+    enrichment_pending: bool = False
+    enrichment_attempts: int = 0
+    enrichment_runs: list[EnrichmentRunOut] = Field(default_factory=list)
     details: list[DetailVersionOut]
     facts: list[FactVersionOut]
     gist_spans: list[GistSpanOut]

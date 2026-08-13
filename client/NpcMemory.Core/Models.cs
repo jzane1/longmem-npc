@@ -103,10 +103,13 @@ namespace NpcMemory
         public Guid FactVersionId { get; set; }
         public List<Guid> GistSpanIds { get; set; } = new List<Guid>();
         public List<Guid> NewComponentIds { get; set; } = new List<Guid>();
-        public double ImportanceRaw { get; set; }
-        public string Typology { get; set; } = "";
-        public double TypologyConfidence { get; set; }
-        public string TypologySource { get; set; } = "";
+        // Nullable since the deferred-write build (2026-08-12): a
+        // deferred-mode observe returns the write-call scalars as null with
+        // EnrichmentPending true — the worker fills them server-side later.
+        public double? ImportanceRaw { get; set; }
+        public string? Typology { get; set; }
+        public double? TypologyConfidence { get; set; }
+        public string? TypologySource { get; set; }
         public string Provenance { get; set; } = "";
         public AffectOut Affect { get; set; } = new AffectOut();
         public List<string> Entities { get; set; } = new List<string>();
@@ -116,6 +119,7 @@ namespace NpcMemory
         public bool EscalationFailed { get; set; }
         public bool EmbeddingFailed { get; set; }
         public bool Pinned { get; set; }
+        public bool EnrichmentPending { get; set; }
         public Instrumentation Instrumentation { get; set; } = new Instrumentation();
     }
 
@@ -352,6 +356,27 @@ namespace NpcMemory
         public string? MatchedCategory { get; set; }
     }
 
+    public sealed class EnrichmentRunOut
+    {
+        public int Attempt { get; set; }
+        public string Outcome { get; set; } = "";
+        public string? Error { get; set; }
+        public List<string> Triggers { get; set; } = new List<string>();
+        public bool EscalationFailed { get; set; }
+        public bool EmbeddingRepaired { get; set; }
+        public double? WriteMs { get; set; }
+        public double? EscalationMs { get; set; }
+        public double? EmbedMs { get; set; }
+        public double? InsertMs { get; set; }
+        public double? TotalMs { get; set; }
+        public int WriteInputTokens { get; set; }
+        public int WriteOutputTokens { get; set; }
+        public int EscalationInputTokens { get; set; }
+        public int EscalationOutputTokens { get; set; }
+        public int EmbeddingTokens { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+    }
+
     public sealed class MemoryChainResult
     {
         public Guid MemoryId { get; set; }
@@ -369,6 +394,9 @@ namespace NpcMemory
         public DateTimeOffset? InvalidAt { get; set; }
         public string? LocationName { get; set; }
         public DateTimeOffset? EventTime { get; set; }
+        public bool EnrichmentPending { get; set; }
+        public int EnrichmentAttempts { get; set; }
+        public List<EnrichmentRunOut> EnrichmentRuns { get; set; } = new List<EnrichmentRunOut>();
         public List<DetailVersionOut> Details { get; set; } = new List<DetailVersionOut>();
         public List<FactVersionOut> Facts { get; set; } = new List<FactVersionOut>();
         public List<GistSpanOut> GistSpans { get; set; } = new List<GistSpanOut>();

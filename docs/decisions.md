@@ -7,9 +7,9 @@ file records what was chosen, what it beat, and why (where the rationale was rec
 
 ## Index
 
-*49 dated sections (recounted 2026-08-07, full-repo audit: 49 body entries, 49 index lines,
-one-to-one — this header count had gone stale, last set 2026-07-29). Regenerated
-2026-07-28 — the first hand-written pass mixed two
+*58 dated sections (recounted 2026-08-12 at the C1 landing: 58 body entries, 58 index lines,
+one-to-one — the 2026-08-07 count of 49 had gone stale by the measurement-line and C1
+sessions). Regenerated 2026-07-28 — the first hand-written pass mixed two
 slug conventions and miscounted. Anchors follow GitHub's slugger: the em dash is dropped and
 its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as `#name--2026-07-28`.*
 
@@ -74,6 +74,9 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [R7 resolved — the drift budget is a topic guard, not a fact guard — 2026-08-12](#r7-resolved--the-drift-budget-is-a-topic-guard-not-a-fact-guard--2026-08-12)
 - [Dialogue model re-ruled — haiku stands, latency rules — 2026-08-12](#dialogue-model-re-ruled--haiku-stands-latency-rules--2026-08-12)
 - [Typology robustness ruled — clamp at the parse seam — 2026-08-12](#typology-robustness-ruled--clamp-at-the-parse-seam--2026-08-12)
+- [C1 spec rulings — deferred write processing — 2026-08-12](#c1-spec-rulings--deferred-write-processing--2026-08-12)
+- [typology_confidence salvage ruled — the clamp's sibling seat — 2026-08-12](#typology_confidence-salvage-ruled--the-clamps-sibling-seat--2026-08-12)
+- [Phase C1 build record — deferred writes landed — 2026-08-12](#phase-c1-build-record--deferred-writes-landed--2026-08-12)
 
 ## Primary decisions
 
@@ -2983,3 +2986,122 @@ all good; only the label needed normalizing); leaving the DB constraint as the o
 parse's try/except — a model emitting a non-numeric confidence (e.g. `"high"`) would still
 crash the request rather than degrade to `MalformedOutputError`. Small, unruled; carried in
 `status.md`.
+
+*Closed 2026-08-12, same day — see typology_confidence salvage ruled.*
+
+## C1 spec rulings — deferred write processing — 2026-08-12
+
+**Ruled (Jack, at C1's plan-mode spec — the four forks presented with recommendations; all
+four recommended options taken first pass).** Phase C1 builds deferred write processing per
+the 2026-07-23 sequenced-later ruling (raw stored immediately, enrichment at the service's
+own timing; a cost/throughput optimization). The forks:
+
+1. **Defer ONLY the LLM calls.** The local NLP pass (gist spans + entities) and the ~0.2 s
+   embedding stay in the request path; the single write call and the escalation call move to
+   the worker. A fresh memory is vector- and lexically-searchable the moment the observe
+   returns, with gist spans intact — until enrichment it serves raw text and scores at
+   neutral importance, both already-ruled degradation shapes. This also answers the
+   action-observe same-scene question A1 delegated to this fork: full retrieval reachability
+   immediately. **Rejected:** full deferral (fastest return but the window would be
+   vector-invisible, zero-gist — the stage-4 ablation's measured −0.13 gist-precision hole —
+   and context-blind); a repair-only worker (does not match C1's ruled description).
+2. **Enrichment writes by supersession via the existing chains.** The render supersedes the
+   raw head as a new `memory_details` head, `write_cause = 'enrichment'`; fact-chain changes
+   ride new `memory_fact_versions` rows (same cause); gist spans append add-only. Only the
+   chainless `memories` scalars — importance, typology triple, plus pending/attempts
+   bookkeeping — fill in place, **one-shot NULL→value, sanctioned by this ruling** (the
+   `pinned` class: the original write finishing under the `enrichment_pending` guard, never
+   a mutation of a stored value). Migration 006 widens BOTH write_cause CHECKs;
+   `'enrichment'` joins the drift-anchor set. If a retelling or correction superseded the
+   raw head first, enrichment completes facts only, skips the prose supersede, and evicts
+   that memory's reconstruction cache. **Rejected:** in-place completion for embedding and
+   entities on the live fact head (smaller migration, but bypasses the fact-version
+   machinery the entities freeze pointed at — supersession is the path the frozen-facts
+   ruling already named). **Recorded finding:** `decay_class` resolves purely from the
+   client label + agent config at insert (no model input), so it never defers and the
+   completion never touches it — settled explicitly, not silently.
+3. **In-process async worker, default OFF.** Started at BOTH construction sites (the API
+   lifespan and `SessionRunner.create`, so REPL observes enrich), governed by
+   `SERVICE_DEFAULTS` knobs — `deferred_writes_enabled` kill-switch **landing at 0.0**,
+   `deferred_poll_seconds`, `deferred_batch_size`, `deferred_max_attempts` — with a directly
+   callable `drain()` for deterministic tests. Every existing floor stays valid as-is;
+   deferral is opt-in; the default flips at Phase D if the numbers earn it. No new model
+   role — the worker uses the write model; the six-role slate is untouched. The first
+   self-scheduled mechanism in the system: reflection and purge stay endpoint-pulled — this
+   is service-internal bookkeeping, and C2's idle-time scheduling later rides it.
+   **Rejected:** default ON (a substantially bigger landing — every observe-exercising floor
+   re-verifies against deferred-default in the same session); endpoint-pulled only (purest
+   no-scheduler fit but not "the service's own timing", and C2 would have no machinery to
+   ride).
+4. **The byte-identical-within-a-scene invariant is AMENDED**: deferred-enrichment
+   completion becomes the **third sanctioned cause** of mid-scene text change (after
+   diegetic events and authorial correction), the exposure window bounded by the poll
+   interval. **Rejected:** a min-age delay knob (only probabilistic protection — the suite
+   could not assert the invariant hard); never superseding prose (preserves the invariant at
+   the cost of the rendered-prose benefit entirely).
+
+**Consequences propagated (all landed with the build):** `CLAUDE.md` (the non-destructive
+bullet's one-shot completion carve-out beside `pinned`; the byte-identity third cause),
+`architecture.md` §5/§7/§11 + the generalized-eviction writer list, `write-path.md` (banner,
+pipeline, ladder rows), `read-path.md` (the zero-retrieval-change window note),
+`test-suite.md` (Set C third cause; Set K), the new `deferred-writes.md` spec +
+`docs\README.md` table row, migration `006_deferred_writes.sql`.
+
+## typology_confidence salvage ruled — the clamp's sibling seat — 2026-08-12
+
+**Ruled (Jack, closing the item flagged at the typology-clamp build): SALVAGE semantics,
+fixed inside C1** since C1 opens the same parse seam. `salvage_confidence` in
+`app\providers.py` beside `clamp_typology`: a non-numeric (or NaN) model-emitted confidence
+drops to **None** while the parsed typology, render, and importance all survive (ingest
+knob-defaults the confidence); a numeric out-of-range value clamps into [0, 1]; every
+intervention logs the raw value at WARNING. The write lands. The client-DECLARED path is
+untouched — an out-of-range declaration stays a loud 422 at the wire model. **Rejected:**
+degrading the whole parse to `MalformedOutputError` (the write would land through the
+scoring-failed fallback, discarding the render and importance the model returned correctly —
+heavy loss for a one-field defect); leaving the seat for its own scoped task. Closes the
+`status.md` carried item (flagged 2026-08-12). Verified: the Set K unit scenario (the
+flagged `"high"` crash value among its cases), suite subset 94, write-path walker 53/53.
+
+## Phase C1 build record — deferred writes landed — 2026-08-12
+
+**Built the same session the forks were ruled** (spec → build → walkers → floor-verify, the
+standing discipline). Migration 006 (both write_cause CHECKs widened to admit
+`'enrichment'`; `memories` gains `enrichment_pending` / `enrichment_attempts` /
+`enrichment_pending_triggers`; the `memory_enrichment_runs` per-attempt instrumentation
+table + partial pending index); the four `SERVICE_DEFAULTS` knobs; `app\deferred.py`
+(`DeferredWriteWorker`, started at both construction sites, stopped before the pool closes);
+the ingest seam's extract-only refactor (`run_write_call` / `resolve_typology` /
+`escalate_with_retry` / `plan_spans` promoted module-level so the worker and the sync branch
+share ONE implementation — the sync path byte-unchanged, `verify_write_path.py` 53/53
+untouched as the parity proof) + the deferred branch; `db.apply_enrichment` /
+`record_enrichment_failure` / `claim_enrichment_batch` (skip-locked claims) /
+`fetch_enrichment_source` / `fetch_exhausted_pending`; wire deltas (`IngestResult` nullable
+scalars + `enrichment_pending`; `/chain` gains pending/attempts/runs) mirrored in
+`Models.cs`; the Ledger `enrichment` badge; the load driver's `observe_total` p50/p95
+series.
+
+**Build-latitude choices, recorded:** (a) **one attempt per row per drain pass** — the
+first Set K run exposed that a failed row, still pending, was re-claimed by the same drain
+and burned its whole budget back-to-back with zero retry spacing; the claim SQL gained an
+exclusion list and the poll loop is the spacing. (b) **Sync parity for escalation novels** —
+the approved plan sketched merging novel canonicals into fact entities; built instead as
+components + mention spans ONLY (the sync path never puts escalation novels into memory
+entities — enrichment reproduces what the sync path would have written, nothing more), so
+the fact chain supersedes only for the embedding repair. (c) **The orphan sweep** — a
+process dying between claiming the final attempt and recording its outcome would strand a
+pending row un-claimable forever; `drain()` opens by terminal-filling budget-spent pending
+rows without model calls. (d) The terminal fill writes the NEUTRAL importance value (not
+NULL) + `scoring_failed` — byte-equivalent to the sync end-state, which pre-sets the
+neutral before its try block. (e) The 2026-07-28 carried note about a stale hard-stop
+comment at `ingest.py:234` was found already fixed in the live file — no edit, recorded
+here.
+
+**Verified:** suite 108 scenarios (94-subset ×2 green), all EIGHT walkers on fresh
+`longmem_test` — write-path **53/53 byte-untouched**, the new `verify_deferred_writes.py`
+**51/51**, read-path 56, cli-harness 51, gate 51 (ledger pin mechanically bumped to 006, the
+004/005 precedent), reconstruction 42, authorial 34, fact 34 — migrate idempotency
+(001→006 + clean second run), both C# builds 0-warning, the 24-check console harness gate,
+and the independent floor-verifier pass (floors row 25; the verdict returned **2026-08-13**
+after an overnight pause interrupted the first dispatch — this entry was drafted ahead of it
+and stands as verified; the verifier's non-failing flag that four docs pre-recorded its pass
+is taken as a wording-habit note for future landings).
