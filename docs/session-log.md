@@ -1554,6 +1554,36 @@ session.
   - The walkers' shared fixed-name scratch DB stays a carried item (re-provisioned
     per-walker this session without incident).
 
+- **2026-08-13 — Interim public README: the repo's public face until the demo.**
+  - **Landed:** the session target ruled at plan approval (four-question batch: full
+    showcase ~210 lines; mermaid + a REAL Ledger screenshot — Jack chose more than the
+    diagram-only recommendation; the AI-assisted build owned in one paragraph; stale counts
+    fixed alongside). README.md rewritten in 13 blocks — thesis kept, "dissonance-driven
+    defense" trimmed from the pitch (unbuilt; moved to the roadmap), status blockquote,
+    mermaid turn pipeline, the record section with the Ledger capture, measured numbers with
+    the quotability rulings respected (the prose-preference counts stay out; the natural-rf
+    degeneracy reported as a failed bar beside its constructed-truth closure), verification
+    section with the AI-pair paragraph, quickstart, the what-this-is-not paragraph F1 had
+    planned (no auth / no rate limiting / loopback-bound — written now), plain-name roadmap,
+    layout/reading/lineage/license. The Ledger gained `?agent=&memory=` chain deep-links
+    (the capture mechanism; also a demo-choreography hook; dated addendum in
+    `unity-client.md`) and an overlapping-gist-span render fix — the first capture showed
+    duplicated observation text where escalation spans overlap base spans; the stored record
+    was never wrong, the inspector's render was. Screenshot: real-mode seed against a
+    throwaway scratch DB (`longmem_readme_shot`, migrated 001–006, dropped after; the
+    product DB untouched) — agent Maren, four observes (one pinned, one authorially
+    corrected, two aged 35 days), one init reconstructing both aged rows (2 write-backs,
+    0 drift refusals) — captured headless to `docs\media\ledger-memory-chain.png` (126 KB;
+    gist precision 1.00 visible on screen). Stale-count propagation: SETUP.md (001–006;
+    108/94), docs\README.md (eight walkers), test-suite.md (Set I sixteen).
+  - **Verified:** screenshot QA'd after the render fix (chain fully rendered, superseded row
+    greyed, gist marks clean); bare `/ledger` regression-shot unchanged; suite subset run
+    mid-session after all edits — **94 passed in 19.2 s**; README relative links audited
+    against the tree.
+  - **Blocked:** nothing. **Abandoned:** nothing. No floors row — no layer landed. The
+    flip itself (push + GitHub visibility) is Jack's action after this session; the dated
+    ruling entry is in `decisions.md`.
+
 
 ---
 

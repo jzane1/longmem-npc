@@ -2,7 +2,13 @@
 
 **Last updated:** 2026-08-13
 **Phase:** **Road to completion — Phases A, B, and C1 are DONE.** (The roadmap below,
-consolidated 2026-08-04.) The second 2026-08-12 session landed **PHASE C1 — deferred write
+consolidated 2026-08-04.) The 2026-08-13 session landed **the interim public README** — the
+repo ruled public ahead of Phase F (the dated entry in `decisions.md`): README.md rewritten as
+the public face until the demo ships (F1's full rewrite at demo time unchanged), a real-mode
+Ledger screenshot at `docs\media\ledger-memory-chain.png`, chain deep-links + an
+overlapping-span render fix in the Ledger, stale counts propagated (SETUP.md, docs\README.md,
+test-suite.md); the flip itself (push + visibility) is Jack's action after the session.
+Before that, the second 2026-08-12 session landed **PHASE C1 — deferred write
 processing** in one pass: the four spec forks + the carried `typology_confidence` seat ruled
 (all recommended options taken; the three dated 2026-08-12 C1 entries in `decisions.md`),
 migration 006, the enrichment worker (`app\deferred.py`, both construction sites, default
@@ -187,7 +193,9 @@ for. The pre-2026-08-04 status narrative and superseded queues live in that file
 
 ## Repo conventions
 
-Private GitHub; commit at least weekly; the public flip is Phase F. Secrets in `.env` only
+Public GitHub (ruled 2026-08-13, the flip pulled ahead of Phase F — the interim-README entry
+in `decisions.md`; the v1 *release* still exits through Phase F, purge included). Commit at
+least weekly. Secrets in `.env` only
 (`.env.example` is the tracked template). Always PowerShell, backslash paths.
 
 Mechanically enforced since 2026-07-28: `ruff format` **and** `ruff check` on every edit (pinned

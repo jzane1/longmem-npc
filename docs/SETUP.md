@@ -85,7 +85,7 @@ Apply the schema:
 python db\migrate.py
 ```
 
-First run applies migrations 001–005 and records each in `schema_migrations` **in the same
+First run applies migrations 001–006 and records each in `schema_migrations` **in the same
 transaction as its DDL** — a half-applied migration can never be logged complete. Re-running is a
 clean no-op:
 
@@ -140,11 +140,11 @@ python -m app.load_driver
 
 Two systems, deliberately distinct — see `docs\README.md` for what each is for.
 
-**The suite** (86 scenarios, self-managing scratch DB, no arguments needed):
+**The suite** (108 scenarios, self-managing scratch DB, no arguments needed):
 
 ```powershell
 python -m pytest tests -q
-python -m pytest tests -q -m "not nlp"   # 74, the turn-end subset — seconds, not minutes
+python -m pytest tests -q -m "not nlp"   # 94, the turn-end subset — seconds, not minutes
 ```
 
 Postgres unreachable ⇒ every scenario skips loudly and the run exits green, by ruling.

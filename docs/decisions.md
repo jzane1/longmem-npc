@@ -7,9 +7,9 @@ file records what was chosen, what it beat, and why (where the rationale was rec
 
 ## Index
 
-*58 dated sections (recounted 2026-08-12 at the C1 landing: 58 body entries, 58 index lines,
-one-to-one — the 2026-08-07 count of 49 had gone stale by the measurement-line and C1
-sessions). Regenerated 2026-07-28 — the first hand-written pass mixed two
+*59 dated sections (recounted 2026-08-13 at the interim-README landing: 59 body entries, 59
+index lines, one-to-one; the prior recount was 58 at the 2026-08-12 C1 landing).
+Regenerated 2026-07-28 — the first hand-written pass mixed two
 slug conventions and miscounted. Anchors follow GitHub's slugger: the em dash is dropped and
 its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as `#name--2026-07-28`.*
 
@@ -77,6 +77,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [C1 spec rulings — deferred write processing — 2026-08-12](#c1-spec-rulings--deferred-write-processing--2026-08-12)
 - [typology_confidence salvage ruled — the clamp's sibling seat — 2026-08-12](#typology_confidence-salvage-ruled--the-clamps-sibling-seat--2026-08-12)
 - [Phase C1 build record — deferred writes landed — 2026-08-12](#phase-c1-build-record--deferred-writes-landed--2026-08-12)
+- [Interim public README — public ahead of Phase F — 2026-08-13](#interim-public-readme--public-ahead-of-phase-f--2026-08-13)
 
 ## Primary decisions
 
@@ -3105,3 +3106,41 @@ and the independent floor-verifier pass (floors row 25; the verdict returned **2
 after an overnight pause interrupted the first dispatch — this entry was drafted ahead of it
 and stands as verified; the verifier's non-failing flag that four docs pre-recorded its pass
 is taken as a wording-habit note for future landings).
+
+## Interim public README — public ahead of Phase F — 2026-08-13
+
+**Ruled (Jack, 2026-08-13, session premise + plan approval):** the repo goes public NOW,
+ahead of Phase F, as a portfolio surface for recruiters. An interim README describes the
+current verified state and persists untouched until the demo ships; **F1's full README
+rewrite at demo time stands unchanged** — this entry re-sequences the visibility flip only,
+never the release (F2 packaging and F3's hygiene sweep still precede the v1 release, and C6
+purge remains the ruled release-blocker; the README's what-this-is-not section says both).
+Shape ruled via the session's four-question batch, all recommended options taken except the
+visual, where Jack chose MORE than the recommendation (mermaid + a REAL Ledger screenshot
+over diagram-only): full showcase (~210 lines) over a compact refresh; the AI-assisted build
+owned in one paragraph inside the verification section (not featured, not silent — the
+tracked `.claude\` apparatus is visible to any visitor regardless); stale counts propagated
+alongside (SETUP.md migrations 001–006 + suite 108/94; docs\README.md eight walkers;
+test-suite.md Set I sixteen — the append-only registers keep their historical "seven
+walkers" mentions by design).
+
+**Build record.** README.md rewritten; the private-stage README's thesis paragraph, layout
+table, quickstart block, and reading pointers survive, and the "dissonance-driven defense"
+clause was trimmed from the pitch — dissonance is unbuilt, so it sits in the roadmap section
+instead. Quotability rulings respected: the 46–7 / 41–9 prose-preference counts appear
+nowhere (below the 0.6 agreement bar), framed instead as "the judge preferred the slower
+model's prose, and the ruling took the sub-second first word"; the natural-rf degeneracy is
+reported as a failed bar beside its constructed-truth closure. No badges: no CI workflow
+exists, and a lone license shield duplicates GitHub's own sidebar. **The Ledger gained two
+changes in service of the capture, both beyond the strictly-named task and recorded here:**
+(1) the existing `?agent=` deep-link got its `&memory=` sibling — straight to a chain view
+(also a demo-choreography hook: a scene cut can land on a specific chain; dated addendum in
+`unity-client.md`); (2) an overlapping-gist-span render fix — spans can overlap since
+escalation landed, and the observation card rendered overlapped characters twice; each
+character now renders exactly once, the mark kept on any unrendered tail. The stored record
+was never wrong; the inspector's render was. Capture: real-mode seed against a throwaway
+scratch DB (`longmem_readme_shot`, migrated 001–006, dropped after — the product DB stays
+out of it), four observes (one pinned, one authorially corrected, two aged 35 days), one
+init (2 write-backs, 0 drift refusals), headless Chrome →
+`docs\media\ledger-memory-chain.png` (126 KB). No floors row — no layer landed, and the
+floors count must not drift for non-layer work.

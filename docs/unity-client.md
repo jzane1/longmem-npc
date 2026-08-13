@@ -166,6 +166,10 @@ in OBS: original vs current telling side by side, superseded rows greyed-but-pre
 `read_mode` / scores / memory IDs per served item, and a real gist/detail number on screen.
 It binds the SAME `DialogueTurnResult` / `RetrievalResult` fields the eval harness (item 3)
 will score — the on-screen number and the paper number are one object. Data source is fork 3.
+*Addendum (2026-08-13, with the interim public README):* the page reads two deep-link params —
+`?agent=<uuid>` preloads the index (build-settled with stage 3) and `&memory=<uuid>` opens that
+memory's chain view directly (added for the README's capture; also a demo-choreography hook —
+a scene cut can land on a specific chain).
 
 ### Demo choreography hooks (ride here, no new backend)
 

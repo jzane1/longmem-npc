@@ -102,7 +102,7 @@ do not report them as stale.
 
 Two words appear constantly and are defined nowhere else:
 
-- **walker** — one of the seven `tests\verify_*.py` scripts. Each walks a single layer's
+- **walker** — one of the eight `tests\verify_*.py` scripts. Each walks a single layer's
   done-when criteria end to end against a scratch database and prints
   `ALL CHECKS PASSED (N assertions)`. Run by hand and at floor verification; they are the
   *evidence* behind a row in `floors.md`.

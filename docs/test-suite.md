@@ -182,7 +182,7 @@ no-eval-tables proof. Never asserts on prose.
 
 ## Set I — the judge layer *(added 2026-08-07 with eval-harness.md stage 3)*
 
-Fourteen scenarios in `tests\test_set_i_judge.py` (13 unmarked + 1 `nlp`) — the stage-3
+Sixteen scenarios in `tests\test_set_i_judge.py` (15 unmarked + 1 `nlp`) — the stage-3
 MECHANICS with the deterministic fake judge, never judged signal (which is real-mode-only and
 quotable only past the agreement bar):
 

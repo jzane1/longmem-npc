@@ -20,6 +20,8 @@
   views) is fed by pasting/dropping a DialogueTurnResult JSON — the
   turn-feed v1 shape settled at build; a live feed rides the demo
   choreography. All text renders via textContent (never innerHTML).
+  Deep-links (2026-08-13): ?agent=<uuid> preloads the index, and
+  &memory=<uuid> opens that memory's chain view directly.
 -->
 <style>
   :root {
@@ -273,9 +275,13 @@ async function renderChainFor(memoryId) {
     if (s.start_char > cursor) {
       obs.append(document.createTextNode(c.observation_text.slice(cursor, s.start_char)));
     }
-    const m = el("mark", null, c.observation_text.slice(s.start_char, s.end_char));
-    obs.append(m);
-    cursor = Math.max(cursor, s.end_char);
+    // Spans may overlap (escalation-added over base): render each character
+    // exactly once, keeping the mark on any not-yet-rendered tail.
+    if (s.end_char > cursor) {
+      const from = Math.max(s.start_char, cursor);
+      obs.append(el("mark", null, c.observation_text.slice(from, s.end_char)));
+      cursor = s.end_char;
+    }
   }
   obs.append(document.createTextNode(c.observation_text.slice(cursor)));
 
@@ -423,7 +429,9 @@ document.addEventListener("paste", (e) => {
 const params = new URLSearchParams(location.search);
 if (params.get("agent")) {
   $("agentId").value = params.get("agent");
-  loadIndex();
+  loadIndex().then(() => {
+    if (params.get("memory")) loadChain(params.get("memory"));
+  });
 }
 </script>
 </body>
