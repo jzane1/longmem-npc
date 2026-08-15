@@ -578,8 +578,12 @@ async def main(database_uri: str) -> None:
             # 2026-08-12) — the same mechanical ledger-pin update. The gate
             # mechanics this walker verifies are untouched by 006.
             "006_deferred_writes.sql",
+            # 007 joined the ledger at the reflection build (Phase C2,
+            # 2026-08-15) — the same mechanical ledger-pin update. The gate
+            # mechanics this walker verifies are untouched by 007.
+            "007_reflection.sql",
         ],
-        "the ledger records 001 + 002 + 003 + 004 + 005 + 006",
+        "the ledger records 001 + 002 + 003 + 004 + 005 + 006 + 007",
     )
     indexes = {
         row[0]

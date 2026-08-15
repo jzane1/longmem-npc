@@ -172,8 +172,10 @@ itself rides the Unity target. **Split-brain per-call weights** (sequenced-later
 pytest suite** (immediate-queue item 2 then — Set D below was specced for it, not built here;
 *built 2026-07-20*).
 **Reflection-time component pruning** (post-August; until then the tripwire's lookup set only
-grows). If adjacent work looks necessary, stop and report — with the correct option and its
-real cost stated, per the reframed contract.
+grows). *(Expired 2026-08-15: the C2 build landed the mechanical trim — `reflection.md` — so
+the lookup set can now SHRINK when a reflect call prunes a stale component; the gate needed no
+change, `fetch_live_components` already followed liveness.)* If adjacent work looks necessary,
+stop and report — with the correct option and its real cost stated, per the reframed contract.
 
 ## Surface (where this attaches)
 

@@ -165,6 +165,66 @@ namespace NpcMemory
         public double TotalMs { get; set; }
     }
 
+    // -- reflection (reflection.md; the C2 rulings 2026-08-15) -----------
+
+    public sealed class ReflectRequest
+    {
+        /// <summary>The reflect event's world time — the written rows'
+        /// valid_at AND the pipeline's time basis (tz-aware, required).</summary>
+        public DateTimeOffset ClientTimestamp { get; set; }
+
+        /// <summary>Tri-state consolidation override: true forces the stage
+        /// (RRR still guards), false suppresses it, null lets the
+        /// reflection_consolidate_at knob decide.</summary>
+        public bool? Consolidate { get; set; }
+    }
+
+    public sealed class ReflectionOut
+    {
+        public Guid ReflectionId { get; set; }
+        public string Content { get; set; } = "";
+        public bool IdentityRelevant { get; set; }
+        public List<Guid> SourceMemoryIds { get; set; } = new List<Guid>();
+    }
+
+    public sealed class ConsolidationOut
+    {
+        public Guid? ReflectionId { get; set; }
+        public List<Guid> AbsorbedReflectionIds { get; set; } = new List<Guid>();
+        public bool Failed { get; set; }
+    }
+
+    public sealed class ReflectInstrumentation
+    {
+        public double ReflectMs { get; set; }
+        public double ConsolidationMs { get; set; }
+        public double InsertMs { get; set; }
+        public double TotalMs { get; set; }
+        public int ReflectInputTokens { get; set; }
+        public int ReflectOutputTokens { get; set; }
+        public int ConsolidationInputTokens { get; set; }
+        public int ConsolidationOutputTokens { get; set; }
+    }
+
+    public sealed class ReflectResult
+    {
+        public Guid AgentId { get; set; }
+        public List<ReflectionOut> Reflections { get; set; } = new List<ReflectionOut>();
+        public List<Guid> SampledMemoryIds { get; set; } = new List<Guid>();
+        public int DroppedUngrounded { get; set; }
+        public double? Rrr { get; set; }
+        public bool RrrBlockedConsolidation { get; set; }
+        public ConsolidationOut? Consolidation { get; set; }
+        public List<Guid> PrunedComponentIds { get; set; } = new List<Guid>();
+        public int EvictedCacheRows { get; set; }
+        public double PressureBefore { get; set; }
+        public double PressureAfter { get; set; }
+        public string IdentityVersion { get; set; } = "";
+        public bool IdentityDocumentNew { get; set; }
+        public ReflectInstrumentation Instrumentation { get; set; } =
+            new ReflectInstrumentation();
+    }
+
     // -- read path ------------------------------------------------------
 
     public sealed class WeightOverrides

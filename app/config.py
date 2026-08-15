@@ -50,6 +50,11 @@ ENV_PROVIDER_MODE = "LONGMEM_PROVIDER_MODE"
 # loaded in BOTH modes, required by NEITHER — the server/REPL never needs a
 # judge; the eval runner validates it itself when a judged run starts.
 ENV_MODEL_JUDGE = "LONGMEM_MODEL_JUDGE"
+# Reflection role (reflection.md; the C2 dossier ruling 2026-08-15): the
+# judge shape exactly — loaded in BOTH modes, required by NEITHER, loud at
+# the first real reflect call (build_reflection_provider raises ConfigError).
+# The server starts fine without it; only a real-mode reflect needs it.
+ENV_MODEL_REFLECTION = "LONGMEM_MODEL_REFLECTION"
 # Dialogue thinking knob (B2 ruling 2026-08-07): "" (unset) omits the thinking
 # parameter from the real prose call entirely — today's request byte-for-byte;
 # "disabled" sends thinking={"type": "disabled"} (the sonnet-5 thinking-off
@@ -74,6 +79,8 @@ PRICE_ENV_KEYS: dict[str, str] = {
     "LONGMEM_PRICE_EMBEDDING": "embedding",
     "LONGMEM_PRICE_JUDGE_IN": "judge_in",
     "LONGMEM_PRICE_JUDGE_OUT": "judge_out",
+    "LONGMEM_PRICE_REFLECTION_IN": "reflection_in",
+    "LONGMEM_PRICE_REFLECTION_OUT": "reflection_out",
 }
 
 # Service-level defaults, each overridable per agent via the same key in
@@ -220,6 +227,44 @@ SERVICE_DEFAULTS: dict[str, float] = {
     # lands in today's sync scoring-failed end-state (integer-valued, cast at
     # the call site).
     "deferred_max_attempts": 3.0,
+    # --- reflection (reflection.md; the C2 rulings 2026-08-15) ---------------
+    # Per-agent worker kill-switch: 0.0 = the worker never auto-reflects this
+    # agent. Gates the WORKER's auto-pull only — the reflect endpoint is
+    # always live regardless.
+    "reflection_worker_enabled": 0.0,
+    # Worker sweep interval. Process-level (the deferred_poll_seconds
+    # precedent: the worker has no agent context; an agents.config override
+    # is inert by design).
+    "reflection_poll_seconds": 60.0,
+    # Max agents reflected per sweep — a cost bound, not a queue
+    # (integer-valued, cast at the call site).
+    "reflection_worker_batch": 4.0,
+    # The worker pulls an enabled agent at/above this pressure.
+    "reflection_pressure_threshold": 1.0,
+    # The divisor defining what pressure 1.0 means (~ the unprocessed
+    # importance mass that should trigger a reflection).
+    "reflection_pressure_norm": 10.0,
+    # Episodes sampled per reflect: deterministic top-k by
+    # importance_norm x recency, ties on memory_id — never a lottery
+    # (integer-valued, cast at the call site).
+    "reflection_sample_k": 16.0,
+    # Below this live-episode count the reflect verb 409s (integer-valued,
+    # cast at the call site).
+    "reflection_min_episodes": 4.0,
+    # RRR (self-repetition) at/above this blocks the consolidation stage —
+    # the reflection itself still stores (the paper default).
+    "reflection_rrr_threshold": 0.85,
+    # Recent live reflections compared for RRR (integer-valued, cast at the
+    # call site).
+    "reflection_rrr_window": 8.0,
+    # Live identity-relevant count that triggers the consolidation stage;
+    # the request's `consolidate` field overrides per call (integer-valued,
+    # cast at the call site).
+    "reflection_consolidate_at": 5.0,
+    # The trim staleness window (30 days): a component prunes only when ALL
+    # its span evidence sits on live memories older than this. 0.0 disables
+    # the trim entirely (the gate_enabled kill-switch shape).
+    "reflection_trim_stale_seconds": 2592000.0,
 }
 
 # Prose-view weight clamp bounds (ruled at the split-brain build 2026-07-21;
@@ -272,6 +317,7 @@ def load_env(path: Path = ENV_PATH) -> dict[str, str]:
             ENV_MODEL_DIALOGUE,
             ENV_MODEL_RECONSTRUCTION,
             ENV_MODEL_JUDGE,
+            ENV_MODEL_REFLECTION,
             ENV_DIALOGUE_THINKING,
             ENV_JUDGE_MAX_TOKENS,
         }
@@ -296,6 +342,10 @@ class Settings:
     # Eval-runner-only judge role: loaded both modes, required by neither
     # (eval-harness.md stage 3; the runner validates on judged runs).
     model_judge: str = ""
+    # Reflection role, the same judge shape (reflection.md, ruled 2026-08-15):
+    # loaded both modes, required by neither; build_reflection_provider raises
+    # loudly at the first real reflect call without it.
+    model_reflection: str = ""
     dialogue_thinking: str = ""  # "" omit param | "disabled" thinking-off arm
     judge_max_tokens: int = JUDGE_MAX_TOKENS_DEFAULT
     anthropic_api_key: str = field(default="", repr=False)
@@ -375,6 +425,10 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
     # Eval-runner-only fields, loaded in BOTH modes (never in the real-mode
     # required list above — that absence is the stage-3 ruling as code).
     model_judge = env.get(ENV_MODEL_JUDGE, "")
+    # The reflection role shares the judge shape (the C2 dossier ruling
+    # 2026-08-15): loaded here in both modes, never in the required list —
+    # the loud failure lives at the first real reflect call instead.
+    model_reflection = env.get(ENV_MODEL_REFLECTION, "")
     dialogue_thinking = env.get(ENV_DIALOGUE_THINKING, "")
     if dialogue_thinking not in ("", "disabled"):
         raise ConfigError(
@@ -414,6 +468,7 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         model_dialogue=model_dialogue,
         model_reconstruction=model_reconstruction,
         model_judge=model_judge,
+        model_reflection=model_reflection,
         dialogue_thinking=dialogue_thinking,
         judge_max_tokens=judge_max_tokens,
         anthropic_api_key=anthropic_key,

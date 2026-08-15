@@ -38,6 +38,12 @@ from app.ingest import (
 from app.nlp import warm_pipelines
 from app.providers import build_providers
 from app.reconstruction import UnknownIdentityVersionError
+from app.reflection import (
+    ReflectionCallError,
+    ReflectionFloorError,
+    ReflectionService,
+    ReflectionWorker,
+)
 from app.retrieval import RetrievalService
 from app.schemas import (
     AgentMemoriesResult,
@@ -54,6 +60,8 @@ from app.schemas import (
     PinRequest,
     PinResult,
     ReconstructionMetricsResult,
+    ReflectRequest,
+    ReflectResult,
     RetrievalResult,
     SceneBoundaryEvent,
     SceneResult,
@@ -82,9 +90,18 @@ async def _lifespan(app: FastAPI):
     # strands a row.
     app.state.deferred = DeferredWriteWorker(pool, providers, settings)
     app.state.deferred.start()
+    # The reflection seam + its worker (reflection.md, ruled 2026-08-15):
+    # the C1 lifecycle contract verbatim — one worker per process, stopped
+    # BEFORE the pool closes. The per-agent reflection_worker_enabled knob
+    # (default 0.0) gates its auto-pull only; the reflect route is always
+    # live.
+    app.state.reflection = ReflectionService(pool, providers, settings)
+    app.state.reflection_worker = ReflectionWorker(pool, providers, settings)
+    app.state.reflection_worker.start()
     try:
         yield
     finally:
+        await app.state.reflection_worker.stop()
         await app.state.deferred.stop()
         await pool.close()
 
@@ -263,6 +280,29 @@ async def create_agent(request: CreateAgentRequest) -> CreateAgentResult:
     identity document compiles at the first scene boundary / session start
     as before. Pass-through by ruling."""
     return await app.state.service.create_agent(request)
+
+
+@app.post("/v1/agents/{agent_id}/reflect", response_model=ReflectResult)
+async def reflect(agent_id: UUID, body: ReflectRequest) -> ReflectResult:
+    """The reflect verb (reflection.md; the C2 rulings 2026-08-15): an
+    agent-scoped operator/integrator verb — /v1/events/* stays diegetic
+    (the correction-route precedent). Stateless like every route. Fail-loud
+    ladder: 404 unknown agent · 409 below the episode floor · 422 malformed
+    request (pydantic; naive timestamp) · 502 reflect-call failure /
+    malformed output / all-ungrounded — nothing written on any of these.
+    ConfigError (real mode without LONGMEM_MODEL_REFLECTION) propagates
+    loud at first use, the judge shape. Pass-through by ruling: the
+    response is exactly the seam result's serialization — sampled and
+    cited ids ride as grounding evidence, unscored by nature (the sampling
+    draw is not the retrieval seam)."""
+    try:
+        return await app.state.reflection.reflect(agent_id, body)
+    except UnknownAgentError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ReflectionFloorError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ReflectionCallError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @app.get("/v1/memories/{memory_id}/chain", response_model=MemoryChainResult)

@@ -43,6 +43,7 @@ from app.config import (
     EMBEDDING_DIM,
     EMBEDDING_MODEL,
     ENV_MODEL_JUDGE,
+    ENV_MODEL_REFLECTION,
     ConfigError,
     Settings,
 )
@@ -240,6 +241,54 @@ class JudgeCallResult:
     output_tokens: int
 
 
+@dataclass(frozen=True)
+class ReflectionItem:
+    """One sampled episode prepared for the reflect call (reflection.md):
+    the live telling head plus the sampling metadata the prompt carries.
+    memory_id is the UUID string — the citation unit of the output
+    contract (the ReconstructionItem precedent: structured inputs ride
+    beside the assembled prompt so the deterministic fake can derive
+    stable, correctly-cited output)."""
+
+    memory_id: str
+    telling: str
+    importance: float | None
+    valid_at: str  # ISO 8601 text — prompt payload, never parsed here
+
+
+@dataclass(frozen=True)
+class ReflectionConclusion:
+    """One parsed conclusion of the reflect call. `source_memory_ids` are
+    raw strings — grounding (non-empty AND a subset of the sampled ids) is
+    the seam's mechanical validation, not the call layer's."""
+
+    content: str
+    identity_relevant: bool
+    source_memory_ids: list[str]
+
+
+@dataclass(frozen=True)
+class ReflectionCallResult:
+    """Parsed output of the reflect call (reflection.md output contract:
+    a JSON object {"reflections": [...]}). An empty conclusion list is a
+    VALID outcome — thin evidence concludes nothing."""
+
+    conclusions: list[ReflectionConclusion]
+    input_tokens: int
+    output_tokens: int
+
+
+@dataclass(frozen=True)
+class ConsolidationCallResult:
+    """Parsed output of the consolidation call: ONE belief's content. The
+    source union and the bi-temporal absorption are computed at the seam —
+    the model never proposes provenance."""
+
+    content: str
+    input_tokens: int
+    output_tokens: int
+
+
 # ---------------------------------------------------------------------------
 # Interfaces
 # ---------------------------------------------------------------------------
@@ -313,6 +362,31 @@ class JudgeProvider(Protocol):
         category: str,
         n_facts: int = 0,
     ) -> JudgeCallResult: ...
+
+
+class ReflectionProvider(Protocol):
+    """The reflect + consolidation calls (reflection.md; C2 build 2026-08-15).
+    Judge-shaped by ruling: never a field on the Providers bundle — the
+    reflect seam builds one lazily via build_reflection_provider at first
+    use. Prompts are fully assembled at the seam (app\\reflection.py owns
+    the block shape); `items` rides structurally so the deterministic fake
+    can cite real sampled ids (the ReconstructionProvider precedent) — the
+    real provider ignores it."""
+
+    def reflect(
+        self,
+        *,
+        system_prompt: str,
+        user_content: str,
+        items: list[ReflectionItem],
+    ) -> ReflectionCallResult: ...
+
+    def consolidate(
+        self,
+        *,
+        system_prompt: str,
+        user_content: str,
+    ) -> ConsolidationCallResult: ...
 
 
 # ---------------------------------------------------------------------------
@@ -531,6 +605,63 @@ class FakeJudgeProvider:
         )
 
 
+class FakeReflectionProvider:
+    """Deterministic conclusions grounded in the ACTUAL sampled ids: one
+    identity-relevant conclusion citing the first ids (up to three) and one
+    non-identity-relevant conclusion citing the last id, both with content
+    derived from the cited tellings (so distinct samples yield distinct
+    contents — the RRR guard sees honest variation). Byte-identical on
+    identical inputs, offline, keyless."""
+
+    def reflect(
+        self,
+        *,
+        system_prompt: str,
+        user_content: str,
+        items: list[ReflectionItem],
+    ) -> ReflectionCallResult:
+        input_tokens = len(system_prompt.split()) + len(user_content.split())
+        conclusions: list[ReflectionConclusion] = []
+        if items:
+            marker = hashlib.sha256(f"reflect:{user_content}".encode()).hexdigest()[:8]
+            head = items[0]
+            conclusions.append(
+                ReflectionConclusion(
+                    content=f"{head.telling} [reflected {marker}]",
+                    identity_relevant=True,
+                    source_memory_ids=[item.memory_id for item in items[:3]],
+                )
+            )
+            tail = items[-1]
+            conclusions.append(
+                ReflectionConclusion(
+                    content=f"{tail.telling} [noted {marker}]",
+                    identity_relevant=False,
+                    source_memory_ids=[tail.memory_id],
+                )
+            )
+        output_tokens = sum(len(c.content.split()) for c in conclusions)
+        return ReflectionCallResult(
+            conclusions=conclusions,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+
+    def consolidate(
+        self,
+        *,
+        system_prompt: str,
+        user_content: str,
+    ) -> ConsolidationCallResult:
+        marker = hashlib.sha256(f"consolidate:{user_content}".encode()).hexdigest()[:8]
+        content = f"Taken together these amount to one belief. [consolidated {marker}]"
+        return ConsolidationCallResult(
+            content=content,
+            input_tokens=len(system_prompt.split()) + len(user_content.split()),
+            output_tokens=len(content.split()),
+        )
+
+
 # --- failure-injection fakes (degradation ladder tests) --------------------
 
 
@@ -688,6 +819,36 @@ class MalformedJudgeProvider:
     def judge(self, **_kwargs) -> JudgeCallResult:
         raise MalformedOutputError(
             "injected malformed judge output", input_tokens=7, output_tokens=3
+        )
+
+
+class FailingReflectionProvider:
+    """Both reflection-call legs fail outright: the reflect verb is
+    fail-loud (502, nothing written); a worker attempt lands a `failed`
+    run row and retries naturally next sweep."""
+
+    def reflect(self, **_kwargs) -> ReflectionCallResult:
+        raise ProviderCallError("injected reflect-call failure")
+
+    def consolidate(self, **_kwargs) -> ConsolidationCallResult:
+        raise ProviderCallError("injected consolidation-call failure")
+
+
+class MalformedReflectionProvider:
+    """Calls 'succeed' but the JSON is unparseable: the malformed-class
+    failure of the reflect ladder, token spend accounted (the
+    MalformedWriteProvider convention)."""
+
+    def reflect(self, **_kwargs) -> ReflectionCallResult:
+        raise MalformedOutputError(
+            "injected malformed reflect output", input_tokens=7, output_tokens=3
+        )
+
+    def consolidate(self, **_kwargs) -> ConsolidationCallResult:
+        raise MalformedOutputError(
+            "injected malformed consolidation output",
+            input_tokens=7,
+            output_tokens=3,
         )
 
 
@@ -1088,6 +1249,103 @@ class RealJudgeProvider:
         )
 
 
+class RealReflectionProvider:
+    """Anthropic reflect + consolidation calls (reflection.md; C2 build
+    2026-08-15). Constructed only by build_reflection_provider — the judge
+    precedent: the server's Providers bundle never carries this role and
+    the seam builds it lazily at first use. Prompts arrive fully assembled
+    (app\\reflection.py owns the block shape); `items` is the fake's
+    structural input and is ignored here. Fixed max_tokens bounds follow
+    the write-call precedent (a structural bound, not integrator policy)."""
+
+    def __init__(self, settings: Settings):
+        import anthropic
+
+        self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        self._model = settings.model_reflection
+
+    def reflect(
+        self,
+        *,
+        system_prompt: str,
+        user_content: str,
+        items: list[ReflectionItem],
+    ) -> ReflectionCallResult:
+        try:
+            response = self._client.messages.create(
+                model=self._model,
+                max_tokens=2048,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_content}],
+            )
+        except Exception as exc:
+            raise ProviderCallError(f"reflect call failed: {exc}") from exc
+        input_tokens = response.usage.input_tokens
+        output_tokens = response.usage.output_tokens
+        try:
+            payload = json.loads(_lenient_json_text(_first_text_block(response)))
+            raw_conclusions = payload["reflections"]
+            if not isinstance(raw_conclusions, list):
+                raise ValueError("'reflections' is not a list")
+            conclusions = []
+            for entry in raw_conclusions:
+                sources = entry["source_memory_ids"]
+                if not isinstance(sources, list):
+                    raise ValueError("'source_memory_ids' is not a list")
+                conclusions.append(
+                    ReflectionConclusion(
+                        content=str(entry["content"]),
+                        identity_relevant=bool(entry["identity_relevant"]),
+                        source_memory_ids=[str(value) for value in sources],
+                    )
+                )
+        except (KeyError, ValueError, TypeError, json.JSONDecodeError) as exc:
+            raise MalformedOutputError(
+                f"reflect output unparseable: {exc}",
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+            ) from exc
+        return ReflectionCallResult(
+            conclusions=conclusions,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+
+    def consolidate(
+        self,
+        *,
+        system_prompt: str,
+        user_content: str,
+    ) -> ConsolidationCallResult:
+        try:
+            response = self._client.messages.create(
+                model=self._model,
+                max_tokens=1024,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_content}],
+            )
+        except Exception as exc:
+            raise ProviderCallError(f"consolidation call failed: {exc}") from exc
+        input_tokens = response.usage.input_tokens
+        output_tokens = response.usage.output_tokens
+        try:
+            payload = json.loads(_lenient_json_text(_first_text_block(response)))
+            content = payload["content"]
+            if not isinstance(content, str) or not content.strip():
+                raise ValueError("'content' is not a non-empty string")
+        except (KeyError, ValueError, TypeError, json.JSONDecodeError) as exc:
+            raise MalformedOutputError(
+                f"consolidation output unparseable: {exc}",
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+            ) from exc
+        return ConsolidationCallResult(
+            content=content,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+        )
+
+
 class RealEmbeddingProvider:
     """OpenAI text-embedding-3-small @ 1536 (locked)."""
 
@@ -1159,3 +1417,18 @@ def build_judge_provider(settings: Settings) -> JudgeProvider:
             )
         return RealJudgeProvider(settings)
     return FakeJudgeProvider()
+
+
+def build_reflection_provider(settings: Settings) -> ReflectionProvider:
+    """Standalone reflection selection (the judge shape, ruled 2026-08-15:
+    NOT a field on the frozen Providers bundle — the server never carries
+    one; the reflect seam builds it lazily at first use). A real reflect
+    without the var is the loud first-use error the spec assigns; the var
+    is otherwise loaded-never-required (load_settings)."""
+    if settings.provider_mode == "real":
+        if not settings.model_reflection:
+            raise ConfigError(
+                f"a reflect call in real mode requires {ENV_MODEL_REFLECTION} in .env."
+            )
+        return RealReflectionProvider(settings)
+    return FakeReflectionProvider()

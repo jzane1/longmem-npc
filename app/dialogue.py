@@ -57,7 +57,7 @@ from uuid import UUID
 
 from psycopg_pool import AsyncConnectionPool
 
-from app import db
+from app import db, identity
 from app.config import (
     WEIGHT_MAX,
     WEIGHT_MIN,
@@ -69,6 +69,7 @@ from app.providers import (
     ProseResult,
     Providers,
 )
+from app.reconstruction import UnknownIdentityVersionError
 from app.retrieval import RetrievalService
 from app.schemas import (
     DialogueInitRequest,
@@ -143,7 +144,7 @@ def _render_memories(
 
 
 def assemble_prose_prompt(
-    seed_identity: str | None,
+    identity_document: str | None,
     items: list[RetrievedMemory],
     *,
     loaded_order: list[UUID] | None = None,
@@ -151,10 +152,18 @@ def assemble_prose_prompt(
     """The streaming prose call's system prompt: identity + the weight-ranked
     memories + the pure-prose instruction. Exposed so the walker can assert
     block order + byte-stability without a model call. The prose call sees no
-    JSON contract — it speaks."""
+    JSON contract — it speaks.
+
+    Since the C2 build (reflection.md, ruled 2026-08-15) the identity block
+    is the RENDERED IDENTITY DOCUMENT for the request's caller-frozen
+    version, not the raw seed — speech sees formed beliefs. With zero
+    reflections the document IS the seed verbatim, so the prompt is
+    byte-identical to the pre-C2 shape (the parity contract the walkers
+    assert); an empty document omits the block, exactly as an empty seed
+    did."""
     blocks: list[str] = []
-    if seed_identity:
-        blocks.append(_BLOCK_IDENTITY.format(seed=seed_identity))
+    if identity_document:
+        blocks.append(_BLOCK_IDENTITY.format(seed=identity_document))
     if items:
         blocks.append(_render_memories(items, loaded_order))
     blocks.append(_BLOCK_PROSE_INSTRUCTION)
@@ -308,8 +317,33 @@ class DialogueService:
             if retrieval.instrumentation.gate.evaluated
             else None
         )
+
+        # --- the identity block rides the RENDERED DOCUMENT (reflection.md,
+        # ruled 2026-08-15 — the raw-seed asymmetry closed at the C2 build):
+        # resolved exactly like reconstruction's (present -> fetch, unknown ->
+        # UnknownIdentityVersionError = 422 at both turn routes; absent ->
+        # lazy ensure). Retrieval above already validated a caller-passed
+        # version, so the fetch here can only miss on a store mutated
+        # mid-request — still the same loud contract error.
+        if request.identity_version is not None:
+            identity_document = await db.fetch_identity_document(
+                self._pool, request.agent_id, request.identity_version
+            )
+            if identity_document is None:
+                raise UnknownIdentityVersionError(
+                    f"unknown identity_version {request.identity_version!r} "
+                    f"for agent {request.agent_id}"
+                )
+        else:
+            (
+                _version,
+                identity_document,
+                _created,
+            ) = await identity.ensure_identity_document(
+                self._pool, request.agent_id, state.seed_identity
+            )
         prose_prompt = assemble_prose_prompt(
-            state.seed_identity,
+            identity_document,
             ranked_items,
             loaded_order=loaded_order,
         )

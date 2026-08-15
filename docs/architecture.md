@@ -330,8 +330,11 @@ pre-warm at dialogue init; on a mid-scene miss, **block and expose a "reconstruc
 latency ever forces async, the swap must be explicit state (a `reconstruction_pending` read mode),
 never silent text mutation, because of the **within-scene text-stability invariant**: absent a
 diegetic event, **an authorial correction** (the second sanctioned text-change cause, ruled
-2026-07-17), **or a deferred-enrichment completion** (the third, ruled 2026-08-12 —
-`deferred-writes.md`; the window is bounded by the worker's poll interval) on that memory,
+2026-07-17), **a deferred-enrichment completion** (the third, ruled 2026-08-12 —
+`deferred-writes.md`; the window is bounded by the worker's poll interval), **or a
+reflection-trim cache eviction** (the fourth, ruled 2026-08-15 and built with C2 —
+`reflection.md`: a mechanically pruned component evicts the affected memories' caches
+per-affected only; reflect at scene edges and the window vanishes) on that memory,
 repeated reads within one scene return byte-identical text.
 
 **Cache:** keyed `(memory_id × identity_version)`, where the version component **composes
@@ -439,7 +442,7 @@ among gate-fetched items on gated turns; `dialogue_view` reports the weighted ra
 cases. The turn result carries `items` (the raw retrieval echo — the IDs+scores invariant)
 beside `dialogue_view` (the weight-ranked view the prompt was built from).
 
-## 10. Reflection & parameter bundles (design ruled 2026-08-15 — `reflection.md`; the C2 build is next)
+## 10. Reflection & parameter bundles (design ruled 2026-08-15 — `reflection.md`; reflection BUILT the same date, the C3 compiler still later)
 
 Reflection is an **endpoint** (the verb) — `POST /v1/agents/{agent_id}/reflect`,
 integrator-pulled — plus, ruled 2026-08-15 (the C2 dossier, fork 1), an **optional sibling
@@ -454,12 +457,14 @@ Reflection writes formed beliefs to the **`reflections` table** — the sole dur
 immutable**: identity-relevant reflections join the rendered identity document via a
 model-free concatenative render, and the periodic evidence-conditioned refresh is an LLM
 **consolidation reflection** that bi-temporally absorbs the rows it summarizes (fork 3;
-`identity_documents` gains rows, never mutations; at build the dialogue prompt moves onto the
-rendered document). `identity_version` bumps via content hash exactly as always. Reflection
-also **prunes the identity components table** (silent cache invalidation) — at build the gist
-constraint follows component liveness and reflection-driven eviction becomes the **fourth
-sanctioned mid-scene text-change cause** (fork 4). A non-LLM RRR repetition guard gates the
-identity consolidation (fork 5).
+`identity_documents` gains rows, never mutations; since the C2 build the dialogue prompt rides
+the rendered document — the raw-seed asymmetry closed). `identity_version` bumps via content
+hash exactly as always. Reflection also **prunes the identity components table** by the purely
+mechanical 3-clause rule (the C2 spec ruling) — since the build the gist constraint follows
+component liveness and reflection-driven eviction IS the **fourth sanctioned mid-scene
+text-change cause** (fork 4; §7's writer list). A non-LLM RRR repetition guard gates the
+identity consolidation (fork 5). All of it landed 2026-08-15 (`app\reflection.py`; migration
+007 `reflection_runs`; the worker default OFF per agent).
 
 **Parameter compiler (later):** one call per (reflection × scene-type), cached. Bundle = a fixed
 **typed core** (retrieval-weight multipliers, action-set biases, stance priors; typed and clamped)

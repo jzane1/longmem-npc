@@ -15,7 +15,8 @@ namespace NpcMemory.Harness
     /// serialization contract against the live gate, and walks provision ->
     /// observe -> loader -> correction-override -> chain inspection ->
     /// drift + cache -> gate fire -> warm-init -> SSE stream -> the
-    /// weights-on-speech re-rank (A1 re-shape, 2026-08-04).
+    /// weights-on-speech re-rank (A1 re-shape, 2026-08-04) -> the reflect
+    /// verb (C2, 2026-08-15).
     /// Structural asserts only: IDs, flags, byte-identity — never prose.
     /// </summary>
     internal static class Program
@@ -323,6 +324,51 @@ namespace NpcMemory.Harness
                     && client.ClientTotalMs > 0.0,
                 "OnCallMeasured fires once per call with the route path",
                 $"{measured[0]} @ {client.ClientTotalMs:F2} ms");
+
+            // -- [12] the reflect verb (reflection.md, C2 2026-08-15) -------
+            Console.WriteLine("\n[12] Reflect: grounded beliefs over the lived episodes");
+            var reflected = await session.ReflectAsync();
+            Check(
+                reflected.AgentId == created.AgentId
+                    && reflected.Reflections.Count > 0
+                    && reflected.SampledMemoryIds.Count > 0,
+                "reflect stored grounded conclusions from the sampled pool",
+                $"{reflected.Reflections.Count} stored / "
+                + $"{reflected.SampledMemoryIds.Count} sampled");
+            var sampledSet = new HashSet<Guid>(reflected.SampledMemoryIds);
+            Check(
+                reflected.Reflections.All(
+                    r => r.SourceMemoryIds.Count > 0
+                        && r.SourceMemoryIds.All(sampledSet.Contains)),
+                "every citation set is non-empty and inside the sampled ids");
+            Check(
+                reflected.PressureBefore > reflected.PressureAfter
+                    && reflected.IdentityVersion.Length > 0
+                    && reflected.Instrumentation.TotalMs > 0.0,
+                "pressure consumed, identity version returned, honest instrumentation",
+                $"pressure {reflected.PressureBefore:F3} -> {reflected.PressureAfter:F3}");
+
+            // The floor is loud over the wire: a fresh agent below
+            // reflection_min_episodes refuses with 409, nothing written.
+            var thin = await client.CreateAgentAsync(new CreateAgentRequest
+            {
+                Name = "harness-thin",
+                SeedIdentity = "A brand-new NPC with nothing to conclude from.",
+            });
+            try
+            {
+                await client.ReflectAsync(thin.AgentId, new ReflectRequest
+                {
+                    ClientTimestamp = DateTimeOffset.UtcNow,
+                });
+                Check(false, "below-floor reflect must refuse with 409");
+            }
+            catch (NpcMemoryApiException ex)
+            {
+                Check(ex.StatusCode == 409,
+                    "below the episode floor -> 409 over the wire",
+                    $"status {ex.StatusCode}");
+            }
 
             // -- wrap-up ---------------------------------------------------
             Console.WriteLine(

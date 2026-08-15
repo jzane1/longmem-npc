@@ -117,6 +117,14 @@ namespace NpcMemory
             PostAsync<CorrectionResult>(
                 $"/v1/memories/{memoryId}/correction", request, DefaultTimeout, ct);
 
+        /// <summary>The reflect verb (reflection.md, 2026-08-15): up to two
+        /// model calls ride it server-side, so it takes the observe-class
+        /// timeout rather than the default.</summary>
+        public Task<ReflectResult> ReflectAsync(
+            Guid agentId, ReflectRequest request, CancellationToken ct = default) =>
+            PostAsync<ReflectResult>(
+                $"/v1/agents/{agentId}/reflect", request, ObserveTimeout, ct);
+
         public Task<RetrievalResult> DialogueInitAsync(
             DialogueInitRequest request, CancellationToken ct = default) =>
             PostAsync<RetrievalResult>("/v1/dialogue/init", request, InitTimeout, ct);

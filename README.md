@@ -202,7 +202,7 @@ this README gets rebuilt around the demo.
 | Path | What it is |
 |---|---|
 | `app\` | the service: ingest, retrieval, reconstruction, the gate, the dialogue seam, the HTTP routes, the eval runner |
-| `db\` | numbered migrations (001–006) and the transactional migration runner |
+| `db\` | numbered migrations (001–007) and the transactional migration runner |
 | `tests\` | the pytest suite + eight structural done-when walkers |
 | `client\` | `NpcMemory.Core`, the engine-agnostic C# client, plus a console harness |
 | `unity\` | the Unity 6 gray-box demo project: a thin adapter over the client, plus the set |

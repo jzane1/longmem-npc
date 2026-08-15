@@ -43,6 +43,7 @@ from app.dialogue import DialogueService
 from app.ingest import IngestService, UnknownAgentError
 from app.nlp import warm_pipelines
 from app.providers import Providers, build_providers
+from app.reflection import ReflectionService, ReflectionWorker
 from app.retrieval import RetrievalService
 from app.schemas import (
     CorrectionRequest,
@@ -52,6 +53,8 @@ from app.schemas import (
     IngestResult,
     ObserveEvent,
     PinResult,
+    ReflectRequest,
+    ReflectResult,
     SceneBoundaryEvent,
     SceneResult,
     WeightOverrides,
@@ -72,6 +75,8 @@ class SessionRunner:
         agent_id: UUID,
         phase_tag: str,
         deferred: DeferredWriteWorker | None = None,
+        reflection: ReflectionService | None = None,
+        reflection_worker: ReflectionWorker | None = None,
     ):
         self._pool = pool
         self._owns_pool = owns_pool
@@ -83,6 +88,12 @@ class SessionRunner:
         # `:observe` enriches without the API process. `deferred.drain()` is
         # also the walkers' deterministic entry.
         self.deferred = deferred
+        # The reflect seam + its worker (reflection.md, 2026-08-15): the
+        # second construction site of the C1 lifecycle contract.
+        # `reflection_worker.sweep()` is the walkers' deterministic entry;
+        # the per-agent kill-switch (default 0.0) gates its auto-pull only.
+        self._reflection = reflection
+        self.reflection_worker = reflection_worker
         self.agent_id = agent_id
         self.phase_tag = phase_tag  # passthrough label on observe events
         self.identity_version: str | None = None  # frozen at scene boundaries
@@ -140,6 +151,9 @@ class SessionRunner:
         dialogue = DialogueService(pool, providers, settings, retrieval)
         deferred = DeferredWriteWorker(pool, providers, settings)
         deferred.start()
+        reflection = ReflectionService(pool, providers, settings)
+        reflection_worker = ReflectionWorker(pool, providers, settings)
+        reflection_worker.start()
         runner = cls(
             pool=pool,
             owns_pool=owns_pool,
@@ -149,6 +163,8 @@ class SessionRunner:
             agent_id=agent_id,
             phase_tag=phase_tag,
             deferred=deferred,
+            reflection=reflection,
+            reflection_worker=reflection_worker,
         )
         # Session start is an implicit scene start: verify the agent loudly,
         # freeze the identity version (ensured directly — no boundary event is
@@ -298,7 +314,24 @@ class SessionRunner:
             CorrectionRequest(content=content, client_timestamp=self._now()),
         )
 
+    async def reflect(self, consolidate: bool | None = None) -> ReflectResult:
+        """The reflect verb at the session's effective time (reflection.md;
+        the correction-verb precedent — under time travel the reflect event
+        happens at as_of). Deliberately does NOT touch the frozen scene
+        state: identity_version stays caller-frozen until the next scene
+        boundary picks up the recompiled document (the integrator guidance —
+        reflect at scene edges and the trim-eviction exposure window
+        vanishes)."""
+        if self._reflection is None:
+            raise RuntimeError("this runner was constructed without reflection")
+        return await self._reflection.reflect(
+            self.agent_id,
+            ReflectRequest(client_timestamp=self._now(), consolidate=consolidate),
+        )
+
     async def close(self) -> None:
+        if self.reflection_worker is not None:
+            await self.reflection_worker.stop()
         if self.deferred is not None:
             await self.deferred.stop()
         if self._owns_pool:

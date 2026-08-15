@@ -1,46 +1,33 @@
 # longmem-npc — Status
 
 **Last updated:** 2026-08-15
-**Phase:** **Road to completion — Phases A, B, and C1 are DONE; C2 is IN FLIGHT (dossier
-landed).** (The roadmap below, consolidated 2026-08-04.) The second 2026-08-15 session landed
-**the C2 reflection design dossier** (`docs\reflection.md` — the same file matures into the
-build spec): the six design forks + the habituation-wording rider all ruled (recommended
-options taken first pass; the dated C2 entry in `decisions.md`) — scheduling composes
-endpoint + optional default-OFF `ReflectionWorker`; beliefs live in the dormant-since-001
-`reflections` table (retrieval untouched); the identity package (model-free render, LLM
-consolidation bi-temporally absorbing what it summarizes, the dialogue prompt moves onto the
-rendered document at build — the raw-seed asymmetry found in-session); component trim gains
-constraint-follows-liveness + the FOURTH sanctioned mid-scene cause (invariant text amends at
-build); RRR guards consolidation; `LONGMEM_MODEL_REFLECTION` judge-shaped. Docs only — no
-code, no migration, no floors row. **The same sitting then landed the C2 BUILD SPEC** (the
-four spec forks ruled — three recommended taken; **trim criteria ruled AGAINST the
-recommendation: purely mechanical**, the three-clause rule + the 30-day window kill-switch
-knob; the dated spec entry in `decisions.md`): `reflection.md` is now the build target —
-pipeline, deterministic sampling, ten knobs, migration 007 (`reflection_runs`), the
-judge-shaped provider factory, Gherkin done-when 1–11. **NEXT UP: the C2 build session.**
-Before that, the 2026-08-13 session landed **the interim public README** — the
-repo ruled public ahead of Phase F (the dated entry in `decisions.md`): README.md rewritten as
-the public face until the demo ships (F1's full rewrite at demo time unchanged), a real-mode
-Ledger screenshot at `docs\media\ledger-memory-chain.png`, chain deep-links + an
-overlapping-span render fix in the Ledger, stale counts propagated (SETUP.md, docs\README.md,
-test-suite.md); the flip itself (push + visibility) is Jack's action after the session.
-Before that, the second 2026-08-12 session landed **PHASE C1 — deferred write
-processing** in one pass: the four spec forks + the carried `typology_confidence` seat ruled
-(all recommended options taken; the three dated 2026-08-12 C1 entries in `decisions.md`),
-migration 006, the enrichment worker (`app\deferred.py`, both construction sites, default
-OFF), the un-enriched-window contract (zero retrieval changes), suite Set K (13 scenarios →
-108 total / 94-subset), and the eighth walker (`verify_deferred_writes.py`, 51/51) — the
-write-path walker's 53/53 byte-untouched is the deferred-OFF parity proof. Two invariants
-carry dated amendments (the one-shot completion carve-out; byte-identity's third sanctioned
-cause).
-Earlier the same day: the full measurement line ran under the gold-label workaround ruling,
-and both queued rulings RESOLVED on the delivered data (R7 → topic guard; dialogue model →
-HAIKU stands, latency rules), plus the typology clamp (ruled + built; the dated entries in
-`decisions.md`).
+**Phase:** **Road to completion — Phases A, B, C1, and C2 are DONE.** (The roadmap below,
+consolidated 2026-08-04.) The third 2026-08-15 session landed **PHASE C2 — reflection**,
+spec-to-floor in one sitting: migration 007 (`reflection_runs`), `app\reflection.py` (the
+reflect pipeline — deterministic top-k sampling, mechanical citation validation, the
+non-LLM RRR guard, the PURELY MECHANICAL component trim, threshold-gated soft
+consolidation), the judge-shaped `LONGMEM_MODEL_REFLECTION` role (loaded both modes,
+required by neither, loud at first real use), **the dialogue-seam move** (the prose prompt
+rides the rendered identity document for the caller-frozen version — zero reflections
+render seed-verbatim, byte parity walker-asserted), the optional `ReflectionWorker`
+(default OFF per agent, both construction sites, `sweep()` the deterministic entry, NO
+attempts ledger), eleven knobs, suite Set L (20 scenarios, ALL unmarked — subset 94 →
+114, total 128), the ninth walker (60/60), the C# mirror + four interop beats (24 → 28),
+and the FOURTH-sanctioned-cause invariant amendments (CLAUDE.md + architecture §7; the
+`mid-dialogue-gate.md` "only grows" note expired). Jack ruled the four build-plan forks
+(all recommended options taken) and the approved plan resolved the spec's
+`[SETTLE-AT-BUILD]` ledger — the dated build record in `decisions.md`. The independent
+floor-verifier returned **PASS** (floors row 26); the believability run shows no
+regression (real-mode smoke vs the 2026-08-07 baseline: checks 6/0 both, gist 0.7667 →
+0.9, keyword retention equal). **Applying migration 007 to the product `longmem` DB is
+Jack's action** (the build touched scratches only; the product ledger sits at 001–006
+with zero reflection rows). **NEXT UP: C3 — reflection → parameter compiler.**
+Earlier the same date: the C2 design dossier (first sitting) and the C2 build spec
+(second sitting) — the prior narrative lives in `session-log.md`.
 The system is BUILT end to end on the final A1 seam — backend, C# client + console harness,
-Unity adapter + gray-box scene, The Ledger, eval-harness stages 1–4, deferred writes — schema
-at migrations 001–006. What is proven lives in `docs\floors.md`, why in `decisions.md`, the
-narrative in `session-log.md`; this file carries only what is live.
+Unity adapter + gray-box scene, The Ledger, eval-harness stages 1–4, deferred writes,
+reflection — schema at migrations 001–007. What is proven lives in `docs\floors.md`, why in
+`decisions.md`, the narrative in `session-log.md`; this file carries only what is live.
 
 This is the *living* file — update it at the end of every working session. `architecture.md`
 changes only when design changes; `decisions.md` is append-only.
@@ -66,7 +53,7 @@ on-screen eval numbers are what survive the interview. The demo records real-pro
 
 ## Verified floors
 
-**Twenty-five floors stand verified.** The full table — layer, what it was verified against,
+**Twenty-six floors stand verified.** The full table — layer, what it was verified against,
 and the date — lives in **`docs\floors.md`** (moved there 2026-07-28 so this living file stays
 small enough to auto-load). That file states the counting convention; cite it rather than a
 number in prose.
@@ -78,7 +65,11 @@ re-openable: re-verifying one is a step, never an argument against a design impr
 
 *None open.*
 
-**Recently closed** (pointers; full trail in `decisions.md`): **the C2 spec forks — the
+**Recently closed** (pointers; full trail in `decisions.md`): **the C2 build-plan forks —
+four ruled 2026-08-15 at the build session, all recommended options taken** (post-commit
+re-render; the tri-state REPL surface; the keyword-only provider test seam; the real-mode
+believability run), with the spec's `[SETTLE-AT-BUILD]` ledger resolved by the approved
+plan (the dated build record); **the C2 spec forks — the
 four ruled 2026-08-15 at the spec sitting** (consolidation auto-threshold + override;
 trim PURELY MECHANICAL — against the recommendation, the one divergence in the C2 line;
 per-affected eviction; C# mirror at build; the dated entry); **the C2 dossier forks — all
@@ -150,15 +141,12 @@ Ordered so shared machinery lands before its reusers.
   record the spec rulings and build latitude; spec: `deferred-writes.md`, migration 006).
   Ships default OFF — the flip is a Phase D question. The deferred-work machinery C2 rides
   now exists.
-- **C2. Reflection** — the biggest item (design dossier → spec → build): reflective writes
-  grounded in cited memory_ids, the repetition detector, periodic evidence-conditioned identity
-  refresh; its model role arrives here; idle-time scheduling rides C1's machinery.
-  **Design dossier ✅ DONE 2026-08-15; build spec ✅ DONE the same sitting**
-  (`reflection.md` is the build target; the two dated C2 entries in `decisions.md` — the
-  spec batch went three recommended + trim criteria ruled AGAINST the recommendation,
-  purely mechanical). **Next: the build session** (`app\reflection.py`, migration 007
-  `reflection_runs`, Set L, the ninth walker, touched-floor re-verifies, the
-  believability run).
+- **C2. Reflection** — the biggest item. ✅ **LANDED 2026-08-15, floor-verified the same
+  date** (floors row 26; the three dated C2 entries in `decisions.md` — dossier, spec,
+  build record): `app\reflection.py` + migration 007 + the judge-shaped role + the
+  dialogue-seam move + Set L + the ninth walker + the C# mirror; the believability run
+  confirmed no regression. Ships default OFF per agent (the endpoint is always live);
+  the flip is a Phase D question alongside C1's.
 - **C3. Reflection → parameter compiler** (formed beliefs → personality knobs; the full
   modulator suite stays cut).
 - **C4. Dissonance path + diegetic-correction event** (ONE session, ruled).
@@ -239,7 +227,7 @@ not vendored).
 
 **Carried, not fixed** (deliberately unscheduled, awaiting its own ruling):
 
-- **The walkers (eight since C1) share a fixed-name scratch DB** (`longmem_test`) they neither create,
+- **The walkers (nine since C2) share a fixed-name scratch DB** (`longmem_test`) they neither create,
   migrate, nor drop, and three assertions in `verify_fact_correction.py` are DB-global counts.
   Giving them the suite's pid-scoped mechanism plus a `tests\run-walkers.ps1` runner is the
   right fix; it is a medium refactor of the verification apparatus itself, so it wants its own

@@ -22,6 +22,11 @@ Meta-commands (everything else is an utterance):
                        authorial correction: replace the live telling with
                        the operator's text byte-verbatim (supersede + cache
                        evict; takes effect immediately, mid-scene included)
+    :reflect [consolidate|no-consolidate]
+                       the reflect verb at the session's time: sample ->
+                       grounded conclusions -> mechanical trim; bare lets
+                       the consolidation knob decide, the tokens force or
+                       suppress the stage (RRR still guards)
     :as-of <iso8601>   drive the session at an injected world time
                        (retrieval age math + observe timestamps);  :as-of clear
     :context [loc=<name>] [entities=<a,b,c>] [time=<iso8601>]
@@ -51,7 +56,8 @@ from app.ingest import (
     UnknownAgentError,
     UnknownMemoryError,
 )
-from app.schemas import DialogueTurnResult, IngestResult
+from app.reflection import ReflectionCallError, ReflectionFloorError
+from app.schemas import DialogueTurnResult, IngestResult, ReflectResult
 from app.session import SessionRunner
 
 HELP = __doc__.split("Meta-commands", 1)[1]
@@ -61,6 +67,36 @@ HELP = __doc__.split("Meta-commands", 1)[1]
 # Rendering — pure functions over the structured payloads, so the structural
 # walker can assert the debug view carries IDs, scores, and counts.
 # ---------------------------------------------------------------------------
+
+
+def render_reflect(result: ReflectResult) -> str:
+    """The :reflect summary line — structural only (counts, ids, flags,
+    pressure, version; never belief prose), so the walker asserts it."""
+    if result.consolidation is None:
+        consolidation = "skipped"
+    elif result.consolidation.failed:
+        consolidation = "FAILED (soft)"
+    else:
+        consolidation = (
+            f"absorbed {len(result.consolidation.absorbed_reflection_ids)} -> "
+            f"{result.consolidation.reflection_id}"
+        )
+    rrr = "n/a" if result.rrr is None else f"{round(result.rrr, 3)}"
+    if result.rrr_blocked_consolidation:
+        rrr += " (blocked consolidation)"
+    return (
+        f"reflected: {len(result.reflections)} stored, "
+        f"{result.dropped_ungrounded} ungrounded dropped, "
+        f"{len(result.sampled_memory_ids)} sampled; rrr {rrr}; "
+        f"consolidation {consolidation}; "
+        f"pruned {len(result.pruned_component_ids)} component(s), "
+        f"evicted {result.evicted_cache_rows} cache row(s); "
+        f"pressure {round(result.pressure_before, 3)} -> "
+        f"{round(result.pressure_after, 3)}; "
+        f"identity {result.identity_version}"
+        f"{' (new document)' if result.identity_document_new else ''} "
+        f"({result.instrumentation.total_ms}ms)"
+    )
 
 
 def render_turn_tail(result: DialogueTurnResult) -> str:
@@ -283,6 +319,19 @@ async def repl(agent_id: UUID, debug: bool) -> None:
                         f"{correction.embedding_tokens}tok, "
                         f"{correction.total_ms}ms total)"
                     )
+                elif line.startswith(":reflect"):
+                    raw = line[len(":reflect") :].strip()
+                    if raw == "consolidate":
+                        consolidate: bool | None = True
+                    elif raw == "no-consolidate":
+                        consolidate = False
+                    elif raw == "":
+                        consolidate = None
+                    else:
+                        print("usage: :reflect [consolidate|no-consolidate]")
+                        continue
+                    reflected = await runner.reflect(consolidate)
+                    print(render_reflect(reflected))
                 elif line.startswith(":as-of"):
                     raw = line[len(":as-of") :].strip()
                     if raw in ("", "clear"):
@@ -341,6 +390,10 @@ async def repl(agent_id: UUID, debug: bool) -> None:
                 # All-or-nothing (ruled 2026-07-18): nothing was written on
                 # either chain; the :correct may be re-issued safely.
                 print(f"correction failed: {exc}")
+            except (ReflectionFloorError, ReflectionCallError) as exc:
+                # Fail-loud, nothing written (reflection.md ladder): the
+                # :reflect may be re-issued safely.
+                print(f"reflect refused: {exc}")
     finally:
         await runner.close()
 

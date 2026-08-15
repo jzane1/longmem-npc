@@ -233,7 +233,7 @@ def test_provision_drop_roundtrip(suite_env):
         uri = provision_scratch(base, name)
         with psycopg.connect(uri, connect_timeout=3) as conn:
             applied = conn.execute("SELECT count(*) FROM schema_migrations").fetchone()
-        assert applied[0] == 6  # 001-006 (006: deferred writes, 2026-08-12)
+        assert applied[0] == 7  # 001-007 (007: reflection runs, 2026-08-15)
         drop_scratch(base, name)
         admin = scratch_uri(base, "postgres")
         with psycopg.connect(admin, connect_timeout=3, autocommit=True) as conn:
@@ -417,6 +417,11 @@ async def _assert_no_eval_rows(ctx):
         "memory_fact_versions",
         "memory_gist_spans",
         "reconstruction_cache",
+        # 007 (reflection, 2026-08-15) added the worker run-log table — the
+        # same mechanical census bump (sorts BEFORE 'reflections' under the
+        # DB collation; confirmed on the migrated scratch). The no-eval-rows
+        # claim this helper asserts is untouched by 007.
+        "reflection_runs",
         "reflections",
         "schema_migrations",
     ]

@@ -913,9 +913,19 @@ async def fetch_reconstruction_sources(
             (memory_ids,),
         )
         texts = {row[0]: row[1] for row in await cur.fetchall()}
+        # Constraint-follows-liveness (reflection.md, ruled 2026-08-15):
+        # spans whose matched component was invalidated (reflection trim)
+        # drop out of the gist constraint; NULL-component spans are
+        # untouched. With every component live the predicate passes for all
+        # rows — byte-identical output, the no-trim parity contract.
         await cur.execute(
-            "SELECT memory_id, start_char, end_char FROM memory_gist_spans "
-            "WHERE memory_id = ANY(%s) ORDER BY memory_id, start_char, end_char",
+            "SELECT s.memory_id, s.start_char, s.end_char "
+            "FROM memory_gist_spans s "
+            "LEFT JOIN identity_components c "
+            "ON c.component_id = s.matched_component_id "
+            "WHERE s.memory_id = ANY(%s) "
+            "AND (s.matched_component_id IS NULL OR c.invalid_at IS NULL) "
+            "ORDER BY s.memory_id, s.start_char, s.end_char",
             (memory_ids,),
         )
         spans: dict[UUID, list[tuple[int, int]]] = {}
@@ -1617,3 +1627,393 @@ async def record_enrichment_failure(
                     total_ms=(run.elapsed_before_ms if run else None),
                 )
     return outcome
+
+
+# ---------------------------------------------------------------------------
+# Reflection (migration 007; reflection.md, the C2 rulings 2026-08-15). The
+# reads/writes for app\reflection.py's seam and worker — the seam holds no
+# SQL (repo hygiene). The reflections table itself is 001's, dormant until
+# this build: bi-temporal rows, provenance in source_memory_ids
+# (intentionally un-FK'd — purge honesty), supersession by invalid_at only.
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ReflectionRow:
+    """One live reflection as the seam reads it: the render's ingredient
+    (content, chronological order keys) and consolidation's absorb surface
+    (reflection_id + the provenance union)."""
+
+    reflection_id: UUID
+    content: str
+    identity_relevant: bool
+    source_memory_ids: list[UUID]
+    valid_at: datetime
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class ReflectionInsert:
+    """One conclusion ready for insert (the seam's grounding validation has
+    already run — every id here is a member of the sampled set)."""
+
+    content: str
+    identity_relevant: bool
+    source_memory_ids: list[UUID]
+
+
+@dataclass(frozen=True)
+class ReflectionApplied:
+    """Row-level outcome of `apply_reflection` (the step-7 transaction)."""
+
+    reflection_ids: list[UUID]
+    pruned_component_ids: list[UUID]
+    evicted_cache_rows: int
+
+
+class _AbsorbRaceError(Exception):
+    """Internal: aborts (rolls back) the consolidation transaction when an
+    absorb-set row was invalidated between the seam's fetch and this write —
+    the seam degrades soft (consolidation_failed), step-7 writes stand."""
+
+
+async def fetch_live_identity_reflections(
+    pool: AsyncConnectionPool, agent_id: UUID
+) -> list[ReflectionRow]:
+    """The agent's live identity-relevant reflections in stable chronology
+    (valid_at, created_at, reflection_id) — the render's order and the
+    consolidation stage's absorb set. `identity_relevant IS NULL` counts as
+    not identity-relevant (the write always sets it explicitly; NULL rows
+    predate this build or came from elsewhere)."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT reflection_id, content, identity_relevant, "
+            "source_memory_ids, valid_at, created_at FROM reflections "
+            "WHERE agent_id = %s AND invalid_at IS NULL AND identity_relevant "
+            "ORDER BY valid_at, created_at, reflection_id",
+            (agent_id,),
+        )
+        rows = await cur.fetchall()
+    return [
+        ReflectionRow(
+            reflection_id=row[0],
+            content=row[1],
+            identity_relevant=row[2],
+            source_memory_ids=row[3] or [],
+            valid_at=row[4],
+            created_at=row[5],
+        )
+        for row in rows
+    ]
+
+
+async def fetch_recent_reflections(
+    pool: AsyncConnectionPool, agent_id: UUID, limit: int
+) -> list[str]:
+    """The RRR comparison window: the most recent live reflections' contents
+    (identity-relevant or not — self-repetition is about what the agent keeps
+    concluding, not where it files it), newest first, deterministic tiebreak
+    (created_at DESC, reflection_id — service bookkeeping time, the ruled
+    window order)."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT content FROM reflections "
+            "WHERE agent_id = %s AND invalid_at IS NULL "
+            "ORDER BY created_at DESC, reflection_id LIMIT %s",
+            (agent_id, limit),
+        )
+        rows = await cur.fetchall()
+    return [row[0] for row in rows]
+
+
+async def fetch_trim_candidates(
+    pool: AsyncConnectionPool,
+    agent_id: UUID,
+    *,
+    stale_before: datetime,
+    sample_memory_ids: list[UUID],
+) -> list[UUID]:
+    """The PURELY MECHANICAL trim rule (the C2 spec ruling 2026-08-15 — SQL
+    plus the sample list, zero model input). A live component is a prune
+    candidate iff ALL of:
+      1. it has span evidence at all (zero-span components are authored —
+         operator intent, exempt);
+      2. all its evidence is stale — no LIVE memory carrying a span matched
+         to it has valid_at at/after `stale_before` (the seam computes
+         `now - reflection_trim_stale_seconds`; evidence living only on
+         invalidated memories counts as stale);
+      3. it is not active evidence — no memory in THIS call's sample
+         references it.
+    Deliberately NO pinned-memory clause: pin means exactly two things
+    (decay exemption, reconstruction exclusion) and a trim guard would be a
+    third. Deterministic order for a stable payload."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT c.component_id FROM identity_components c "
+            "WHERE c.agent_id = %(agent_id)s AND c.invalid_at IS NULL "
+            "AND EXISTS (SELECT 1 FROM memory_gist_spans s "
+            "WHERE s.matched_component_id = c.component_id) "
+            "AND NOT EXISTS (SELECT 1 FROM memory_gist_spans s "
+            "JOIN memories m ON m.memory_id = s.memory_id "
+            "AND m.invalid_at IS NULL "
+            "WHERE s.matched_component_id = c.component_id "
+            "AND m.valid_at >= %(stale_before)s) "
+            "AND NOT EXISTS (SELECT 1 FROM memory_gist_spans s "
+            "WHERE s.matched_component_id = c.component_id "
+            "AND s.memory_id = ANY(%(sample_ids)s)) "
+            "ORDER BY c.component_id",
+            {
+                "agent_id": agent_id,
+                "stale_before": stale_before,
+                "sample_ids": sample_memory_ids,
+            },
+        )
+        rows = await cur.fetchall()
+    return [row[0] for row in rows]
+
+
+async def apply_reflection(
+    pool: AsyncConnectionPool,
+    agent_id: UUID,
+    *,
+    conclusions: list[ReflectionInsert],
+    valid_at: datetime,
+    prune_component_ids: list[UUID],
+) -> ReflectionApplied:
+    """The step-7 write transaction (reflection.md pipeline): insert the
+    surviving conclusions as bi-temporal reflection rows, invalidate the
+    mechanically-pruned components (CAS on invalid_at IS NULL — a component
+    invalidated since the trim query simply drops out, reported honestly via
+    RETURNING), and evict reconstruction_cache rows PER AFFECTED MEMORY only
+    (spec ruling 3: memories having at least one gist span matched to a
+    component actually pruned by this call). The cache DELETE is the
+    sanctioned derived-row eviction (the correction/enrichment precedent) —
+    the fourth mid-scene text-change cause lands with this build. The
+    identity re-render runs AFTER this commits (build ruling 2026-08-15:
+    the upsert is idempotent and self-heals at the next ensure)."""
+    reflection_ids: list[UUID] = []
+    pruned: list[UUID] = []
+    evicted = 0
+    async with pool.connection() as conn:
+        async with conn.transaction():
+            async with conn.cursor() as cur:
+                for conclusion in conclusions:
+                    await cur.execute(
+                        "INSERT INTO reflections (agent_id, content, "
+                        "identity_relevant, source_memory_ids, valid_at) "
+                        "VALUES (%s, %s, %s, %s, %s) RETURNING reflection_id",
+                        (
+                            agent_id,
+                            conclusion.content,
+                            conclusion.identity_relevant,
+                            conclusion.source_memory_ids,
+                            valid_at,
+                        ),
+                    )
+                    reflection_ids.append((await cur.fetchone())[0])
+                if prune_component_ids:
+                    await cur.execute(
+                        "UPDATE identity_components SET invalid_at = %s "
+                        "WHERE component_id = ANY(%s) AND invalid_at IS NULL "
+                        "RETURNING component_id",
+                        (valid_at, prune_component_ids),
+                    )
+                    pruned = sorted(row[0] for row in await cur.fetchall())
+                if pruned:
+                    await cur.execute(
+                        "DELETE FROM reconstruction_cache WHERE memory_id IN "
+                        "(SELECT DISTINCT memory_id FROM memory_gist_spans "
+                        "WHERE matched_component_id = ANY(%s))",
+                        (pruned,),
+                    )
+                    evicted = cur.rowcount
+    return ReflectionApplied(
+        reflection_ids=reflection_ids,
+        pruned_component_ids=pruned,
+        evicted_cache_rows=evicted,
+    )
+
+
+async def apply_consolidation(
+    pool: AsyncConnectionPool,
+    agent_id: UUID,
+    *,
+    content: str,
+    source_memory_ids: list[UUID],
+    absorbed_ids: list[UUID],
+    valid_at: datetime,
+) -> UUID | None:
+    """The step-8 consolidation transaction: insert ONE identity-relevant
+    reflection whose provenance is the server-computed source union, and
+    absorb the summarized rows by invalid_at (bi-temporal — they stay
+    queryable, never deleted). CAS on the absorb set: if any row was
+    invalidated since the seam's fetch, the whole transaction rolls back and
+    None returns — the seam degrades soft (consolidation_failed), the step-7
+    writes stand."""
+    try:
+        async with pool.connection() as conn:
+            async with conn.transaction():
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        "INSERT INTO reflections (agent_id, content, "
+                        "identity_relevant, source_memory_ids, valid_at) "
+                        "VALUES (%s, %s, true, %s, %s) RETURNING reflection_id",
+                        (agent_id, content, source_memory_ids, valid_at),
+                    )
+                    reflection_id = (await cur.fetchone())[0]
+                    await cur.execute(
+                        "UPDATE reflections SET invalid_at = %s "
+                        "WHERE reflection_id = ANY(%s) AND invalid_at IS NULL",
+                        (valid_at, absorbed_ids),
+                    )
+                    if cur.rowcount != len(absorbed_ids):
+                        raise _AbsorbRaceError
+    except _AbsorbRaceError:
+        return None
+    return reflection_id
+
+
+async def reflection_pressure_mass(
+    pool: AsyncConnectionPool, agent_id: UUID, *, neutral: float
+) -> float:
+    """The pressure gauge's numerator (reflection.md): summed
+    COALESCE(importance_raw, neutral) over the agent's live memories created
+    AFTER the most recent reflection row's created_at — any reflection row,
+    live or absorbed: the last reflect EVENT; all live memories when none
+    exists. `created_at`, not valid_at: pressure is service bookkeeping
+    (unprocessed accumulation), not world time. Computed on demand, never
+    stored (architecture §2's runtime-state rule); the seam divides by
+    reflection_pressure_norm."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT COALESCE(SUM(COALESCE(m.importance_raw, %(neutral)s)), 0.0) "
+            "FROM memories m "
+            "WHERE m.agent_id = %(agent_id)s AND m.invalid_at IS NULL "
+            "AND m.created_at > COALESCE((SELECT max(r.created_at) "
+            "FROM reflections r WHERE r.agent_id = %(agent_id)s), "
+            "'-infinity'::timestamptz)",
+            {"agent_id": agent_id, "neutral": neutral},
+        )
+        row = await cur.fetchone()
+    return float(row[0])
+
+
+async def fetch_agent_configs(
+    pool: AsyncConnectionPool,
+) -> list[tuple[UUID, dict]]:
+    """Every agent's (agent_id, config) in deterministic order — the
+    ReflectionWorker's sweep scan (build ruling 2026-08-15: the knob filter
+    and pressure check run in Python; agents is small, and the fixed order
+    makes sweep() walker-assertable)."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute("SELECT agent_id, config FROM agents ORDER BY agent_id")
+        rows = await cur.fetchall()
+    return [(row[0], row[1] or {}) for row in rows]
+
+
+@dataclass(frozen=True)
+class ReflectionRunRecord:
+    """Per-run instrumentation destined for reflection_runs — the WORKER's
+    persisted accounting (endpoint reflects ride the response payload and
+    write no row; the C1 endpoint/worker split). Fields mirror migration
+    007's columns; nullable numbers stay None on runs that died before the
+    stage produced them."""
+
+    agent_id: UUID
+    outcome: str  # 'completed' | 'failed'
+    error: str | None
+    reflections_written: int
+    dropped_ungrounded: int
+    consolidation_ran: bool
+    consolidation_failed: bool
+    rrr: float | None
+    rrr_blocked: bool
+    pruned_components: int
+    evicted_cache_rows: int
+    pressure_before: float | None
+    pressure_after: float | None
+    reflect_ms: float | None
+    consolidation_ms: float | None
+    insert_ms: float | None
+    total_ms: float | None
+    reflect_input_tokens: int
+    reflect_output_tokens: int
+    consolidation_input_tokens: int
+    consolidation_output_tokens: int
+
+
+async def insert_reflection_run(
+    pool: AsyncConnectionPool, run: ReflectionRunRecord
+) -> None:
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "INSERT INTO reflection_runs (agent_id, outcome, error, "
+            "reflections_written, dropped_ungrounded, consolidation_ran, "
+            "consolidation_failed, rrr, rrr_blocked, pruned_components, "
+            "evicted_cache_rows, pressure_before, pressure_after, reflect_ms, "
+            "consolidation_ms, insert_ms, total_ms, reflect_input_tokens, "
+            "reflect_output_tokens, consolidation_input_tokens, "
+            "consolidation_output_tokens) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, "
+            "%s, %s, %s, %s, %s, %s, %s, %s)",
+            (
+                run.agent_id,
+                run.outcome,
+                run.error,
+                run.reflections_written,
+                run.dropped_ungrounded,
+                run.consolidation_ran,
+                run.consolidation_failed,
+                run.rrr,
+                run.rrr_blocked,
+                run.pruned_components,
+                run.evicted_cache_rows,
+                run.pressure_before,
+                run.pressure_after,
+                run.reflect_ms,
+                run.consolidation_ms,
+                run.insert_ms,
+                run.total_ms,
+                run.reflect_input_tokens,
+                run.reflect_output_tokens,
+                run.consolidation_input_tokens,
+                run.consolidation_output_tokens,
+            ),
+        )
+
+
+async def fetch_reflection_runs(
+    pool: AsyncConnectionPool, agent_id: UUID
+) -> list[dict]:
+    """An agent's run rows, oldest first — the walker/test surface for the
+    worker's accounting (no product read route rides this until C5's
+    agent-state read, by ruling)."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT run_id, outcome, error, reflections_written, "
+            "dropped_ungrounded, consolidation_ran, consolidation_failed, "
+            "rrr, rrr_blocked, pruned_components, evicted_cache_rows, "
+            "pressure_before, pressure_after, created_at "
+            "FROM reflection_runs WHERE agent_id = %s ORDER BY created_at, run_id",
+            (agent_id,),
+        )
+        rows = await cur.fetchall()
+    return [
+        {
+            "run_id": row[0],
+            "outcome": row[1],
+            "error": row[2],
+            "reflections_written": row[3],
+            "dropped_ungrounded": row[4],
+            "consolidation_ran": row[5],
+            "consolidation_failed": row[6],
+            "rrr": row[7],
+            "rrr_blocked": row[8],
+            "pruned_components": row[9],
+            "evicted_cache_rows": row[10],
+            "pressure_before": row[11],
+            "pressure_after": row[12],
+            "created_at": row[13],
+        }
+        for row in rows
+    ]

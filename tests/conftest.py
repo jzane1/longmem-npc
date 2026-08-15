@@ -229,6 +229,42 @@ class Ctx:
             settings = replace(settings, defaults={**settings.defaults, **defaults})
         return DeferredWriteWorker(self.pool, self.providers(**overrides), settings)
 
+    def _settings_with(self, defaults: dict | None) -> Settings:
+        from dataclasses import replace
+
+        if not defaults:
+            return self.settings
+        return replace(self.settings, defaults={**self.settings.defaults, **defaults})
+
+    def reflection(self, *, defaults: dict | None = None, provider=None, **overrides):
+        """The reflect seam over this scenario's pool (Set L, reflection.md).
+        `provider` injects a reflection-provider fake through the
+        keyword-only build seam (ruled 2026-08-15); None means the lazy
+        judge-shaped factory (fake mode => FakeReflectionProvider)."""
+        from app.reflection import ReflectionService
+
+        return ReflectionService(
+            self.pool,
+            self.providers(**overrides),
+            self._settings_with(defaults),
+            reflection_provider=provider,
+        )
+
+    def reflection_worker(
+        self, *, defaults: dict | None = None, provider=None, **overrides
+    ):
+        """A reflection worker over this scenario's pool (Set L). Never
+        started — tests call `sweep()` directly, the deterministic no-timer
+        entry (the Set K drain() precedent)."""
+        from app.reflection import ReflectionWorker
+
+        return ReflectionWorker(
+            self.pool,
+            self.providers(**overrides),
+            self._settings_with(defaults),
+            reflection_provider=provider,
+        )
+
     # -- fixtures -----------------------------------------------------------
     async def make_agent(
         self,
@@ -265,13 +301,17 @@ class Ctx:
         entities: list[str] | None = None,
         embedding=_UNSET,
         spans: tuple = (),
+        component_spans: tuple = (),
         event_time: datetime | None = None,
         location_name: str | None = None,
     ) -> db.InsertOutcome:
         """Db-layer seed through the real atomic insert — no write-pass call,
         so unmarked scenarios never trigger the NLP loaders. Values are
         explicit fixture facts (importance chosen, not hash-derived).
-        `embedding=None` seeds the embed-degradation row shape."""
+        `embedding=None` seeds the embed-degradation row shape.
+        `component_spans` (Set L, reflection.md trim fixtures): (start, end,
+        component_id) triples — spans MATCHED to an existing component, the
+        trim rule's evidence unit."""
         vec = embed_text(text) if embedding is _UNSET else embedding
         plan = db.InsertPlan(
             agent_id=agent_id,
@@ -289,11 +329,69 @@ class Ctx:
             decay_class_unknown=False,
             embedding=vec,
             entities=entities,
-            spans=[db.SpanPlan(s, e, None, "person") for (s, e) in spans],
+            spans=(
+                [db.SpanPlan(s, e, None, "person") for (s, e) in spans]
+                + [
+                    db.SpanPlan(s, e, str(cid), "person")
+                    for (s, e, cid) in component_spans
+                ]
+            ),
             event_time=event_time,
             location_name=location_name,
         )
         return await db.insert_observation(self.pool, plan)
+
+    async def add_component(
+        self,
+        agent_id: UUID,
+        canonical: str,
+        aliases: tuple = (),
+        category: str = "person",
+    ) -> UUID:
+        """One identity component, id returned — Set L's trim fixtures
+        attach span evidence to it via seed(component_spans=...)."""
+        async with self.pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                "INSERT INTO identity_components (agent_id, canonical, "
+                "aliases, category) VALUES (%s, %s, %s, %s) "
+                "RETURNING component_id",
+                (agent_id, canonical, list(aliases), category),
+            )
+            return (await cur.fetchone())[0]
+
+    async def seed_reflection(
+        self,
+        agent_id: UUID,
+        content: str,
+        valid_at: datetime,
+        *,
+        identity_relevant: bool = True,
+        source_memory_ids: tuple = (),
+        created_at: datetime | None = None,
+        invalid_at: datetime | None = None,
+    ) -> UUID:
+        """Db-layer reflection seed (Set L, reflection.md — the seed_pending
+        precedent): a prior belief row placed directly, so RRR-window,
+        consolidation, and pressure fixtures control content, chronology
+        (created_at is the RRR window's and the pressure gauge's order key),
+        and liveness exactly — no service call, no model."""
+        async with self.pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                "INSERT INTO reflections (agent_id, content, "
+                "identity_relevant, source_memory_ids, valid_at, created_at, "
+                "invalid_at) VALUES (%s, %s, %s, %s, %s, COALESCE(%s, now()), "
+                "%s) RETURNING reflection_id",
+                (
+                    agent_id,
+                    content,
+                    identity_relevant,
+                    list(source_memory_ids),
+                    valid_at,
+                    created_at,
+                    invalid_at,
+                ),
+            )
+            return (await cur.fetchone())[0]
 
     async def seed_pending(
         self,

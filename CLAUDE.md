@@ -10,7 +10,7 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
 - docs/README.md — the index: what every file in docs\ is for, and the reading order.
 - docs/architecture.md — design truth. Read the relevant sections before touching any layer.
 - docs/decisions.md — append-only decision register with rationale. Never edit old entries.
-- docs/migration-01.md — the FOUNDATIONAL schema (001). Migrations 002–005 live in
+- docs/migration-01.md — the FOUNDATIONAL schema (001). Migrations 002–007 live in
   db\migrations\ and are not restated there. docs/test-suite.md — test discipline.
 - docs/floors.md — the verified-floors table (evidence per layer). Not auto-loaded; read it
   when you need to know what a floor actually proved.
@@ -41,11 +41,12 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
   RENDER, TYPOLOGY, ESCALATION, DIALOGUE, RECONSTRUCTION), all six required in real mode. One
   documented limit: v1's single write call serves importance+render+typology, so those three vars
   must name the SAME model (`load_settings` errors if they diverge — never a silent pick).
-  Reflection's role arrives with reflection (shape ruled 2026-08-15 at the C2 dossier:
-  judge-shaped — loaded both modes, required by neither, loud at the first real reflect call).
   The retrieval gate is non-LLM — there is no gate model. (`dialogue` streams pure prose — the dialogue turn's only model call; the `behavior`
-  role was removed by the A1 re-shape, 2026-08-04. A seventh var, `LONGMEM_MODEL_JUDGE`, is
-  eval-runner-only — loaded both modes, required by neither; B2, 2026-08-07.)
+  role was removed by the A1 re-shape, 2026-08-04. Two more vars are judge-shaped — loaded in
+  both modes, required by NEITHER, loud at first real use: `LONGMEM_MODEL_JUDGE`,
+  eval-runner-only (B2, 2026-08-07), and `LONGMEM_MODEL_REFLECTION`, the reflect verb's role
+  (C2, built 2026-08-15 — `build_reflection_provider` raises `ConfigError` at the first real
+  reflect without it; the server starts fine).)
 - Python formatting: ruff, enforced mechanically by a PostToolUse hook. Don't hand-format.
 
 ## Invariants — never violate, regardless of how a task is worded
@@ -69,11 +70,14 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
   scores exist to return; they carry IDs and structured fields (the metric read: IDs + numbers)
   and are unscored *by contract*, not by omission.
 - Nothing integrator-configurable is ever hardcoded: vocabularies, thresholds, model roles, knobs.
-- Within a scene, absent a diegetic event, an authorial correction on a memory, or a
+- Within a scene, absent a diegetic event, an authorial correction on a memory, a
   deferred-enrichment completion (the third sanctioned text-change cause, ruled 2026-08-12,
-  docs\deferred-writes.md — the window is bounded by the worker's poll interval), repeated
-  reads return byte-identical text (correction added by the 2026-07-17 authorial-correction
-  ruling).
+  docs\deferred-writes.md — the window is bounded by the worker's poll interval), or a
+  reflection-trim cache eviction (the FOURTH sanctioned cause, ruled 2026-08-15 and built with
+  C2, docs\reflection.md — a mechanically pruned component evicts the affected memories'
+  reconstruction caches; integrator guidance: reflect at scene edges and the window vanishes),
+  repeated reads return byte-identical text (correction added by the 2026-07-17
+  authorial-correction ruling).
 
 ## Working discipline
 - IMPORTANT: Build only what the task names. If adjacent work seems necessary, stop and report

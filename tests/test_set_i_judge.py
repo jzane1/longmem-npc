@@ -4,7 +4,8 @@
 Covers the stage-3 MECHANICS with the deterministic fake judge — never real
 judged signal and never assertions on prose (the judged surface's semantics
 live in real run artifacts, past the agreement bar): the config regression
-(real mode never requires the judge var — the 2026-07-29 ruling as code),
+(real mode never requires the judge var — the 2026-07-29 ruling as code;
+the reflection var joined the same judge shape 2026-08-15, asserted here),
 the thinking knob's request shapes, fake-judge determinism, verdict
 validation and per-item judge_failed degradation, the position-swap tie
 rule, hand-computed kappa arithmetic with honest-None denominators, the
@@ -28,6 +29,7 @@ from app.config import (
     ENV_DIALOGUE_THINKING,
     ENV_JUDGE_MAX_TOKENS,
     ENV_MODEL_JUDGE,
+    ENV_MODEL_REFLECTION,
     ConfigError,
     Settings,
     load_env,
@@ -97,31 +99,44 @@ REAL_ENV = {
 
 def test_config_judge_regression():
     """Real mode loads WITHOUT the judge var (never in the required list);
-    both modes load it when present; prices and the max-tokens knob parse."""
+    both modes load it when present; prices and the max-tokens knob parse.
+    The reflection role shares the judge shape (the C2 dossier ruling
+    2026-08-15) — the same load-rule assertions cover it here."""
     settings = load_settings(dict(REAL_ENV))
     assert settings.provider_mode == "real"
     assert settings.model_judge == ""
+    assert settings.model_reflection == ""  # loaded-never-required, like judge
 
     settings = load_settings({**REAL_ENV, ENV_MODEL_JUDGE: "model-j"})
     assert settings.model_judge == "model-j"
+    assert (
+        load_settings({**REAL_ENV, ENV_MODEL_REFLECTION: "model-f"}).model_reflection
+        == "model-f"
+    )
     fake = load_settings(
         {
             "DATABASE_URI": UNREACHABLE_URI,
             "LONGMEM_PROVIDER_MODE": "fake",
             ENV_MODEL_JUDGE: "model-j",
+            ENV_MODEL_REFLECTION: "model-f",
         }
     )
     assert fake.model_judge == "model-j"  # loaded in fake mode too
+    assert fake.model_reflection == "model-f"
 
     priced = load_settings(
         {
             **REAL_ENV,
             "LONGMEM_PRICE_JUDGE_IN": "5.00",
             "LONGMEM_PRICE_JUDGE_OUT": "25.00",
+            "LONGMEM_PRICE_REFLECTION_IN": "1.00",
+            "LONGMEM_PRICE_REFLECTION_OUT": "5.00",
         }
     )
     assert priced.prices["judge_in"] == 5.0
     assert priced.prices["judge_out"] == 25.0
+    assert priced.prices["reflection_in"] == 1.0
+    assert priced.prices["reflection_out"] == 5.0
 
     assert load_settings(dict(REAL_ENV)).judge_max_tokens == 2048
     assert (
@@ -135,8 +150,9 @@ def test_config_judge_regression():
 
 
 def test_dialogue_thinking_knob(tmp_path, monkeypatch):
-    """Values validate at load; the request-shape helper is exact; all three
-    new env keys ride the process-env override allowlist."""
+    """Values validate at load; the request-shape helper is exact; the
+    judge/thinking/max-tokens keys (B2) and the reflection key (C2) all
+    ride the process-env override allowlist."""
     assert load_settings(dict(REAL_ENV)).dialogue_thinking == ""
     assert (
         load_settings({**REAL_ENV, ENV_DIALOGUE_THINKING: "disabled"}).dialogue_thinking
@@ -153,10 +169,12 @@ def test_dialogue_thinking_knob(tmp_path, monkeypatch):
     monkeypatch.setenv(ENV_MODEL_JUDGE, "override-j")
     monkeypatch.setenv(ENV_DIALOGUE_THINKING, "disabled")
     monkeypatch.setenv(ENV_JUDGE_MAX_TOKENS, "1024")
+    monkeypatch.setenv(ENV_MODEL_REFLECTION, "override-f")
     values = load_env(env_file)
     assert values[ENV_MODEL_JUDGE] == "override-j"
     assert values[ENV_DIALOGUE_THINKING] == "disabled"
     assert values[ENV_JUDGE_MAX_TOKENS] == "1024"
+    assert values[ENV_MODEL_REFLECTION] == "override-f"
 
 
 # ---------------------------------------------------------------------------

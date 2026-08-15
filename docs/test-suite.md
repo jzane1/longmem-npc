@@ -1,15 +1,17 @@
 # longmem-npc — Test suite spec
 
-**BUILT 2026-07-20 — 108 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation +
-hygiene + eval metrics + eval runner + judge + ablation + deferred writes; the Set A diegetic
-pair still lands with the dissonance mechanism). Count as of 2026-08-12: Set A 8, Set B 7,
-Set C 7, Set D 20, degradation 12, hygiene 2, Set G eval metrics 8, **Set H eval runner 9**
-(stage 2, 2026-08-05), **Set I judge 16** (stage 3, 2026-08-07; +2 with the 2026-08-12
-workaround session), **Set J ablation 6** (stage 4, 2026-08-12 — its section is `eval-harness.md`'s
-stage-4 block), **Set K deferred writes 13** (Phase C1, 2026-08-12) — grown from the 38 built on
-2026-07-20 by the route-contract scenarios that arrived with each later route, by the
-gap-closing and guard scenarios from the full-repo audit, and by the eval harness stages 1–4.
-**Fourteen carry the `nlp` marker**, so the turn-end subset runs **94**. *(Counts corrected
+**BUILT 2026-07-20 — 128 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation +
+hygiene + eval metrics + eval runner + judge + ablation + deferred writes + reflection; the
+Set A diegetic pair still lands with the dissonance mechanism). Count as of 2026-08-15: Set A 8,
+Set B 7, Set C 7, Set D 20, degradation 12, hygiene 2, Set G eval metrics 8, **Set H eval
+runner 9** (stage 2, 2026-08-05), **Set I judge 16** (stage 3, 2026-08-07; +2 with the
+2026-08-12 workaround session; the reflection role's load-rule amendment rides the existing
+config scenarios, 2026-08-15), **Set J ablation 6** (stage 4, 2026-08-12 — its section is
+`eval-harness.md`'s stage-4 block), **Set K deferred writes 13** (Phase C1, 2026-08-12),
+**Set L reflection 20** (Phase C2, 2026-08-15) — grown from the 38 built on 2026-07-20 by the
+route-contract scenarios that arrived with each later route, by the gap-closing and guard
+scenarios from the full-repo audit, and by the eval harness stages 1–4. **Fourteen carry the
+`nlp` marker** (Set L adds none), so the turn-end subset runs **114**. *(Counts corrected
 2026-08-12 with the Set K landing — the 2026-08-07 header had drifted again by the stage-4 and
 workaround-session scenarios.)* Build rulings 2026-07-20
 (dated `decisions.md` entry): the suite-gate Stop hook runs the `-m "not nlp"` subset (the 7
@@ -249,6 +251,57 @@ The eighth walker `tests\verify_deferred_writes.py` (51 criteria) covers the mig
 shape, kill-switch parity, the full ladder at service level, and the worker lifecycle at both
 construction sites; the write-path walker staying byte-identical at 53/53 is the deferred-OFF
 parity evidence.
+
+## Set L — reflection *(added 2026-08-15 with Phase C2, `reflection.md`)*
+
+Twenty scenarios in `tests\test_reflection.py`, ALL unmarked. Memories and prior beliefs seed
+at the db layer (`Ctx.seed` / `Ctx.seed_reflection`); the seam runs through
+`ReflectionService.reflect` and the worker through `sweep()` — deterministic, no timers, no
+spaCy. The pipeline's time basis is the request's `client_timestamp`, so the clock freezes by
+freezing the request (the `as_of` precedent):
+
+- **Happy path:** grounded bi-temporal rows at the request's `valid_at` (citations non-empty
+  and ⊆ the sampled ids), pressure before/after served, honest instrumentation, the
+  re-rendered document carrying the identity-relevant belief byte-for-byte; the endpoint
+  writes NO run row (the C1 endpoint/worker split).
+- **Sampling:** deterministic top-k by importance_norm × recency, ties on `memory_id`; a
+  pinned ancient row takes the PLAIN decay score (pin keeps exactly two meanings — reflection
+  is neither) and falls out of the sample a `rec = 1.0` arm would have topped.
+- **Grounding:** a partial drop stores the valid subset (`dropped_ungrounded` counts);
+  all-ungrounded is the 502 class with zero rows; call-failure and malformed land the same
+  way; a genuinely empty conclusion list is a VALID outcome.
+- **The floor:** below `reflection_min_episodes` the 409 class, zero rows; unknown agent 404.
+- **RRR:** a near-duplicate repeat blocks consolidation (even under a `consolidate=true`
+  override) while the reflections still store; the threshold pins inert (>1) in the scenario
+  that isolates the override arm (the fixture-pin discipline).
+- **Consolidation:** absorbs bi-temporally (`invalid_at`, rows stay queryable), provenance =
+  the source union, the version bumps, the document carries the belief and not the absorbed
+  rows; `consolidate=false` suppresses when due; a consolidation-call failure is SOFT — the
+  step-7 writes stand.
+- **Trim:** the 3-clause mechanical rule under the frozen clock (a component with all-stale
+  span evidence prunes by `invalid_at`, never DELETE); the authored (zero-span) and
+  active-evidence exemptions hold; 0.0 disables the trim entirely; eviction is
+  per-affected-memory only; `fetch_live_components` shrinks; `fetch_reconstruction_sources`
+  drops the pruned spans; no-trim byte parity.
+- **The dialogue seam:** zero reflections ⇒ seed-verbatim render, the pre-C2 version and a
+  byte-identical prose prompt; after a belief + recompile the `[identity]` block carries it;
+  an unknown `identity_version` stays the loud 422 class.
+- **The worker:** sweep determinism, the per-agent kill-switch (gates auto-pull only), at
+  most one reflect per agent per sweep, pressure consumed by the reflect event, `failed` run
+  rows + natural retry (NO attempts ledger — the deliberate contrast with enrichment), the
+  below-floor skip writes no row, idempotent start/stop.
+- **Pressure math:** exact masses incl. the NULL-importance neutral fallback and
+  absorbed-rows-still-mark-the-last-event; the zero-norm guard is loud, never a clamp.
+- **Role shape:** real mode loads WITHOUT `LONGMEM_MODEL_REFLECTION` (the Set I load-rule
+  amendment asserts `load_settings`); the first real reflect raises `ConfigError` naming the
+  var, nothing written. **Route contracts:** 200/404/409/422/502 via the ASGI-transport
+  pattern.
+
+The ninth walker `tests\verify_reflection.py` (60 criteria, lettered sections A–F) covers the
+migration-007 shape, the reflect verb ladder, render/consolidation/dialogue-seam parity, trim
++ liveness + eviction, the worker lifecycle at both construction sites, and the judge-shaped
+role surface; the write- and read-path walkers staying byte-identical at 53/56 are the
+zero-retrieval-change evidence.
 
 ## Route contracts *(added as each route shipped; consolidated here 2026-07-28)*
 

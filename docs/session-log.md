@@ -1653,6 +1653,56 @@ session.
     the dialogue-seam + reconstruction walker re-runs, the independent floor-verify, the
     post-landing believability run).
 
+- **2026-08-15 — Phase C2 build: reflection landed, spec-to-floor in one sitting (third
+  session this date).**
+  - **Landed:** the full `reflection.md` spec as code — migration 007 (`reflection_runs`;
+    the three pins bumped, the census order confirmed against real collation);
+    `app\reflection.py` (pipeline 1–9, `compute_rrr`, `ReflectionWorker` with `sweep()`,
+    NO attempts ledger); the judge-shaped `LONGMEM_MODEL_REFLECTION` role + standalone
+    factory + Fake/Failing/Malformed/Real providers; db.py's reflection section (the
+    3-clause mechanical trim, the pressure aggregate, the step-7/8 transactions, run
+    rows) + the constraint-follows-liveness join in `fetch_reconstruction_sources`; the
+    extended model-free identity render; THE DIALOGUE-SEAM MOVE (the prose prompt rides
+    the rendered document for the caller-frozen version — zero reflections render
+    seed-verbatim, byte parity walker-asserted); the reflect route (404/409/422/502) +
+    REPL `:reflect` + the worker at both construction sites; eleven `SERVICE_DEFAULTS`
+    knobs; suite Set L (20 scenarios, ALL unmarked — subset 94 → 114); the ninth walker
+    (60/60); the C# mirror field-for-field + four interop beats (24 → 28); the Set I
+    load-rule amendment; the fourth-sanctioned-cause invariant amendments (CLAUDE.md +
+    architecture §7) + the `mid-dialogue-gate.md` "only grows" expiry + the doc sweep.
+    Jack ruled four plan-batch forks (all recommended options taken: post-commit
+    re-render; tri-state REPL tokens; the keyword-only provider test seam; the real-mode
+    believability run) and the approved plan resolved the spec's `[SETTLE-AT-BUILD]`
+    ledger — the dated build record in `decisions.md`.
+  - **Verified:** the independent floor-verifier returned **PASS**, re-running everything
+    itself — suite 128 full / 114-subset, all NINE walkers on fresh scratches (write
+    53/53 + read 56/56 byte-untouched = the zero-retrieval-change evidence; gate 51 with
+    the +007 ledger pin), migrate 001→007 fresh + idempotent, the 13-table census, both
+    C# builds 0-warning, the 28-check interop gate re-run live, the product DB pristine
+    (ledger exactly 001–006, zero reflection rows — applying 007 to the product store is
+    Jack's action, deliberately left to him). Believability: the real-mode stage-2 smoke
+    vs the 2026-08-07 real baseline — checks 6/0 both, gist 0.7667 → 0.9, keyword
+    retention equal, the rest single-run noise; no regression. Floors row 26.
+  - **Honest notes:** (1) the deterministic fake's repeat conclusions tripped RRR
+    (measured 0.905) inside the suppress-when-due scenario that was not testing the
+    guard — fixed with the fixture-pin discipline (threshold pinned >1 there), and the
+    RRR scenario itself asserts ≥ threshold rather than an exact 1.0 (the identity block
+    shifts between calls, so repeats are near- not byte-identical: the guard working as
+    designed); (2) same-transaction reflection inserts share one `created_at` (Postgres
+    stamps transaction time), so Set L asserts membership, not row order — the happy
+    path's first green run was UUID luck, caught by an immediate re-run; (3) the
+    verifier's one finding — three stale `SETUP.md` counts the propagation sweep
+    missed — fixed before commit; (4) the spec sitting's "ten knobs" phrase was a
+    miscount of its own eleven-row table; the build followed the table and the build
+    record says so (the applied entries stay unedited, append-only).
+  - **Surfaced, not fixed:** `reconstruction_metrics`' fabricated-entities baseline uses
+    the seed-only 1-arg render, so a belief-introduced entity would count "fabricated"
+    once identity-relevant reflections exist. `retrieval.py` is ruled untouched and
+    reflection ships default OFF — flagged for Phase D (or C5's neighborhood).
+  - **Blocked:** nothing. **Abandoned:** nothing. Next: C3 (reflection → parameter
+    compiler) per the roadmap; the deferred + reflection default flips stay Phase D
+    questions.
+
 
 ---
 

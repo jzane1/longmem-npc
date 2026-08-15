@@ -10,11 +10,16 @@ constraint-follows-liveness teeth. Design truth: [architecture.md](architecture.
 in [decisions.md](decisions.md); the research grounding is `docs\research\FINDINGS.md` #4.
 This doc points, it does not re-derive.
 
-> **Status: SPECCED 2026-08-15 — the six dossier forks and the spec forks ruled the same
-> date (two sittings; the dated C2 entries in `decisions.md`). NOT BUILT.** The build
-> session lands `app\reflection.py`, migration 007, suite Set L, the ninth walker
-> `tests\verify_reflection.py`, the touched-floor re-verifications, and the post-landing
-> believability run; this banner then records BUILT + floor-verified.
+> **Status: BUILT + floor-verified 2026-08-15 — specced, built, and independently
+> verified the same date (three sittings; the three dated C2 entries in `decisions.md`,
+> the build record included).** Landed: `app\reflection.py`, migration 007
+> (`reflection_runs`), suite Set L (20 scenarios, all unmarked), the ninth walker
+> `tests\verify_reflection.py` (60/60), the dialogue-seam move, the C# mirror + four
+> interop-gate beats (24 → 28), all nine walkers green with write/read byte-identical at
+> 53/56 (the zero-retrieval-change evidence), and the post-landing believability run
+> (real-mode smoke vs the 2026-08-07 baseline: checks 6/0 both, no regression). The
+> independent floor-verifier returned **pass**; floors row 26. The `[SETTLE-AT-BUILD]`
+> ledger below was ruled at the build plan — the build record in `decisions.md`.
 
 ## The six dossier rulings (2026-08-15, first sitting — pointers, not re-derivation)
 

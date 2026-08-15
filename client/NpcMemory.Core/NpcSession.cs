@@ -194,6 +194,23 @@ namespace NpcMemory
                 },
                 ct);
 
+        /// <summary>The reflect verb at the session's effective time
+        /// (reflection.md, 2026-08-15; the CorrectAsync time precedent).
+        /// Deliberately does NOT touch the frozen scene state:
+        /// IdentityVersion stays caller-frozen until the next scene boundary
+        /// picks up the recompiled document — reflect at scene edges and the
+        /// trim-eviction exposure window vanishes.</summary>
+        public Task<ReflectResult> ReflectAsync(
+            bool? consolidate = null, CancellationToken ct = default) =>
+            _client.ReflectAsync(
+                AgentId,
+                new ReflectRequest
+                {
+                    ClientTimestamp = Now(),
+                    Consolidate = consolidate,
+                },
+                ct);
+
         public Task<PinResult> PinAsync(
             Guid memoryId, bool pinned, CancellationToken ct = default) =>
             _client.SetPinAsync(memoryId, pinned, ct);

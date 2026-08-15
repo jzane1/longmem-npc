@@ -85,7 +85,7 @@ Apply the schema:
 python db\migrate.py
 ```
 
-First run applies migrations 001–006 and records each in `schema_migrations` **in the same
+First run applies migrations 001–007 and records each in `schema_migrations` **in the same
 transaction as its DDL** — a half-applied migration can never be logged complete. Re-running is a
 clean no-op:
 
@@ -140,24 +140,25 @@ python -m app.load_driver
 
 Two systems, deliberately distinct — see `docs\README.md` for what each is for.
 
-**The suite** (108 scenarios, self-managing scratch DB, no arguments needed):
+**The suite** (128 scenarios, self-managing scratch DB, no arguments needed):
 
 ```powershell
 python -m pytest tests -q
-python -m pytest tests -q -m "not nlp"   # 94, the turn-end subset — seconds, not minutes
+python -m pytest tests -q -m "not nlp"   # 114, the turn-end subset — seconds, not minutes
 ```
 
 Postgres unreachable ⇒ every scenario skips loudly and the run exits green, by ruling.
 
-**The walkers** (eight structural done-when scripts) need a scratch DB you create yourself:
+**The walkers** (nine structural done-when scripts) need a scratch DB you create yourself:
 
 ```powershell
 $scratch = "postgresql://longmem:change-me@localhost:5432/longmem_test"
 docker exec longmem-pg psql -U longmem -d postgres -c "CREATE DATABASE longmem_test"
 python db\migrate.py --database-uri $scratch
 python tests\verify_write_path.py --database-uri $scratch
-# ... verify_deferred_writes (C1, 2026-08-12), verify_read_path, verify_cli_harness,
-#     verify_gate, verify_reconstruction, verify_authorial_correction, verify_fact_correction
+# ... verify_reflection (C2, 2026-08-15), verify_deferred_writes (C1, 2026-08-12),
+#     verify_read_path, verify_cli_harness, verify_gate, verify_reconstruction,
+#     verify_authorial_correction, verify_fact_correction
 docker exec longmem-pg psql -U longmem -d postgres -c "DROP DATABASE longmem_test WITH (FORCE)"
 ```
 
@@ -189,7 +190,7 @@ interop gate. With the service up on a scratch database:
 dotnet run --project client\NpcMemory.Harness -- --base-url http://127.0.0.1:8000
 ```
 
-It provisions its own agent and ends with `ALL HARNESS BEATS PASSED (24 checks)`. Point it
+It provisions its own agent and ends with `ALL HARNESS BEATS PASSED (28 checks)`. Point it
 at a scratch DB, not the product one — it writes.
 
 ### Refreshing the Unity plugin DLL

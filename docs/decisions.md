@@ -7,8 +7,9 @@ file records what was chosen, what it beat, and why (where the rationale was rec
 
 ## Index
 
-*62 dated sections (recounted 2026-08-15 at the C2 spec landing: 62 body entries, 62
-index lines, one-to-one; prior recounts 61 at the same date's dossier landing, 60 at the
+*63 dated sections (recounted 2026-08-15 at the C2 build landing: 63 body entries, 63
+index lines, one-to-one; prior recounts 62 at the same date's spec landing, 61 at the
+dossier landing, 60 at the
 2026-08-15 wrap-up sweep, 59 at the 2026-08-13 interim-README landing). Regenerated 2026-07-28 — the first hand-written pass mixed two
 slug conventions and miscounted. Anchors follow GitHub's slugger: the em dash is dropped and
 its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as `#name--2026-07-28`.*
@@ -81,6 +82,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Em-dashes banned from public-facing prose — 2026-08-13](#em-dashes-banned-from-public-facing-prose--2026-08-13)
 - [C2 design-dossier rulings — reflection — 2026-08-15](#c2-design-dossier-rulings--reflection--2026-08-15)
 - [C2 spec rulings — reflection build target — 2026-08-15](#c2-spec-rulings--reflection-build-target--2026-08-15)
+- [Phase C2 build record — reflection landed — 2026-08-15](#phase-c2-build-record--reflection-landed--2026-08-15)
 
 ## Primary decisions
 
@@ -3335,3 +3337,100 @@ entry + its Index line (count 61 → 62). Architecture needed no further edit �
 dossier sitting's §10 amendment makes no model-prune claim, so the mechanical ruling
 contradicts nothing. Everything else lands with the build per the spec's
 `[SETTLE-AT-BUILD]` ledger.
+
+## Phase C2 build record — reflection landed — 2026-08-15
+
+**Built the same date the spec was ruled** (dossier → spec → build → walkers →
+independent floor-verify; the third C2 sitting). Migration 007 (`reflection_runs`, the
+WORKER's per-run instrumentation home — endpoint reflects ride the response payload, the
+C1 endpoint/worker split; 006's column-type idioms; `reflection_runs_agent_id_idx`);
+`app\reflection.py` (pure prompt assemblers, `ReflectionService.reflect` = the ruled
+pipeline 1–9, `compute_rrr`, `ReflectionWorker` on the C1 lifecycle contract with
+`sweep()` as the deterministic no-timer entry and NO attempts ledger); the judge-shaped
+role (`ENV_MODEL_REFLECTION` loaded both modes required by neither; the standalone
+`build_reflection_provider` loud at first real use; Fake/Failing/Malformed/Real
+providers; `LONGMEM_PRICE_REFLECTION_IN/OUT`); db.py's reflection section (the reads,
+the step-7/8 transactions, the 3-clause mechanical trim query, the pressure aggregate,
+run rows, the worker's agent scan) + the constraint-follows-liveness join in
+`fetch_reconstruction_sources`; the extended model-free identity render (a defaulted
+second parameter — every 1-arg caller stands); the dialogue-seam move (the prose prompt
+rides the RENDERED DOCUMENT for the caller-frozen `identity_version`, resolved exactly
+like reconstruction's — the raw-seed asymmetry closed; zero reflections render
+seed-verbatim, byte parity walker-asserted); `POST /v1/agents/{agent_id}/reflect`
+(404/409/422/502); the worker at BOTH construction sites, stopped before the pool
+closes; the REPL `:reflect [consolidate|no-consolidate]`; **eleven** `reflection_*`
+knobs in `SERVICE_DEFAULTS` (the spec table's own row count — the spec sitting's
+"ten-knob" phrase was a miscount of the same table, corrected here rather than by
+editing the applied entry); suite Set L (`tests\test_reflection.py`, 20 scenarios, ALL
+unmarked — db-layer seeding via the new `Ctx.seed_reflection` / `add_component` /
+`component_spans` helpers); the ninth walker `tests\verify_reflection.py` (60 criteria,
+lettered A–F); the C# mirror field-for-field (`ReflectRequest` / `ReflectionOut` /
+`ConsolidationOut` / `ReflectInstrumentation` / `ReflectResult`; `ReflectAsync` on
+client + session) + four interop-gate beats (24 → 28 checks); the three migration pins
+(+007, the census confirmed against real collation: `reflection_runs` sorts BEFORE
+`reflections`); the Set I load-rule amendment; the fourth-cause invariant amendments
+(CLAUDE.md + architecture §7) and the `mid-dialogue-gate.md` "only grows" expiry.
+
+**Build-plan rulings (Jack, 2026-08-15, the plan-mode fork batch — four asked, all
+recommended options taken):** (1) the identity re-render + upsert runs AFTER each write
+transaction commits (the upsert is idempotent, content-addressed, and self-heals at the
+next ensure — the spec's "then" sequencing made physical); (2) the REPL surface is the
+tri-state token pair `:reflect` / `:reflect consolidate` / `:reflect no-consolidate`;
+(3) tests inject failing/malformed reflection fakes through a keyword-only
+`reflection_provider=None` constructor seam (None = the lazy factory; both production
+call sites keep the pinned 3-arg shape); (4) the post-landing believability check is the
+REAL-mode stage-2 metrics run on the existing smoke scenarios against the on-disk
+baselines, fake dry-run first. **Plan-approved `[SETTLE-AT-BUILD]` resolutions** (the
+spec's ledger, ruled by the approved plan): 007 column types copy 006 per class;
+pydantic field names = the spec's verbatim; single-module `app\reflection.py`; the
+worker scans `SELECT agent_id, config FROM agents ORDER BY agent_id` with knob/pressure
+logic in Python; the error taxonomy (`ReflectionFloorError` → 409, `ReflectionCallError`
+→ 502 carrying token counts so failed worker runs stay honest, `UnknownAgentError`
+reused → 404, `ConfigError` unwrapped); the RRR window order `created_at DESC,
+reflection_id`; **the pipeline's time basis = the request's `client_timestamp`** (the
+as_of / scene-frozen-basis precedent — tests and walkers freeze the clock by freezing
+the request; the worker stamps wall-clock now); the zero-norm pressure guard raises
+loud, never a clamp; consolidation is a `consolidate()` protocol method returning
+`{"content": str}` with the source union computed server-side; the worker's below-floor
+rung is a skip with NO run row; the ninth walker prints the doc-stated `ALL CHECKS
+PASSED (N assertions)` convention (walker eight stays the recorded outlier); pinned rows
+take the PLAIN decay score in sampling (spec-settled: pin = exactly two meanings —
+reflection is neither).
+
+**Build-latitude choices, recorded:** (a) Set L grew to 20 from the spec's ~13 — the
+trim family split into three scenarios, the route contracts rode the house
+ASGI-transport convention (found mid-build in `test-suite.md`'s Route-contracts
+section), and the suppress-when-due arm got its own scenario with the RRR threshold
+pinned inert (>1, the fixture-pin discipline) after the deterministic fake's
+near-identical repeat conclusions (measured rrr 0.905 against the shifted identity
+block) tripped the guard inside a scenario that was not testing it — an honest reminder
+the guard works. (b) Same-transaction reflection inserts share one `created_at`
+(Postgres stamps transaction time), so row order among one call's conclusions is
+id-tiebroken — Set L asserts membership, not sequence. (c) `fetch_reflection_runs`
+exists as a walker/test read only (no product route — C5's agent-state read is the ruled
+surface). (d) The real provider's fixed max_tokens (2048 reflect / 1024 consolidate)
+follows the write-call precedent of a structural bound, not integrator policy.
+
+**Verified (the independent floor-verifier re-ran everything itself; VERDICT pass):**
+suite **128** full / **114**-subset (Set L 20/20 incl. the ASGI route contracts); all
+NINE walkers on fresh scratches — write **53/53 byte-untouched** and read **56/56
+byte-untouched** (the zero-retrieval-change evidence), reconstruction 42, cli-harness
+51, authorial 34, fact 34, gate 51 (ledger pin +007), deferred 51/51, the new
+`verify_reflection.py` **60/60**; fresh 001→007 + idempotent re-run ("Up to date: 7
+applied, 0 pending"); the 13-table census; both C# builds 0-warning; the 28-check
+interop gate re-run LIVE by the verifier (fake-mode served app, incl. the four reflect
+beats); the product DB pristine before and after (ledger exactly 001–006, zero
+reflection rows — applying 007 to the product store is Jack's action, deliberately not
+the build's); believability = the real-mode stage-2 smoke vs the 2026-08-07 real
+baseline: checks 6/0 both, gist_precision 0.7667 → 0.9, keyword_retention equal at
+0.9375, the remaining deltas single-run real-mode noise — **no regression**
+(`run_20260815T222459Z_pid_31388.json` vs `run_20260807T224423Z_pid_15844.json`).
+Floors row 26. The verifier caught three stale `SETUP.md` counts (scenarios/walkers/
+harness checks) — fixed before commit.
+
+**Surfaced, not fixed (recorded under the zero-retrieval-changes ruling):** the eval
+metric read (`retrieval.py` `reconstruction_metrics`) builds its fabricated-entities
+baseline from the seed-only 1-arg render; once identity-relevant reflections exist, a
+belief-introduced entity would count "fabricated". Reflection ships default OFF, so
+nothing is wrong today — flagged for Phase D (or C5's neighborhood) as the
+metric-honesty counterpart of the dialogue-seam move.

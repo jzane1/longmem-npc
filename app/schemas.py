@@ -230,6 +230,101 @@ class CorrectionResult(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Reflection (docs\reflection.md; the C2 rulings dated 2026-08-15)
+# ---------------------------------------------------------------------------
+
+
+class ReflectRequest(BaseModel):
+    """Body of POST /v1/agents/{agent_id}/reflect — an agent-scoped
+    operator/integrator verb (`/v1/events/*` stays diegetic; the
+    correction-route precedent). `client_timestamp` is the reflect event's
+    world time: the written rows' valid_at AND the pipeline's single time
+    basis (sampling age, trim staleness) — the as_of / scene-frozen-basis
+    precedent, so tests and walkers freeze the clock by freezing the
+    request. `consolidate` overrides the consolidation trigger this call:
+    True forces the stage (RRR still guards), False suppresses it, absent
+    lets the reflection_consolidate_at knob decide (spec ruling 1)."""
+
+    client_timestamp: datetime
+    consolidate: bool | None = None
+
+    @field_validator("client_timestamp")
+    @classmethod
+    def _tz_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            raise ValueError("timestamp must be timezone-aware")
+        return value
+
+
+class ReflectionOut(BaseModel):
+    """One stored conclusion: id, content, and the grounding citations —
+    mechanically validated at the seam (non-empty AND a subset of the
+    sampled ids) before anything writes."""
+
+    reflection_id: UUID
+    content: str
+    identity_relevant: bool
+    source_memory_ids: list[UUID]
+
+
+class ConsolidationOut(BaseModel):
+    """The consolidation stage's outcome when it ran. Success = the new
+    consolidated reflection's id + the rows it absorbed (bi-temporally:
+    invalid_at, never deleted; provenance flows by source union). `failed`
+    True is the SOFT path (the escalation precedent): the stage was due and
+    its call or write failed — the step-7 writes stand, id/absorbed stay
+    empty."""
+
+    reflection_id: UUID | None = None
+    absorbed_reflection_ids: list[UUID] = Field(default_factory=list)
+    failed: bool = False
+
+
+class ReflectInstrumentation(BaseModel):
+    """Per-stage timing + token accounting, recorded once at the seam. The
+    ENDPOINT's accounting rides here (route-passthrough); worker runs
+    persist to reflection_runs instead — the C1 endpoint/worker split.
+    Consolidation fields stay at their zero-values when the stage never
+    ran."""
+
+    reflect_ms: float
+    consolidation_ms: float = 0.0
+    insert_ms: float
+    total_ms: float
+    reflect_input_tokens: int
+    reflect_output_tokens: int
+    consolidation_input_tokens: int = 0
+    consolidation_output_tokens: int = 0
+
+
+class ReflectResult(BaseModel):
+    """The reflect verb's result (reflection.md wire contract).
+
+    The IDs+scores invariant, stated: reflect is a WRITE verb — the
+    weighted sampling draw is not the retrieval seam and produces no
+    relevance scores; `sampled_memory_ids` and each conclusion's citations
+    ride as grounding evidence, unscored by nature. `rrr` is None when the
+    agent had no prior live reflections to compare against (and when zero
+    conclusions survived — nothing to compare). Pressure is served, never
+    stored (architecture §2's runtime-state rule)."""
+
+    agent_id: UUID
+    reflections: list[ReflectionOut]
+    sampled_memory_ids: list[UUID]
+    dropped_ungrounded: int
+    rrr: float | None
+    rrr_blocked_consolidation: bool
+    consolidation: ConsolidationOut | None
+    pruned_component_ids: list[UUID]
+    evicted_cache_rows: int
+    pressure_before: float
+    pressure_after: float
+    identity_version: str
+    identity_document_new: bool
+    instrumentation: ReflectInstrumentation
+
+
+# ---------------------------------------------------------------------------
 # Read path — dialogue-init retrieval (docs\read-path.md, built rulings
 # 2026-07-14)
 # ---------------------------------------------------------------------------
