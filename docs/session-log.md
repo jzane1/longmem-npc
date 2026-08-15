@@ -1587,7 +1587,7 @@ session.
     reading it (a standing taste for public-facing prose under his name; en-dashes and
     hyphens stay). Applied throughout, mermaid labels and tables included, verified by
     character count, committed as its own follow-up. Internal registers keep their existing
-    register.
+    register. The ruling was recorded in `decisions.md` at the 2026-08-15 wrap-up.
 
 
 ---

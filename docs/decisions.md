@@ -7,9 +7,9 @@ file records what was chosen, what it beat, and why (where the rationale was rec
 
 ## Index
 
-*59 dated sections (recounted 2026-08-13 at the interim-README landing: 59 body entries, 59
-index lines, one-to-one; the prior recount was 58 at the 2026-08-12 C1 landing).
-Regenerated 2026-07-28 — the first hand-written pass mixed two
+*60 dated sections (recounted 2026-08-15 at the wrap-up sweep: 60 body entries, 60 index
+lines, one-to-one; prior recounts 59 at the 2026-08-13 interim-README landing, 58 at the
+2026-08-12 C1 landing). Regenerated 2026-07-28 — the first hand-written pass mixed two
 slug conventions and miscounted. Anchors follow GitHub's slugger: the em dash is dropped and
 its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as `#name--2026-07-28`.*
 
@@ -78,6 +78,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [typology_confidence salvage ruled — the clamp's sibling seat — 2026-08-12](#typology_confidence-salvage-ruled--the-clamps-sibling-seat--2026-08-12)
 - [Phase C1 build record — deferred writes landed — 2026-08-12](#phase-c1-build-record--deferred-writes-landed--2026-08-12)
 - [Interim public README — public ahead of Phase F — 2026-08-13](#interim-public-readme--public-ahead-of-phase-f--2026-08-13)
+- [Em-dashes banned from public-facing prose — 2026-08-13](#em-dashes-banned-from-public-facing-prose--2026-08-13)
 
 ## Primary decisions
 
@@ -3144,3 +3145,17 @@ out of it), four observes (one pinned, one authorially corrected, two aged 35 da
 init (2 write-backs, 0 drift refusals), headless Chrome →
 `docs\media\ledger-memory-chain.png` (126 KB). No floors row — no layer landed, and the
 floors count must not drift for non-layer work.
+
+## Em-dashes banned from public-facing prose — 2026-08-13
+
+*(Recorded at the 2026-08-15 wrap-up sweep.)* **Ruled (Jack, 2026-08-13, reviewing the landed
+interim README):** zero em-dashes in the README and in any public-facing document presented in
+Jack's voice — replace with colons, commas, semicolons, parentheticals, or sentence rewrites;
+en-dashes (ranges like 001–006) and hyphens stay. Applied the same day (commit `78ba346`: 49
+README lines swapped line-for-line, mermaid labels and tables included, U+2014 count verified
+0 on the staged blob). Scope boundary set by the ask ("the sentences" of the deliverable): the
+internal registers — this file, `session-log.md`, `status.md`, CLAUDE.md — keep their
+long-established em-dash register. Binds **F1's demo-time README** and any future outward doc.
+Two flagged residues left to Jack's later call: the Ledger UI's own labels (visible in the
+README screenshot's pixels; a ~10-minute restyle + recapture with the saved rig if wanted),
+and whether the ban should extend to future register entries.

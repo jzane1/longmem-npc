@@ -1,6 +1,6 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-08-13
+**Last updated:** 2026-08-15
 **Phase:** **Road to completion — Phases A, B, and C1 are DONE.** (The roadmap below,
 consolidated 2026-08-04.) The 2026-08-13 session landed **the interim public README** — the
 repo ruled public ahead of Phase F (the dated entry in `decisions.md`): README.md rewritten as
@@ -62,7 +62,11 @@ re-openable: re-verifying one is a step, never an argument against a design impr
 
 *None open.*
 
-**Recently closed** (pointers; full trail in `decisions.md`): **the C1 spec forks + the
+**Recently closed** (pointers; full trail in `decisions.md`): **the interim public README +
+the early public flip — ruled 2026-08-13** (repo public ahead of Phase F; F1's demo-time
+rewrite unchanged; the dated entry); **em-dashes banned from public-facing prose — ruled
+2026-08-13, recorded at the 2026-08-15 wrap-up** (zero U+2014 in Jack's-voice deliverables,
+F1 included; en-dashes and hyphens stay; the dated entry); **the C1 spec forks + the
 `typology_confidence` seat — all five ruled 2026-08-12 at the C1 spec** (defer-LLM-calls-only;
 supersession via chains + the one-shot scalar sanction; worker default OFF; the byte-identity
 third cause; confidence salvage); **the dialogue model — HAIKU
