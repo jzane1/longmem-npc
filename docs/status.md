@@ -12,7 +12,12 @@ consolidation bi-temporally absorbing what it summarizes, the dialogue prompt mo
 rendered document at build — the raw-seed asymmetry found in-session); component trim gains
 constraint-follows-liveness + the FOURTH sanctioned mid-scene cause (invariant text amends at
 build); RRR guards consolidation; `LONGMEM_MODEL_REFLECTION` judge-shaped. Docs only — no
-code, no migration, no floors row. **NEXT UP: the C2 build spec session, then the build.**
+code, no migration, no floors row. **The same sitting then landed the C2 BUILD SPEC** (the
+four spec forks ruled — three recommended taken; **trim criteria ruled AGAINST the
+recommendation: purely mechanical**, the three-clause rule + the 30-day window kill-switch
+knob; the dated spec entry in `decisions.md`): `reflection.md` is now the build target —
+pipeline, deterministic sampling, ten knobs, migration 007 (`reflection_runs`), the
+judge-shaped provider factory, Gherkin done-when 1–11. **NEXT UP: the C2 build session.**
 Before that, the 2026-08-13 session landed **the interim public README** — the
 repo ruled public ahead of Phase F (the dated entry in `decisions.md`): README.md rewritten as
 the public face until the demo ships (F1's full rewrite at demo time unchanged), a real-mode
@@ -73,7 +78,10 @@ re-openable: re-verifying one is a step, never an argument against a design impr
 
 *None open.*
 
-**Recently closed** (pointers; full trail in `decisions.md`): **the C2 dossier forks — all
+**Recently closed** (pointers; full trail in `decisions.md`): **the C2 spec forks — the
+four ruled 2026-08-15 at the spec sitting** (consolidation auto-threshold + override;
+trim PURELY MECHANICAL — against the recommendation, the one divergence in the C2 line;
+per-affected eviction; C# mirror at build; the dated entry); **the C2 dossier forks — all
 six + the habituation rider ruled 2026-08-15 at the dossier session** (scheduling
 composition; belief home; the identity package incl. the dialogue-seam move; trim teeth +
 the fourth sanctioned cause; the RRR guard; the judge-shaped role; the dated entry);
@@ -145,10 +153,12 @@ Ordered so shared machinery lands before its reusers.
 - **C2. Reflection** — the biggest item (design dossier → spec → build): reflective writes
   grounded in cited memory_ids, the repetition detector, periodic evidence-conditioned identity
   refresh; its model role arrives here; idle-time scheduling rides C1's machinery.
-  **Design dossier ✅ DONE 2026-08-15** (`reflection.md`; the six forks + the habituation
-  rider ruled — the dated entry in `decisions.md`). **Next: the build spec session** (the
-  settle ledger becomes spec rulings in the same file), **then the build** (Set L, the ninth
-  walker, migration 007 iff the worker's runs table).
+  **Design dossier ✅ DONE 2026-08-15; build spec ✅ DONE the same sitting**
+  (`reflection.md` is the build target; the two dated C2 entries in `decisions.md` — the
+  spec batch went three recommended + trim criteria ruled AGAINST the recommendation,
+  purely mechanical). **Next: the build session** (`app\reflection.py`, migration 007
+  `reflection_runs`, Set L, the ninth walker, touched-floor re-verifies, the
+  believability run).
 - **C3. Reflection → parameter compiler** (formed beliefs → personality knobs; the full
   modulator suite stays cut).
 - **C4. Dissonance path + diegetic-correction event** (ONE session, ruled).

@@ -7,9 +7,9 @@ file records what was chosen, what it beat, and why (where the rationale was rec
 
 ## Index
 
-*61 dated sections (recounted 2026-08-15 at the C2 dossier landing: 61 body entries, 61
-index lines, one-to-one; prior recounts 60 at the 2026-08-15 wrap-up sweep, 59 at the
-2026-08-13 interim-README landing, 58 at the 2026-08-12 C1 landing). Regenerated 2026-07-28 — the first hand-written pass mixed two
+*62 dated sections (recounted 2026-08-15 at the C2 spec landing: 62 body entries, 62
+index lines, one-to-one; prior recounts 61 at the same date's dossier landing, 60 at the
+2026-08-15 wrap-up sweep, 59 at the 2026-08-13 interim-README landing). Regenerated 2026-07-28 — the first hand-written pass mixed two
 slug conventions and miscounted. Anchors follow GitHub's slugger: the em dash is dropped and
 its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as `#name--2026-07-28`.*
 
@@ -80,6 +80,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Interim public README — public ahead of Phase F — 2026-08-13](#interim-public-readme--public-ahead-of-phase-f--2026-08-13)
 - [Em-dashes banned from public-facing prose — 2026-08-13](#em-dashes-banned-from-public-facing-prose--2026-08-13)
 - [C2 design-dossier rulings — reflection — 2026-08-15](#c2-design-dossier-rulings--reflection--2026-08-15)
+- [C2 spec rulings — reflection build target — 2026-08-15](#c2-spec-rulings--reflection-build-target--2026-08-15)
 
 ## Primary decisions
 
@@ -3270,3 +3271,67 @@ gains the ruled shape; `docs\README.md` spec-table row; `status.md`; `session-lo
 Deferred to the spec/build sessions per the dossier's settle ledger: the fourth-cause
 invariant text (CLAUDE.md + §7), §4.2's liveness mechanics, migration 007 (worker-contingent
 `reflection_runs`), knobs, wire shapes, Set L, the ninth walker.
+
+## C2 spec rulings — reflection build target — 2026-08-15
+
+**Ruled (Jack, at the C2 spec sitting — the same date and session as the dossier,
+continued at his call; the four spec forks presented with recommendations).** Three took
+the recommended option; **trim criteria was ruled AGAINST the recommendation** — the
+first non-recommended ruling in the C2 line, recorded as such. `docs\reflection.md`
+matured from DESIGN DOSSIER into the Phase C2 build target in the same file. The forks:
+
+1. **Consolidation trigger — automatic threshold + explicit override** (recommended,
+   taken). Consolidation runs when live identity-relevant reflections reach
+   `reflection_consolidate_at` (default 5.0); the request's tri-state `consolidate`
+   field forces or suppresses it per call; the RRR guard applies either way — the worker
+   gets periodic refresh for free, integrators keep manual control. **Rejected:**
+   explicit-only (the periodic-refresh promise would depend on integrator diligence, and
+   the worker could never consolidate); every-reflect (no accumulation between rewrites;
+   consolidation churn and model cost per call).
+
+2. **Trim criteria — PURELY MECHANICAL** (ruled against the recommendation; the
+   model-in-the-loop shape was presented first with its rationale and declined with its
+   cost heard). No model touches the prune decision. Spec latitude then shaped the
+   concrete rule — three clauses, all SQL + the sample list, executed by the reflect
+   verb (so §10's "reflection prunes" stays true in the scheduling sense): a live
+   component prunes iff (i) it HAS span evidence at all (zero-span components are
+   authored/provisioning content — operator intent, exempt), (ii) ALL its evidence is
+   stale (no live referencing memory's `valid_at` within
+   `reflection_trim_stale_seconds`, default 30 days), and (iii) it is NOT referenced by
+   this call's sample (active evidence never prunes — a formative old memory can sample
+   on importance while sitting outside the window). 0.0 disables the trim (the
+   kill-switch shape). Deliberately NO pinned-memory clause: pin keeps its ruled
+   exactly-two meanings. The reflect prompt carries no prune content; the model output
+   contract is conclusions-only. **Rejected:** model-proposed from mechanically-derived
+   candidates (the recommendation — judgment grounded in a mechanically-safe candidate
+   set); model-unrestricted (the confabulation shape the dossier was built to avoid).
+
+3. **Eviction scope — per-affected-memory** (recommended, taken). Trim evicts
+   `reconstruction_cache` rows only for `memory_id`s with a span matched to a pruned
+   component. **Rejected:** agent-wide (wider fourth-cause mid-scene exposure and
+   re-reconstruction cost for rows the trim never touched).
+
+4. **C# mirror at this build** (recommended, taken). `NpcMemory.Core` mirrors the
+   reflect verb + result models field-for-field; the console-harness gate extends; the
+   1:1 route-mirroring attestation keeps no exceptions. **Rejected:** a dated exemption
+   deferring to C5 (the attestation carries an exception for a phase; C5's scope grows).
+
+**Spec content recorded under standing latitude** (shapes flowing from the dossier
+rulings; no batch required): the reflect pipeline (sample → mechanical trim set → one
+model call → mechanical citation validation → RRR → the write transaction →
+threshold-gated consolidation, soft-fail); deterministic top-k sampling
+(importance-norm × the decay module's recency, ties on `memory_id` — never a lottery);
+the live-telling-head input; the ten-knob slate; migration 007 = `reflection_runs` only
+(agent-keyed, worker runs only — endpoint runs ride the response payload, the C1 split);
+the judge-shaped standalone provider factory; `sweep()` as the worker's deterministic
+no-timer entry with NO attempts ledger (pressure persistence IS the retry — the
+deliberate contrast with enrichment's budget); the pressure formula (importance mass
+since the last reflect event / `reflection_pressure_norm`, computed on demand, never
+stored); the loud-reflect / soft-consolidation degradation ladder; done-when 1–11.
+
+**Consequences propagated this sitting:** `docs\reflection.md` (banner SPECCED, the
+spec-rulings section, the mechanical-trim rework); `status.md`; `session-log.md`; this
+entry + its Index line (count 61 → 62). Architecture needed no further edit — the
+dossier sitting's §10 amendment makes no model-prune claim, so the mechanical ruling
+contradicts nothing. Everything else lands with the build per the spec's
+`[SETTLE-AT-BUILD]` ledger.

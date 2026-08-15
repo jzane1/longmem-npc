@@ -1622,6 +1622,37 @@ session.
     shared-scratch-DB limitation — and migration 007 iff the worker's `reflection_runs`
     table).
 
+- **2026-08-15 — C2 build spec: `reflection.md` matured to the build target (same sitting
+  as the dossier, at Jack's call — the session was short).**
+  - **Landed:** targeted seam reads (route idioms, `SERVICE_DEFAULTS` comment style,
+    `app\decay.py`, the session runner, provider factories, Set K's suite conventions),
+    then the full rewrite of `docs\reflection.md` into the Phase C2 build target:
+    the reflect pipeline, deterministic top-k sampling (decay-module recency ×
+    importance-norm, ties on memory_id), the pure prompt + conclusions-only output
+    contract, RRR mechanics, render/consolidation/dialogue-seam contracts, the worker
+    (`sweep()` deterministic entry; NO attempts ledger — pressure persistence is the
+    retry, the stated contrast with enrichment), the pressure formula, the degradation
+    ladder, ten knobs, migration 007 (`reflection_runs`, agent-keyed, worker runs only),
+    instrumentation/wire, the verification plan, `[SETTLE-AT-BUILD]`, done-when 1–11.
+    The four spec forks presented as one batch: **three recommended options taken; trim
+    criteria ruled AGAINST the recommendation — PURELY MECHANICAL** (the first divergence
+    in the C2 line; the concrete three-clause rule — span-evidence-only,
+    all-evidence-stale within `reflection_trim_stale_seconds`, never the current sample —
+    plus the 0.0 kill-switch and the no-pin-clause reasoning, shaped under spec latitude
+    and recorded in the dated entry).
+  - **Honest note:** the spec draft went to disk with its rulings section phrased
+    post-verdict BEFORE the batch went out — the C1 floor-verifier's "write the claim
+    after the verdict" lesson, nearly repeated. The batch followed immediately and the
+    divergent trim ruling was reworked in before anything else happened; no verdict was
+    recorded that Jack had not given, but the order was wrong and is named here so it is
+    not repeated.
+  - **Verified:** control-byte grep clean over every doc touched; decisions index
+    recounted 62/62; docs-only sitting — the Stop-hook subset is the only suite gate.
+  - **Blocked:** nothing. **Abandoned:** nothing. No floors row — no layer landed. Next:
+    the C2 build session (`app\reflection.py`, migration 007, Set L, the ninth walker,
+    the dialogue-seam + reconstruction walker re-runs, the independent floor-verify, the
+    post-landing believability run).
+
 
 ---
 
