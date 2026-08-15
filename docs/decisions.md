@@ -7,9 +7,9 @@ file records what was chosen, what it beat, and why (where the rationale was rec
 
 ## Index
 
-*60 dated sections (recounted 2026-08-15 at the wrap-up sweep: 60 body entries, 60 index
-lines, one-to-one; prior recounts 59 at the 2026-08-13 interim-README landing, 58 at the
-2026-08-12 C1 landing). Regenerated 2026-07-28 — the first hand-written pass mixed two
+*61 dated sections (recounted 2026-08-15 at the C2 dossier landing: 61 body entries, 61
+index lines, one-to-one; prior recounts 60 at the 2026-08-15 wrap-up sweep, 59 at the
+2026-08-13 interim-README landing, 58 at the 2026-08-12 C1 landing). Regenerated 2026-07-28 — the first hand-written pass mixed two
 slug conventions and miscounted. Anchors follow GitHub's slugger: the em dash is dropped and
 its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as `#name--2026-07-28`.*
 
@@ -79,6 +79,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Phase C1 build record — deferred writes landed — 2026-08-12](#phase-c1-build-record--deferred-writes-landed--2026-08-12)
 - [Interim public README — public ahead of Phase F — 2026-08-13](#interim-public-readme--public-ahead-of-phase-f--2026-08-13)
 - [Em-dashes banned from public-facing prose — 2026-08-13](#em-dashes-banned-from-public-facing-prose--2026-08-13)
+- [C2 design-dossier rulings — reflection — 2026-08-15](#c2-design-dossier-rulings--reflection--2026-08-15)
 
 ## Primary decisions
 
@@ -156,7 +157,9 @@ decay math. Async serve-verbatim-then-cache was explicitly rejected; any future 
 explicit state, never silent text mutation (within-scene text-stability invariant).
 
 **Reflection: endpoint + pressure gauge.** No scheduler; the integrator pulls the trigger. Sampling
-weighted by importance × recency, not recent-N.
+weighted by importance × recency, not recent-N. *(Amended 2026-08-15 — see "C2 design-dossier
+rulings": the endpoint and the gauge stand; an optional default-OFF `ReflectionWorker` on the C1
+lifecycle contract may pull the same seam when pressure crosses a per-agent knob threshold.)*
 
 **Scene-type parameter bundles: typed core + namespaced passthrough.** Integrator-owned scene-type
 vocabulary; unknown types log-and-continue against a default bundle; compiled params consumed only
@@ -3159,3 +3162,111 @@ long-established em-dash register. Binds **F1's demo-time README** and any futur
 Two flagged residues left to Jack's later call: the Ledger UI's own labels (visible in the
 README screenshot's pixels; a ~10-minute restyle + recapture with the saved rig if wanted),
 and whether the ban should extend to future register entries.
+
+## C2 design-dossier rulings — reflection — 2026-08-15
+
+**Ruled (Jack, at the C2 design-dossier session — the six forks presented with
+recommendations in two batches (4 + 2, the C1 rhythm); all six recommended options taken
+first pass, plus one rider).** Phase C2's first stage: the design dossier
+(`docs\reflection.md`, DESIGN banner — the same file matures into the build spec next
+session, ruled at plan approval alongside the session scope). The dossier consolidates
+architecture §10, the standing rulings, the banked research findings (FINDINGS #4),
+migration 001's dormant `reflections` table, and C1's worker machinery. The forks:
+
+1. **Scheduling composes: endpoint + optional worker, default OFF.** The reflect endpoint
+   stays the verb (`POST /v1/agents/{agent_id}/reflect`); an optional sibling
+   `ReflectionWorker` on C1's exact lifecycle contract (both construction sites, stop before
+   pool close, catch-log-continue, a deterministic no-timer test entry) pulls the same
+   internal seam when reflection pressure crosses a per-agent knob threshold
+   (`reflection_worker_enabled` lands at 0.0 — kill-switch semantics, the
+   `deferred_writes_enabled` precedent). §10's "no scheduler" and the roadmap's "idle-time
+   scheduling rides C1's machinery" compose rather than conflict: the endpoint is the verb,
+   the gauge is the evidence, the worker is optional automation of the same pull; §10 and
+   the primary register entry carry the amendment. **Rejected:** endpoint-only (contradicts
+   the roadmap line and C1's recorded "C2 would have no machinery to ride" rationale);
+   worker-only (overturns the standing endpoint ruling and removes integrator control); a
+   generic jobs table with work types (a migration-006-rewrite-shaped change to a verified
+   floor — the enrichment queue is memory_id-keyed and structurally cannot host agent-scoped
+   jobs; pays off only if a third background work type ever arrives).
+
+2. **Reflective content lives in the `reflections` table — the sole durable home.** A
+   reflection is an identity ingredient + C3 feedstock, not a retrievable memory:
+   identity-relevant rows reach prompts through the rendered document; the rest wait for
+   C3 (runtime-inert until then — the option's stated cost, accepted). Citations land in
+   the existing `source_memory_ids` (provenance-only, deliberately un-FK'd); supersession
+   by the ordinary bi-temporal verb (the C3 eviction contract); retrieval untouched — zero
+   code changes, so the post-landing believability compare isolates the identity channel.
+   **Rejected:** `memories` rows with `typology='reflected'` (the CHECK admits it — genuine
+   schema-now evidence, weighed, not strawmanned — but `memories` has no citation column,
+   §5's write-path obligations cascade onto belief text, purge semantics fork, and the
+   `reflections` table stays a census corpse); dual-write (two homes for one content; the
+   purge divergence — the memories twin purgeable, the reflections twin surviving).
+   Retrieval-visible beliefs, if ever wanted, are a separate later ruling.
+
+3. **Identity refresh: model-free render + LLM consolidation + the dialogue seam moves —
+   ruled as a package.** (i) `render_identity_document` extends concatenatively — seed
+   prose + live identity-relevant reflections, deterministic, non-LLM; the scene-edge
+   recompile stays fast and the version hash stays reproducible. (ii) The periodic
+   evidence-conditioned refresh is a consolidation product of reflection itself: an LLM
+   rewrite conditioned on the prior document + the live identity-relevant reflections + the
+   immutable seed lands as a NEW identity-relevant reflection that bi-temporally absorbs
+   the rows it consolidates — `identity_documents` gains rows never mutations,
+   `agents.seed_identity` is never touched. (iii) The dialogue prose prompt moves off raw
+   `state.seed_identity` (`app\dialogue.py:311-315` — the asymmetry found this session:
+   reconstruction reads the rendered document, dialogue reads the raw column) onto the
+   rendered document fetched by the caller-frozen `identity_version` the request already
+   carries; without this, NPC speech would never see a reflection. Parity contract: zero
+   reflections ⇒ renders byte-identical to today ⇒ existing floors hold; the dialogue-seam
+   floors re-verify at build (a step, not a cost). **Rejected:** LLM-render-at-scene-edge
+   (a model call in the boundary heartbeat; a non-deterministic version);
+   refresh-as-mutation of seed or document rows (violates non-destructive storage);
+   dialogue staying on raw seed (a permanent speech/reconstruction identity split).
+
+4. **Component trim gets teeth, and its eviction is the FOURTH sanctioned cause.**
+   (i) Constraint-follows-liveness: reconstruction's gist constraint drops spans whose
+   `matched_component_id` is invalidated. Found this session:
+   `fetch_reconstruction_sources` reads spans with no liveness join (`app\db.py:916-923`),
+   so a trim would currently remove nothing at the reconstruction seam and §4.2's "sole
+   mechanism that removes a durable fact" would be mechanically vacuous; the gate side
+   already follows liveness (`fetch_live_components`). (ii) Reflection-driven cache
+   eviction becomes the fourth sanctioned cause of mid-scene text change (the C1 amendment
+   pattern; the CLAUDE.md/architecture §7 invariant text amends WITH the build, when the
+   mechanism exists), with integrator guidance: reflect at scene edges and the window
+   vanishes. Eviction scope (per-affected-memory vs agent-wide) is spec latitude.
+   **Rejected:** scene-boundary-only (unenforceable — scene state is caller-held by ruled
+   design; no server-side scene registry; the worker cannot see scenes);
+   trim-without-eviction (stale caches keep serving the trimmed fact);
+   no-liveness-filter (the trim stays a no-op on tellings).
+
+5. **The repetition detector is a GUARD, not telemetry.** RRR (SequenceMatcher similarity
+   against the agent's recent live reflections; threshold knob, paper default 0.85;
+   non-LLM) is always recorded in instrumentation; at/above threshold the new reflection
+   still stores (honest evidence of the agent's state) but the identity-consolidation step
+   is blocked and flagged — the "staleness check before an identity revision is trusted."
+   Boundary stated in the dossier: RRR is self-repetition among the agent's own
+   reflections; the cut automatic conflict/staleness detection (cross-memory, write-time)
+   stays cut. **Rejected:** log-only (the measured failure mode — a stale belief
+   reinforced into identity — ships unguarded).
+
+6. **`LONGMEM_MODEL_REFLECTION` takes the judge shape.** Loaded in both modes, required by
+   neither at startup; a standalone `build_reflection_provider` factory raises
+   `ConfigError` at the first real reflect call without it. Reflection ships default-OFF
+   and endpoint-pulled, so every existing real-mode `.env` keeps loading; the Set I
+   load-rule pins amend for the new role's shape rather than break. Haiku-class per the
+   ruled slate; pricing rows + the full add-a-role checklist run at build. **Rejected:**
+   seventh-required (breaks every current real-mode `.env` for a verb many integrators
+   never call; cuts against the logic the judge precedent established).
+
+**Rider (same session):** architecture.md's stale habituation wording (the §2 knob list
+and §8's "Habituation guards" line still read as live though habituation was cut
+2026-08-04) — ruled ANNOTATE NOW: cut-parentheticals at both spots, the design text
+otherwise untouched.
+
+**Consequences propagated this session (docs only — no code, no migration, no tests, no
+floors row):** `docs\reflection.md` finalized to the rulings; `architecture.md` §10
+rewritten to the ruled composition + the §3 role-shape parenthetical + the two habituation
+annotations; the primary register entry's amendment note (above); CLAUDE.md's role sentence
+gains the ruled shape; `docs\README.md` spec-table row; `status.md`; `session-log.md`.
+Deferred to the spec/build sessions per the dossier's settle ledger: the fourth-cause
+invariant text (CLAUDE.md + §7), §4.2's liveness mechanics, migration 007 (worker-contingent
+`reflection_runs`), knobs, wire shapes, Set L, the ninth walker.

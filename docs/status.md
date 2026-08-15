@@ -1,8 +1,19 @@
 # longmem-npc — Status
 
 **Last updated:** 2026-08-15
-**Phase:** **Road to completion — Phases A, B, and C1 are DONE.** (The roadmap below,
-consolidated 2026-08-04.) The 2026-08-13 session landed **the interim public README** — the
+**Phase:** **Road to completion — Phases A, B, and C1 are DONE; C2 is IN FLIGHT (dossier
+landed).** (The roadmap below, consolidated 2026-08-04.) The second 2026-08-15 session landed
+**the C2 reflection design dossier** (`docs\reflection.md` — the same file matures into the
+build spec): the six design forks + the habituation-wording rider all ruled (recommended
+options taken first pass; the dated C2 entry in `decisions.md`) — scheduling composes
+endpoint + optional default-OFF `ReflectionWorker`; beliefs live in the dormant-since-001
+`reflections` table (retrieval untouched); the identity package (model-free render, LLM
+consolidation bi-temporally absorbing what it summarizes, the dialogue prompt moves onto the
+rendered document at build — the raw-seed asymmetry found in-session); component trim gains
+constraint-follows-liveness + the FOURTH sanctioned mid-scene cause (invariant text amends at
+build); RRR guards consolidation; `LONGMEM_MODEL_REFLECTION` judge-shaped. Docs only — no
+code, no migration, no floors row. **NEXT UP: the C2 build spec session, then the build.**
+Before that, the 2026-08-13 session landed **the interim public README** — the
 repo ruled public ahead of Phase F (the dated entry in `decisions.md`): README.md rewritten as
 the public face until the demo ships (F1's full rewrite at demo time unchanged), a real-mode
 Ledger screenshot at `docs\media\ledger-memory-chain.png`, chain deep-links + an
@@ -16,7 +27,7 @@ OFF), the un-enriched-window contract (zero retrieval changes), suite Set K (13 
 108 total / 94-subset), and the eighth walker (`verify_deferred_writes.py`, 51/51) — the
 write-path walker's 53/53 byte-untouched is the deferred-OFF parity proof. Two invariants
 carry dated amendments (the one-shot completion carve-out; byte-identity's third sanctioned
-cause). **NEXT UP: PHASE C2 (reflection — design dossier → spec → build).**
+cause).
 Earlier the same day: the full measurement line ran under the gold-label workaround ruling,
 and both queued rulings RESOLVED on the delivered data (R7 → topic guard; dialogue model →
 HAIKU stands, latency rules), plus the typology clamp (ruled + built; the dated entries in
@@ -62,7 +73,11 @@ re-openable: re-verifying one is a step, never an argument against a design impr
 
 *None open.*
 
-**Recently closed** (pointers; full trail in `decisions.md`): **the interim public README +
+**Recently closed** (pointers; full trail in `decisions.md`): **the C2 dossier forks — all
+six + the habituation rider ruled 2026-08-15 at the dossier session** (scheduling
+composition; belief home; the identity package incl. the dialogue-seam move; trim teeth +
+the fourth sanctioned cause; the RRR guard; the judge-shaped role; the dated entry);
+**the interim public README +
 the early public flip — ruled 2026-08-13** (repo public ahead of Phase F; F1's demo-time
 rewrite unchanged; the dated entry); **em-dashes banned from public-facing prose — ruled
 2026-08-13, recorded at the 2026-08-15 wrap-up** (zero U+2014 in Jack's-voice deliverables,
@@ -130,6 +145,10 @@ Ordered so shared machinery lands before its reusers.
 - **C2. Reflection** — the biggest item (design dossier → spec → build): reflective writes
   grounded in cited memory_ids, the repetition detector, periodic evidence-conditioned identity
   refresh; its model role arrives here; idle-time scheduling rides C1's machinery.
+  **Design dossier ✅ DONE 2026-08-15** (`reflection.md`; the six forks + the habituation
+  rider ruled — the dated entry in `decisions.md`). **Next: the build spec session** (the
+  settle ledger becomes spec rulings in the same file), **then the build** (Set L, the ninth
+  walker, migration 007 iff the worker's runs table).
 - **C3. Reflection → parameter compiler** (formed beliefs → personality knobs; the full
   modulator suite stays cut).
 - **C4. Dissonance path + diegetic-correction event** (ONE session, ruled).

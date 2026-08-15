@@ -1589,6 +1589,39 @@ session.
     character count, committed as its own follow-up. Internal registers keep their existing
     register. The ruling was recorded in `decisions.md` at the 2026-08-15 wrap-up.
 
+- **2026-08-15 — C2 design dossier: reflection's six forks ruled (second session this date).**
+  - **Landed:** the session target ruled at plan approval (dossier + in-session fork rulings;
+    one file, `docs\reflection.md`, maturing into the build spec). The dossier written in
+    house style — the ruled shape collected (twelve standing items + two leaned-on facts),
+    eight design areas, the scope boundary against the cut list, the C3 contract, a
+    contradictions register, the verification preview, the settle ledger. The six forks
+    presented in two batches (4 + 2, the C1 rhythm) — **Jack took all six recommended
+    options first pass**: (1) scheduling composes — the endpoint stays the verb, an optional
+    sibling `ReflectionWorker` on C1's lifecycle contract, default OFF, pressure-thresholded;
+    (2) beliefs live in the dormant-since-001 `reflections` table only — retrieval untouched,
+    citations in the existing `source_memory_ids`; (3) the identity package — model-free
+    concatenative render, LLM consolidation landing as a new reflection that bi-temporally
+    absorbs what it summarizes, and the dialogue prompt moves onto the rendered document
+    (the raw-seed asymmetry found this session at `app\dialogue.py:311` — without the move,
+    NPC speech would never see a reflection); (4) component trim gains
+    constraint-follows-liveness (found: `fetch_reconstruction_sources` reads spans with no
+    liveness join, `app\db.py:916-923`, so a trim would remove nothing today) + its eviction
+    ruled the FOURTH sanctioned mid-scene cause (invariant text amends with the build);
+    (5) RRR is a guard on identity consolidation, not telemetry; (6) `LONGMEM_MODEL_REFLECTION`
+    judge-shaped. Rider ruled the same session: the stale habituation wording annotated in
+    architecture §2/§8 (cut 2026-08-04). Propagated: the dated `decisions.md` entry (+ index
+    line, count 60 → 61, and the amendment note on the primary "endpoint + pressure gauge"
+    entry), architecture §10 rewritten to the ruled composition + the §3 role parenthetical,
+    CLAUDE.md's role sentence, `docs\README.md` spec-table row, `status.md`, this entry.
+  - **Verified:** control-byte grep clean over the new doc (the standing scripted-write trap
+    — not triggered, checked anyway); decisions index recounted 61/61; docs-only session, so
+    the Stop-hook subset is the only suite gate.
+  - **Blocked:** nothing. **Abandoned:** nothing. No floors row — no layer landed. Next: the
+    C2 build spec session turns the dossier's settle ledger into spec rulings in the same
+    file, then the build (Set L, the ninth walker — which inherits the walkers' carried
+    shared-scratch-DB limitation — and migration 007 iff the worker's `reflection_runs`
+    table).
+
 
 ---
 

@@ -44,7 +44,8 @@ memory can drift and be defended, while the ground-truth record underneath never
   2026-07-17; the 2026-07-14 reconstruction re-slating is the pull-forward template).
 - **Integrator-defined vocabulary everywhere.** Observation phase tags, diagnosticity goal,
   context-match weights, scene-type vocabulary, model roles, rigidity, prose-view weights,
-  decay knobs, drift threshold, habituation cap/decay — none is ever hardcoded.
+  decay knobs, drift threshold, habituation cap/decay *(habituation cut 2026-08-04 —
+  annotated at the C2 dossier, 2026-08-15)* — none is ever hardcoded.
   Violating this anywhere makes the config surface incoherent. *(The action vocabulary and
   reputation sensitivity left the surface with the A1 re-shape, 2026-08-04.)*
 - **Instrument at the seam, not after.** Timing and token accounting are added to each layer as that
@@ -100,7 +101,9 @@ One honest limit on "each upgrades independently" *(corrected 2026-07-28 — the
 previously over-claimed)*: v1 serves importance + render + typology from **one** write call, so
 those three vars must name the same model (`load_settings` raises rather than silently picking one
 — a documented v1 limitation, not a design position). Reflection's var arrives
-with reflection. The retrieval gate is **non-LLM** — there is no gate model and no gate env var.
+with reflection *(shape ruled 2026-08-15 at the C2 dossier: `LONGMEM_MODEL_REFLECTION`,
+judge-shaped — loaded both modes, required by neither, loud at the first real reflect call;
+`reflection.md` fork 6)*. The retrieval gate is **non-LLM** — there is no gate model and no gate env var.
 
 **Embeddings.** OpenAI `text-embedding-3-small` at 1536 dimensions; the column dimension is locked.
 The same model embeds location names/descriptions and gate-time utterances.
@@ -363,6 +366,8 @@ crystallizes — "the story has set"). On-camera demo artifact: one memory drift
 (0.5 pushover → 2.0 zealot). "I saw it" resists harder than "I heard it," on both sides of a clash.
 Either way **the store records the truth**; the fork only shapes the character's reaction.
 Habituation guards for the future context term: **both a cap and a decay**, as integrator knobs.
+*(Habituation was cut from scope 2026-08-04 — these guards are not arriving; annotated at the C2
+dossier, 2026-08-15.)*
 
 **Two correction verbs, semantically distinct:**
 - **Authorial** (operator fixes wrong data): **replace model (ruled 2026-07-12)** — supersedes the
@@ -434,15 +439,27 @@ among gate-fetched items on gated turns; `dialogue_view` reports the weighted ra
 cases. The turn result carries `items` (the raw retrieval echo — the IDs+scores invariant)
 beside `dialogue_view` (the weight-ranked view the prompt was built from).
 
-## 10. Reflection & parameter bundles (mechanism sequenced later — see `status.md`)
+## 10. Reflection & parameter bundles (design ruled 2026-08-15 — `reflection.md`; the C2 build is next)
 
-Reflection is an **endpoint** (the verb) — no scheduler. The store exposes **reflection pressure as
-a readable gauge** and the integrator pulls the trigger. Sampling: episodes weighted by
-**importance × recency** (the existing diagnosticity axis), not recent-N.
+Reflection is an **endpoint** (the verb) — `POST /v1/agents/{agent_id}/reflect`,
+integrator-pulled — plus, ruled 2026-08-15 (the C2 dossier, fork 1), an **optional sibling
+`ReflectionWorker`** on the C1 lifecycle contract, **default OFF**, pulling the same internal
+seam when **reflection pressure** (a computed, never-stored gauge — §2's runtime-state rule)
+crosses a per-agent knob threshold. The store exposes the gauge; the integrator — or the
+opted-in worker — pulls the trigger. Sampling: episodes weighted by **importance × recency**
+(the existing diagnosticity axis), not recent-N; the sampled text is the live telling head.
 
-Reflection revises the **seed identity** (which lives in Postgres); identity-relevant changes flow
-into the rendered identity document and bump `identity_version` via content hash. Reflection also
-**prunes the identity components table** (silent cache invalidation).
+Reflection writes formed beliefs to the **`reflections` table** — the sole durable home
+(fork 2; citations in `source_memory_ids`) — never into retrieval. The **seed stays
+immutable**: identity-relevant reflections join the rendered identity document via a
+model-free concatenative render, and the periodic evidence-conditioned refresh is an LLM
+**consolidation reflection** that bi-temporally absorbs the rows it summarizes (fork 3;
+`identity_documents` gains rows, never mutations; at build the dialogue prompt moves onto the
+rendered document). `identity_version` bumps via content hash exactly as always. Reflection
+also **prunes the identity components table** (silent cache invalidation) — at build the gist
+constraint follows component liveness and reflection-driven eviction becomes the **fourth
+sanctioned mid-scene text-change cause** (fork 4). A non-LLM RRR repetition guard gates the
+identity consolidation (fork 5).
 
 **Parameter compiler (later):** one call per (reflection × scene-type), cached. Bundle = a fixed
 **typed core** (retrieval-weight multipliers, action-set biases, stance priors; typed and clamped)

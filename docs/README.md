@@ -66,6 +66,7 @@ spec is no longer a plan.
 | `unity-client.md` | SSE + provisioning + inspector reads, C# client, Unity, Ledger | — |
 | `eval-harness.md` | judged eval harness: judge-free metrics + metrics route (stage 1); runner, judge, ablation (stages 2–4) | — |
 | `deferred-writes.md` | deferred write processing: the pending window, the enrichment worker, the completion contract | 006 |
+| `reflection.md` | reflection (C2): the design dossier — formed beliefs cited to memories, identity refresh + consolidation, component trim; forks ruled 2026-08-15, the build spec matures in this same file next | — |
 
 **Note on `migration-01.md`:** it documents migration **001 only**. Migrations 002–006 (fact
 versions, fact entities, the lexical index, `escalation_failed`, deferred writes) are specced in
