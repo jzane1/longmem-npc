@@ -352,6 +352,14 @@ namespace NpcMemory
 
         public int GateFruitlessStreak { get; set; }
         public WeightOverrides? WeightOverrides { get; set; }
+
+        /// <summary>The compiled-parameter scene type (C3, 2026-08-17):
+        /// selects which compiled bundles multiply the prose-view weights.
+        /// null = the reserved default type; an unconfigured value
+        /// log-and-continues against the default server-side (flagged in
+        /// the instrumentation echo).</summary>
+        public string? SceneType { get; set; }
+
         public bool Debug { get; set; }
     }
 
@@ -370,6 +378,19 @@ namespace NpcMemory
         public double FirstWordMs { get; set; }
         public double ProseStreamMs { get; set; }
         public double PerceivedFirstWordMs { get; set; }
+
+        // Parameter-compiler consume terms (C3, 2026-08-17): the composed
+        // multiplier products applied over the resolved weights — all 1.0
+        // with zero bundles (the parity contract) — plus the resolved scene
+        // type, its unknown flag, the contributing beliefs in window order,
+        // and the consume read's per-turn cost.
+        public string SceneTypeResolved { get; set; } = "default";
+        public bool SceneTypeUnknown { get; set; }
+        public double BundleWRelevance { get; set; } = 1.0;
+        public double BundleWRecency { get; set; } = 1.0;
+        public double BundleWImportance { get; set; } = 1.0;
+        public List<Guid> BundleReflectionIds { get; set; } = new List<Guid>();
+        public double BundleFetchMs { get; set; }
     }
 
     public sealed class DialogueTurnResult

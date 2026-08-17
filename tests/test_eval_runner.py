@@ -233,7 +233,7 @@ def test_provision_drop_roundtrip(suite_env):
         uri = provision_scratch(base, name)
         with psycopg.connect(uri, connect_timeout=3) as conn:
             applied = conn.execute("SELECT count(*) FROM schema_migrations").fetchone()
-        assert applied[0] == 7  # 001-007 (007: reflection runs, 2026-08-15)
+        assert applied[0] == 8  # 001-008 (008: parameter compiler, 2026-08-17)
         drop_scratch(base, name)
         admin = scratch_uri(base, "postgres")
         with psycopg.connect(admin, connect_timeout=3, autocommit=True) as conn:
@@ -405,6 +405,13 @@ async def _assert_no_eval_rows(ctx):
     )
     assert [t[0] for t in tables] == [
         "agents",
+        # 008 (parameter compiler, 2026-08-17) added the bundle + run-log
+        # tables — the same mechanical census bump ('compiled' sorts before
+        # 'compiler' at char 8, both before 'corrections'; confirmed on the
+        # migrated scratch). The no-eval-rows claim this helper asserts is
+        # untouched by 008.
+        "compiled_bundles",
+        "compiler_runs",
         "corrections",
         "identity_components",
         "identity_documents",

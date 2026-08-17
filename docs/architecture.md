@@ -103,7 +103,10 @@ those three vars must name the same model (`load_settings` raises rather than si
 — a documented v1 limitation, not a design position). Reflection's var arrives
 with reflection *(shape ruled 2026-08-15 at the C2 dossier: `LONGMEM_MODEL_REFLECTION`,
 judge-shaped — loaded both modes, required by neither, loud at the first real reflect call;
-`reflection.md` fork 6)*. The retrieval gate is **non-LLM** — there is no gate model and no gate env var.
+`reflection.md` fork 6)*. The compiler's var landed with C3 *(2026-08-17:
+`LONGMEM_MODEL_COMPILER`, the THIRD judge-shaped var — the same contract, loud at the
+worker's first real compile; C3 has no endpoint, so that call is always the worker's —
+`parameter-compiler.md`)*. The retrieval gate is **non-LLM** — there is no gate model and no gate env var.
 
 **Embeddings.** OpenAI `text-embedding-3-small` at 1536 dimensions; the column dimension is locked.
 The same model embeds location names/descriptions and gate-time utterances.
@@ -442,7 +445,7 @@ among gate-fetched items on gated turns; `dialogue_view` reports the weighted ra
 cases. The turn result carries `items` (the raw retrieval echo — the IDs+scores invariant)
 beside `dialogue_view` (the weight-ranked view the prompt was built from).
 
-## 10. Reflection & parameter bundles (design ruled 2026-08-15 — `reflection.md`; reflection BUILT the same date, the C3 compiler still later)
+## 10. Reflection & parameter bundles (design ruled 2026-08-15 — `reflection.md`; reflection BUILT the same date, the C3 compiler BUILT 2026-08-17 — `parameter-compiler.md`)
 
 Reflection is an **endpoint** (the verb) — `POST /v1/agents/{agent_id}/reflect`,
 integrator-pulled — plus, ruled 2026-08-15 (the C2 dossier, fork 1), an **optional sibling
@@ -466,12 +469,29 @@ text-change cause** (fork 4; §7's writer list). A non-LLM RRR repetition guard 
 identity consolidation (fork 5). All of it landed 2026-08-15 (`app\reflection.py`; migration
 007 `reflection_runs`; the worker default OFF per agent).
 
-**Parameter compiler (later):** one call per (reflection × scene-type), cached. Bundle = a fixed
-**typed core** (retrieval-weight multipliers, action-set biases, stance priors; typed and clamped)
-+ **namespaced passthrough**. Scene-type vocabulary is integrator-owned; unknown types
-log-and-continue against a default bundle. Compiled params are consumed **only upstream of the
-dialogue call** — the dialogue call sees only their consequences. Bi-temporal reflection
-invalidation doubles as compiler-cache eviction.
+**Parameter compiler (BUILT 2026-08-17 — `parameter-compiler.md`; the seven C3 rulings in
+`decisions.md`):** one call per (reflection × scene-type), cached in the append-only
+`compiled_bundles` table (migration 008) — bundle liveness is DERIVED by joining the source
+reflection's `invalid_at`, so bi-temporal reflection invalidation doubles as compiler-cache
+eviction with zero bundle writes. Bundle = the fixed **typed core** — multipliers on the three
+prose-view weights (relevance/recency/importance), clamped [0.25, 4.0] at write and re-clamped
+at consume (module constants, mirrored by the migration CHECK) — plus **namespaced
+passthrough** (stored, never interpreted server-side; C5's agent-state read is the recorded
+future surface). *(The founding wording's "action-set biases" died with the A1 action-side
+scrap 2026-08-04, and "stance priors" folded into the passthrough — corrected here with the
+build; ruling 2.)* Scene-type vocabulary is integrator-owned (`agents.config` `scene_types`;
+the reserved `default` always compiles); unknown types log-and-continue against the default
+bundle, flagged in instrumentation. Compiled params are consumed **only upstream of the
+dialogue call** — the composed per-axis products multiply the resolved weights before the
+§9 re-rank; membership never changes, and a bundle-free turn is byte-identical to the pre-C3
+seam (walker-asserted parity; no §7 amendment — ordering, never stored text). Scheduling is
+the standalone **`CompilerWorker`** — the third background worker on the C1/C2 lifecycle
+contract, default OFF per agent, **no endpoint and no route by ruling**; work discovery is
+stateless SQL (the missing-pair join, the pressure-gauge precedent), and the generic jobs
+table was surfaced with its real cost and declined as its own later task. The staleness guard
+is all-mechanical — the K-window (`compiler_window_k`) enforced at discovery AND consume,
+liveness-by-join, hard clamps — the downstream half of the ExpeL caution whose upstream half
+is C2's RRR.
 
 ## 11. Instrumentation & load driver
 
@@ -496,21 +516,27 @@ invalidation doubles as compiler-cache eviction.
 
 ## 12. Integrator surface requirements
 
-**The shipped HTTP surface** *(twelve routes; five landed 2026-07-23 and 2026-07-27 —
-`unity-client.md`; the metric read 2026-07-29 — `eval-harness.md`)*: `POST /v1/events/observe`,
+**The shipped HTTP surface** *(thirteen routes; five landed 2026-07-23 and 2026-07-27 —
+`unity-client.md`; the metric read 2026-07-29 — `eval-harness.md`; the reflect verb
+2026-08-15 — `reflection.md`; this paragraph still said "twelve" and omitted reflect until
+2026-08-17, a C2 propagation miss corrected at the C3 build — C3 itself adds NO route by
+ruling)*: `POST /v1/events/observe`,
 `POST /v1/events/scene-boundary`,
 `PUT /v1/memories/{id}/pin`, `POST /v1/memories/{id}/correction`, `POST /v1/dialogue/init`,
 **`POST /v1/dialogue/turn`** (stateless — all scene state rides the request; the runner bookkeeping
 is the client's job), **`POST /v1/dialogue/turn/stream`** (its SSE twin, iterating the SAME
 async-generator seam — `chunk` / `reconstructing` / `result` / `error` events), **`POST /v1/agents`**
-(provisioning; UUID minted server-side), the two **inspector reads** (§6),
+(provisioning; UUID minted server-side), **`POST /v1/agents/{id}/reflect`** (the reflect verb),
+the two **inspector reads** (§6),
 **`GET /v1/memories/{id}/reconstruction-metrics`** (the judge-free metric read, §6), and
 **`GET /ledger`** (the static browser inspector, served BY the API so it shares the origin of the
 routes it polls — no CORS surface, no second server).
 
 **The client package** *(built 2026-07-27)*: `client\NpcMemory.Core` — netstandard2.1,
 engine-agnostic (**zero `UnityEngine` types** by ruling), one flat `NpcMemoryClient` covering all
-eleven verbs 1:1 *(the metrics read joined 2026-07-29)*, plus `NpcSession`, the C# port of the
+twelve verbs 1:1 *(the metrics read joined 2026-07-29; the reflect verb 2026-08-15 — "eleven"
+stood stale here until the 2026-08-17 correction; C3 adds no verb, its scene_type rides the
+turn request)*, plus `NpcSession`, the C# port of the
 Python runner's turn bookkeeping. Unity gets a
 thin MonoBehaviour adapter over it; a `dotnet run` console harness plays every demo beat headless.
 

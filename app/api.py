@@ -23,6 +23,7 @@ from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, StreamingResponse
 
+from app.compiler import CompilerWorker
 from app.config import load_settings
 from app.db import build_pool
 from app.deferred import DeferredWriteWorker
@@ -98,9 +99,16 @@ async def _lifespan(app: FastAPI):
     app.state.reflection = ReflectionService(pool, providers, settings)
     app.state.reflection_worker = ReflectionWorker(pool, providers, settings)
     app.state.reflection_worker.start()
+    # The parameter-compiler worker (parameter-compiler.md, ruled
+    # 2026-08-17): the same lifecycle contract, and C3's ONLY scheduler —
+    # no compile route exists. The per-agent compiler_worker_enabled knob
+    # (default 0.0) gates the component entirely.
+    app.state.compiler_worker = CompilerWorker(pool, providers, settings)
+    app.state.compiler_worker.start()
     try:
         yield
     finally:
+        await app.state.compiler_worker.stop()
         await app.state.reflection_worker.stop()
         await app.state.deferred.stop()
         await pool.close()

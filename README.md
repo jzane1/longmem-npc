@@ -181,8 +181,9 @@ NLP load.
 
 - **Not a hosted service.** No auth, no rate limiting; the API binds `127.0.0.1:8000`. It runs
   next to your game, on your machine.
-- **Not finished.** Reflection isn't built; the purge endpoint is a documented contract without
-  a handler; the deferred-write worker ships default OFF.
+- **Not finished.** The purge endpoint is a documented contract without a handler, and the
+  three background workers (deferred writes, reflection, the parameter compiler) ship
+  default OFF until the tuning pass turns them on.
 - **Not optimized.** The dedicated latency pass (reconstruction pre-warm, prompt caching,
   concurrency caps) hasn't happened; today's numbers are the floor, not the ceiling.
 - **Not platform-neutral in its docs.** Setup is written Windows/PowerShell-first and assumes a
@@ -191,11 +192,12 @@ NLP load.
 
 ## What's next
 
-In order: reflection (evidence-cited beliefs, a repetition detector, periodic identity
-refresh), compiling formed beliefs into personality parameters, dissonance-driven defense of
-corrected memories, client-contract completion, the purge endpoint, then the latency pass.
-After that: the demo video, a Unity package, and one-command backend spin-up, at which point
-this README gets rebuilt around the demo.
+Reflection (evidence-cited beliefs, a repetition detector, periodic identity refresh) and the
+parameter compiler (formed beliefs compiled into per-scene personality weights) are now
+built. In order from here: dissonance-driven defense of corrected memories, client-contract
+completion, the purge endpoint, then the latency pass. After that: the demo video, a Unity
+package, and one-command backend spin-up, at which point this README gets rebuilt around the
+demo.
 
 ## Repository layout
 

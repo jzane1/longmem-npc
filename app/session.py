@@ -36,6 +36,7 @@ from uuid import UUID
 from psycopg_pool import AsyncConnectionPool
 
 from app import db, identity
+from app.compiler import CompilerWorker
 from app.config import Settings, load_settings
 from app.db import build_pool
 from app.deferred import DeferredWriteWorker
@@ -77,6 +78,7 @@ class SessionRunner:
         deferred: DeferredWriteWorker | None = None,
         reflection: ReflectionService | None = None,
         reflection_worker: ReflectionWorker | None = None,
+        compiler_worker: CompilerWorker | None = None,
     ):
         self._pool = pool
         self._owns_pool = owns_pool
@@ -94,9 +96,20 @@ class SessionRunner:
         # the per-agent kill-switch (default 0.0) gates its auto-pull only.
         self._reflection = reflection
         self.reflection_worker = reflection_worker
+        # The parameter-compiler worker (parameter-compiler.md, 2026-08-17):
+        # the second construction site of the C1/C2 lifecycle contract, and
+        # C3's ONLY scheduler (no endpoint by ruling).
+        # `compiler_worker.sweep()` is the walkers' and `:compile`'s
+        # deterministic entry; the per-agent kill-switch (default 0.0) gates
+        # the component entirely.
+        self.compiler_worker = compiler_worker
         self.agent_id = agent_id
         self.phase_tag = phase_tag  # passthrough label on observe events
         self.identity_version: str | None = None  # frozen at scene boundaries
+        # The session's scene type (C3): set by scene(<type>), cleared by a
+        # bare scene(); rides every turn request so compiled bundles for the
+        # current scene's type multiply the prose-view weights.
+        self.scene_type: str | None = None
         self.scene_started_at: datetime | None = None  # the scene basis
         self.as_of: datetime | None = None  # session time-travel override
         self.debug: bool = False  # rendering hint; inert to the seams
@@ -154,6 +167,8 @@ class SessionRunner:
         reflection = ReflectionService(pool, providers, settings)
         reflection_worker = ReflectionWorker(pool, providers, settings)
         reflection_worker.start()
+        compiler_worker = CompilerWorker(pool, providers, settings)
+        compiler_worker.start()
         runner = cls(
             pool=pool,
             owns_pool=owns_pool,
@@ -165,6 +180,7 @@ class SessionRunner:
             deferred=deferred,
             reflection=reflection,
             reflection_worker=reflection_worker,
+            compiler_worker=compiler_worker,
         )
         # Session start is an implicit scene start: verify the agent loudly,
         # freeze the identity version (ensured directly — no boundary event is
@@ -207,6 +223,7 @@ class SessionRunner:
             loaded_memory_ids=self.loaded_memory_ids,
             gate_fruitless_streak=self.gate_fruitless_streak,
             weight_overrides=weight_overrides,
+            scene_type=self.scene_type,
             debug=self.debug,
         )
         async for item in self._dialogue.run_dialogue_turn(
@@ -280,7 +297,10 @@ class SessionRunner:
         """Scene boundary: emit the event (whose handler recompiles the
         identity document server-side and returns its version), then refresh
         the frozen scene state — the next scene sees the current identity
-        version and a new basis; within the ending scene neither moved."""
+        version and a new basis; within the ending scene neither moved.
+        Since C3 the type ALSO becomes session state: it rides every
+        subsequent turn so the new scene's compiled bundles apply (a bare
+        boundary clears it back to the default)."""
         result = await self._ingest.scene_boundary(
             SceneBoundaryEvent(
                 agent_id=self.agent_id,
@@ -290,6 +310,7 @@ class SessionRunner:
         )
         self.identity_version = result.identity_version
         self.scene_started_at = self._now()
+        self.scene_type = scene_type
         # Gate scene reset (caller-side only): next turn is a loader; the
         # damper's suppression dies with the scene.
         self.loaded_memory_ids = None
@@ -329,7 +350,18 @@ class SessionRunner:
             ReflectRequest(client_timestamp=self._now(), consolidate=consolidate),
         )
 
+    async def compile(self) -> int:
+        """One deterministic compile sweep (the REPL's `:compile`; the
+        walkers' entry beside it). Sweep semantics by ruling: the per-agent
+        kill-switch is honored, so an unconfigured agent is a visible
+        no-op — the returned attempt count says so."""
+        if self.compiler_worker is None:
+            raise RuntimeError("this runner was constructed without a compiler")
+        return await self.compiler_worker.sweep()
+
     async def close(self) -> None:
+        if self.compiler_worker is not None:
+            await self.compiler_worker.stop()
         if self.reflection_worker is not None:
             await self.reflection_worker.stop()
         if self.deferred is not None:

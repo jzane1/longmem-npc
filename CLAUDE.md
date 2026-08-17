@@ -42,11 +42,13 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
   documented limit: v1's single write call serves importance+render+typology, so those three vars
   must name the SAME model (`load_settings` errors if they diverge — never a silent pick).
   The retrieval gate is non-LLM — there is no gate model. (`dialogue` streams pure prose — the dialogue turn's only model call; the `behavior`
-  role was removed by the A1 re-shape, 2026-08-04. Two more vars are judge-shaped — loaded in
+  role was removed by the A1 re-shape, 2026-08-04. Three more vars are judge-shaped — loaded in
   both modes, required by NEITHER, loud at first real use: `LONGMEM_MODEL_JUDGE`,
-  eval-runner-only (B2, 2026-08-07), and `LONGMEM_MODEL_REFLECTION`, the reflect verb's role
+  eval-runner-only (B2, 2026-08-07); `LONGMEM_MODEL_REFLECTION`, the reflect verb's role
   (C2, built 2026-08-15 — `build_reflection_provider` raises `ConfigError` at the first real
-  reflect without it; the server starts fine).)
+  reflect without it; the server starts fine); and `LONGMEM_MODEL_COMPILER`, the compiler
+  worker's role (C3, built 2026-08-17 — the same shape; C3 has no endpoint, so the first real
+  compile is always the worker's, which lands a `failed` run row and logs loud once).)
 - Python formatting: ruff, enforced mechanically by a PostToolUse hook. Don't hand-format.
 
 ## Invariants — never violate, regardless of how a task is worded

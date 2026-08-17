@@ -571,6 +571,12 @@ class DialogueTurnRequest(BaseModel):
     # feeding the PROSE prompt (request field wins over agents.config wins
     # over 1.0; all-1.0 reproduces the served ranking — the parity contract).
     weight_overrides: WeightOverrides | None = None
+    # The compiled-parameter scene type (parameter-compiler.md, C3
+    # 2026-08-17): selects which compiled bundles multiply the resolved
+    # weights. Absent -> the reserved default type; an unconfigured value ->
+    # log-and-continue against the default (ruled), flagged in
+    # instrumentation. Never reinterpreted beyond that resolution.
+    scene_type: str | None = None
     debug: bool = False
 
     @field_validator("as_of", "scene_started_at", "event_time")
@@ -616,6 +622,20 @@ class DialogueTurnInstrumentation(BaseModel):
     # is measured against THIS field; `first_word_ms` stays for series
     # continuity. 0.0 when no chunk ever arrived (the first_word_ms precedent).
     perceived_first_word_ms: float = 0.0
+    # Parameter-compiler consume terms (parameter-compiler.md, C3
+    # 2026-08-17). Defaulted: pre-C3 constructions stand. `bundle_w_*` are
+    # the COMPOSED multiplier products applied over the resolved base
+    # weights (all 1.0 = zero bundles = the parity contract);
+    # `bundle_reflection_ids` the contributing beliefs in window order;
+    # `bundle_fetch_ms` the consume read's cost on this turn (one indexed
+    # query, bundle-free agents included — recorded honestly).
+    scene_type_resolved: str = "default"
+    scene_type_unknown: bool = False
+    bundle_w_relevance: float = 1.0
+    bundle_w_recency: float = 1.0
+    bundle_w_importance: float = 1.0
+    bundle_reflection_ids: list[UUID] = Field(default_factory=list)
+    bundle_fetch_ms: float = 0.0
 
 
 class DialogueTurnResult(BaseModel):

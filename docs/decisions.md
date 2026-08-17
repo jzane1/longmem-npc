@@ -83,6 +83,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [C2 design-dossier rulings — reflection — 2026-08-15](#c2-design-dossier-rulings--reflection--2026-08-15)
 - [C2 spec rulings — reflection build target — 2026-08-15](#c2-spec-rulings--reflection-build-target--2026-08-15)
 - [Phase C2 build record — reflection landed — 2026-08-15](#phase-c2-build-record--reflection-landed--2026-08-15)
+- [Phase C3 build record — the parameter compiler landed — 2026-08-17](#phase-c3-build-record--the-parameter-compiler-landed--2026-08-17)
 
 ## Primary decisions
 
@@ -3434,3 +3435,117 @@ baseline from the seed-only 1-arg render; once identity-relevant reflections exi
 belief-introduced entity would count "fabricated". Reflection ships default OFF, so
 nothing is wrong today — flagged for Phase D (or C5's neighborhood) as the
 metric-honesty counterpart of the dialogue-seam move.
+
+## Phase C3 build record — the parameter compiler landed — 2026-08-17
+
+The build session (plan-mode spec + spec-to-floor in one sitting): migration 008
+(`compiled_bundles` + `compiler_runs`), `app\compiler.py` (the compile service, the pure
+consume functions, the standalone `CompilerWorker`), the provider quartet +
+`build_compiler_provider`, the dialogue-seam consume splice (`scene_type` on the turn
+request; the composed multiplier products over the walker-pinned weight resolver), the
+session/CLI surface (`:compile`; `:scene <type>` extended to session state), the C# mirror
++ interop beats [13], suite Set M (21 scenarios, all unmarked — subset 114 → 135, total
+128 → 149), the tenth walker (48 assertions), and the docs sweep. Spec:
+`parameter-compiler.md`. Ships default OFF (`compiler_worker_enabled` 0.0); the flip is a
+Phase D question beside C1's and C2's.
+
+**The seven rulings (settled at the plan-mode fork batches, 2026-08-16/17, before any
+file changed):**
+
+1. **Feedstock: ALL live beliefs compile** — identity-relevant included (the prose
+   channel and the parameter channel are orthogonal); a neutral bundle is a valid
+   compile. Rejected: non-identity-only (one-belief-one-channel — it would have made any
+   demo beat hostage to how the reflect model happens to flag the belief).
+2. **Typed core = the three prose-view weight multipliers only.** The founding §10
+   "action-set biases" clause was dead by the A1 action-side scrap (2026-08-04) and is
+   corrected in `architecture.md` with this build; "stance priors" folded into the
+   integrator's namespaced passthrough. Rejected: a compiled stance prompt block (a
+   second text channel into speech, overlapping the identity document's job and adding
+   prompt byte-stability surface).
+3. **Scheduling: a standalone third background worker** — Jack took the LARGER option
+   over the recommended reflect-pipeline stage, and the follow-up fork ruled it lands
+   WITHOUT the generic jobs table: `CompilerWorker` on the exact C1/C2 lifecycle
+   contract (both construction sites, stop before pool close LIFO, catch-log-continue,
+   the deterministic `sweep()` entry), work discovery as stateless SQL (the missing
+   (live belief × scene-type) pairs join — the pressure-gauge precedent), **no endpoint
+   and no route**. The jobs-table unification was surfaced with its real cost (re-opens
+   the C1/C2 floors; the 006 queue abandoned in place under migration immutability;
+   roughly two to three sessions) and stays available as its own scoped later task.
+4. **The staleness guard is the all-mechanical trio** (the C2 spec's ExpeL caution,
+   downstream half): liveness-by-join (bundles have no independent life — supersession
+   and the consolidation N→1 collapse evict with zero bundle writes), the K-window
+   (`compiler_window_k`, enforced at discovery AND the consume fetch), hard clamps at
+   write AND consume. Rejected: liveness+clamps without the window (influence saturates
+   at the clamp as the never-consolidated non-identity population grows); age
+   attenuation (a third time mechanism beside recency decay and bi-temporal
+   invalidation, which the invariants deliberately keep distinct).
+5. **`LONGMEM_MODEL_COMPILER` takes the judge shape** — the THIRD such var: loaded both
+   modes, required by neither, standalone lazy factory, loud `ConfigError` at the first
+   real compile (always the worker's — no endpoint exists); prices
+   `LONGMEM_PRICE_COMPILER_IN/OUT` join `PRICE_ENV_KEYS`. The twice-established
+   precedent applied a third time; seventh-required was not re-litigated.
+6. **Multiplier clamp = [0.25, 4.0]**, frozen into migration 008's CHECK — ruled before
+   the file was written, because applied migrations are immutable. One belief moves one
+   axis at most ×4 either way and can never zero it (zeroing stays the caller's explicit
+   weight-override privilege). Rejected: 0.5–2.0 (the rigidity-CHECK band —
+   corroboration-required extremes, the more conservative reading) and 0.0–4.0 (a single
+   confabulated belief could mask an axis — the exact failure the guard exists to
+   bound).
+7. **`:compile` = sweep semantics** — the per-agent kill-switch honored, the printed
+   attempt count making a no-op visible; one code path, the REPL exercising exactly what
+   production runs. Rejected: an always-live direct compile (the `:reflect` feel — but
+   reflect is always-live because its ENDPOINT is; C3 has none, so the REPL would have
+   exercised a verb the shipped system cannot perform).
+
+**Build latitude (within the approved plan):** (a) the run-row split mirrors C2 — the
+service returns the record, the WORKER persists it; a pass that found no work writes
+nothing. (b) `compiler_runs` kept lean — no window/vocabulary-size columns (derivable
+from config at read time); `passthrough_keys_dropped` included per the plan. (c) The
+consume read costs one indexed query on EVERY turn, bundle-free agents included —
+`bundle_fetch_ms` records it honestly; C7's latency pass sees it fresh. (d) The interop
+beats are wire-contract-only — the harness cannot reach `sweep()` (no endpoint; the
+served worker is default-OFF and poll-based); beat [13] opens with a bare boundary
+because earlier beats' narrative boundary types now stick as session state — the
+designed stickiness biting the fixture, not the code. (e) The known three mechanical
+migration pins were actually FOUR — `verify_reflection.py`'s own A5 ledger assertion,
+found at plan time by grepping the prior migration's filename; the census pin's
+collation was confirmed on the migrated scratch ('compiled' < 'compiler' <
+'corrections'). (f) `RealCompilerProvider` max_tokens 512 (the structural-bound
+precedent). (g) `SessionRunner.create`'s live poll loop races deterministic sweep
+counts — probes and the walker stop it before seeding; the walker's module docstring
+carries this beside the persistent-scratch rule (any section leaving an enabled agent
+with uncompiled pairs flips its kill-switch off, so re-runs stay deterministic on the
+fixed-name scratch). (h) Stale-text corrections carried with the build: architecture
+§12 still said "twelve routes"/"eleven verbs" and omitted the reflect route (a C2
+propagation miss), README still said "Reflection isn't built", and `docs\README.md`'s
+migration note stopped at 006.
+
+**Verified (the independent floor-verifier re-ran everything itself; VERDICT pass):**
+suite **149** full / **135**-subset (Set M 21/21); the TEN walkers — the new
+`verify_compiler.py` **48/48** (lettered A–F), write **53/53 byte-untouched** and read
+**56/56 byte-untouched** (the zero-retrieval-change evidence), reconstruction 42,
+cli-harness 51, authorial 34, fact 34, gate 51 (ledger pin mechanically +008), deferred
+51/51, reflection **60/60 on a fresh scratch** — the verifier's one substantive finding:
+`verify_reflection`'s B6/E9 DB-global counts make that walker non-re-runnable on the
+persistent `longmem_test` once its own prior green run has landed rows there (the
+carried walker-scratch item's SECOND documented bite; root-caused airtight as
+pre-existing — `app\reflection.py` byte-identical to the C2-verified HEAD, the compiler
+walker incapable of writing the rows — not a C3 regression); fresh 001→008 + idempotent
+re-run ("Up to date: 8 applied, 0 pending") with all three CHECKs' teeth probed; the
+15-table census on the real collation; the judge-shape probe; both C# builds clean; the
+**32-check** interop gate re-run LIVE (incl. the four scene-type beats); the product DB
+pristine before and after (ledger exactly 001–006, zero reflection rows, no compiler
+tables — applying 007 + 008 to the product store is Jack's action, deliberately not the
+build's); believability = the real-mode stage-2 smoke vs the 2026-08-07 baseline:
+checks **6/0 both**, keyword_retention equal at 0.9375, gist_precision 0.7667 → **0.85**
+(above baseline; C2's single-run 0.9 sits in the same noise band; the compiler was
+default OFF for the run), fabrication_rate mean 0.0833 → 0.1667 on the SAME single
+fabricated entity (a per-telling denominator effect, not a criterion) — **no
+regression** (`run_20260817T141601Z_pid_25616.json` vs
+`run_20260807T224423Z_pid_15844.json`). Floors row 27. Honest close-out note: the
+floors row was first appended via a Python heredoc and the backslash-escape doc trap
+bit a SEVENTH time, in a new SILENT costume — `\t`/`\v` are VALID Python escapes, so
+TAB/VT landed and ate the following letter with no SyntaxWarning (the invalid-escape
+spots warned and preserved their bytes), and `write_text`'s newline translation CRLF'd
+the file besides; the standing grep-verify-control-bytes rule caught it, the row was
+rewritten byte-level from raw strings, and the file re-verified clean.

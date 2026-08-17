@@ -16,7 +16,9 @@ Meta-commands (everything else is an utterance):
     :scene [type]      scene boundary: emits the event (the handler recompiles
                        the identity document and returns its version), then
                        re-freezes the scene state — identity version and the
-                       scene basis time
+                       scene basis time. Since C3 the type also rides the
+                       following turns, selecting which compiled bundles
+                       weight the prose view (bare :scene clears it)
     :pin <memory_id>   pin a memory (decay exemption)     :unpin undoes it
     :correct <memory_id> <text>
                        authorial correction: replace the live telling with
@@ -27,6 +29,10 @@ Meta-commands (everything else is an utterance):
                        grounded conclusions -> mechanical trim; bare lets
                        the consolidation knob decide, the tokens force or
                        suppress the stage (RRR still guards)
+    :compile           one compiler sweep (sweep semantics by ruling: the
+                       per-agent kill-switch is honored, so an unconfigured
+                       agent shows 0 calls); compiled bundles multiply the
+                       prose-view weights per scene type
     :as-of <iso8601>   drive the session at an injected world time
                        (retrieval age math + observe timestamps);  :as-of clear
     :context [loc=<name>] [entities=<a,b,c>] [time=<iso8601>]
@@ -140,6 +146,15 @@ def render_debug(result: DialogueTurnResult) -> str:
     # served order above (the parity contract).
     lines.append("-- dialogue view (weight-ranked) --")
     lines.append(f"  {[str(r.memory_id)[:8] for r in result.dialogue_view]}")
+    # Compiled-parameter terms (C3): the composed multiplier products that
+    # shaped the view above — all 1.0 on a bundle-free turn (parity).
+    lines.append(
+        f"  compiled:  scene={ins.scene_type_resolved}"
+        f"{' (unknown->default)' if ins.scene_type_unknown else ''} "
+        f"mult rel={ins.bundle_w_relevance:.4f} rec={ins.bundle_w_recency:.4f} "
+        f"imp={ins.bundle_w_importance:.4f} "
+        f"beliefs={len(ins.bundle_reflection_ids)} {ins.bundle_fetch_ms}ms"
+    )
     lines.append("-- timing / tokens --")
     lines.append(
         f"  retrieval: embed={ret.embed_ms}ms sql={ret.sql_ms}ms "
@@ -332,6 +347,9 @@ async def repl(agent_id: UUID, debug: bool) -> None:
                         continue
                     reflected = await runner.reflect(consolidate)
                     print(render_reflect(reflected))
+                elif line == ":compile":
+                    attempts = await runner.compile()
+                    print(f"compile sweep: {attempts} call(s)")
                 elif line.startswith(":as-of"):
                     raw = line[len(":as-of") :].strip()
                     if raw in ("", "clear"):

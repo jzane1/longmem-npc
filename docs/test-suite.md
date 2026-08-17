@@ -1,19 +1,21 @@
 # longmem-npc — Test suite spec
 
-**BUILT 2026-07-20 — 128 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation +
-hygiene + eval metrics + eval runner + judge + ablation + deferred writes + reflection; the
-Set A diegetic pair still lands with the dissonance mechanism). Count as of 2026-08-15: Set A 8,
+**BUILT 2026-07-20 — 149 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation +
+hygiene + eval metrics + eval runner + judge + ablation + deferred writes + reflection + the
+parameter compiler; the
+Set A diegetic pair still lands with the dissonance mechanism). Count as of 2026-08-17: Set A 8,
 Set B 7, Set C 7, Set D 20, degradation 12, hygiene 2, Set G eval metrics 8, **Set H eval
 runner 9** (stage 2, 2026-08-05), **Set I judge 16** (stage 3, 2026-08-07; +2 with the
 2026-08-12 workaround session; the reflection role's load-rule amendment rides the existing
 config scenarios, 2026-08-15), **Set J ablation 6** (stage 4, 2026-08-12 — its section is
 `eval-harness.md`'s stage-4 block), **Set K deferred writes 13** (Phase C1, 2026-08-12),
-**Set L reflection 20** (Phase C2, 2026-08-15) — grown from the 38 built on 2026-07-20 by the
+**Set L reflection 20** (Phase C2, 2026-08-15), **Set M parameter compiler 21** (Phase C3,
+2026-08-17) — grown from the 38 built on 2026-07-20 by the
 route-contract scenarios that arrived with each later route, by the gap-closing and guard
 scenarios from the full-repo audit, and by the eval harness stages 1–4. **Fourteen carry the
-`nlp` marker** (Set L adds none), so the turn-end subset runs **114**. *(Counts corrected
+`nlp` marker** (Sets L and M add none), so the turn-end subset runs **135**. *(Counts corrected
 2026-08-12 with the Set K landing — the 2026-08-07 header had drifted again by the stage-4 and
-workaround-session scenarios.)* Build rulings 2026-07-20
+workaround-session scenarios; updated 2026-08-17 with the Set M landing.)* Build rulings 2026-07-20
 (dated `decisions.md` entry): the suite-gate Stop hook runs the `-m "not nlp"` subset (the 7
 `nlp`-marked scenarios call the write pass at the service level and pay the lazy
 spaCy+fastcoref load; the full suite runs on demand + at floor verification); Postgres
@@ -301,6 +303,43 @@ The ninth walker `tests\verify_reflection.py` (60 criteria, lettered sections A�
 migration-007 shape, the reflect verb ladder, render/consolidation/dialogue-seam parity, trim
 + liveness + eviction, the worker lifecycle at both construction sites, and the judge-shaped
 role surface; the write- and read-path walkers staying byte-identical at 53/56 are the
+zero-retrieval-change evidence.
+
+## Set M — the parameter compiler *(added 2026-08-17 with Phase C3, `parameter-compiler.md`)*
+
+Twenty-one scenarios in `tests\test_set_m_compiler.py`, ALL unmarked. Beliefs and bundles
+seed at the db layer (`Ctx.seed_reflection` / `Ctx.seed_bundle`); the worker runs through the
+never-started factories' `sweep()` (deterministic, no poll loop to race a count) and the
+consume side through the dialogue seam with `as_of` pinned:
+
+- **The compile ladder:** the happy-path sweep (missing pairs = window × vocabulary, clamped
+  multipliers, namespaced passthrough, one honest run row); pair idempotency (discovery IS
+  the idempotency — no-work passes write nothing); malformed records-with-spend and retries
+  naturally (NO attempts ledger); a hard failure records without spend and continues across
+  agents; clamp-at-write + the namespace filter + the dropped-keys count (pinned provider).
+- **The staleness guard:** `compiler_window_k` bounds discovery AND the consume fetch;
+  belief invalidation evicts instantly with zero bundle writes and empties discovery; the
+  consolidation N→1 collapse kills absorbed contributions and the survivor compiles next
+  sweep.
+- **Consume:** zero-bundle byte parity (`dialogue_view` == the served projection, neutral
+  echo); the neutral-bundle license; the per-scene re-rank flip (one agent, two types,
+  opposite recency extremes — deterministic regardless of embedding hashes) with membership
+  constant and every view score equal to the hand exponent math; override × bundle clamps at
+  the weight ceiling; unknown type log-and-continues flagged; a known type selects only its
+  own bundles (no default fallback); newest-bundle-per-pair wins; multi-belief products
+  compose exactly; the consume-side re-clamp defense.
+- **Lifecycle + role:** idempotent start/stop, kill-switch skip, the batch cap + the
+  deterministic prefix; real mode loads WITHOUT `LONGMEM_MODEL_COMPILER`, the worker's first
+  real compile lands a `failed` run row naming the var (logged once, worker alive), fake mode
+  builds the deterministic fake; the migration-008 pins (columns, CHECK teeth, knob
+  defaults).
+
+The tenth walker `tests\verify_compiler.py` (48 criteria, lettered sections A–F) re-proves
+it against the scratch DB: the migration-008 shape, the compile ladder, the guard, consume
+parity + the per-scene flip, the worker lifecycle at both construction sites, and the
+judge-shaped role surface. Its module docstring carries the persistent-scratch rule (a
+section leaving an enabled agent with uncompiled pairs flips the kill-switch off, so re-runs
+stay deterministic). The nine prior walkers passing byte-untouched at their criteria are the
 zero-retrieval-change evidence.
 
 ## Route contracts *(added as each route shipped; consolidated here 2026-07-28)*

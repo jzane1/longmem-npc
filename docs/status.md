@@ -1,33 +1,35 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-08-15
-**Phase:** **Road to completion — Phases A, B, C1, and C2 are DONE.** (The roadmap below,
-consolidated 2026-08-04.) The third 2026-08-15 session landed **PHASE C2 — reflection**,
-spec-to-floor in one sitting: migration 007 (`reflection_runs`), `app\reflection.py` (the
-reflect pipeline — deterministic top-k sampling, mechanical citation validation, the
-non-LLM RRR guard, the PURELY MECHANICAL component trim, threshold-gated soft
-consolidation), the judge-shaped `LONGMEM_MODEL_REFLECTION` role (loaded both modes,
-required by neither, loud at first real use), **the dialogue-seam move** (the prose prompt
-rides the rendered identity document for the caller-frozen version — zero reflections
-render seed-verbatim, byte parity walker-asserted), the optional `ReflectionWorker`
-(default OFF per agent, both construction sites, `sweep()` the deterministic entry, NO
-attempts ledger), eleven knobs, suite Set L (20 scenarios, ALL unmarked — subset 94 →
-114, total 128), the ninth walker (60/60), the C# mirror + four interop beats (24 → 28),
-and the FOURTH-sanctioned-cause invariant amendments (CLAUDE.md + architecture §7; the
-`mid-dialogue-gate.md` "only grows" note expired). Jack ruled the four build-plan forks
-(all recommended options taken) and the approved plan resolved the spec's
-`[SETTLE-AT-BUILD]` ledger — the dated build record in `decisions.md`. The independent
-floor-verifier returned **PASS** (floors row 26); the believability run shows no
-regression (real-mode smoke vs the 2026-08-07 baseline: checks 6/0 both, gist 0.7667 →
-0.9, keyword retention equal). **Applying migration 007 to the product `longmem` DB is
-Jack's action** (the build touched scratches only; the product ledger sits at 001–006
-with zero reflection rows). **NEXT UP: C3 — reflection → parameter compiler.**
-Earlier the same date: the C2 design dossier (first sitting) and the C2 build spec
-(second sitting) — the prior narrative lives in `session-log.md`.
+**Last updated:** 2026-08-17
+**Phase:** **Road to completion — Phases A, B, C1, C2, and C3 are DONE.** (The roadmap
+below, consolidated 2026-08-04.) The 2026-08-17 session landed **PHASE C3 — the parameter
+compiler**, plan-to-floor in one session. The seven C3 rulings settled at the plan-mode
+fork batches BEFORE any file changed: feedstock = ALL live beliefs; typed core = the three
+prose-view weight multipliers only (§10's dead "action-set biases" corrected with the
+build); scheduling = the STANDALONE third background worker — Jack took the larger option
+over the recommended reflect-pipeline stage, with the follow-up fork ruling it lands
+WITHOUT the generic jobs table (that unification stays its own later task) — no endpoint,
+no route; the all-mechanical staleness guard (the K-window at discovery AND consume +
+liveness-by-join + hard clamps); the judge-shaped `LONGMEM_MODEL_COMPILER` (the THIRD such
+var); the multiplier clamp **[0.25, 4.0]** frozen into migration 008's CHECK; and
+`:compile` = sweep semantics. Landed: migration 008 (`compiled_bundles` append-only,
+liveness DERIVED by join + `compiler_runs`), `app\compiler.py` (service + worker + the
+pure consume functions), the dialogue-seam consume splice (`scene_type` on the turn
+request; composed multiplier products over the untouched weight resolver; zero-bundle
+byte parity walker-asserted), the session/CLI surface, suite Set M (21 scenarios, ALL
+unmarked — subset 114 → 135, total 128 → 149), the TENTH walker (48/48), the C# mirror +
+interop beats [13] (28 → 32), and the docs sweep incl. `parameter-compiler.md` and the
+§12 stale-count corrections. The independent floor-verifier returned **PASS** (floors row
+27); believability shows no regression (real-mode smoke vs the 2026-08-07 baseline:
+checks 6/0 both, gist 0.7667 → 0.85, keyword retention equal). **Applying migrations
+007 + 008 to the product `longmem` DB is Jack's action** (builds touch scratches only;
+the product ledger sits at 001–006 with zero reflection or bundle rows). **NEXT UP: C4 —
+dissonance path + diegetic-correction event.**
 The system is BUILT end to end on the final A1 seam — backend, C# client + console harness,
 Unity adapter + gray-box scene, The Ledger, eval-harness stages 1–4, deferred writes,
-reflection — schema at migrations 001–007. What is proven lives in `docs\floors.md`, why in
-`decisions.md`, the narrative in `session-log.md`; this file carries only what is live.
+reflection, the parameter compiler — schema at migrations 001–008. What is proven lives in
+`docs\floors.md`, why in `decisions.md`, the narrative in `session-log.md`; this file
+carries only what is live.
 
 This is the *living* file — update it at the end of every working session. `architecture.md`
 changes only when design changes; `decisions.md` is append-only.
@@ -65,7 +67,12 @@ re-openable: re-verifying one is a step, never an argument against a design impr
 
 *None open.*
 
-**Recently closed** (pointers; full trail in `decisions.md`): **the C2 build-plan forks —
+**Recently closed** (pointers; full trail in `decisions.md`): **the C3 forks — seven
+ruled 2026-08-16/17 at the plan-mode batches** (feedstock; typed core; the standalone
+third worker — the one larger-than-recommended pick, with the jobs-table follow-up ruled
+standalone; the mechanical staleness guard; the judge-shaped role; the [0.25, 4.0] clamp
+frozen pre-migration; `:compile` sweep semantics — the dated build record); **the C2
+build-plan forks —
 four ruled 2026-08-15 at the build session, all recommended options taken** (post-commit
 re-render; the tri-state REPL surface; the keyword-only provider test seam; the real-mode
 believability run), with the spec's `[SETTLE-AT-BUILD]` ledger resolved by the approved
@@ -147,8 +154,13 @@ Ordered so shared machinery lands before its reusers.
   dialogue-seam move + Set L + the ninth walker + the C# mirror; the believability run
   confirmed no regression. Ships default OFF per agent (the endpoint is always live);
   the flip is a Phase D question alongside C1's.
-- **C3. Reflection → parameter compiler** (formed beliefs → personality knobs; the full
-  modulator suite stays cut).
+- **C3. Reflection → parameter compiler.** ✅ **LANDED 2026-08-17, floor-verified the
+  same date** (floors row 27; the dated C3 build record in `decisions.md` — the seven
+  plan-batch rulings): migration 008 + `app\compiler.py` (the standalone third worker —
+  no endpoint, no jobs table by ruling) + the judge-shaped `LONGMEM_MODEL_COMPILER` +
+  the dialogue-seam consume splice + Set M + the tenth walker + the C# mirror; the
+  believability run confirmed no regression. Ships default OFF per agent (the full
+  modulator suite stays cut); the flip is a Phase D question alongside C1's and C2's.
 - **C4. Dissonance path + diegetic-correction event** (ONE session, ruled).
 - **C5. Client contract completion** (one session): the agent-state read route (backend + C#) +
   async observes (fire-and-forget client observes; ruled in explicitly 2026-08-04).
@@ -227,13 +239,17 @@ not vendored).
 
 **Carried, not fixed** (deliberately unscheduled, awaiting its own ruling):
 
-- **The walkers (nine since C2) share a fixed-name scratch DB** (`longmem_test`) they neither create,
+- **The walkers (ten since C3) share a fixed-name scratch DB** (`longmem_test`) they neither create,
   migrate, nor drop, and three assertions in `verify_fact_correction.py` are DB-global counts.
   Giving them the suite's pid-scoped mechanism plus a `tests\run-walkers.ps1` runner is the
   right fix; it is a medium refactor of the verification apparatus itself, so it wants its own
   scoped task rather than riding an audit. *(Bite recorded 2026-08-12: the DB was found
   MISSING — dropped at some point since the 2026-08-07 audit — and psycopg_pool masked
   "database does not exist" as a 30 s `PoolTimeout`; recreated + migrated 001–005 in-session.)*
+  *(SECOND bite recorded 2026-08-17 at the C3 floor-verify: `verify_reflection`'s B6/E9
+  DB-global counts make that walker non-re-runnable on the persistent scratch once its own
+  prior green run has landed rows — it needed a fresh pid-scoped scratch to pass 60/60; the
+  C3 walker ships a persistent-scratch rule in its docstring to stay out of this class.)*
   *(The other three 2026-07-28 carried items — the auth honesty paragraph, the Unity MCP pin,
   the DLL staleness check — are now scheduled: Phase F.)*
 - *(The `typology_confidence` parse seat flagged earlier on 2026-08-12 was **ruled SALVAGE

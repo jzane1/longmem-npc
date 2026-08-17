@@ -58,6 +58,7 @@ from uuid import UUID
 from psycopg_pool import AsyncConnectionPool
 
 from app import db, identity
+from app.compiler import compose_bundle_weights, resolve_scene_type
 from app.config import (
     WEIGHT_MAX,
     WEIGHT_MIN,
@@ -303,7 +304,33 @@ class DialogueService:
         weights = resolve_dialogue_weights(
             config, request.weight_overrides, self._settings
         )
-        ranked = rank_dialogue_view(retrieval.items, weights)
+
+        # --- compiled parameters (parameter-compiler.md, C3 2026-08-17):
+        # resolve the scene type (unknown -> the default bundle + a flag,
+        # log-and-continue by ruling), fetch the newest bundle per in-window
+        # live belief for exactly that type, and compose multiplier products
+        # over the resolved base — clamped back into [WEIGHT_MIN, WEIGHT_MAX].
+        # Zero bundles compose to the identity, so a bundle-free turn is
+        # byte-identical to the pre-C3 seam (the parity contract).
+        scene_type_resolved, scene_type_unknown = resolve_scene_type(
+            config, request.scene_type
+        )
+        if scene_type_unknown:
+            logger.warning(
+                "unknown scene_type %r for agent %s; serving the default bundle",
+                request.scene_type,
+                request.agent_id,
+            )
+        t_bundles = time.perf_counter()
+        bundles = await db.fetch_dialogue_bundles(
+            self._pool,
+            request.agent_id,
+            scene_type=scene_type_resolved,
+            window_k=int(agent_knob(config, "compiler_window_k", self._settings)),
+        )
+        bundle_fetch_ms = _ms(time.perf_counter() - t_bundles)
+        effective_weights, bundle_products = compose_bundle_weights(weights, bundles)
+        ranked = rank_dialogue_view(retrieval.items, effective_weights)
         ranked_items = [item for _score, item in ranked]
         dialogue_view = [
             ScoredRef(memory_id=item.memory_id, score=score) for score, item in ranked
@@ -442,6 +469,13 @@ class DialogueService:
                 first_word_ms=first_word_ms,
                 perceived_first_word_ms=perceived_first_word_ms,
                 prose_stream_ms=prose_stream_ms,
+                scene_type_resolved=scene_type_resolved,
+                scene_type_unknown=scene_type_unknown,
+                bundle_w_relevance=bundle_products[0],
+                bundle_w_recency=bundle_products[1],
+                bundle_w_importance=bundle_products[2],
+                bundle_reflection_ids=[b.reflection_id for b in bundles],
+                bundle_fetch_ms=bundle_fetch_ms,
                 cost_usd=_turn_cost_usd(
                     self._settings.prices,
                     prose_in,

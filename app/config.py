@@ -55,6 +55,12 @@ ENV_MODEL_JUDGE = "LONGMEM_MODEL_JUDGE"
 # the first real reflect call (build_reflection_provider raises ConfigError).
 # The server starts fine without it; only a real-mode reflect needs it.
 ENV_MODEL_REFLECTION = "LONGMEM_MODEL_REFLECTION"
+# Compiler role (parameter-compiler.md; the C3 rulings 2026-08-17): the
+# THIRD judge-shaped var — loaded in BOTH modes, required by NEITHER, loud
+# at the first real compile call (build_compiler_provider raises
+# ConfigError). C3 has no endpoint verb, so that first call is always the
+# worker's; the server starts fine without the var.
+ENV_MODEL_COMPILER = "LONGMEM_MODEL_COMPILER"
 # Dialogue thinking knob (B2 ruling 2026-08-07): "" (unset) omits the thinking
 # parameter from the real prose call entirely — today's request byte-for-byte;
 # "disabled" sends thinking={"type": "disabled"} (the sonnet-5 thinking-off
@@ -81,6 +87,8 @@ PRICE_ENV_KEYS: dict[str, str] = {
     "LONGMEM_PRICE_JUDGE_OUT": "judge_out",
     "LONGMEM_PRICE_REFLECTION_IN": "reflection_in",
     "LONGMEM_PRICE_REFLECTION_OUT": "reflection_out",
+    "LONGMEM_PRICE_COMPILER_IN": "compiler_in",
+    "LONGMEM_PRICE_COMPILER_OUT": "compiler_out",
 }
 
 # Service-level defaults, each overridable per agent via the same key in
@@ -265,6 +273,26 @@ SERVICE_DEFAULTS: dict[str, float] = {
     # its span evidence sits on live memories older than this. 0.0 disables
     # the trim entirely (the gate_enabled kill-switch shape).
     "reflection_trim_stale_seconds": 2592000.0,
+    # --- parameter compiler (parameter-compiler.md; the C3 rulings ---------
+    # 2026-08-17) -----------------------------------------------------------
+    # Per-agent worker kill-switch: 0.0 = the worker never compiles this
+    # agent. C3 has no endpoint verb (the standalone-worker ruling), so this
+    # gates compilation entirely; the consume side stays live either way
+    # (zero bundles compose to the identity).
+    "compiler_worker_enabled": 0.0,
+    # Worker sweep interval. Process-level (the reflection_poll_seconds
+    # precedent: the worker has no agent context; an agents.config override
+    # is inert by design).
+    "compiler_poll_seconds": 60.0,
+    # Max compile CALLS per sweep across agents — a cost bound, not a queue
+    # (integer-valued, cast at the call site). Missing pairs beyond the
+    # budget persist; the next sweep continues them. Process-level, like the
+    # poll interval.
+    "compiler_worker_batch": 8.0,
+    # The staleness-guard window (the C3 ruling): only the K most recent
+    # live beliefs compile AND apply — enforced at work discovery and at the
+    # consume fetch alike (integer-valued, cast at the call site).
+    "compiler_window_k": 8.0,
 }
 
 # Prose-view weight clamp bounds (ruled at the split-brain build 2026-07-21;
@@ -275,6 +303,15 @@ SERVICE_DEFAULTS: dict[str, float] = {
 # bound).
 WEIGHT_MIN = 0.0
 WEIGHT_MAX = 4.0
+
+# Compiled-bundle multiplier clamp bounds (the C3 ruling 2026-08-17, frozen
+# into migration 008's CHECK): one belief may move a prose-view weight axis
+# by at most x4 in either direction and can never zero it — zeroing stays
+# the caller's explicit weight-override privilege (WEIGHT_MIN above). Module
+# constants, not knobs (the WEIGHT_MIN/MAX precedent); the compiler clamps
+# at write and the consume path re-clamps as defense.
+MULTIPLIER_MIN = 0.25
+MULTIPLIER_MAX = 4.0
 
 # The lexical channel's text-search config: a string knob, so it follows the
 # decay_classes precedent (a plain agents.config key + a module default)
@@ -288,6 +325,23 @@ def text_search_config(agent_config: dict) -> str:
     """Per-agent text_search_config override, else the service default."""
     value = agent_config.get("text_search_config")
     return str(value) if value else TEXT_SEARCH_CONFIG_DEFAULT
+
+
+# The compiler's scene-type vocabulary: an integrator-owned string list, so
+# it follows the decay_classes / text_search_config precedent (a plain
+# agents.config key + a module default) rather than the float-only
+# SERVICE_DEFAULTS/agent_knob contract. The default is EMPTY — with no
+# configured vocabulary only the reserved default scene type compiles; a
+# hardcoded vocabulary would violate the never-hardcoded rule.
+SCENE_TYPES_DEFAULT: tuple[str, ...] = ()
+
+
+def scene_types(agent_config: dict) -> list[str]:
+    """Per-agent scene-type vocabulary, else the (empty) service default."""
+    value = agent_config.get("scene_types")
+    if not isinstance(value, list):
+        return list(SCENE_TYPES_DEFAULT)
+    return [str(entry) for entry in value]
 
 
 def load_env(path: Path = ENV_PATH) -> dict[str, str]:
@@ -318,6 +372,7 @@ def load_env(path: Path = ENV_PATH) -> dict[str, str]:
             ENV_MODEL_RECONSTRUCTION,
             ENV_MODEL_JUDGE,
             ENV_MODEL_REFLECTION,
+            ENV_MODEL_COMPILER,
             ENV_DIALOGUE_THINKING,
             ENV_JUDGE_MAX_TOKENS,
         }
@@ -346,6 +401,10 @@ class Settings:
     # loaded both modes, required by neither; build_reflection_provider raises
     # loudly at the first real reflect call without it.
     model_reflection: str = ""
+    # Compiler role, the third judge-shaped var (parameter-compiler.md, the
+    # C3 rulings 2026-08-17): loaded both modes, required by neither;
+    # build_compiler_provider raises loudly at the first real compile call.
+    model_compiler: str = ""
     dialogue_thinking: str = ""  # "" omit param | "disabled" thinking-off arm
     judge_max_tokens: int = JUDGE_MAX_TOKENS_DEFAULT
     anthropic_api_key: str = field(default="", repr=False)
@@ -429,6 +488,10 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
     # 2026-08-15): loaded here in both modes, never in the required list —
     # the loud failure lives at the first real reflect call instead.
     model_reflection = env.get(ENV_MODEL_REFLECTION, "")
+    # The compiler role is the third judge-shaped var (the C3 rulings
+    # 2026-08-17): loaded in both modes, never in the required list — the
+    # loud failure lives at the worker's first real compile call instead.
+    model_compiler = env.get(ENV_MODEL_COMPILER, "")
     dialogue_thinking = env.get(ENV_DIALOGUE_THINKING, "")
     if dialogue_thinking not in ("", "disabled"):
         raise ConfigError(
@@ -469,6 +532,7 @@ def load_settings(env: dict[str, str] | None = None) -> Settings:
         model_reconstruction=model_reconstruction,
         model_judge=model_judge,
         model_reflection=model_reflection,
+        model_compiler=model_compiler,
         dialogue_thinking=dialogue_thinking,
         judge_max_tokens=judge_max_tokens,
         anthropic_api_key=anthropic_key,

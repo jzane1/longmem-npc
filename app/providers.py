@@ -42,6 +42,7 @@ from typing import Protocol
 from app.config import (
     EMBEDDING_DIM,
     EMBEDDING_MODEL,
+    ENV_MODEL_COMPILER,
     ENV_MODEL_JUDGE,
     ENV_MODEL_REFLECTION,
     ConfigError,
@@ -289,6 +290,37 @@ class ConsolidationCallResult:
     output_tokens: int
 
 
+@dataclass(frozen=True)
+class CompilerItem:
+    """One (belief, scene-type) pair prepared for the compile call
+    (parameter-compiler.md): the compilable surface plus the target scene
+    type. reflection_id is the UUID string — structural input so the
+    deterministic fake derives stable per-pair output (the ReflectionItem
+    precedent); the real provider ignores it."""
+
+    reflection_id: str
+    content: str
+    identity_relevant: bool
+    scene_type: str
+
+
+@dataclass(frozen=True)
+class CompilerCallResult:
+    """Parsed output of the compile call (the C3 output contract: a JSON
+    object {"multipliers": {"relevance", "recency", "importance"},
+    "passthrough": {...}}). Values arrive RAW — the clamp to the module
+    constants and the passthrough namespace filter are the seam's
+    mechanical validation, not the call layer's (the grounding-validation
+    split)."""
+
+    w_relevance: float
+    w_recency: float
+    w_importance: float
+    passthrough: dict
+    input_tokens: int
+    output_tokens: int
+
+
 # ---------------------------------------------------------------------------
 # Interfaces
 # ---------------------------------------------------------------------------
@@ -387,6 +419,24 @@ class ReflectionProvider(Protocol):
         system_prompt: str,
         user_content: str,
     ) -> ConsolidationCallResult: ...
+
+
+class CompilerProvider(Protocol):
+    """The parameter-compile call (parameter-compiler.md; the C3 rulings
+    2026-08-17). Judge-shaped by ruling: never a field on the Providers
+    bundle — the compiler seam builds one lazily via build_compiler_provider
+    at first use. Prompts are fully assembled at the seam (app\\compiler.py
+    owns the block shape); `item` rides structurally so the deterministic
+    fake can derive stable per-(belief, scene-type) output — the real
+    provider ignores it."""
+
+    def compile(
+        self,
+        *,
+        system_prompt: str,
+        user_content: str,
+        item: CompilerItem,
+    ) -> CompilerCallResult: ...
 
 
 # ---------------------------------------------------------------------------
@@ -662,6 +712,42 @@ class FakeReflectionProvider:
         )
 
 
+class FakeCompilerProvider:
+    """Deterministic multipliers derived from the pair itself: per axis,
+    0.5 + 3.0 * hash-unit of the belief content salted by axis + scene type
+    — inside the [0.25, 4.0] write clamp, almost never exactly 1.0, and
+    DISTINCT per scene type (so per-type selection is assertable). One
+    namespaced passthrough key exercises the store path. Byte-identical on
+    identical inputs, offline, keyless. Scenarios that need exact
+    multipliers (re-rank flips) pin a local provider instead — hash-derived
+    values cannot guarantee a flip on an arbitrary fixture."""
+
+    def compile(
+        self,
+        *,
+        system_prompt: str,
+        user_content: str,
+        item: CompilerItem,
+    ) -> CompilerCallResult:
+        def axis(name: str) -> float:
+            unit = _stable_unit_float(
+                item.content, f"compiler:{name}:{item.scene_type}"
+            )
+            return round(0.5 + 3.0 * unit, 4)
+
+        marker = hashlib.sha256(
+            f"compile:{item.content}:{item.scene_type}".encode()
+        ).hexdigest()[:8]
+        return CompilerCallResult(
+            w_relevance=axis("relevance"),
+            w_recency=axis("recency"),
+            w_importance=axis("importance"),
+            passthrough={"fake.note": marker},
+            input_tokens=len(system_prompt.split()) + len(user_content.split()),
+            output_tokens=9,
+        )
+
+
 # --- failure-injection fakes (degradation ladder tests) --------------------
 
 
@@ -849,6 +935,26 @@ class MalformedReflectionProvider:
             "injected malformed consolidation output",
             input_tokens=7,
             output_tokens=3,
+        )
+
+
+class FailingCompilerProvider:
+    """The compile call fails outright: the pair records as failed, the
+    sweep continues its other pairs, and the missing pair persists — the
+    next sweep retries naturally (no attempts ledger by design)."""
+
+    def compile(self, **_kwargs) -> CompilerCallResult:
+        raise ProviderCallError("injected compile-call failure")
+
+
+class MalformedCompilerProvider:
+    """Calls 'succeed' but the JSON is unparseable: the malformed-class
+    failure of the compile ladder, token spend accounted (the
+    MalformedWriteProvider convention)."""
+
+    def compile(self, **_kwargs) -> CompilerCallResult:
+        raise MalformedOutputError(
+            "injected malformed compile output", input_tokens=7, output_tokens=3
         )
 
 
@@ -1346,6 +1452,64 @@ class RealReflectionProvider:
         )
 
 
+class RealCompilerProvider:
+    """The Anthropic compile call (parameter-compiler.md; C3 2026-08-17).
+    Constructed only by build_compiler_provider — the judge precedent: the
+    server's Providers bundle never carries this role and the seam builds it
+    lazily at first use. Prompts arrive fully assembled (app\\compiler.py
+    owns the block shape); `item` is the fake's structural input and is
+    ignored here. Fixed max_tokens bounds follow the write-call precedent
+    (a structural bound, not integrator policy)."""
+
+    def __init__(self, settings: Settings):
+        import anthropic
+
+        self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        self._model = settings.model_compiler
+
+    def compile(
+        self,
+        *,
+        system_prompt: str,
+        user_content: str,
+        item: CompilerItem,
+    ) -> CompilerCallResult:
+        try:
+            response = self._client.messages.create(
+                model=self._model,
+                max_tokens=512,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_content}],
+            )
+        except Exception as exc:
+            raise ProviderCallError(f"compile call failed: {exc}") from exc
+        input_tokens = response.usage.input_tokens
+        output_tokens = response.usage.output_tokens
+        try:
+            payload = json.loads(_lenient_json_text(_first_text_block(response)))
+            multipliers = payload["multipliers"]
+            if not isinstance(multipliers, dict):
+                raise ValueError("'multipliers' is not an object")
+            passthrough = payload.get("passthrough", {})
+            if not isinstance(passthrough, dict):
+                raise ValueError("'passthrough' is not an object")
+            result = CompilerCallResult(
+                w_relevance=float(multipliers["relevance"]),
+                w_recency=float(multipliers["recency"]),
+                w_importance=float(multipliers["importance"]),
+                passthrough=passthrough,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+            )
+        except (KeyError, ValueError, TypeError, json.JSONDecodeError) as exc:
+            raise MalformedOutputError(
+                f"compile output unparseable: {exc}",
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+            ) from exc
+        return result
+
+
 class RealEmbeddingProvider:
     """OpenAI text-embedding-3-small @ 1536 (locked)."""
 
@@ -1432,3 +1596,19 @@ def build_reflection_provider(settings: Settings) -> ReflectionProvider:
             )
         return RealReflectionProvider(settings)
     return FakeReflectionProvider()
+
+
+def build_compiler_provider(settings: Settings) -> CompilerProvider:
+    """Standalone compiler selection (the judge shape, the C3 ruling
+    2026-08-17: NOT a field on the frozen Providers bundle — the compiler
+    seam builds it lazily at first use). A real compile without the var is
+    the loud first-use error the spec assigns — always inside the worker,
+    since C3 has no endpoint verb; the var is otherwise loaded-never-required
+    (load_settings)."""
+    if settings.provider_mode == "real":
+        if not settings.model_compiler:
+            raise ConfigError(
+                f"a compile call in real mode requires {ENV_MODEL_COMPILER} in .env."
+            )
+        return RealCompilerProvider(settings)
+    return FakeCompilerProvider()

@@ -265,6 +265,35 @@ class Ctx:
             reflection_provider=provider,
         )
 
+    def compiler(self, *, defaults: dict | None = None, provider=None, **overrides):
+        """The compile seam over this scenario's pool (Set M,
+        parameter-compiler.md). `provider` injects a compiler-provider fake
+        through the keyword-only build seam (the C2 precedent); None means
+        the lazy judge-shaped factory (fake mode => FakeCompilerProvider)."""
+        from app.compiler import CompilerService
+
+        return CompilerService(
+            self.pool,
+            self.providers(**overrides),
+            self._settings_with(defaults),
+            compiler_provider=provider,
+        )
+
+    def compiler_worker(
+        self, *, defaults: dict | None = None, provider=None, **overrides
+    ):
+        """A compiler worker over this scenario's pool (Set M). Never
+        started — tests call `sweep()` directly, the deterministic no-timer
+        entry (the Set K/L precedent)."""
+        from app.compiler import CompilerWorker
+
+        return CompilerWorker(
+            self.pool,
+            self.providers(**overrides),
+            self._settings_with(defaults),
+            compiler_provider=provider,
+        )
+
     # -- fixtures -----------------------------------------------------------
     async def make_agent(
         self,
@@ -389,6 +418,41 @@ class Ctx:
                     valid_at,
                     created_at,
                     invalid_at,
+                ),
+            )
+            return (await cur.fetchone())[0]
+
+    async def seed_bundle(
+        self,
+        agent_id: UUID,
+        reflection_id: UUID,
+        *,
+        scene_type: str = "default",
+        w_relevance: float = 1.0,
+        w_recency: float = 1.0,
+        w_importance: float = 1.0,
+        passthrough: dict | None = None,
+        created_at: datetime | None = None,
+    ) -> UUID:
+        """Db-layer compiled-bundle seed (Set M, parameter-compiler.md — the
+        seed_reflection precedent): a bundle row placed directly so consume
+        fixtures control multipliers, pair membership, and newest-per-pair
+        ordering exactly — no service call, no model."""
+        async with self.pool.connection() as conn, conn.cursor() as cur:
+            await cur.execute(
+                "INSERT INTO compiled_bundles (agent_id, reflection_id, "
+                "scene_type, w_relevance, w_recency, w_importance, "
+                "passthrough, created_at) VALUES (%s, %s, %s, %s, %s, %s, "
+                "%s, COALESCE(%s, now())) RETURNING bundle_id",
+                (
+                    agent_id,
+                    reflection_id,
+                    scene_type,
+                    w_relevance,
+                    w_recency,
+                    w_importance,
+                    Jsonb(passthrough or {}),
+                    created_at,
                 ),
             )
             return (await cur.fetchone())[0]

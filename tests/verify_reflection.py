@@ -375,8 +375,13 @@ async def run(uri: str) -> None:
             pool, "SELECT version FROM schema_migrations ORDER BY version"
         )
         check(
-            [row[0] for row in ledger][-1] == "007_reflection.sql" and len(ledger) == 7,
-            "A5 the ledger records 001-007",
+            # 008 joined the ledger at the parameter-compiler build (Phase
+            # C3, 2026-08-17) — the mechanical ledger-pin update every
+            # migration makes to prior walkers. The reflection mechanics
+            # this walker verifies are untouched by 008.
+            [row[0] for row in ledger][-1] == "008_parameter_compiler.sql"
+            and len(ledger) == 8,
+            "A5 the ledger records 001-008",
         )
         refl_cols = {
             r[0]

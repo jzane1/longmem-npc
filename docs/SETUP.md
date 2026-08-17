@@ -149,15 +149,16 @@ python -m pytest tests -q -m "not nlp"   # 114, the turn-end subset — seconds,
 
 Postgres unreachable ⇒ every scenario skips loudly and the run exits green, by ruling.
 
-**The walkers** (nine structural done-when scripts) need a scratch DB you create yourself:
+**The walkers** (ten structural done-when scripts) need a scratch DB you create yourself:
 
 ```powershell
 $scratch = "postgresql://longmem:change-me@localhost:5432/longmem_test"
 docker exec longmem-pg psql -U longmem -d postgres -c "CREATE DATABASE longmem_test"
 python db\migrate.py --database-uri $scratch
 python tests\verify_write_path.py --database-uri $scratch
-# ... verify_reflection (C2, 2026-08-15), verify_deferred_writes (C1, 2026-08-12),
-#     verify_read_path, verify_cli_harness, verify_gate, verify_reconstruction,
+# ... verify_compiler (C3, 2026-08-17), verify_reflection (C2, 2026-08-15),
+#     verify_deferred_writes (C1, 2026-08-12), verify_read_path,
+#     verify_cli_harness, verify_gate, verify_reconstruction,
 #     verify_authorial_correction, verify_fact_correction
 docker exec longmem-pg psql -U longmem -d postgres -c "DROP DATABASE longmem_test WITH (FORCE)"
 ```
@@ -190,7 +191,7 @@ interop gate. With the service up on a scratch database:
 dotnet run --project client\NpcMemory.Harness -- --base-url http://127.0.0.1:8000
 ```
 
-It provisions its own agent and ends with `ALL HARNESS BEATS PASSED (28 checks)`. Point it
+It provisions its own agent and ends with `ALL HARNESS BEATS PASSED (32 checks)`. Point it
 at a scratch DB, not the product one — it writes.
 
 ### Refreshing the Unity plugin DLL

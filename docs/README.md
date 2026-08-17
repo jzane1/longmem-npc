@@ -67,10 +67,12 @@ spec is no longer a plan.
 | `eval-harness.md` | judged eval harness: judge-free metrics + metrics route (stage 1); runner, judge, ablation (stages 2–4) | — |
 | `deferred-writes.md` | deferred write processing: the pending window, the enrichment worker, the completion contract | 006 |
 | `reflection.md` | reflection (C2): the reflect verb + optional default-OFF worker, evidence-cited beliefs, identity consolidation, the mechanical component trim; dossier + spec + BUILD all 2026-08-15 | 007 |
+| `parameter-compiler.md` | the parameter compiler (C3): live beliefs compiled into per-scene-type weight-multiplier bundles, the standalone third worker (no endpoint), the all-mechanical staleness guard; rulings + BUILD 2026-08-17 | 008 |
 
-**Note on `migration-01.md`:** it documents migration **001 only**. Migrations 002–006 (fact
-versions, fact entities, the lexical index, `escalation_failed`, deferred writes) are specced in
-the targets above and live in `db\migrations\`. For the current schema, read the SQL.
+**Note on `migration-01.md`:** it documents migration **001 only**. Migrations 002–008 (fact
+versions, fact entities, the lexical index, `escalation_failed`, deferred writes, reflection
+runs, the parameter compiler) are specced in the targets above and live in `db\migrations\`.
+For the current schema, read the SQL.
 
 ---
 

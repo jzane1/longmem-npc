@@ -1703,6 +1703,59 @@ session.
     compiler) per the roadmap; the deferred + reflection default flips stay Phase D
     questions.
 
+- **2026-08-17 — Phase C3 build: the parameter compiler landed, plan-to-floor in one
+  session.**
+  - **Landed:** the seven rulings settled at the plan-mode fork batches BEFORE any file
+    changed — five design forks (feedstock = ALL live beliefs; typed core = the three
+    weight multipliers only; scheduling = the STANDALONE third worker, where Jack took
+    the LARGER option over the recommended reflect-pipeline stage and the follow-up
+    fork ruled it lands WITHOUT the generic jobs table; the all-mechanical staleness
+    guard; the judge-shaped role) plus the two migration-freeze rulings (the
+    [0.25, 4.0] clamp; `:compile` sweep semantics). Then: migration 008
+    (`compiled_bundles` append-only with liveness DERIVED by join + `compiler_runs`;
+    the FOUR mechanical pins bumped — the documented three plus `verify_reflection`'s
+    own A5 ledger pin, found at plan time by grepping the prior migration's filename);
+    `app\compiler.py` (service + the pure consume functions + `CompilerWorker` — no
+    endpoint, no route, no jobs table, no attempts ledger); the provider quartet +
+    `build_compiler_provider`; the dialogue-seam consume splice (`scene_type` on the
+    turn request, six instrumentation terms incl. `bundle_fetch_ms`,
+    `resolve_dialogue_weights` untouched, zero-bundle byte parity); session/CLI
+    (`:compile` with the visible attempt count; `:scene <type>` extended — the type
+    always rode the boundary event, now it also sticks as session state riding turns);
+    Set M (21 scenarios, all unmarked; suite 135 subset / 149 total); the TENTH walker
+    (48/48 — its docstring carries the persistent-scratch rule and the
+    stop-the-poll-loop-before-counting rule); the C# mirror + interop beats [13]
+    (28 → 32); the docs sweep incl. `parameter-compiler.md` and the stale-text
+    corrections (architecture §12's twelve-routes/eleven-verbs/missing-reflect — a C2
+    propagation miss; README's "Reflection isn't built"; `docs\README.md`'s 006 note).
+    Floor-verifier **PASS** → floors row 27. Believability: no regression (checks 6/0
+    both; gist 0.7667 → 0.85, above the 2026-08-07 baseline; keyword retention equal).
+  - **Found along the way:** the verifier demonstrated `verify_reflection` is
+    non-re-runnable on the persistent `longmem_test` — its B6/E9 DB-global counts get
+    poisoned by its OWN prior green run's rows (the carried walker-scratch item's
+    SECOND documented bite; root-caused airtight as pre-existing, not a C3 regression;
+    60/60 on a fresh scratch, that walker's documented precondition). `longmem_test`
+    currently holds those rows plus aborted-run fixtures — normal walker writes, left
+    as-is for the carried item's own future task.
+  - **Honest notes:** (1) the floors row was first appended via a Python heredoc and
+    the backslash doc-corruption trap bit a SEVENTH time, in a NEW silent costume:
+    `\t`/`\v` are VALID Python escapes, so TAB/VT landed and ATE the following letter
+    with no SyntaxWarning (unlike the invalid-escape spots, which warn and preserve),
+    and `write_text`'s newline translation CRLF'd the whole file besides; the standing
+    grep-verify-control-bytes rule caught it, the row was rewritten byte-level from raw
+    strings, and the file re-verified clean. (2) The interop gate's first run failed on
+    the new beat's own premise — earlier beats' narrative boundary types now stick as
+    session state by design; fixed with a clearing bare boundary in the beat, not a
+    code change. (3) The stage-6 probe first raced the auto-started poll worker's
+    startup sweep — the deterministic-count rule (stop the loop before seeding) is now
+    recorded where it belongs.
+  - **Verified:** control-byte grep clean over every touched doc (after the repair);
+    the product DB pristine before and after (ledger exactly 001–006 — applying
+    007 + 008 to the product store stays Jack's action).
+  - **Blocked:** nothing. **Abandoned:** nothing. Next: C4 (dissonance path +
+    diegetic-correction event) per the roadmap; the three default flips (deferred,
+    reflection, compiler) stay Phase D questions.
+
 
 ---
 

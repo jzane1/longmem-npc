@@ -2017,3 +2017,249 @@ async def fetch_reflection_runs(
         }
         for row in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# Parameter compiler (migration 008; parameter-compiler.md, the C3 rulings
+# 2026-08-17). The reads/writes for app\compiler.py's service and worker —
+# the seam holds no SQL (repo hygiene). compiled_bundles is APPEND-ONLY and
+# its liveness is DERIVED: a bundle applies only while its source reflection
+# is live, so belief supersession/consolidation evicts compiled parameters
+# with zero writes here (the §10 eviction contract — bi-temporal reflection
+# invalidation doubles as compiler-cache eviction).
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class CompilePair:
+    """One unit of compiler work: a live in-window belief that has no bundle
+    yet for one scene type (the compilable surface rides along so the seam
+    never re-fetches)."""
+
+    reflection_id: UUID
+    content: str
+    identity_relevant: bool
+    scene_type: str
+
+
+async def fetch_missing_bundle_pairs(
+    pool: AsyncConnectionPool,
+    agent_id: UUID,
+    *,
+    scene_types: list[str],
+    window_k: int,
+) -> list[CompilePair]:
+    """Work discovery — stateless, like the reflection pressure gauge: the K
+    most recent live beliefs (valid_at DESC, created_at DESC, reflection_id —
+    the ruled window order) crossed with the compile vocabulary, minus pairs
+    that already hold at least one bundle. Deterministic output order (newest
+    belief first, then scene_type) so the sweep's budget cuts a stable
+    prefix."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "WITH window_beliefs AS ("
+            "SELECT reflection_id, content, identity_relevant, valid_at, "
+            "created_at FROM reflections "
+            "WHERE agent_id = %(agent_id)s AND invalid_at IS NULL "
+            "ORDER BY valid_at DESC, created_at DESC, reflection_id "
+            "LIMIT %(window_k)s) "
+            "SELECT w.reflection_id, w.content, w.identity_relevant, "
+            "t.scene_type FROM window_beliefs w "
+            "CROSS JOIN unnest(%(scene_types)s::text[]) AS t(scene_type) "
+            "WHERE NOT EXISTS (SELECT 1 FROM compiled_bundles b "
+            "WHERE b.reflection_id = w.reflection_id "
+            "AND b.scene_type = t.scene_type) "
+            "ORDER BY w.valid_at DESC, w.created_at DESC, w.reflection_id, "
+            "t.scene_type",
+            {
+                "agent_id": agent_id,
+                "scene_types": scene_types,
+                "window_k": window_k,
+            },
+        )
+        rows = await cur.fetchall()
+    return [
+        CompilePair(
+            reflection_id=row[0],
+            content=row[1],
+            identity_relevant=bool(row[2]),
+            scene_type=row[3],
+        )
+        for row in rows
+    ]
+
+
+@dataclass(frozen=True)
+class CompiledBundleInsert:
+    """One compile call's validated result (the seam has already clamped the
+    multipliers to the module constants and namespace-filtered the
+    passthrough — the CHECK is defense, not the validator)."""
+
+    reflection_id: UUID
+    scene_type: str
+    w_relevance: float
+    w_recency: float
+    w_importance: float
+    passthrough: dict
+    input_tokens: int
+    output_tokens: int
+    compile_ms: float | None
+
+
+async def insert_compiled_bundle(
+    pool: AsyncConnectionPool, agent_id: UUID, insert: CompiledBundleInsert
+) -> UUID:
+    """Append-only: a re-compile of the same (reflection, scene_type) appends
+    a newer row and the consume read picks it by created_at (bundle_id breaks
+    the tie — same-transaction rows share one created_at)."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "INSERT INTO compiled_bundles (agent_id, reflection_id, "
+            "scene_type, w_relevance, w_recency, w_importance, passthrough, "
+            "input_tokens, output_tokens, compile_ms) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+            "RETURNING bundle_id",
+            (
+                agent_id,
+                insert.reflection_id,
+                insert.scene_type,
+                insert.w_relevance,
+                insert.w_recency,
+                insert.w_importance,
+                Jsonb(insert.passthrough),
+                insert.input_tokens,
+                insert.output_tokens,
+                insert.compile_ms,
+            ),
+        )
+        return (await cur.fetchone())[0]
+
+
+@dataclass(frozen=True)
+class DialogueBundleRow:
+    """One contributing bundle as the dialogue seam consumes it."""
+
+    reflection_id: UUID
+    w_relevance: float
+    w_recency: float
+    w_importance: float
+
+
+async def fetch_dialogue_bundles(
+    pool: AsyncConnectionPool,
+    agent_id: UUID,
+    *,
+    scene_type: str,
+    window_k: int,
+) -> list[DialogueBundleRow]:
+    """The consume read: for each of the K most recent live beliefs (the same
+    window order as discovery — the staleness guard binds both ends), the
+    newest bundle for exactly the resolved scene type. A KNOWN type whose
+    pair is not yet compiled contributes nothing — no cross-type fallback;
+    the compile-lag window degrades toward neutral, never leaks another
+    type's parameters. Outer order = belief recency, so the instrumentation
+    list is stable."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "WITH window_beliefs AS ("
+            "SELECT reflection_id, valid_at, created_at FROM reflections "
+            "WHERE agent_id = %(agent_id)s AND invalid_at IS NULL "
+            "ORDER BY valid_at DESC, created_at DESC, reflection_id "
+            "LIMIT %(window_k)s) "
+            "SELECT latest.reflection_id, latest.w_relevance, "
+            "latest.w_recency, latest.w_importance FROM ("
+            "SELECT DISTINCT ON (w.reflection_id) w.reflection_id, "
+            "b.w_relevance, b.w_recency, b.w_importance, w.valid_at, "
+            "w.created_at FROM window_beliefs w "
+            "JOIN compiled_bundles b ON b.reflection_id = w.reflection_id "
+            "AND b.scene_type = %(scene_type)s "
+            "ORDER BY w.reflection_id, b.created_at DESC, b.bundle_id"
+            ") latest "
+            "ORDER BY latest.valid_at DESC, latest.created_at DESC, "
+            "latest.reflection_id",
+            {
+                "agent_id": agent_id,
+                "scene_type": scene_type,
+                "window_k": window_k,
+            },
+        )
+        rows = await cur.fetchall()
+    return [
+        DialogueBundleRow(
+            reflection_id=row[0],
+            w_relevance=float(row[1]),
+            w_recency=float(row[2]),
+            w_importance=float(row[3]),
+        )
+        for row in rows
+    ]
+
+
+@dataclass(frozen=True)
+class CompilerRunRecord:
+    """Per-agent-per-sweep instrumentation destined for compiler_runs — the
+    WORKER's persisted accounting (C3 has no endpoint verb by ruling, so
+    every row is worker-written; a skipped agent writes nothing)."""
+
+    agent_id: UUID
+    outcome: str  # 'completed' | 'failed'
+    error: str | None
+    pairs_compiled: int
+    pairs_failed: int
+    passthrough_keys_dropped: int
+    input_tokens: int
+    output_tokens: int
+    total_ms: float | None
+
+
+async def insert_compiler_run(
+    pool: AsyncConnectionPool, run: CompilerRunRecord
+) -> None:
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "INSERT INTO compiler_runs (agent_id, outcome, error, "
+            "pairs_compiled, pairs_failed, passthrough_keys_dropped, "
+            "input_tokens, output_tokens, total_ms) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (
+                run.agent_id,
+                run.outcome,
+                run.error,
+                run.pairs_compiled,
+                run.pairs_failed,
+                run.passthrough_keys_dropped,
+                run.input_tokens,
+                run.output_tokens,
+                run.total_ms,
+            ),
+        )
+
+
+async def fetch_compiler_runs(pool: AsyncConnectionPool, agent_id: UUID) -> list[dict]:
+    """An agent's run rows, oldest first — the walker/test surface for the
+    worker's accounting (no product read route rides this until C5's
+    agent-state read, by ruling — the fetch_reflection_runs precedent)."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT run_id, outcome, error, pairs_compiled, pairs_failed, "
+            "passthrough_keys_dropped, input_tokens, output_tokens, "
+            "total_ms, created_at "
+            "FROM compiler_runs WHERE agent_id = %s ORDER BY created_at, run_id",
+            (agent_id,),
+        )
+        rows = await cur.fetchall()
+    return [
+        {
+            "run_id": row[0],
+            "outcome": row[1],
+            "error": row[2],
+            "pairs_compiled": row[3],
+            "pairs_failed": row[4],
+            "passthrough_keys_dropped": row[5],
+            "input_tokens": row[6],
+            "output_tokens": row[7],
+            "total_ms": row[8],
+            "created_at": row[9],
+        }
+        for row in rows
+    ]

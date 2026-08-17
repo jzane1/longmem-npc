@@ -29,6 +29,12 @@ namespace NpcMemory
         public Guid AgentId { get; }
         public string? IdentityVersion { get; private set; }
         public DateTimeOffset? SceneStartedAt { get; private set; }
+
+        /// <summary>The session's scene type (C3, 2026-08-17): set by
+        /// SceneBoundaryAsync's argument, cleared by a bare boundary; rides
+        /// every turn request so the current scene's compiled bundles
+        /// multiply the prose-view weights.</summary>
+        public string? SceneType { get; private set; }
         public DateTimeOffset? AsOf { get; set; }
         public List<Guid>? LoadedMemoryIds { get; private set; }
         public int GateFruitlessStreak { get; private set; }
@@ -70,6 +76,7 @@ namespace NpcMemory
                 LoadedMemoryIds = LoadedMemoryIds,
                 GateFruitlessStreak = GateFruitlessStreak,
                 WeightOverrides = weightOverrides,
+                SceneType = SceneType,
                 Debug = Debug,
             };
 
@@ -153,7 +160,9 @@ namespace NpcMemory
 
         /// <summary>Scene boundary: emit the event (the handler recompiles
         /// the identity document server-side), then refresh the frozen scene
-        /// state — within the ending scene none of it moved.</summary>
+        /// state — within the ending scene none of it moved. Since C3 the
+        /// type also becomes session state riding the following turns
+        /// (a bare boundary clears it back to the default).</summary>
         public async Task<SceneResult> SceneBoundaryAsync(
             string? sceneType = null, CancellationToken ct = default)
         {
@@ -168,6 +177,7 @@ namespace NpcMemory
                     ct);
             IdentityVersion = result.IdentityVersion;
             SceneStartedAt = Now();
+            SceneType = sceneType;
             LoadedMemoryIds = null; // next turn is a loader
             GateFruitlessStreak = 0; // the damper dies with the scene
             ContextLocation = null; // a new scene is a new place/cast

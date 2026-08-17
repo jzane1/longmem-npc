@@ -65,6 +65,10 @@ namespace NpcMemory.Harness
                         ["semantic"] = 2592000.0,
                     },
                     ["decay_class_default"] = "episodic",
+                    // The compiler's scene-type vocabulary (C3, 2026-08-17):
+                    // beat [13] asserts a configured type resolves to itself
+                    // over the wire.
+                    ["scene_types"] = new JArray("ford"),
                 },
             });
             Check(created.AgentId != Guid.Empty, "agent provisioned, server-minted UUID",
@@ -369,6 +373,55 @@ namespace NpcMemory.Harness
                     "below the episode floor -> 409 over the wire",
                     $"status {ex.StatusCode}");
             }
+
+            // -- [13] compiled parameters: the scene-type wire contract ----
+            // (parameter-compiler.md, C3 2026-08-17). The compiler is
+            // worker-scheduled with no endpoint and ships default OFF, so
+            // over the wire these beats assert the RESOLUTION + echo
+            // contract; the sweep/eviction mechanics are the tenth walker's
+            // job. Beliefs exist from beat [12], bundles do not — the
+            // neutral echo is the parity contract on a live store.
+            Console.WriteLine("\n[13] Compiled parameters: scene-type resolution + echo");
+            // Earlier beats' boundaries carried narrative types; the type is
+            // session state since C3, so clear it first — the stickiness the
+            // bare boundary exists for.
+            await session.SceneBoundaryAsync();
+            var neutralTurn = await session.SayAsync("what do you make of the ford?");
+            Check(
+                neutralTurn.Instrumentation.SceneTypeResolved == "default"
+                    && !neutralTurn.Instrumentation.SceneTypeUnknown
+                    && neutralTurn.Instrumentation.BundleWRelevance == 1.0
+                    && neutralTurn.Instrumentation.BundleWRecency == 1.0
+                    && neutralTurn.Instrumentation.BundleWImportance == 1.0
+                    && neutralTurn.Instrumentation.BundleReflectionIds.Count == 0,
+                "absent scene type resolves default with the neutral echo",
+                $"scene={neutralTurn.Instrumentation.SceneTypeResolved}");
+
+            await session.SceneBoundaryAsync("ford");
+            var typedTurn = await session.SayAsync("and now, at the crossing?");
+            Check(
+                session.SceneType == "ford"
+                    && typedTurn.Instrumentation.SceneTypeResolved == "ford"
+                    && !typedTurn.Instrumentation.SceneTypeUnknown,
+                "a configured type rides the session and resolves to itself",
+                $"scene={typedTurn.Instrumentation.SceneTypeResolved}");
+
+            await session.SceneBoundaryAsync("moonlit-heist");
+            var unknownTurn = await session.SayAsync("do you know this place?");
+            Check(
+                unknownTurn.Instrumentation.SceneTypeResolved == "default"
+                    && unknownTurn.Instrumentation.SceneTypeUnknown,
+                "an unconfigured type log-and-continues to the default, flagged",
+                $"scene={unknownTurn.Instrumentation.SceneTypeResolved}"
+                + $" unknown={unknownTurn.Instrumentation.SceneTypeUnknown}");
+
+            await session.SceneBoundaryAsync();
+            var clearedTurn = await session.SayAsync("back to plain daylight.");
+            Check(
+                session.SceneType == null
+                    && clearedTurn.Instrumentation.SceneTypeResolved == "default"
+                    && !clearedTurn.Instrumentation.SceneTypeUnknown,
+                "a bare boundary clears the session type back to the default");
 
             // -- wrap-up ---------------------------------------------------
             Console.WriteLine(

@@ -355,6 +355,11 @@ future supersession set `invalid_at`, never delete); `content` + `identity_relev
 compiled parameter layer amplifies like a confabulated rule library (the honest-lying
 ExpeL note) — C3 budgets its own staleness guard; RRR here is the upstream half.
 
+*(C3 BUILT 2026-08-17 on exactly this contract — `parameter-compiler.md`: the eviction
+rides liveness-by-join with zero bundle writes, the three-field surface is consumed
+verbatim, and the staleness guard landed as the all-mechanical K-window + liveness +
+clamps trio.)*
+
 ## Verification
 
 - **Suite Set L** (`tests\test_reflection.py`, ~13 scenarios, mostly unmarked — fixtures
