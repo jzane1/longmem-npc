@@ -938,3 +938,125 @@ class ReconstructionMetricsResult(BaseModel):
     cache_bands: list[int] = Field(default_factory=list)
     metrics_ms: float
     total_ms: float
+
+
+# ---------------------------------------------------------------------------
+# The agent-state read (C5, ruled 2026-08-17 — the FOURTH unscored-by-contract
+# member): the composed runtime snapshot that four earlier builds recorded
+# this route as the consumer for — reflection.md's pressure gauge, the 007/008
+# run logs, and compiled_bundles.passthrough (the future-integrator read).
+# ---------------------------------------------------------------------------
+
+
+class ReflectionSummaryOut(BaseModel):
+    """One live belief (a reflections row) as the state read serves it —
+    content + provenance. Served in the ruled compiler-window order
+    (valid_at DESC, created_at DESC, reflection_id), so the first
+    compiler_window_k rows ARE the compile window, by construction."""
+
+    reflection_id: UUID
+    content: str
+    identity_relevant: bool
+    source_memory_ids: list[UUID] = Field(default_factory=list)
+    valid_at: datetime
+    created_at: datetime
+
+
+class CompiledBundleOut(BaseModel):
+    """The newest live bundle for one (belief, scene_type) pair — liveness
+    DERIVED from the source reflection being live (the §10 contract; no
+    stored flag exists to echo). `passthrough` is the integrator's
+    namespaced data verbatim: stored, never interpreted server-side — this
+    read is its recorded surface (parameter-compiler.md)."""
+
+    bundle_id: UUID
+    reflection_id: UUID
+    scene_type: str
+    w_relevance: float
+    w_recency: float
+    w_importance: float
+    passthrough: dict = Field(default_factory=dict)
+    input_tokens: int
+    output_tokens: int
+    compile_ms: float | None
+    created_at: datetime
+
+
+class ReflectionRunOut(BaseModel):
+    """One reflection-worker run row (migration 007), full column mirror —
+    the EnrichmentRunOut precedent: a background seam has no response
+    payload to ride, so its persisted accounting surfaces on an unscored
+    read. Endpoint reflects write NO row (the endpoint/worker split), so an
+    agent driven only through the reflect verb shows an empty log here."""
+
+    run_id: UUID
+    outcome: Literal["completed", "failed"]
+    error: str | None
+    reflections_written: int
+    dropped_ungrounded: int
+    consolidation_ran: bool
+    consolidation_failed: bool
+    rrr: float | None
+    rrr_blocked: bool
+    pruned_components: int
+    evicted_cache_rows: int
+    pressure_before: float | None
+    pressure_after: float | None
+    reflect_ms: float | None
+    consolidation_ms: float | None
+    insert_ms: float | None
+    total_ms: float | None
+    reflect_input_tokens: int
+    reflect_output_tokens: int
+    consolidation_input_tokens: int
+    consolidation_output_tokens: int
+    created_at: datetime
+
+
+class CompilerRunOut(BaseModel):
+    """One compiler-worker run row (migration 008), full column mirror —
+    every row is worker-written (C3 has no endpoint verb by ruling); a
+    skipped agent (kill-switch, or no missing pairs) writes nothing."""
+
+    run_id: UUID
+    outcome: Literal["completed", "failed"]
+    error: str | None
+    pairs_compiled: int
+    pairs_failed: int
+    passthrough_keys_dropped: int
+    input_tokens: int
+    output_tokens: int
+    total_ms: float | None
+    created_at: datetime
+
+
+class AgentStateResult(BaseModel):
+    """GET /v1/agents/{agent_id}/state — the agent-state read (C5, ruled
+    2026-08-17): the stored agent row (`config` AS STORED — SERVICE_DEFAULTS
+    are never merged in; knobs resolve per call at use time, and a resolved
+    snapshot would rot), the current identity version (SELECT-only, the
+    newest document row — never the ensure_ upsert), the reflection-pressure
+    gauge (computed on demand, never stored — architecture §2's
+    runtime-state rule; same guard as the reflect verb: a non-positive norm
+    raises, never clamps), the live beliefs, the derived-liveness bundles,
+    and the two workers' run logs (newest first, capped by `runs_limit` — a
+    caller argument, the k precedent). The FOURTH unscored-by-contract
+    member: no retrieval runs, so no scores exist — IDs + structured fields;
+    ZERO writes. The dormant reputation columns are deliberately absent —
+    the A1 removal stays removed."""
+
+    agent_id: UUID
+    name: str | None
+    seed_identity: str | None
+    rigidity: float | None
+    diagnosticity_goal: str | None
+    config: dict
+    identity_version: str | None
+    identity_compiled_at: datetime | None
+    reflection_pressure: float
+    reflections: list[ReflectionSummaryOut] = Field(default_factory=list)
+    compiled_bundles: list[CompiledBundleOut] = Field(default_factory=list)
+    reflection_runs: list[ReflectionRunOut] = Field(default_factory=list)
+    compiler_runs: list[CompilerRunOut] = Field(default_factory=list)
+    runs_limit: int
+    total_ms: float

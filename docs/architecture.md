@@ -214,8 +214,10 @@ byte-equivalent to the sync scoring-failed end-state — deferral never adds a l
 
 **Dialogue initialization:** top-k retrieval. Endpoints that run retrieval return **memory IDs and
 scores alongside prose** — this is load-bearing; it is what makes the test suite assertable.
-*(Carve-out, ruled 2026-07-27: the two **inspector reads** below run no retrieval and are unscored
-by contract — IDs and structured fields on every row, no scores, because none were computed.)*
+*(Carve-out, ruled 2026-07-27; third member 2026-07-29; **fourth member ruled 2026-08-17**: the
+two **inspector reads** below, the judge-free metric read, and the **agent-state read** run no
+retrieval and are unscored by contract — IDs and structured fields on every row, no scores,
+because none were computed.)*
 
 **Inspector reads** (unity-client.md fork 3, **built & floor-verified 2026-07-27**) — the record
 made legible, and the Ledger's data source: `GET /v1/memories/{id}/chain` returns the immutable
@@ -236,6 +238,22 @@ not bind; the two inspector reads' unscored contract is untouched) and performs 
 the identity document is the pure render, never the `ensure_` upsert. The presence rule is the
 `metric_gist_match_threshold` knob (default 1.0 — strict lexical; paraphrase slack belongs to
 the judged categories).
+
+**The agent-state read** (C5, **built & ruled 2026-08-17** — the carve-out's fourth member):
+`GET /v1/agents/{id}/state` is the composed runtime snapshot three earlier builds recorded this
+route as the consumer for — the reflection-pressure gauge's standing surface (`reflection.md`),
+the `compiled_bundles.passthrough` integrator read (`parameter-compiler.md`), and both workers'
+run logs (the enrichment-runs-on-`/chain` precedent: a background seam's accounting surfaces on
+an unscored read). Payload: the stored agent row **as stored** (`config` verbatim —
+SERVICE_DEFAULTS never merged; a resolved snapshot would rot), the current `identity_version`
+(the newest document row, SELECT-only — never the `ensure_` upsert), the pressure gauge
+(computed on demand, never stored — §2's runtime-state rule; the reflect verb's loud
+non-positive-norm guard verbatim), the live beliefs in the ruled compiler-window order (the
+first `compiler_window_k` rows ARE the compile window, by construction), the newest live bundle
+per (belief, scene_type) with liveness DERIVED from the source reflection (§10), and the two
+run logs newest-first capped by `runs_limit` (a caller argument, the `k` precedent). Zero
+writes; 404 on unknown agent. The dormant reputation columns stay absent — the A1 removal
+stays removed.
 
 **Retrieval scoring** (built & floor-verified 2026-07-14, `read-path.md`; shapes ruled in the
 dated `decisions.md` entry): `relevance × recency(decay class) × importance_norm`; pin exemption;
@@ -527,11 +545,12 @@ is C2's RRR.
 
 ## 12. Integrator surface requirements
 
-**The shipped HTTP surface** *(fourteen routes; five landed 2026-07-23 and 2026-07-27 —
+**The shipped HTTP surface** *(fifteen routes; five landed 2026-07-23 and 2026-07-27 —
 `unity-client.md`; the metric read 2026-07-29 — `eval-harness.md`; the reflect verb
 2026-08-15 — `reflection.md`; this paragraph still said "twelve" and omitted reflect until
 2026-08-17, a C2 propagation miss corrected at the C3 build — C3 itself adds NO route by
-ruling; the diegetic-correction event joined with C4, 2026-08-17 — `dissonance.md`)*:
+ruling; the diegetic-correction event joined with C4, 2026-08-17 — `dissonance.md`; the
+agent-state read with C5 the same day)*:
 `POST /v1/events/observe`,
 `POST /v1/events/scene-boundary`,
 **`POST /v1/events/diegetic-correction`** (the confrontation event — the dissonance path),
@@ -541,16 +560,18 @@ is the client's job), **`POST /v1/dialogue/turn/stream`** (its SSE twin, iterati
 async-generator seam — `chunk` / `reconstructing` / `result` / `error` events), **`POST /v1/agents`**
 (provisioning; UUID minted server-side), **`POST /v1/agents/{id}/reflect`** (the reflect verb),
 the two **inspector reads** (§6),
-**`GET /v1/memories/{id}/reconstruction-metrics`** (the judge-free metric read, §6), and
+**`GET /v1/memories/{id}/reconstruction-metrics`** (the judge-free metric read, §6),
+**`GET /v1/agents/{id}/state`** (the agent-state read, §6 — C5), and
 **`GET /ledger`** (the static browser inspector, served BY the API so it shares the origin of the
 routes it polls — no CORS surface, no second server).
 
 **The client package** *(built 2026-07-27)*: `client\NpcMemory.Core` — netstandard2.1,
 engine-agnostic (**zero `UnityEngine` types** by ruling), one flat `NpcMemoryClient` covering all
-twelve verbs 1:1 *(the metrics read joined 2026-07-29; the reflect verb 2026-08-15 — "eleven"
+thirteen verbs 1:1 *(the metrics read joined 2026-07-29; the reflect verb 2026-08-15 — "eleven"
 stood stale here until the 2026-08-17 correction; C3 adds no verb, its scene_type rides the
-turn request)*, plus `NpcSession`, the C# port of the
-Python runner's turn bookkeeping. Unity gets a
+turn request; the agent-state read joined with C5, 2026-08-17)*, plus `NpcSession`, the C# port
+of the Python runner's turn bookkeeping *(C5 added the session's fire-and-forget observe
+surface — `unity-client.md`)*. Unity gets a
 thin MonoBehaviour adapter over it; a `dotnet run` console harness plays every demo beat headless.
 
 Docs are written as though a **hostile integrator** is reading them, answering ownership questions

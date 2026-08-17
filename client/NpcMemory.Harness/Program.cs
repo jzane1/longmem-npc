@@ -17,6 +17,7 @@ namespace NpcMemory.Harness
     /// drift + cache -> gate fire -> warm-init -> SSE stream -> the
     /// weights-on-speech re-rank (A1 re-shape, 2026-08-04) -> the reflect
     /// verb (C2, 2026-08-15) -> the diegetic-correction event (C4,
+    /// 2026-08-17) -> the agent-state read + fire-and-forget observes (C5,
     /// 2026-08-17).
     /// Structural asserts only: IDs, flags, byte-identity — never prose.
     /// </summary>
@@ -489,6 +490,136 @@ namespace NpcMemory.Harness
                     "stale CAS -> 409 over the wire, nothing written",
                     $"status {ex.StatusCode}");
             }
+
+            // -- [15] the agent-state read (C5, 2026-08-17) ----------------
+            // The fourth unscored read over the wire: the stored row echoed
+            // as stored (never resolved), identity currency agreeing with
+            // the session's frozen version, beat-[12]'s beliefs, and the
+            // endpoint/worker split made visible — endpoint reflects write
+            // no run row and the compiler ships OFF, so both logs are EMPTY
+            // on a store this very harness populated.
+            Console.WriteLine("\n[15] Agent state: the composed snapshot over the wire");
+            var agentState = await client.AgentStateAsync(created.AgentId);
+            Check(
+                agentState.AgentId == created.AgentId
+                    && agentState.Name == "harness-keeper"
+                    && agentState.SeedIdentity == created.SeedIdentity
+                    && agentState.DiagnosticityGoal == "what threatens the ford"
+                    && agentState.Rigidity == null,
+                "the stored row echoes back, absent rigidity present-null",
+                $"name={agentState.Name}");
+            Check(
+                JToken.DeepEquals(
+                    agentState.Config["scene_types"], new JArray("ford"))
+                    && agentState.Config["decay_class_default"]?.Value<string>()
+                        == "episodic",
+                "config comes back AS STORED (the beat-[1] values verbatim)");
+            Check(
+                agentState.IdentityVersion == session.IdentityVersion
+                    && agentState.IdentityCompiledAt != null,
+                "the state read's identity version agrees with the session's "
+                + "frozen scene state",
+                $"identity={agentState.IdentityVersion?.Substring(0, 8)}…");
+            var believedIds = new HashSet<Guid>(
+                agentState.Reflections.Select(r => r.ReflectionId));
+            Check(
+                reflected.Reflections.All(r => believedIds.Contains(r.ReflectionId))
+                    && agentState.Reflections.All(r => r.Content.Length > 0),
+                "beat-[12]'s stored beliefs ride the state read",
+                $"{agentState.Reflections.Count} live beliefs");
+            Check(
+                agentState.ReflectionPressure > 0.0,
+                "post-reflect observes accumulate fresh pressure on the gauge",
+                $"pressure={agentState.ReflectionPressure:F3}");
+            Check(
+                agentState.CompiledBundles.Count == 0
+                    && agentState.ReflectionRuns.Count == 0
+                    && agentState.CompilerRuns.Count == 0
+                    && agentState.RunsLimit == 100,
+                "endpoint/worker split visible: no run rows, no bundles "
+                + "(endpoint reflects write none; the compiler ships OFF)");
+            try
+            {
+                await client.AgentStateAsync(Guid.NewGuid());
+                Check(false, "unknown agent must refuse the state read with 404");
+            }
+            catch (NpcMemoryApiException ex)
+            {
+                Check(ex.StatusCode == 404,
+                    "unknown agent -> 404 over the wire",
+                    $"status {ex.StatusCode}");
+            }
+
+            // -- [16] fire-and-forget observes (C5, 2026-08-17) ------------
+            // The lever: dialogue never waits on the write pass. The stamp
+            // is synchronous (world time = the AsOf at the call), so arrival
+            // order cannot reorder the record; the drain is the explicit
+            // join (no verb auto-drains, by ruling).
+            Console.WriteLine("\n[16] Async observes: fire, speak, drain, verify");
+            var indexBefore = await client.AgentMemoriesAsync(created.AgentId, 1);
+            var tA = t0.AddDays(50);
+            var tB = t0.AddDays(50).AddHours(1);
+            session.AsOf = tA;
+            session.ObserveAndForget(
+                "A raft of cut timber slipped its rope and jammed the ford.");
+            session.AsOf = tB;
+            session.ObserveAndForget(
+                "The carters levered the timber free before nightfall.");
+            Check(
+                session.PendingObserves > 0,
+                "both fires returned immediately, calls in flight",
+                $"pending={session.PendingObserves}");
+            var whilePending = await session.SayAsync("what troubles the ford today?");
+            Check(
+                whilePending.Items.Count > 0,
+                "a dialogue turn completes WITHOUT draining — observes never "
+                + "block speech");
+            await session.DrainObservesAsync();
+            Check(session.PendingObserves == 0, "drain joins every in-flight observe");
+            var after = await client.AgentMemoriesAsync(created.AgentId, 1000);
+            var rowA = after.Memories.FirstOrDefault(m => m.ValidAt == tA);
+            var rowB = after.Memories.FirstOrDefault(m => m.ValidAt == tB);
+            Check(
+                after.TotalCount == indexBefore.TotalCount + 2
+                    && rowA != null && rowB != null
+                    && after.Memories.ToList().IndexOf(rowB)
+                        < after.Memories.ToList().IndexOf(rowA),
+                "both landed with their CALL-time world times, newest first "
+                + "(arrival order cannot reorder the record)",
+                $"count {indexBefore.TotalCount} -> {after.TotalCount}");
+
+            // The failure path stays loud with no one awaiting: a session on
+            // a deliberately bogus agent id (a harness fixture — the one
+            // deterministic failure a fake-mode server can produce; the
+            // product path is real observes) records the typed 404, raises
+            // the event at failure time, and the next drain re-throws it as
+            // ONE AggregateException — then clears, so draining is how the
+            // integrator acknowledges.
+            var doomed = new NpcSession(client, Guid.NewGuid(), phaseTag: "harness");
+            var failures = new List<string>();
+            doomed.OnObserveFailed += (text, ex) => failures.Add(text);
+            doomed.ObserveAndForget("this agent does not exist");
+            try
+            {
+                await doomed.DrainObservesAsync();
+                Check(false, "a failed fire-and-forget must re-throw at drain");
+            }
+            catch (AggregateException agg)
+            {
+                Check(
+                    agg.InnerExceptions.Count == 1
+                        && agg.InnerExceptions[0] is NpcMemoryApiException api
+                        && api.StatusCode == 404,
+                    "drain re-throws the typed failure as one AggregateException",
+                    $"status {(agg.InnerExceptions[0] as NpcMemoryApiException)?.StatusCode}");
+            }
+            Check(
+                failures.Count == 1 && failures[0] == "this agent does not exist",
+                "OnObserveFailed fired once, at failure time, with the text");
+            await doomed.DrainObservesAsync(); // must NOT throw: acknowledged
+            Check(
+                doomed.PendingObserves == 0,
+                "failures clear on drain — the second drain is clean");
 
             // -- wrap-up ---------------------------------------------------
             Console.WriteLine(

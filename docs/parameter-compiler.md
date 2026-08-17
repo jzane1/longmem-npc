@@ -112,8 +112,9 @@ field-for-field (`NpcSession.SceneType` set by `SceneBoundaryAsync`).
 
 **Passthrough is stored, never consumed or wire-carried in C3.** Ruling 2 leaves it no
 server-side consumer; it lands validated in `compiled_bundles.passthrough` for the future
-integrator read (C5's agent-state neighborhood — the recorded dependency). Nobody should
-hunt for a phantom consumer.
+integrator read (C5's agent-state neighborhood — the recorded dependency; **BUILT
+2026-08-17**: `GET /v1/agents/{id}/state` serves it verbatim on every live bundle, still
+never interpreted server-side). Nobody should hunt for a phantom consumer.
 
 ## The staleness guard (ruling 4 — all mechanical, no model judgment)
 

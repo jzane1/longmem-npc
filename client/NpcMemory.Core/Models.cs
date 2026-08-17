@@ -587,4 +587,111 @@ namespace NpcMemory
         public double MetricsMs { get; set; }
         public double TotalMs { get; set; }
     }
+
+    // -- the agent-state read (C5, ruled 2026-08-17) --------------------
+
+    /// <summary>One live belief as the state read serves it, in the ruled
+    /// compiler-window order — the first compiler_window_k rows ARE the
+    /// compile window.</summary>
+    public sealed class ReflectionSummaryOut
+    {
+        public Guid ReflectionId { get; set; }
+        public string Content { get; set; } = "";
+        public bool IdentityRelevant { get; set; }
+        public List<Guid> SourceMemoryIds { get; set; } = new List<Guid>();
+        public DateTimeOffset ValidAt { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+    }
+
+    /// <summary>The newest live bundle per (belief, scene_type) —
+    /// Passthrough is the integrator's namespaced data verbatim,
+    /// stored-never-interpreted server-side (this read is its recorded
+    /// surface).</summary>
+    public sealed class CompiledBundleOut
+    {
+        public Guid BundleId { get; set; }
+        public Guid ReflectionId { get; set; }
+        public string SceneType { get; set; } = "";
+        public double WRelevance { get; set; }
+        public double WRecency { get; set; }
+        public double WImportance { get; set; }
+        public JObject Passthrough { get; set; } = new JObject();
+        public int InputTokens { get; set; }
+        public int OutputTokens { get; set; }
+        public double? CompileMs { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+    }
+
+    /// <summary>One reflection-worker run row (migration 007, full mirror).
+    /// Endpoint reflects write NO row — the endpoint/worker split.</summary>
+    public sealed class ReflectionRunOut
+    {
+        public Guid RunId { get; set; }
+        public string Outcome { get; set; } = "";
+        public string? Error { get; set; }
+        public int ReflectionsWritten { get; set; }
+        public int DroppedUngrounded { get; set; }
+        public bool ConsolidationRan { get; set; }
+        public bool ConsolidationFailed { get; set; }
+        public double? Rrr { get; set; }
+        public bool RrrBlocked { get; set; }
+        public int PrunedComponents { get; set; }
+        public int EvictedCacheRows { get; set; }
+        public double? PressureBefore { get; set; }
+        public double? PressureAfter { get; set; }
+        public double? ReflectMs { get; set; }
+        public double? ConsolidationMs { get; set; }
+        public double? InsertMs { get; set; }
+        public double? TotalMs { get; set; }
+        public int ReflectInputTokens { get; set; }
+        public int ReflectOutputTokens { get; set; }
+        public int ConsolidationInputTokens { get; set; }
+        public int ConsolidationOutputTokens { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+    }
+
+    /// <summary>One compiler-worker run row (migration 008, full mirror) —
+    /// every row is worker-written; C3 has no endpoint verb.</summary>
+    public sealed class CompilerRunOut
+    {
+        public Guid RunId { get; set; }
+        public string Outcome { get; set; } = "";
+        public string? Error { get; set; }
+        public int PairsCompiled { get; set; }
+        public int PairsFailed { get; set; }
+        public int PassthroughKeysDropped { get; set; }
+        public int InputTokens { get; set; }
+        public int OutputTokens { get; set; }
+        public double? TotalMs { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+    }
+
+    /// <summary>GET /v1/agents/{id}/state — the composed runtime snapshot
+    /// (C5): the stored row (Config AS STORED, defaults never merged), the
+    /// current identity version (null = never compiled), the pressure gauge
+    /// (computed server-side, never stored), live beliefs, derived-liveness
+    /// bundles, and both workers' run logs newest-first. The fourth
+    /// unscored-by-contract read: structured fields, no scores.</summary>
+    public sealed class AgentStateResult
+    {
+        public Guid AgentId { get; set; }
+        public string? Name { get; set; }
+        public string? SeedIdentity { get; set; }
+        public double? Rigidity { get; set; }
+        public string? DiagnosticityGoal { get; set; }
+        public JObject Config { get; set; } = new JObject();
+        public string? IdentityVersion { get; set; }
+        public DateTimeOffset? IdentityCompiledAt { get; set; }
+        public double ReflectionPressure { get; set; }
+        public List<ReflectionSummaryOut> Reflections { get; set; } =
+            new List<ReflectionSummaryOut>();
+        public List<CompiledBundleOut> CompiledBundles { get; set; } =
+            new List<CompiledBundleOut>();
+        public List<ReflectionRunOut> ReflectionRuns { get; set; } =
+            new List<ReflectionRunOut>();
+        public List<CompilerRunOut> CompilerRuns { get; set; } =
+            new List<CompilerRunOut>();
+        public int RunsLimit { get; set; }
+        public double TotalMs { get; set; }
+    }
 }

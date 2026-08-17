@@ -85,10 +85,11 @@ register entry):
 (request models serialize exactly what Pydantic accepts; response models deserialize every field
 the service returns — the route pass-through ruling carried to the client).
 
-**Eleven verbs as built** *(table corrected 2026-07-28: it was written before the forks were ruled
+**Fourteen verbs as built** *(table corrected 2026-07-28: it was written before the forks were ruled
 and still said "six routes" — forks 1–3 added four more, all of which shipped in stage 0; row
 eleven added 2026-08-07 audit — `ReconstructionMetricsAsync` had joined 2026-07-29 with
-eval-harness stage 1 and the table was never updated)*:
+eval-harness stage 1 and the table was never updated; corrected again 2026-08-17 with C5's row —
+`ReflectAsync` had joined 2026-08-15 with C2 and this table was never updated, the same miss)*:
 
 | Verb | Route | Errors surfaced |
 |---|---|---|
@@ -101,16 +102,19 @@ eval-harness stage 1 and the table was never updated)*:
 | `CorrectAsync` | `POST /v1/memories/{id}/correction` | 404 / 409 CAS conflict / 422 / 502 fail-loud |
 | `DiegeticCorrectAsync` | `POST /v1/events/diegetic-correction` (C4, 2026-08-17 — `dissonance.md`) | 404 unknown/foreign memory / 409 CAS / 422 / 502 retell fail-loud |
 | `CreateAgentAsync` | `POST /v1/agents` (provisioning, fork 2) | 422 on an empty name |
+| `ReflectAsync` | `POST /v1/agents/{id}/reflect` (C2, 2026-08-15 — `reflection.md`) | 404 / 409 below the episode floor / 422 / 502 fail-loud |
 | `MemoryChainAsync` | `GET /v1/memories/{id}/chain` (fork 3, unscored) | 404 |
 | `AgentMemoriesAsync` | `GET /v1/agents/{id}/memories` (fork 3, unscored) | 404 |
 | `ReconstructionMetricsAsync` | `GET /v1/memories/{id}/reconstruction-metrics` (eval-harness stage 1, 2026-07-29; the third unscored-by-contract read) | 404 |
+| `AgentStateAsync` | `GET /v1/agents/{id}/state` (C5, 2026-08-17; the FOURTH unscored-by-contract read — the composed runtime snapshot: the stored row as stored, identity currency, the pressure gauge, live beliefs, bundles incl. passthrough, both workers' run logs newest-first capped by `runsLimit`) | 404 |
 
 HTTP errors map to typed exceptions (the Python service-error precedent — never swallowed,
 never retried silently). Timeouts are per-route config: `init` must tolerate the cold
 reconstruction pre-warm (16.3 s real-mode against the sonnet-5 stopgap; *re-measured 2026-07-29
 on the ruled Haiku class — 8.1 s headline, 3.3–8.6 s across the cold snaps; (b2) done, the quote
 embargo is lifted, and the generous timeout stays safe*), `turn` the full turn (~30 s ceiling),
-`observe` ~10 s; fire-and-forget observe is the session's job, not hidden retry logic here.
+`observe` ~10 s; fire-and-forget observe is the session's job, not hidden retry logic here
+(built with C5, 2026-08-17 — the "Async observes" subsection below).
 
 **The null-vs-absent contract is load-bearing** (the panel's sharpest finding): on
 `DialogueTurnRequest`, `loaded_memory_ids = null` means **loader turn** and `[]` means **a
@@ -134,6 +138,35 @@ only under SSE (fork 1); until then the session surfaces the result's post-hoc r
 fields — no faked signal. *(**A1 re-shape, 2026-08-04:** the snapshot refresh, both callbacks,
 and the recent-actions block are removed with the behavior/reputation cut; `SayAsync` gained
 the `weightOverrides` weights-on-speech parameter. Gate/loaded-set bookkeeping unchanged.)*
+*(**C5, 2026-08-17:** the fire-and-forget observe surface joined — the subsection below.)*
+
+### Async observes (C5, ruled 2026-08-17)
+
+Observe latency was ruled a client concern (`deferred-writes.md` — server-side deferral is
+throughput, this is the latency answer), and the session is its ruled home. Four members, no
+queue, no pump, ~40 lines:
+
+- **`ObserveAndForget(text)`** — stamps the event at the session's effective time
+  **synchronously** (byte-identical event shape to `ObserveAsync`), then the HTTP call runs
+  without blocking the caller. The synchronous stamp is what preserves world-time ordering:
+  `valid_at` and every product ordering ride the timestamp, so arrival order cannot reorder
+  the record. (One honest caveat: an observe fired before a `reflect` but *arriving* after it
+  counts toward the new pressure epoch — the gauge thresholds on arrival-side `created_at`.)
+- **`PendingObserves`** — the in-flight count (completed trackers pruned on read).
+- **`OnObserveFailed(text, error)`** — per-failure surfacing at failure time, on the caller's
+  SynchronizationContext (Unity main thread — safe to touch UI).
+- **`DrainObservesAsync()`** — awaits every in-flight observe; failures accumulated since the
+  last drain re-throw as ONE `AggregateException` (a stable type even for a single failure;
+  inners are the typed `NpcMemoryApiException`s) and then clear — draining is how the
+  integrator acknowledges. No retry anywhere; failures are never swallowed, with or without a
+  subscriber.
+
+**No verb auto-drains, by ruling** — no hidden multi-second await inside an on-camera verb.
+Integrator guidance: **drain at scene edges** (the reflect-at-scene-edges shape); E2
+choreography places the actual drains. An un-drained observe is bi-temporally safe — it lands
+with the correct world time, it is merely not yet retrievable until it arrives. Orthogonal to
+C1's server-side deferred writes: deferral shortens the round trip, fire-and-forget hides it —
+they compose, and nothing backend changed for this half of C5.
 
 ### Console harness (the Wk-1 gate)
 
@@ -147,9 +180,13 @@ weights-on-speech pair — parity at default weights, then an override re-rankin
 feeds the prose prompt over the same served set)* → the reflect verb + its 409 floor (C2) →
 the compiled-parameter scene-type echo contract (C3) → the diegetic-correction event (C4:
 verb + IDs over the wire, both decision sides recomputed client-side from the echoed inputs,
-the chain read's correction record, the 409 CAS). Debug output mirrors the REPL's debug view
-(IDs, scores, gate line, both TTFT fields, cost row). Passing this end-to-end IS the interop
-go/no-go.
+the chain read's correction record, the 409 CAS) → the agent-state read (C5: the stored row
+as stored, identity currency agreeing with the session's frozen version, the endpoint/worker
+split visible as empty run logs, the 404) → fire-and-forget observes (C5: fires return with
+calls in flight, a dialogue turn completes without draining, the drain joins, both rows land
+in CALL-time world order, and the bogus-agent failure path re-throws typed at drain). Debug
+output mirrors the REPL's debug view (IDs, scores, gate line, both TTFT fields, cost row).
+Passing this end-to-end IS the interop go/no-go.
 
 ### Unity adapter + gray-box scene
 
@@ -180,7 +217,9 @@ a scene cut can land on a specific chain).
 
 Off-camera warm-init during camera cuts (one throwaway `DialogueInitAsync` per scene-basis
 jump — kills the cold stall with zero pre-warm code); the game-authored action-observe beat +
-async observes (the old pre-ship (d): the client fires observes without blocking dialogue);
+async observes (the old pre-ship (d): the client fires observes without blocking dialogue —
+**built with C5, 2026-08-17**: `ObserveAndForget` + drain-at-scene-edges, the subsection
+above; the beat's driver staging stays E2's);
 the demo corpus authored in **shipped-game dialogue register**, not driver prose (the
 construct-validity mitigation — escalation fired 79% on realistic prose vs 0% on synthetic in
 the 2026-07-21 pre-thin_gist measurement, ~95% on the corpus at current defaults; the

@@ -23,6 +23,6 @@ similarity checks. A model's wording is not a test surface.
 ## When blocked
 If an assertion seems to require checking prose, stop and report. The gap is usually in the
 endpoint contract — IDs + scores for endpoints that RUN RETRIEVAL, IDs + structured fields for the
-three unscored-by-contract reads (`/chain` and `/agents/{id}/memories`, ruled 2026-07-27;
-`/memories/{id}/reconstruction-metrics`, the third member 2026-07-29). That is a
-design conversation, not a test workaround.
+four unscored-by-contract reads (`/chain` and `/agents/{id}/memories`, ruled 2026-07-27;
+`/memories/{id}/reconstruction-metrics`, the third member 2026-07-29; `/agents/{id}/state`, the
+fourth, 2026-08-17). That is a design conversation, not a test workaround.

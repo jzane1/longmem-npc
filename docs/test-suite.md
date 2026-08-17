@@ -1,8 +1,8 @@
 # longmem-npc — Test suite spec
 
-**BUILT 2026-07-20 — 172 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation +
+**BUILT 2026-07-20 — 182 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation +
 hygiene + eval metrics + eval runner + judge + ablation + deferred writes + reflection + the
-parameter compiler + dissonance; the
+parameter compiler + dissonance + agent state; the
 Set A diegetic pair LANDED with the dissonance mechanism, 2026-08-17). Count as of 2026-08-17:
 Set A 8,
 Set B 7, Set C 7, Set D 20, degradation 12, hygiene 2, Set G eval metrics 8, **Set H eval
@@ -11,14 +11,15 @@ runner 9** (stage 2, 2026-08-05), **Set I judge 16** (stage 3, 2026-08-07; +2 wi
 config scenarios, 2026-08-15), **Set J ablation 6** (stage 4, 2026-08-12 — its section is
 `eval-harness.md`'s stage-4 block), **Set K deferred writes 13** (Phase C1, 2026-08-12),
 **Set L reflection 20** (Phase C2, 2026-08-15), **Set M parameter compiler 21** (Phase C3,
-2026-08-17), **Set N dissonance 23** (Phase C4, 2026-08-17) — grown from the 38 built on
+2026-08-17), **Set N dissonance 23** (Phase C4, 2026-08-17), **Set O agent state 10** (Phase
+C5, 2026-08-17) — grown from the 38 built on
 2026-07-20 by the
 route-contract scenarios that arrived with each later route, by the gap-closing and guard
 scenarios from the full-repo audit, and by the eval harness stages 1–4. **Fourteen carry the
-`nlp` marker** (Sets L, M, and N add none), so the turn-end subset runs **158**. *(Counts
+`nlp` marker** (Sets L, M, N, and O add none), so the turn-end subset runs **168**. *(Counts
 corrected
 2026-08-12 with the Set K landing — the 2026-08-07 header had drifted again by the stage-4 and
-workaround-session scenarios; updated 2026-08-17 with the Set M and Set N landings.)* Build rulings 2026-07-20
+workaround-session scenarios; updated 2026-08-17 with the Set M, N, and O landings.)* Build rulings 2026-07-20
 (dated `decisions.md` entry): the suite-gate Stop hook runs the `-m "not nlp"` subset (the 7
 `nlp`-marked scenarios call the write pass at the service level and pay the lazy
 spaCy+fastcoref load; the full suite runs on demand + at floor verification); Postgres
@@ -38,8 +39,9 @@ distortion operators) belong to the eval story and the paper ablations, not this
 
 Corollary that makes this possible: read endpoints that run retrieval return memory IDs and scores
 alongside prose. That contract is load-bearing; if an endpoint stops returning IDs, the suite is
-dead. *(The three unscored-by-contract reads — `/chain` and `/agents/{id}/memories`, ruled
-2026-07-27, and `/memories/{id}/reconstruction-metrics`, the third member 2026-07-29 — run no
+dead. *(The four unscored-by-contract reads — `/chain` and `/agents/{id}/memories`, ruled
+2026-07-27, `/memories/{id}/reconstruction-metrics`, the third member 2026-07-29, and
+`/agents/{id}/state`, the fourth, 2026-08-17 — run no
 retrieval and are unscored by contract; they still carry IDs and structured fields on every row,
 which is what their scenarios assert.)*
 
@@ -383,6 +385,39 @@ per-run fixture scoping (unique agent names, never a DB-global count) rather tha
 kill-switch flip. `verify_reconstruction` owns the ruling-4 constraint branch (its [13]
 section, added and re-closed with C4 at 46 assertions).
 
+## Set O — agent state *(added 2026-08-17 with Phase C5; the rulings in `decisions.md`)*
+
+Ten scenarios in `tests\test_set_o_agent_state.py`, ALL unmarked. Every fixture is db-layer
+(`ctx.seed` / `ctx.seed_reflection` / `ctx.seed_bundle` + direct `insert_reflection_run` /
+`insert_compiler_run`); the seam is `RetrievalService.agent_state` service-side and the route
+over `httpx.ASGITransport`:
+
+- **The ladder + wire baseline:** 404 unknown agent; 422 on `runs_limit` outside [1, 1000]; a
+  name-only agent's wire shape — every nullable scalar PRESENT-null (the tri-state), `config`
+  normalized `{}`, `identity_version` null (never compiled), pressure 0.0, four empty lists,
+  the `runs_limit` echo.
+- **The gauge:** pressure hand math at the default norm (NULL importance resolving through
+  `importance_neutral`), the per-agent norm override rescaling, a reflection EVENT created
+  after the rows zeroing it (even an invalidated one — the epoch is `created_at`), and
+  `norm <= 0` raising the reflect verb's ValueError (one rule at both gauges).
+- **Beliefs + bundles:** live-only membership, both `identity_relevant` values, the ruled
+  compiler-window order, `source_memory_ids` round-trip; newest bundle per live pair, a dead
+  belief's bundle EXCLUDED (liveness derived), nested passthrough verbatim, deterministic
+  order.
+- **The run logs:** full 007/008 column mirrors newest-first, present-null nullables on failed
+  rows, `runs_limit` capping each list independently.
+- **Contract proofs:** identity currency = the newest `identity_documents` row; route JSON ==
+  service JSON (the CapturingRetrieval pattern — pass-through by ruling); zero writes (count
+  snapshots across every touched table unchanged by a read).
+
+The twelfth walker `tests\verify_agent_state.py` (26 criteria, lettered sections A–F) re-proves
+it against the scratch DB, and owns the **no-migration shape** (the ledger still ends at 008 —
+the ruled per-target scope fact made assertable; the agents table exactly its 001 columns; the
+pre-laid 007/008 agent-id indexes present). Per-run fixture scoping (the verify_dissonance
+precedent); it runs LAST in full sweeps (the newest — elder walkers first, fresh + serial).
+C5's other half (fire-and-forget observes) is client-side C# — the console harness's beats
+[15]/[16] own both halves over the wire (36 → 50 checks).
+
 ## Route contracts *(added as each route shipped; consolidated here 2026-07-28)*
 
 Every route in `app\api.py` has at least one HTTP-level scenario asserting its success payload,
@@ -408,6 +443,9 @@ rather than quietly implied by "every route", because that is what this section 
   rows present; 404) · `GET /ledger`
 - `GET /v1/memories/{id}/reconstruction-metrics` (IDs + counts + ratios, honest-`None`
   denominators, zero writes; 404) — `tests\test_eval_metrics.py`
+- `GET /v1/agents/{id}/state` (unscored by contract — the fourth member; the stored row AS
+  STORED, present-null tri-state, route JSON == service JSON, zero writes; 404, 422 on
+  `runs_limit` bounds) — `tests\test_set_o_agent_state.py`
 
 ## Degradation cases
 

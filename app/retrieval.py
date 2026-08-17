@@ -79,6 +79,7 @@ from app.providers import ProviderCallError, Providers
 from app.reconstruction import ReconstructionService, ServeOutcome
 from app.schemas import (
     AgentMemoriesResult,
+    AgentStateResult,
     DialogueInitRequest,
     GateInstrumentation,
     MemoryChainResult,
@@ -832,5 +833,61 @@ class RetrievalService:
             ),
             cache_bands=bands,
             metrics_ms=_ms(time.perf_counter() - t_metrics),
+            total_ms=_ms(time.perf_counter() - t_total),
+        )
+
+    async def agent_state(self, agent_id: UUID, runs_limit: int) -> AgentStateResult:
+        """The agent-state read (C5, ruled 2026-08-17): the stored row as
+        stored, the current identity version (SELECT-only — never the
+        ensure_ upsert), the pressure gauge (computed on demand, never
+        stored; the reflect verb's guard verbatim — a non-positive norm is
+        knob misuse and raises, never clamps), live beliefs in the
+        compiler-window order, derived-liveness bundles, and the two
+        workers' run logs newest-first. Unscored by contract (the FOURTH
+        carve-out member — no retrieval runs) and ZERO writes. Sequential
+        awaits by design: single-cause failure over a local pool beats
+        gathered round-trips measured in single-digit ms."""
+        t_total = time.perf_counter()
+        agent = await db.fetch_agent(self._pool, agent_id)
+        if agent is None:
+            raise UnknownAgentError(f"unknown agent_id {agent_id}")
+        config = agent["config"]
+        neutral = agent_knob(config, "importance_neutral", self._settings)
+        norm = agent_knob(config, "reflection_pressure_norm", self._settings)
+        if norm <= 0.0:
+            raise ValueError(
+                f"reflection_pressure_norm must be > 0, got {norm} "
+                "(a zero divisor is knob misuse, never a silent clamp)"
+            )
+        pressure = (
+            await db.reflection_pressure_mass(self._pool, agent_id, neutral=neutral)
+            / norm
+        )
+        identity_row = await db.fetch_current_identity_version(self._pool, agent_id)
+        reflections = await db.fetch_agent_reflections(self._pool, agent_id)
+        bundles = await db.fetch_agent_bundles(self._pool, agent_id)
+        reflection_runs = await db.fetch_recent_reflection_runs(
+            self._pool, agent_id, limit=runs_limit
+        )
+        compiler_runs = await db.fetch_recent_compiler_runs(
+            self._pool, agent_id, limit=runs_limit
+        )
+        return AgentStateResult(
+            agent_id=agent_id,
+            name=agent["name"],
+            seed_identity=agent["seed_identity"],
+            rigidity=agent["rigidity"],
+            diagnosticity_goal=agent["diagnosticity_goal"],
+            config=config,
+            identity_version=(
+                identity_row["identity_version"] if identity_row else None
+            ),
+            identity_compiled_at=identity_row["created_at"] if identity_row else None,
+            reflection_pressure=pressure,
+            reflections=reflections,
+            compiled_bundles=bundles,
+            reflection_runs=reflection_runs,
+            compiler_runs=compiler_runs,
+            runs_limit=runs_limit,
             total_ms=_ms(time.perf_counter() - t_total),
         )

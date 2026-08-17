@@ -1829,6 +1829,43 @@ session.
   - **Blocked:** nothing. **Abandoned:** nothing. Next: C5 per the roadmap — the
     agent-state read route (backend + C#) + async observes.
 
+- **2026-08-17 — C5: client contract completion (the agent-state read + async observes),
+  plan-to-floor in one session (floors row 29).**
+  - **Landed:** both halves the task named, on seven plan-batch rulings (two
+    AskUserQuestion batches at plan mode, all recommended options taken — the dated C5
+    build record). C5 had no spec doc, so the approved plan served as the spec; the
+    contract landed in `unity-client.md` + `architecture.md`, no new file. **The read:**
+    `GET /v1/agents/{agent_id}/state` — the fourth unscored-by-contract member (the
+    ruling `reflection.md` had pre-assigned here), NO migration (the ruled per-target
+    scope fact; both 007/008 index comments had named this read as their consumer since
+    they landed) — the STANDARD payload: the stored row as stored, identity currency,
+    the pressure gauge (one implementation with reflect, same loud norm guard), live
+    beliefs in the compiler-window order, derived-liveness bundles incl. the passthrough
+    (its recorded integrator read, finally real), both workers' run logs newest-first.
+    Set O (10 scenarios, unmarked; suite 172 → 182), the twelfth walker
+    `verify_agent_state.py` (26 assertions, runs LAST in sweeps), the C# mirror
+    (`AgentStateAsync` + five DTOs, client-only per the inspector precedent). **Async
+    observes:** `NpcSession.ObserveAndForget` + `PendingObserves` + `OnObserveFailed` +
+    `DrainObservesAsync` (~40 lines, no queue, no pump; world time stamped synchronously
+    at the call so arrival order cannot reorder the record; failures never swallowed —
+    event at failure time + ONE AggregateException at drain, cleared on drain; no verb
+    auto-drains by ruling — "drain at scene edges" guidance, E2 places the drains).
+    Harness beats [15]/[16] grew the interop gate 36 → 50 checks, re-run LIVE green.
+  - **Honest notes:** (1) One first-run full-suite failure — the new docstrings' phrase
+    "pure SELECT " tripped the SQL-containment hygiene scan (it reads docstring prose
+    too); reworded to "SELECT-only", no rule change. (2) The walker's gauge hand-math
+    compare needed the float32 tolerance class (importance_raw is float4) — 1e-6, not
+    1e-9. (3) Believability non-regression rests on the C3 evidence class (zero
+    retrieval/scoring/dialogue changes; Sets A–N green + elder walkers byte-untouched),
+    not a harness compare run — flagged in the build record if Jack wants the full
+    compare anyway. (4) Two stale client-doc counts corrected in-pass, dated:
+    unity-client.md's verb table had been missing `ReflectAsync` since C2; SETUP.md's
+    pinned harness check count had rotted twice and now points at the output line
+    instead. (5) The committed Unity DLL stays stale by ruling (Phase F), now five Core
+    builds behind.
+  - **Blocked:** nothing. **Abandoned:** nothing. Next: C6 per the roadmap — the purge
+    endpoint, the ruled release-blocker and the sole sanctioned DELETE.
+
 
 ---
 
@@ -1838,6 +1875,16 @@ session.
 at the top of the living file — each a snapshot of what the current phase was when it was
 written. Kept verbatim: they are the most readable summary of each build era, and the
 session-log entries below them carry the detail. Newest first, as they were.*
+
+**(moved 2026-08-17 at the C5 wrap-up, the ≤12 KB tripwire's first firing — the C4
+landing narrative + the closed operator action, verbatim from the phase header:)**
+C4 (the dissonance
+path + diegetic-correction event) landed 2026-08-17, plan-to-floor in one session — floors
+row 28; the dated C4 build record in `decisions.md` carries the eight plan-batch rulings
+(NO migration — the `corrections` table waited since 001); believability confirmed no
+regression. **No operator action stands:** Jack applied migrations 007 + 008 to the product
+`longmem` DB himself the same morning (the reserved action, done — the product ledger now
+reads 001–008 with zero reflection, bundle, or corrections rows).
 
 ### Pruned from status.md 2026-08-17 — the ≤12 KB tripwire's first application
 

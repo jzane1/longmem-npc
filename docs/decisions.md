@@ -86,6 +86,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Phase C3 build record — the parameter compiler landed — 2026-08-17](#phase-c3-build-record--the-parameter-compiler-landed--2026-08-17)
 - [Session-effort audit — the status.md tripwire — 2026-08-17](#session-effort-audit--the-statusmd-tripwire--2026-08-17)
 - [Phase C4 build record — the dissonance path landed — 2026-08-17](#phase-c4-build-record--the-dissonance-path-landed--2026-08-17)
+- [Phase C5 build record — client contract completion landed — 2026-08-17](#phase-c5-build-record--client-contract-completion-landed--2026-08-17)
 
 ## Primary decisions
 
@@ -3676,3 +3677,103 @@ the telling chain alone; the record obligation is `verify_dissonance`'s, scoped 
 The elder walkers stay byte-untouched; the global-emptiness asserts in
 `verify_authorial_correction`/`verify_fact_correction` remain order-fragile by construction
 — recorded here for the carried item's own future task, not fixed at this ride-along.
+
+## Phase C5 build record — client contract completion landed — 2026-08-17
+
+**Decided (plan-mode session, then built plan-to-floor the same day):** C5 had no spec doc —
+the only Phase C item without one — so the approved plan served as the spec, with the contract
+landing in `unity-client.md` (the client-contract doc) + `architecture.md` rather than a new
+file. Seven forks settled at two plan-mode batches; **all seven recommended options taken**
+(no divergence this time). The route's founding 2026-07-27 motivation (the multi-client
+reputation snapshot) died with A1; it was built on the three later-recorded dependencies that
+named it their consumer (the pressure gauge's standing surface, the passthrough integrator
+read, the two orphaned run logs).
+
+1. **Payload = the STANDARD shape**: the recorded surfaces (pressure gauge, live bundles incl.
+   passthrough, both run logs) PLUS the stored agent row (name, seed_identity, rigidity,
+   diagnosticity_goal, `config` **as stored** — SERVICE_DEFAULTS never merged; a resolved
+   snapshot rots), the current `identity_version`, and the live-beliefs list. **Rejected:**
+   LEAN (recorded surfaces only — the row and beliefs stay unreadable anywhere post-creation;
+   bundles reference beliefs the client cannot resolve) and FULL (+ rendered identity text,
+   effective config, memory counts — derived wire state; the counts duplicate the index read).
+2. **Path = `GET /v1/agents/{agent_id}/state`** — a composed runtime snapshot, not the created
+   resource; sits beside `/memories`; the plain resource URL stays free. **Rejected:**
+   `GET /v1/agents/{id}` (promises "the row you created" while returning run logs).
+3. **The unscored carve-out's FOURTH member** — the ruling `reflection.md` pre-assigned to this
+   task. Propagated: `CLAUDE.md`, `architecture.md` §6/§12, `test-suite.md`, `tests\CLAUDE.md`,
+   `unity-client.md`.
+4. **NO migration — the ruled per-target scope fact** (never inherited): the gauge is
+   computed-never-stored by standing rule; every table and index the read touches was pre-laid
+   in 001/007/008 (both newest index comments named this read). The walker's section A asserts
+   the ledger still ends at 008.
+5. **Fire-and-forget shape = `ObserveAndForget` + `PendingObserves` + `DrainObservesAsync` +
+   `OnObserveFailed` on `NpcSession`** (~40 lines, no queue, no pump; the session is the ruled
+   home — the client stays a 1:1 verb mirror). **Rejected:** a discardable Task (a discarded
+   faulted Task surfaces nowhere — swallows by construction) and an internal queue+pump (real
+   new moving parts buying an arrival ordering that world-time stamping already provides: the
+   event is stamped synchronously at the call, and `valid_at` + every product ordering ride
+   the timestamp).
+6. **No auto-drain in any verb** — drains always explicit; "drain at scene edges" ships as
+   integrator guidance (the reflect-at-scene-edges shape); E2 choreography places the actual
+   drains. **Rejected:** SceneBoundaryAsync draining first (a hidden multi-second await inside
+   an on-camera verb).
+7. **Unity face: Core + harness only** — the adapter and demo driver untouched (Play-mode
+   verification suspended by ruling since 2026-08-05; the committed DLL refresh is Phase F's,
+   so Unity could not see new members before then anyway; the driver's observe staging is E2
+   choreography). The `_busy`-gates-the-whole-UI symptom in `NpcDemoDriver` stays for E2.
+
+**Build-latitude choices, recorded:** `runs_limit` = `Query(default=100, ge=1, le=1000)`
+governing BOTH run logs (the agent-memories `limit` precedent — a caller argument, never a
+config knob); reflections and bundles carry no limit (bounded by mechanism); the beliefs list
+rides the ruled compiler-window order, so its first `compiler_window_k` rows ARE the compile
+window by construction; bundles = newest live row per (reflection, scene_type), liveness
+derived (the §10 contract), outer order = belief window order then scene_type; the dormant
+reputation columns excluded from the payload; `reflection_pressure_norm <= 0` raises the
+reflect verb's ValueError verbatim (one rule at both gauges); instrumentation = `total_ms`
+only (homogeneous SQL — no per-section ceremony); `seed_identity` in, rendered identity text
+out (derivable by the public formula); the walker-facing oldest-first fetchers stay
+byte-untouched — the route rides four new SELECT-only fetchers + a widened `fetch_agent`
+(`name` joined the SELECT, the additive C4-rigidity precedent); drain failures re-throw as ONE
+`AggregateException` (stable type even for a single failure) and clear on drain — an
+acknowledged failure is not re-thrown twice, and an abandoned (cancelled) drain is not a
+drain; the tracker task catches its own exception, so nothing reaches
+`TaskScheduler.UnobservedTaskException`. One honest caveat documented in `unity-client.md`:
+an observe fired before a reflect but ARRIVING after it counts toward the new pressure epoch
+(the gauge thresholds on arrival-side `created_at`).
+
+**Landed:** `GET /v1/agents/{agent_id}/state` (app\api.py, pass-through) over
+`RetrievalService.agent_state` in the unscored inspector section; `AgentStateResult` + four
+sub-models (schemas.py — full 007/008 column mirrors, the EnrichmentRunOut precedent);
+**Set O (10 scenarios, none nlp-marked** — suite 172 → 182, subset 158 → 168); the **twelfth
+walker `verify_agent_state.py` (26 assertions**, sections A–F: no-migration shape, gauge hand
+math + the loud norm guard, beliefs/bundles liveness + orders + verbatim passthrough, run-log
+mirrors, the wire ladder + route-JSON==service-JSON + present-null tri-state, zero-writes
+proof; per-run fixture scoping, runs LAST in sweeps); the C# mirror (`AgentStateAsync` + five
+DTOs in the inspector-reads section — client-only, the inspector precedent; NpcJson unchanged,
+tri-state on nullable value types); the `NpcSession` fire-and-forget surface; **harness beats
+[15]/[16] (36 → 50 checks)** — [15] proves the as-stored row echo, identity currency agreeing
+with the session's frozen version, beat-[12]'s beliefs riding the read, and the
+endpoint/worker split visible as EMPTY run logs on a live store; [16] proves fires return with
+calls in flight, a dialogue turn completes WITHOUT draining, both rows land in CALL-time world
+order over the wire, and the bogus-agent failure path (a harness fixture — the one
+deterministic fake-mode failure) re-throws typed at drain with the event fired once.
+
+**Verification:** Set O 10/10 on the first run; the walker 26/26 on the persistent scratch
+(one tolerance fix: `importance_raw` is float4, so the hand-math compare runs at 1e-6, the
+pytest.approx class, not 1e-9); both C# projects 0-warning (Release); the interop gate
+**50/50 LIVE** against a served fake-mode app on the recreated `longmem_smoke` scratch; full
+suite **182 passed** including the nlp-marked set. One first-run full-suite failure, honestly
+recorded: the new route/model docstrings' phrase "pure SELECT " tripped
+`test_no_sql_outside_the_db_module`'s token scan (the hygiene test reads docstring prose too)
+— reworded to "SELECT-only", a wording fix, no rule change. **Believability non-regression:**
+C5 touches zero retrieval, scoring, or dialogue code (an additive read route + client-side
+machinery); the evidence is Sets A–N green + the elder walkers byte-untouched — the C3
+evidence class, not a harness compare run. Flagged: if Jack wants the full harness compare
+regardless, it is one command on the standing rig.
+
+**Doc drift corrected in-pass (dated in place):** `unity-client.md`'s verb table was missing
+`ReflectAsync` (a C2 propagation miss — the same miss class the C3 build fixed in
+architecture.md, now corrected with C5's row and the header at fourteen);
+`architecture.md` §12's client paragraph moved twelve → thirteen verbs; `SETUP.md`'s harness
+line stopped pinning the check count (it said 32 while the gate stood at 36 — its second rot;
+now points at the line itself).

@@ -1,17 +1,17 @@
 # longmem-npc — Status
 
 **Last updated:** 2026-08-17
-**Phase:** **Road to completion — Phases A, B, and C1–C4 are DONE. NEXT UP: C5 — client
-contract completion (the agent-state read route + async observes).** C4 (the dissonance
-path + diegetic-correction event) landed 2026-08-17, plan-to-floor in one session — floors
-row 28; the dated C4 build record in `decisions.md` carries the eight plan-batch rulings
-(NO migration — the `corrections` table waited since 001); believability confirmed no
-regression. **No operator action stands:** Jack applied migrations 007 + 008 to the product
-`longmem` DB himself the same morning (the reserved action, done — the product ledger now
-reads 001–008 with zero reflection, bundle, or corrections rows).
+**Phase:** **Road to completion — Phases A, B, and C1–C5 are DONE. NEXT UP: C6 — the purge
+endpoint (the ruled release-blocker; the sole sanctioned DELETE).** C5 (the agent-state
+read + async observes) landed 2026-08-17, plan-to-floor in one session — floors row 29; the
+dated C5 build record carries the seven plan-batch rulings (NO migration by ruling; the
+read joined the unscored carve-out as its FOURTH member; the C4 landing narrative moved to
+`session-log.md`'s archive at this wrap-up — the tripwire's first firing). **No operator
+action stands.**
 The system is BUILT end to end on the final A1 seam — backend, C# client + console harness,
 Unity adapter + gray-box scene, The Ledger, eval-harness stages 1–4, deferred writes,
-reflection, the parameter compiler, the dissonance path — schema at migrations 001–008.
+reflection, the parameter compiler, the dissonance path, the agent-state read + async
+observes — schema at migrations 001–008.
 What is proven lives in
 `docs\floors.md`, why in `decisions.md`, the narrative in `session-log.md`; this file
 carries only what is live.
@@ -54,12 +54,12 @@ re-openable: re-verifying one is a step, never an argument against a design impr
 *None open.*
 
 **Recently closed** (pointers only; `decisions.md`'s index is the full list, and the
-pre-prune litany sits verbatim in `session-log.md`'s archive, moved 2026-08-17): the C4
-forks — eight ruled 2026-08-17 at two plan-mode batches, incl. the reconstruction-role
-reuse AGAINST the recommendation, the second such divergence (the dated build record); the
-status.md size tripwire (2026-08-17, the dated entry); the C3 forks — seven ruled
-2026-08-16/17 (the dated build record); the C2 line — dossier, spec, and build-plan forks
-ruled 2026-08-15 (three dated entries); earlier closures: the dated entries.
+pre-prune litany sits verbatim in `session-log.md`'s archive, moved 2026-08-17): the C5
+forks — seven ruled 2026-08-17 at two plan-mode batches, all recommended options taken
+(the dated build record); the C4 forks — eight ruled 2026-08-17, incl. the second
+divergence (the build record); the status.md size tripwire (2026-08-17); the C3 forks
+(2026-08-16/17); the C2 line (2026-08-15, three dated entries); earlier closures: the
+dated entries.
 
 ## The roadmap (re-planned 2026-08-04; ordering delegated to Claude on efficiency grounds)
 
@@ -71,17 +71,15 @@ believability didn't regress (the point of doing Phase B first).
 ### Phase A — Re-shape the dialogue seam — DONE
 
 - **A1. Split-brain removal + weights-on-speech.** ✅ LANDED 2026-08-04, floor-verified
-  (floors row 21; the dated A1 entry in `decisions.md`; the Unity Play-mode re-run closed
-  2026-08-05 — resolution notes on floors rows 19/21).
+  (floors row 21; Play-mode re-run closed 2026-08-05 — floors rows 19/21).
 
 ### Phase B — Finish the measurement rig — DONE
 
-- **B1. Eval-harness stage 2.** ✅ LANDED 2026-08-05, floor-verified (floors row 22; the
-  dated entry; spec: `eval-harness.md`).
-- **B2. Eval-harness stage 3.** ✅ LANDED 2026-08-07, floor-verified (floors row 23; the
-  dated entry). The deferred first real use ran 2026-08-12 under the workaround ruling.
-- **B3. Eval-harness stage 4.** ✅ LANDED 2026-08-12, floor-verified (floors row 24; the
-  dated entries; stage-4 BUILT banner). Its first real run decided R7, ruled the same day.
+- **B1. Eval-harness stage 2.** ✅ LANDED 2026-08-05, floor-verified (floors row 22).
+- **B2. Eval-harness stage 3.** ✅ LANDED 2026-08-07, floor-verified (floors row 23; first
+  real use 2026-08-12).
+- **B3. Eval-harness stage 4.** ✅ LANDED 2026-08-12, floor-verified (floors row 24; its
+  first real run decided R7).
 
 ### Phase C — Build the kept components (~7–8 sessions)
 
@@ -102,8 +100,12 @@ Ordered so shared machinery lands before its reusers.
   spec: `dissonance.md`; NO migration — the `corrections` table waited since 001). Always
   live (no kill-switch by ruling — the event is client-invoked; not sending it is the off
   state).
-- **C5. Client contract completion** (one session): the agent-state read route (backend + C#) +
-  async observes (fire-and-forget client observes; ruled in explicitly 2026-08-04).
+- **C5. Client contract completion.** ✅ LANDED 2026-08-17 plan-to-floor in one session
+  (floors row 29; the dated C5 build record; NO spec doc by design — the contract lives in
+  `unity-client.md` + `architecture.md`; NO migration by ruling). The agent-state read
+  (`GET /v1/agents/{id}/state`, the FOURTH unscored member) + fire-and-forget observes
+  (`NpcSession`: fire + pending + drain + failure event; no auto-drain — "drain at scene
+  edges" is integrator guidance, E2 places the drains).
 - **C6. Purge endpoint** — the ruled release-blocker; the sole sanctioned DELETE.
 - **C7. Latency trio** (~2 sessions): concurrency cap + scene-boundary reconstruction pre-warm;
   then prompt caching / prompt-head rebuild. Last in the phase so Phase D measures them fresh.
@@ -179,7 +181,7 @@ not vendored).
 
 **Carried, not fixed** (deliberately unscheduled, awaiting its own ruling):
 
-- **The walkers (eleven since C4) share a fixed-name scratch DB** (`longmem_test`) they neither
+- **The walkers (twelve since C5) share a fixed-name scratch DB** (`longmem_test`) they neither
   create, migrate, nor drop, and some walker assertions are DB-global counts. The right fix —
   the suite's pid-scoped mechanism plus a `tests\run-walkers.ps1` runner — is a medium refactor
   of the verification apparatus itself, so it wants its own scoped task rather than riding an

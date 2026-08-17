@@ -103,7 +103,8 @@ believability run uses the existing scenario suite unchanged (reflection default
 the seam moves carry parity contracts, so the run is meaningful as-is); a reflect event
 kind in the runner schema and a reflection-ON believability arm are Phase D material. No
 new read route (the gauge's standing surface is C5's agent-state read, where the
-unscored-carve-out ruling belongs). Nothing ships default-ON.
+unscored-carve-out ruling belongs — **BUILT and ruled 2026-08-17**:
+`GET /v1/agents/{id}/state`, the fourth member). Nothing ships default-ON.
 
 ## The reflect verb
 
@@ -283,7 +284,9 @@ demand, **never stored** (architecture §2's runtime-state rule); served as
 `pressure_before` / `pressure_after` on the reflect response and used identically by the
 worker's threshold check — one implementation. `created_at`, not `valid_at`: pressure is
 service bookkeeping (unprocessed accumulation), not world time. The standing read
-surface for the gauge is C5's agent-state route (recorded dependency; no route here).
+surface for the gauge is C5's agent-state route (recorded dependency; no route here —
+**BUILT 2026-08-17**: `GET /v1/agents/{id}/state` serves it as `reflection_pressure`,
+same implementation, same loud norm guard).
 
 ## Degradation ladder (reflection)
 
@@ -344,7 +347,9 @@ None` (`reflection_id`, `absorbed_reflection_ids`, `failed`) · `pruned_componen
 **C# mirror** (spec ruling 4): `NpcMemory.Core` gains the reflect call + models
 field-for-field; both projects build 0-warning; the console-harness gate extends. The
 Ledger's reflection surface and any reflections inspector read stay OUT (C5's
-neighborhood — unscored-carve-out territory with its own ruling).
+neighborhood — unscored-carve-out territory with its own ruling; **ruled and built
+2026-08-17**: the agent-state read carries the live-beliefs list — the Ledger page itself
+stays E2 polish).
 
 ## The C3 contract (what this build leaves standing)
 

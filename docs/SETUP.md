@@ -197,7 +197,9 @@ interop gate. With the service up on a scratch database:
 dotnet run --project client\NpcMemory.Harness -- --base-url http://127.0.0.1:8000
 ```
 
-It provisions its own agent and ends with `ALL HARNESS BEATS PASSED (32 checks)`. Point it
+It provisions its own agent and ends with `ALL HARNESS BEATS PASSED (N checks)` — the count
+grows with each client build, so trust the line, not a number here (this sentence pinned "32"
+while the gate stood at 36, its second rot; reworded 2026-08-17). Point it
 at a scratch DB, not the product one — it writes.
 
 ### Refreshing the Unity plugin DLL

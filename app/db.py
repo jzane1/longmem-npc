@@ -76,12 +76,13 @@ def build_pool(database_uri: str) -> AsyncConnectionPool:
 
 async def fetch_agent(pool: AsyncConnectionPool, agent_id: UUID) -> dict | None:
     """`rigidity` joined the SELECT with C4 (dissonance.md — the decision's
-    per-NPC scalar; NULL resolves via dissonance_rigidity_default). Additive:
-    every consumer reads this dict by key."""
+    per-NPC scalar; NULL resolves via dissonance_rigidity_default); `name`
+    with C5 (the agent-state read echoes the stored row). Additive: every
+    consumer reads this dict by key."""
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
             "SELECT agent_id, diagnosticity_goal, config, seed_identity, "
-            "rigidity FROM agents WHERE agent_id = %s",
+            "rigidity, name FROM agents WHERE agent_id = %s",
             (agent_id,),
         )
         row = await cur.fetchone()
@@ -93,6 +94,7 @@ async def fetch_agent(pool: AsyncConnectionPool, agent_id: UUID) -> dict | None:
         "config": row[2] or {},
         "seed_identity": row[3],
         "rigidity": row[4],
+        "name": row[5],
     }
 
 
@@ -858,6 +860,28 @@ async def fetch_identity_document(
         )
         row = await cur.fetchone()
     return row[0] if row is not None else None
+
+
+async def fetch_current_identity_version(
+    pool: AsyncConnectionPool, agent_id: UUID
+) -> dict | None:
+    """The agent's CURRENT identity document version — the newest row, the
+    same currency rule the render follows. A pure SELECT for the agent-state
+    read (C5): the read must never compile a document, so this is
+    deliberately not ensure_identity_document. None = never compiled (a
+    fresh agent before its first boundary/init — present-null on the
+    wire)."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT identity_version, created_at FROM identity_documents "
+            "WHERE agent_id = %s ORDER BY created_at DESC, identity_version "
+            "LIMIT 1",
+            (agent_id,),
+        )
+        row = await cur.fetchone()
+    if row is None:
+        return None
+    return {"identity_version": row[0], "created_at": row[1]}
 
 
 async def fetch_cache_rows(
@@ -1875,6 +1899,38 @@ async def fetch_recent_reflections(
     return [row[0] for row in rows]
 
 
+async def fetch_agent_reflections(
+    pool: AsyncConnectionPool, agent_id: UUID
+) -> list[dict]:
+    """Every LIVE belief, both identity_relevant values, in the ruled
+    compiler-window order (valid_at DESC, created_at DESC, reflection_id) —
+    the agent-state read's beliefs list (C5): the first compiler_window_k
+    rows are exactly the compile window, by construction. Bounded by
+    mechanism (consolidation absorbs; supersession invalidates), so no
+    limit. NULL identity_relevant counts as not identity-relevant (the
+    fetch_live_identity_reflections rule)."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT reflection_id, content, identity_relevant, "
+            "source_memory_ids, valid_at, created_at FROM reflections "
+            "WHERE agent_id = %s AND invalid_at IS NULL "
+            "ORDER BY valid_at DESC, created_at DESC, reflection_id",
+            (agent_id,),
+        )
+        rows = await cur.fetchall()
+    return [
+        {
+            "reflection_id": row[0],
+            "content": row[1],
+            "identity_relevant": bool(row[2]),
+            "source_memory_ids": row[3] or [],
+            "valid_at": row[4],
+            "created_at": row[5],
+        }
+        for row in rows
+    ]
+
+
 async def fetch_trim_candidates(
     pool: AsyncConnectionPool,
     agent_id: UUID,
@@ -2135,8 +2191,9 @@ async def fetch_reflection_runs(
     pool: AsyncConnectionPool, agent_id: UUID
 ) -> list[dict]:
     """An agent's run rows, oldest first — the walker/test surface for the
-    worker's accounting (no product read route rides this until C5's
-    agent-state read, by ruling)."""
+    worker's accounting. The C5 agent-state read rides its own newest-first,
+    limited, full-column fetcher (fetch_recent_reflection_runs below); this
+    one stays the walkers' chronological surface."""
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
             "SELECT run_id, outcome, error, reflections_written, "
@@ -2163,6 +2220,56 @@ async def fetch_reflection_runs(
             "pressure_before": row[11],
             "pressure_after": row[12],
             "created_at": row[13],
+        }
+        for row in rows
+    ]
+
+
+async def fetch_recent_reflection_runs(
+    pool: AsyncConnectionPool, agent_id: UUID, *, limit: int
+) -> list[dict]:
+    """The agent-state read's reflection-run log (C5): ALL migration-007
+    columns, newest first, capped by the route's runs_limit (a caller
+    argument, the k precedent) — the table is append-only, so the product
+    read is bounded where the walker surface above walks full history."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT run_id, outcome, error, reflections_written, "
+            "dropped_ungrounded, consolidation_ran, consolidation_failed, "
+            "rrr, rrr_blocked, pruned_components, evicted_cache_rows, "
+            "pressure_before, pressure_after, reflect_ms, consolidation_ms, "
+            "insert_ms, total_ms, reflect_input_tokens, "
+            "reflect_output_tokens, consolidation_input_tokens, "
+            "consolidation_output_tokens, created_at "
+            "FROM reflection_runs WHERE agent_id = %s "
+            "ORDER BY created_at DESC, run_id LIMIT %s",
+            (agent_id, limit),
+        )
+        rows = await cur.fetchall()
+    return [
+        {
+            "run_id": row[0],
+            "outcome": row[1],
+            "error": row[2],
+            "reflections_written": row[3],
+            "dropped_ungrounded": row[4],
+            "consolidation_ran": row[5],
+            "consolidation_failed": row[6],
+            "rrr": row[7],
+            "rrr_blocked": row[8],
+            "pruned_components": row[9],
+            "evicted_cache_rows": row[10],
+            "pressure_before": row[11],
+            "pressure_after": row[12],
+            "reflect_ms": row[13],
+            "consolidation_ms": row[14],
+            "insert_ms": row[15],
+            "total_ms": row[16],
+            "reflect_input_tokens": row[17],
+            "reflect_output_tokens": row[18],
+            "consolidation_input_tokens": row[19],
+            "consolidation_output_tokens": row[20],
+            "created_at": row[21],
         }
         for row in rows
     ]
@@ -2344,6 +2451,55 @@ async def fetch_dialogue_bundles(
     ]
 
 
+async def fetch_agent_bundles(pool: AsyncConnectionPool, agent_id: UUID) -> list[dict]:
+    """The newest live bundle per (reflection, scene_type) pair, passthrough
+    included verbatim — the agent-state read's compiler surface (C5, the
+    recorded future-integrator read; parameter-compiler.md). Liveness is
+    DERIVED from the source reflection (the §10 contract). Unlike the
+    consume read above this is un-windowed and cross-type: the snapshot
+    shows every parameter in force, not one scene's slice. Outer order =
+    the belief window order then scene_type — deterministic, consistent
+    with the beliefs list. Bounded by mechanism (one row per live pair)."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT latest.bundle_id, latest.reflection_id, "
+            "latest.scene_type, latest.w_relevance, latest.w_recency, "
+            "latest.w_importance, latest.passthrough, latest.input_tokens, "
+            "latest.output_tokens, latest.compile_ms, latest.created_at "
+            "FROM ("
+            "SELECT DISTINCT ON (b.reflection_id, b.scene_type) b.bundle_id, "
+            "b.reflection_id, b.scene_type, b.w_relevance, b.w_recency, "
+            "b.w_importance, b.passthrough, b.input_tokens, b.output_tokens, "
+            "b.compile_ms, b.created_at, r.valid_at AS r_valid_at, "
+            "r.created_at AS r_created_at FROM compiled_bundles b "
+            "JOIN reflections r ON r.reflection_id = b.reflection_id "
+            "AND r.invalid_at IS NULL "
+            "WHERE b.agent_id = %s "
+            "ORDER BY b.reflection_id, b.scene_type, b.created_at DESC, "
+            "b.bundle_id) latest "
+            "ORDER BY latest.r_valid_at DESC, latest.r_created_at DESC, "
+            "latest.reflection_id, latest.scene_type",
+            (agent_id,),
+        )
+        rows = await cur.fetchall()
+    return [
+        {
+            "bundle_id": row[0],
+            "reflection_id": row[1],
+            "scene_type": row[2],
+            "w_relevance": float(row[3]),
+            "w_recency": float(row[4]),
+            "w_importance": float(row[5]),
+            "passthrough": row[6] or {},
+            "input_tokens": row[7],
+            "output_tokens": row[8],
+            "compile_ms": row[9],
+            "created_at": row[10],
+        }
+        for row in rows
+    ]
+
+
 @dataclass(frozen=True)
 class CompilerRunRecord:
     """Per-agent-per-sweep instrumentation destined for compiler_runs — the
@@ -2386,8 +2542,9 @@ async def insert_compiler_run(
 
 async def fetch_compiler_runs(pool: AsyncConnectionPool, agent_id: UUID) -> list[dict]:
     """An agent's run rows, oldest first — the walker/test surface for the
-    worker's accounting (no product read route rides this until C5's
-    agent-state read, by ruling — the fetch_reflection_runs precedent)."""
+    worker's accounting. The C5 agent-state read rides its own newest-first,
+    limited fetcher (fetch_recent_compiler_runs below); this one stays the
+    walkers' chronological surface (the fetch_reflection_runs precedent)."""
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
             "SELECT run_id, outcome, error, pairs_compiled, pairs_failed, "
@@ -2395,6 +2552,39 @@ async def fetch_compiler_runs(pool: AsyncConnectionPool, agent_id: UUID) -> list
             "total_ms, created_at "
             "FROM compiler_runs WHERE agent_id = %s ORDER BY created_at, run_id",
             (agent_id,),
+        )
+        rows = await cur.fetchall()
+    return [
+        {
+            "run_id": row[0],
+            "outcome": row[1],
+            "error": row[2],
+            "pairs_compiled": row[3],
+            "pairs_failed": row[4],
+            "passthrough_keys_dropped": row[5],
+            "input_tokens": row[6],
+            "output_tokens": row[7],
+            "total_ms": row[8],
+            "created_at": row[9],
+        }
+        for row in rows
+    ]
+
+
+async def fetch_recent_compiler_runs(
+    pool: AsyncConnectionPool, agent_id: UUID, *, limit: int
+) -> list[dict]:
+    """The agent-state read's compiler-run log (C5): all migration-008
+    columns, newest first, capped by the route's runs_limit — the
+    fetch_recent_reflection_runs shape on the other append-only table."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT run_id, outcome, error, pairs_compiled, pairs_failed, "
+            "passthrough_keys_dropped, input_tokens, output_tokens, "
+            "total_ms, created_at "
+            "FROM compiler_runs WHERE agent_id = %s "
+            "ORDER BY created_at DESC, run_id LIMIT %s",
+            (agent_id, limit),
         )
         rows = await cur.fetchall()
     return [

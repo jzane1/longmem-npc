@@ -156,6 +156,19 @@ namespace NpcMemory
             GetAsync<ReconstructionMetricsResult>(
                 $"/v1/memories/{memoryId}/reconstruction-metrics", ct);
 
+        /// <summary>The agent-state read (C5, ruled 2026-08-17): the fourth
+        /// unscored inspector read — the stored row, identity currency, the
+        /// pressure gauge, live beliefs, bundles incl. passthrough, and both
+        /// workers' run logs (newest first, capped by runsLimit). No model
+        /// call rides it, so the default GET timeout applies; runsLimit is
+        /// the size lever.</summary>
+        public Task<AgentStateResult> AgentStateAsync(
+            Guid agentId, int? runsLimit = null, CancellationToken ct = default) =>
+            GetAsync<AgentStateResult>(
+                $"/v1/agents/{agentId}/state"
+                    + (runsLimit is int r ? $"?runs_limit={r}" : ""),
+                ct);
+
         /// <summary>
         /// The SSE turn (POST /v1/dialogue/turn/stream): onChunk fires per
         /// prose chunk as it arrives; onReconstructing fires if the server

@@ -49,6 +49,7 @@ from app.reflection import (
 from app.retrieval import RetrievalService
 from app.schemas import (
     AgentMemoriesResult,
+    AgentStateResult,
     CorrectionRequest,
     CorrectionResult,
     CreateAgentRequest,
@@ -399,5 +400,24 @@ async def agent_memories(
     argument (the k precedent), never a config knob. 404 on unknown agent."""
     try:
         return await app.state.retrieval.agent_memories(agent_id, limit)
+    except UnknownAgentError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.get("/v1/agents/{agent_id}/state", response_model=AgentStateResult)
+async def agent_state(
+    agent_id: UUID, runs_limit: int = Query(default=100, ge=1, le=1000)
+) -> AgentStateResult:
+    """The agent-state read (C5, ruled 2026-08-17): the composed runtime
+    snapshot — the stored row (config as stored, defaults never merged),
+    the current identity version, the reflection-pressure gauge
+    (computed-never-stored), live beliefs in the compiler-window order,
+    derived-liveness bundles incl. the integrator passthrough, and the two
+    workers' run logs (newest first; `runs_limit` is a caller argument, the
+    k precedent). The FOURTH unscored-by-contract member (ruled 2026-08-17):
+    no retrieval runs, so no scores exist — IDs + structured fields, ZERO
+    writes. 404 on unknown agent; pass-through by ruling."""
+    try:
+        return await app.state.retrieval.agent_state(agent_id, runs_limit)
     except UnknownAgentError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
