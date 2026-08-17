@@ -1756,6 +1756,39 @@ session.
     diegetic-correction event) per the roadmap; the three default flips (deferred,
     reflection, compiler) stay Phase D questions.
 
+- **2026-08-17 — Session-effort audit: session growth measured, diagnosed, one lever
+  adopted.**
+  - **Landed:** a full parse of the project's own session transcripts (58 main + 202
+    subagent files, 46,755 records, fork-copied history deduped by uuid) clustered into
+    27 work sessions and reconciled three ways against this log and all 21 commit days.
+    Diagnosis: per-unit efficiency is flat-to-improving (the best lines-per-hour week was
+    Aug 09–15); what grew is the arc per queue item (~96 attributed minutes per landing in
+    mid-July → ~260–290 for C2/C3), driven roughly two-thirds by the planning phase (the
+    settle-at-spec discipline: the C3 arc spent 2.4 h in plan for a 1.1 h build+verify)
+    and one-third by the standing per-landing apparatus (8 areas incl. the C# mirror vs
+    3–5 and no client in July). Verify redundancy is real (40–65% of verify events fire
+    with no code edits since the previous one) but cheap in wall time; the docs sweep +
+    four-register ritual is ~10 min per arc; the auto-loaded boot cost was the one proven
+    pathology (~38k tokens on 07-12 → ~100k by 07-27, cut to ~53k by the 07-28 split +
+    08-07 prune, crept back to ~58.6k as status.md regrew 12 → 17.5 KB). **Jack ruled:
+    option 1 only** — status.md re-pruned to live state (the trimmed prose moved verbatim
+    into this file's archive, below) plus a standing ≤12 KB wrap-up tripwire recorded as a
+    CLAUDE.md rule (the dated `decisions.md` entry). Options 2–6 (Stop-hook scoping, the
+    walker runner as an audit rider, plan-phase sizing, rider unbundling, floor-verifier
+    scoping) explicitly DECLINED — the remaining growth is accepted as the repo's real
+    character. Also fixed in the prune: status.md's stale "twenty-six floors" prose count
+    (27 rows stand; replaced with the pointer form its own rule asks for).
+  - **Honest notes:** the audit's backing data (per-session metrics, the verify-run
+    ledger, per-arc phase timelines) lives in the audit session's scratchpad, which
+    evaporates in ~5 days — the load-bearing numbers are in the decisions entry, and the
+    rest re-derives in a ~2-minute re-parse of the transcript store. The Stop-hook
+    per-turn suite cost is an ESTIMATE (turn-ends × observed same-era subset runtime; the
+    hook logs itself only when it blocks). No transcripts exist for 07-16 or the
+    pre-17:53 part of 07-17; one 08-12 floor-verifier transcript spans 17 idle hours
+    (left open overnight) and was capped, not counted.
+  - **Blocked:** nothing. **Abandoned:** nothing (options 2–6 were declined by ruling,
+    not abandoned). Next: C4 per the roadmap, unchanged.
+
 
 ---
 
@@ -1765,6 +1798,90 @@ session.
 at the top of the living file — each a snapshot of what the current phase was when it was
 written. Kept verbatim: they are the most readable summary of each build era, and the
 session-log entries below them carry the detail. Newest first, as they were.*
+
+### Pruned from status.md 2026-08-17 — the ≤12 KB tripwire's first application
+
+*The session-effort audit ruled a standing size line for the auto-loaded living file.
+These are the trimmed blocks, verbatim; the compressed pointers that replaced them remain
+in status.md.*
+
+**The C3 phase header as it stood:**
+
+**Phase:** **Road to completion — Phases A, B, C1, C2, and C3 are DONE.** (The roadmap
+below, consolidated 2026-08-04.) The 2026-08-17 session landed **PHASE C3 — the parameter
+compiler**, plan-to-floor in one session. The seven C3 rulings settled at the plan-mode
+fork batches BEFORE any file changed: feedstock = ALL live beliefs; typed core = the three
+prose-view weight multipliers only (§10's dead "action-set biases" corrected with the
+build); scheduling = the STANDALONE third background worker — Jack took the larger option
+over the recommended reflect-pipeline stage, with the follow-up fork ruling it lands
+WITHOUT the generic jobs table (that unification stays its own later task) — no endpoint,
+no route; the all-mechanical staleness guard (the K-window at discovery AND consume +
+liveness-by-join + hard clamps); the judge-shaped `LONGMEM_MODEL_COMPILER` (the THIRD such
+var); the multiplier clamp **[0.25, 4.0]** frozen into migration 008's CHECK; and
+`:compile` = sweep semantics. Landed: migration 008 (`compiled_bundles` append-only,
+liveness DERIVED by join + `compiler_runs`), `app\compiler.py` (service + worker + the
+pure consume functions), the dialogue-seam consume splice (`scene_type` on the turn
+request; composed multiplier products over the untouched weight resolver; zero-bundle
+byte parity walker-asserted), the session/CLI surface, suite Set M (21 scenarios, ALL
+unmarked — subset 114 → 135, total 128 → 149), the TENTH walker (48/48), the C# mirror +
+interop beats [13] (28 → 32), and the docs sweep incl. `parameter-compiler.md` and the
+§12 stale-count corrections. The independent floor-verifier returned **PASS** (floors row
+27); believability shows no regression (real-mode smoke vs the 2026-08-07 baseline:
+checks 6/0 both, gist 0.7667 → 0.85, keyword retention equal). **Applying migrations
+007 + 008 to the product `longmem` DB is Jack's action** (builds touch scratches only;
+the product ledger sits at 001–006 with zero reflection or bundle rows). **NEXT UP: C4 —
+dissonance path + diegetic-correction event.**
+
+**The "Recently closed" litany as it stood:**
+
+**Recently closed** (pointers; full trail in `decisions.md`): **the C3 forks — seven
+ruled 2026-08-16/17 at the plan-mode batches** (feedstock; typed core; the standalone
+third worker — the one larger-than-recommended pick, with the jobs-table follow-up ruled
+standalone; the mechanical staleness guard; the judge-shaped role; the [0.25, 4.0] clamp
+frozen pre-migration; `:compile` sweep semantics — the dated build record); **the C2
+build-plan forks —
+four ruled 2026-08-15 at the build session, all recommended options taken** (post-commit
+re-render; the tri-state REPL surface; the keyword-only provider test seam; the real-mode
+believability run), with the spec's `[SETTLE-AT-BUILD]` ledger resolved by the approved
+plan (the dated build record); **the C2 spec forks — the
+four ruled 2026-08-15 at the spec sitting** (consolidation auto-threshold + override;
+trim PURELY MECHANICAL — against the recommendation, the one divergence in the C2 line;
+per-affected eviction; C# mirror at build; the dated entry); **the C2 dossier forks — all
+six + the habituation rider ruled 2026-08-15 at the dossier session** (scheduling
+composition; belief home; the identity package incl. the dialogue-seam move; trim teeth +
+the fourth sanctioned cause; the RRR guard; the judge-shaped role; the dated entry);
+**the interim public README +
+the early public flip — ruled 2026-08-13** (repo public ahead of Phase F; F1's demo-time
+rewrite unchanged; the dated entry); **em-dashes banned from public-facing prose — ruled
+2026-08-13, recorded at the 2026-08-15 wrap-up** (zero U+2014 in Jack's-voice deliverables,
+F1 included; en-dashes and hyphens stay; the dated entry); **the C1 spec forks + the
+`typology_confidence` seat — all five ruled 2026-08-12 at the C1 spec** (defer-LLM-calls-only;
+supersession via chains + the one-shot scalar sanction; worker default OFF; the byte-identity
+third cause; confidence salvage); **the dialogue model — HAIKU
+re-ruled 2026-08-12 on the first real compares** (perceived first word is decisive: 943 ms p50
+vs sonnet-5's 2626/2086 ms against the 1 s bar; sonnet's 46–7 / 41–9 prose preference on the
+record and rejected as not justifying the latency; the thinking-off variant measured and
+closed the same way); **R7 — resolved 2026-08-12 on the stage-4 ablation's data** (the drift
+budget keeps its mechanism and 0.35 threshold and is re-scoped as a TOPIC guard — wholesale
+nonsense/topic-swaps; factual faithfulness is policed by gist-precision (fact survival) and
+the judged faithfulness category; nothing changes at runtime, the claim is corrected in
+`architecture.md` §7, `reconstruction.md`, the `drift_budget_threshold` knob comment, and the
+stage-4 banner); the 2026-08-04 scope rulings (below); haiku ships as the dialogue role +
+quote embargo lifted (2026-07-29); reconstruction's model class — Haiku stands (2026-07-28;
+re-measured on Haiku 2026-07-29); escalation failure path + trigger tuning (2026-07-22/23).
+
+**Carried-item parentheticals as they stood:**
+
+*(Bite recorded 2026-08-12: the DB was found
+MISSING — dropped at some point since the 2026-08-07 audit — and psycopg_pool masked
+"database does not exist" as a 30 s `PoolTimeout`; recreated + migrated 001–005 in-session.)*
+*(SECOND bite recorded 2026-08-17 at the C3 floor-verify: `verify_reflection`'s B6/E9
+DB-global counts make that walker non-re-runnable on the persistent scratch once its own
+prior green run has landed rows — it needed a fresh pid-scoped scratch to pass 60/60; the
+C3 walker ships a persistent-scratch rule in its docstring to stay out of this class.)*
+*(The `typology_confidence` parse seat flagged earlier on 2026-08-12 was **ruled SALVAGE
+and closed the same day inside C1** — the dated entry in `decisions.md`; the typology gap
+itself was ruled CLAMP and built that morning. Neither is carried any longer.)*
 
 **Prior phase:** **the HTTP dialogue-turn route is LIVE — Unity's front door exists** (2026-07-23,
 immediate-queue item 1, the audit's #1 blocker closed; plan-as-spec session). `POST

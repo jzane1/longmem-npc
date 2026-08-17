@@ -103,7 +103,10 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
 ## End of every task
 1. Update the living record (split three ways 2026-07-28 so status.md stays cheap to auto-load):
    - **docs/status.md** — Last-updated date, the phase header if the phase moved, and any queue
-     changes. Keep it live state only; do not let history accumulate here again.
+     changes. Keep it live state only; do not let history accumulate here again. **Size tripwire
+     (ruled 2026-08-17): status.md leaves every wrap-up at or under ~12 KB.** Past the line, move
+     history verbatim into session-log.md's archive section — trimmed, never deleted (the
+     session-effort audit measured the auto-loaded boot cost; the dated decisions.md entry).
    - **docs/session-log.md** — append ONE entry for the session, honest about what landed, what
      was blocked, and what was abandoned.
    - **docs/floors.md** — append a row ONLY if a layer landed and the floor-verifier returned

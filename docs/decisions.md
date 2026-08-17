@@ -84,6 +84,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [C2 spec rulings — reflection build target — 2026-08-15](#c2-spec-rulings--reflection-build-target--2026-08-15)
 - [Phase C2 build record — reflection landed — 2026-08-15](#phase-c2-build-record--reflection-landed--2026-08-15)
 - [Phase C3 build record — the parameter compiler landed — 2026-08-17](#phase-c3-build-record--the-parameter-compiler-landed--2026-08-17)
+- [Session-effort audit — the status.md tripwire — 2026-08-17](#session-effort-audit--the-statusmd-tripwire--2026-08-17)
 
 ## Primary decisions
 
@@ -3549,3 +3550,63 @@ TAB/VT landed and ate the following letter with no SyntaxWarning (the invalid-es
 spots warned and preserved their bytes), and `write_text`'s newline translation CRLF'd
 the file besides; the standing grep-verify-control-bytes rule caught it, the row was
 rewritten byte-level from raw strings, and the file re-verified clean.
+
+## Session-effort audit — the status.md tripwire — 2026-08-17
+
+**Context.** Jack observed sessions growing longer, with far more in-scope riders per
+queue item, and asked for a diagnosis before any fix. The session parsed the project's
+own Claude Code transcripts — 58 main-thread + 202 subagent files (~172 MB, 46,755
+records, zero malformed), fork-copied history deduplicated by uuid — into 27 work
+sessions over 23 dates, reconciled three ways against session-log.md and all 21 commit
+days (fully matched; no transcripts exist for 07-16 or pre-17:53 07-17). Tool runtimes
+derive from tool_use→tool_result timestamp deltas capped at 15 min; the per-turn
+Stop-hook suite cost is an estimate (turn-ends × observed same-era subset runtime — the
+hook logs itself only when it blocks); token comparisons are within-model only.
+
+**The measured findings.**
+
+1. Per-unit efficiency did NOT degrade: hours per 100 landed insertions by week —
+   0.08 (Jul 12–18), 0.33 (Jul 19–25, the profiling week), 0.08 (Jul 26–Aug 01),
+   0.18 (Aug 02–08), **0.04 (Aug 09–15, the best of the project)**, 0.21 (Aug 16–17,
+   the single C3 landing).
+2. What grew is the arc per queue item: ~96 attributed minutes per landing on 07-21
+   (four landings that day) → ~260–290 for C2/C3. Phase decomposition attributes about
+   two-thirds of that growth to the PLAN phase (the settle-at-spec discipline — the C3
+   arc spent 145.7 min in plan against 64.8 build + 42.2 verify) and one-third to the
+   standing per-landing apparatus: since A1 every component landing touches 8 areas
+   (app, tests, db, docs ×10 files, client, README, CLAUDE.md, .env.example) vs 3–5
+   areas and no client in July, at roughly double the insertions.
+3. Verification: 40–65% of verify events (suite/walker/floor runs) fire with zero code
+   edits since the previous verify event — the re-run habit is real but costs only tens
+   of minutes per week. The floor-verifier's per-landing cost tracks the stack it
+   re-verifies: 2.5 min / 12k output tokens (write path, July) → 20.8 min / 119k (C3).
+   Suite subset runtime grew 16 s → 45 s as the subset grew 38 → 135 scenarios.
+4. The docs sweep + four-register ritual is ~10 min per arc — visually prominent in
+   diffs, nearly free in wall time. No context-churn signal (repeat-reads flat, late
+   re-reads down; the 5.8 h single-human-turn C3 marathon ran clean).
+5. The one proven pathology was auto-loaded boot cost: ~38k tokens (07-12) → ~100k
+   (07-27, status.md at 110 KB) → ~59k after the 07-28 three-way split → ~53k after the
+   08-07 live-state prune → crept back to ~58.6k by 08-16 as status.md regrew
+   12 → 17.5 KB. The mechanism and its fix are both demonstrated by the repo's own
+   history.
+
+**The ruling (Jack, 2026-08-17).** Of the six priced counter-measures presented, adopt
+**option 1 only**: re-prune status.md to live state now, and make the size line a
+standing rule — **status.md leaves every wrap-up at or under ~12 KB; anything past the
+line moves verbatim into session-log.md's archive section (trimmed, never deleted).**
+Recorded in CLAUDE.md's end-of-task step 1. Explicitly DECLINED: (2) walker runner +
+verify-after-edits discipline (stays the carried item on its own timeline), (3) Stop-hook
+scoping, (4) per-component plan-phase sizing, (5) unbundling the C# mirror rider,
+(6) floor-verifier scoping. Rationale: the diagnosis shows the growth is mostly the
+repo's real character — bigger queue items carrying their full apparatus, and a planning
+discipline that is measurably winning (one-arc floor-verified landings, zero rework
+sessions, improving lines-per-hour) — so only the cheapest lever with a proven mechanism
+is worth adopting.
+
+**Applied the same day:** the prune (status.md 17,500 B → under the line; the C3 phase
+header, the recently-closed litany, and the carried-item bite parentheticals moved
+verbatim to the archive; the stale "twenty-six floors" prose count replaced with the
+pointer form the file's own rule asks for), the CLAUDE.md tripwire text, and this entry.
+The audit's full data tables live in the audit session's scratchpad (evaporates ~5 days);
+everything load-bearing is in this entry, and the parse re-derives from the transcript
+store in ~2 minutes.
