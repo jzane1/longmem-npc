@@ -308,15 +308,18 @@ falls below theta; text-affecting decay evaluations bind to a scene-frozen basis
 never flips mid-scene). The reconstructor sees the **full gist span as a fixed constraint** plus
 the time-thinned detail slice **plus the current live head — "how you currently tell it" (ruled
 2026-07-17: retellings compound; without the prior telling the drift budget rarely binds)** —
-conditioned on the rendered identity document. *(On a chain whose drift anchor is an
-`authorial_correction` head, the fixed constraint follows the anchor — the corrected head
-replaces the stale gist constraint; ruled 2026-07-17, **built & floor-verified 2026-07-18**,
-`authorial-correction.md`.)*
+conditioned on the rendered identity document. *(On a chain whose drift anchor is a
+correction head — `authorial_correction`, ruled 2026-07-17, **built & floor-verified
+2026-07-18**, `authorial-correction.md`; extended to `update_with_resentment` by C4 ruling 4,
+**built 2026-08-17**, `dissonance.md` — the fixed constraint follows the anchor: that head
+replaces the stale gist constraint, and original observation detail is never re-injected.)*
 
 **Write-back with a version chain:** one permanent `memory_id` forever; each retelling inserts a new
 detail row and stamps the prior one superseded — **versioned confabulation over an immutable
 record**. Chain rows carry a `write_cause` enum:
-`original | reconstruction | rationalization | update_with_resentment | authorial_correction`.
+`original | reconstruction | rationalization | update_with_resentment | authorial_correction |
+enrichment` *(the sixth value joined with migration 006, C1 2026-08-12; this line had omitted
+it — fixed at the C4 doc pass, ruling 8, 2026-08-17)*.
 
 **Serving:** Haiku-class *(**re-confirmed 2026-07-28.** The doc audit surfaced that the shipped
 config had been running `claude-sonnet-5` since 2026-07-21 — a stopgap when the env var was found
@@ -360,7 +363,10 @@ Factual faithfulness is policed by the other two guards — the **fixed gist con
 gist-precision** (fact survival, the judge-free metric read) and the **judged faithfulness
 category** (semantic support, past the agreement bar). Mechanism and threshold unchanged.
 **The anchor needs no pointer:** it is the latest
-chain row whose `write_cause` is `original`, `authorial_correction`, or `update_with_resentment`.
+chain row whose `write_cause` is `original`, `authorial_correction`, `update_with_resentment`,
+or `enrichment` *(the fourth member since migration 006 — the worker's canonical render
+re-anchors, `deferred-writes.md`; this line had omitted it — fixed at the C4 doc pass,
+ruling 8, 2026-08-17)*.
 Re-anchoring by cause: authorial → the corrected head (the authorial-correction row);
 update-with-resentment → the new head;
 rationalization → **never** (it spends headroom without being blocked, so a heavily defended memory
@@ -389,7 +395,12 @@ dossier, 2026-08-15.)*
   retrieval follows the fix.)*
 - **Diegetic** (in-world confrontation; an API event referencing a target `memory_id`): preserves
   the chain and routes through the dissonance path; the new head row is typed `rationalization` or
-  `update_with_resentment`, and a correction record is present.
+  `update_with_resentment`, and a correction record is present. *(Specced & **built 2026-08-17**,
+  `dissonance.md` — the eight C4 rulings: the defend-vs-update fork is the §8 formula computed
+  mechanically (no model call decides; every multiplier a knob); the RECONSTRUCTION role writes
+  the new telling in the decided stance (no new env var); tellings-only — the fact chain never
+  moves, so retrieval keeps matching the original account; `POST /v1/events/diegetic-correction`,
+  no migration — the `corrections` table waited since 001.)*
 
 **Pin semantics (final ruling — supersedes any earlier note saying pin blocks diegetic):** both
 correction verbs **outrank pin**, and the resulting new head **inherits the pin**. Pin means exactly
@@ -516,12 +527,14 @@ is C2's RRR.
 
 ## 12. Integrator surface requirements
 
-**The shipped HTTP surface** *(thirteen routes; five landed 2026-07-23 and 2026-07-27 —
+**The shipped HTTP surface** *(fourteen routes; five landed 2026-07-23 and 2026-07-27 —
 `unity-client.md`; the metric read 2026-07-29 — `eval-harness.md`; the reflect verb
 2026-08-15 — `reflection.md`; this paragraph still said "twelve" and omitted reflect until
 2026-08-17, a C2 propagation miss corrected at the C3 build — C3 itself adds NO route by
-ruling)*: `POST /v1/events/observe`,
+ruling; the diegetic-correction event joined with C4, 2026-08-17 — `dissonance.md`)*:
+`POST /v1/events/observe`,
 `POST /v1/events/scene-boundary`,
+**`POST /v1/events/diegetic-correction`** (the confrontation event — the dissonance path),
 `PUT /v1/memories/{id}/pin`, `POST /v1/memories/{id}/correction`, `POST /v1/dialogue/init`,
 **`POST /v1/dialogue/turn`** (stateless — all scene state rides the request; the runner bookkeeping
 is the client's job), **`POST /v1/dialogue/turn/stream`** (its SSE twin, iterating the SAME

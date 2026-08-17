@@ -24,6 +24,15 @@ Meta-commands (everything else is an utterance):
                        authorial correction: replace the live telling with
                        the operator's text byte-verbatim (supersede + cache
                        evict; takes effect immediately, mid-scene included)
+    :confront <memory_id> [typology[@weight]] <challenge text>
+                       diegetic correction (C4): an in-world confrontation of
+                       a memory at the session's time. The mechanical formula
+                       decides defend (rationalization) vs fold
+                       (update_with_resentment); the reconstruction role
+                       writes the new telling; prints verb, both sides, IDs.
+                       typology one of observed|told|inferred|reflected
+                       (default observed — REPL ergonomics; the wire field is
+                       required); @weight in [0,1] scales the challenge
     :reflect [consolidate|no-consolidate]
                        the reflect verb at the session's time: sample ->
                        grounded conclusions -> mechanical trim; bare lets
@@ -57,6 +66,7 @@ import sys
 from datetime import datetime, timezone
 from uuid import UUID
 
+from app.dissonance import DissonanceCallError
 from app.ingest import (
     CorrectionEmbedFailedError,
     UnknownAgentError,
@@ -334,6 +344,50 @@ async def repl(agent_id: UUID, debug: bool) -> None:
                         f"{correction.embedding_tokens}tok, "
                         f"{correction.total_ms}ms total)"
                     )
+                elif line.startswith(":confront"):
+                    rest = line[len(":confront") :].strip()
+                    raw_id, _, tail = rest.partition(" ")
+                    tail = tail.strip()
+                    typology = "observed"
+                    weight: float | None = None
+                    if tail:
+                        candidate, _, remainder = tail.partition(" ")
+                        base_typ, at_sign, raw_weight = candidate.partition("@")
+                        if base_typ in ("observed", "told", "inferred", "reflected"):
+                            typology = base_typ
+                            if at_sign:
+                                weight = float(raw_weight)
+                            tail = remainder.strip()
+                    if not raw_id or not tail:
+                        print(
+                            "usage: :confront <memory_id> [typology[@weight]] "
+                            "<challenge text>"
+                        )
+                        continue
+                    confronted = await runner.confront(
+                        UUID(raw_id),
+                        tail,
+                        challenge_typology=typology,
+                        challenge_weight=weight,
+                    )
+                    print(
+                        f"{confronted.verb} on {confronted.memory_id}: "
+                        f"challenge {confronted.challenge:.3f} "
+                        f"(w {confronted.challenge_weight_effective:.2f} x "
+                        f"typ {confronted.typology_mult_challenge:.2f}) vs "
+                        f"resistance {confronted.resistance:.3f} "
+                        f"(imp {confronted.importance_norm:.2f} x "
+                        f"typ {confronted.typology_mult_memory:.2f} x "
+                        f"rig {confronted.rigidity_effective:.2f}); head "
+                        f"{confronted.superseded_detail_id} -> "
+                        f"{confronted.detail_id}; correction "
+                        f"{confronted.correction_id}; "
+                        f"{confronted.evicted_cache_rows} cache row(s) "
+                        f"evicted (retell {confronted.retell_ms:.0f}ms/"
+                        f"{confronted.retell_input_tokens}+"
+                        f"{confronted.retell_output_tokens}tok, "
+                        f"{confronted.total_ms:.0f}ms total)"
+                    )
                 elif line.startswith(":reflect"):
                     raw = line[len(":reflect") :].strip()
                     if raw == "consolidate":
@@ -412,6 +466,10 @@ async def repl(agent_id: UUID, debug: bool) -> None:
                 # Fail-loud, nothing written (reflection.md ladder): the
                 # :reflect may be re-issued safely.
                 print(f"reflect refused: {exc}")
+            except DissonanceCallError as exc:
+                # All-or-nothing (dissonance.md, the authorial precedent):
+                # nothing was written; the :confront may be re-issued safely.
+                print(f"confrontation failed: {exc}")
     finally:
         await runner.close()
 

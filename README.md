@@ -192,12 +192,13 @@ NLP load.
 
 ## What's next
 
-Reflection (evidence-cited beliefs, a repetition detector, periodic identity refresh) and the
-parameter compiler (formed beliefs compiled into per-scene personality weights) are now
-built. In order from here: dissonance-driven defense of corrected memories, client-contract
-completion, the purge endpoint, then the latency pass. After that: the demo video, a Unity
-package, and one-command backend spin-up, at which point this README gets rebuilt around the
-demo.
+Reflection (evidence-cited beliefs, a repetition detector, periodic identity refresh), the
+parameter compiler (formed beliefs compiled into per-scene personality weights), and
+dissonance-driven defense (an in-world confrontation event: the NPC either rationalizes its
+story or grudgingly updates it, decided by a tunable evidence formula) are now built. In
+order from here: client-contract completion, the purge endpoint, then the latency pass.
+After that: the demo video, a Unity package, and one-command backend spin-up, at which point
+this README gets rebuilt around the demo.
 
 ## Repository layout
 

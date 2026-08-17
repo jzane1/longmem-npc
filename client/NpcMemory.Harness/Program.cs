@@ -16,7 +16,8 @@ namespace NpcMemory.Harness
     /// observe -> loader -> correction-override -> chain inspection ->
     /// drift + cache -> gate fire -> warm-init -> SSE stream -> the
     /// weights-on-speech re-rank (A1 re-shape, 2026-08-04) -> the reflect
-    /// verb (C2, 2026-08-15).
+    /// verb (C2, 2026-08-15) -> the diegetic-correction event (C4,
+    /// 2026-08-17).
     /// Structural asserts only: IDs, flags, byte-identity — never prose.
     /// </summary>
     internal static class Program
@@ -422,6 +423,72 @@ namespace NpcMemory.Harness
                     && clearedTurn.Instrumentation.SceneTypeResolved == "default"
                     && !clearedTurn.Instrumentation.SceneTypeUnknown,
                 "a bare boundary clears the session type back to the default");
+
+            // -- [14] the diegetic-correction event (dissonance.md, C4) ----
+            // Structural over the wire: verb + IDs + the echoed resolved
+            // inputs (both sides recomputable client-side) + the chain read's
+            // correction record + the 409 CAS. The formula extremes, anchor
+            // semantics, and eviction mechanics are the eleventh walker's job.
+            Console.WriteLine("\n[14] Diegetic correction: the confrontation over the wire");
+            var confrontObs = await session.ObserveAsync(
+                "A tinker paid the toll with a clipped coin and I let it pass.");
+            var confronted = await session.ConfrontAsync(
+                confrontObs.MemoryId,
+                "The coin was full weight; the clipping was just wear at the rim.");
+            Check(
+                confronted.MemoryId == confrontObs.MemoryId
+                    && (confronted.Verb == "rationalization"
+                        || confronted.Verb == "update_with_resentment")
+                    && confronted.CorrectionId != Guid.Empty
+                    && confronted.DetailId != Guid.Empty
+                    && confronted.SupersededDetailId == confrontObs.DetailId
+                    && confronted.Content.Length > 0,
+                "the confrontation superseded the live head and recorded a verb",
+                $"verb={confronted.Verb}");
+            Check(
+                Math.Abs(
+                    confronted.Resistance
+                        - confronted.ImportanceNorm * confronted.TypologyMultMemory
+                            * confronted.RigidityEffective) < 1e-9
+                    && Math.Abs(
+                        confronted.Challenge
+                            - confronted.ChallengeWeightEffective
+                                * confronted.TypologyMultChallenge) < 1e-9,
+                "both decision sides recompute from the echoed resolved inputs",
+                $"challenge {confronted.Challenge:F3} vs "
+                + $"resistance {confronted.Resistance:F3}");
+            var confrontChain = await client.MemoryChainAsync(confrontObs.MemoryId);
+            Check(
+                confrontChain.Corrections.Count == 1
+                    && confrontChain.Corrections[0].CorrectionId
+                        == confronted.CorrectionId
+                    && confrontChain.Corrections[0].DetailId == confronted.DetailId
+                    && confrontChain.Corrections[0].Verb == confronted.Verb
+                    && confrontChain.Details.Count(d => d.IsLive) == 1
+                    && confrontChain.Details.Single(d => d.IsLive).DetailId
+                        == confronted.DetailId
+                    && confrontChain.Details.Single(d => d.IsLive).WriteCause
+                        == confronted.Verb,
+                "the chain read carries the correction record beside the typed head");
+            try
+            {
+                await client.DiegeticCorrectAsync(new DiegeticCorrectionEvent
+                {
+                    AgentId = created.AgentId,
+                    MemoryId = confrontObs.MemoryId,
+                    ChallengeText = "again, but against a head that moved",
+                    ChallengeTypology = "observed",
+                    ClientTimestamp = DateTimeOffset.UtcNow,
+                    ExpectedDetailId = confrontObs.DetailId, // now superseded
+                });
+                Check(false, "a stale expected_detail_id must refuse with 409");
+            }
+            catch (NpcMemoryApiException ex)
+            {
+                Check(ex.StatusCode == 409,
+                    "stale CAS -> 409 over the wire, nothing written",
+                    $"status {ex.StatusCode}");
+            }
 
             // -- wrap-up ---------------------------------------------------
             Console.WriteLine(

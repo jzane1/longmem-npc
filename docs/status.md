@@ -1,16 +1,18 @@
 # longmem-npc — Status
 
 **Last updated:** 2026-08-17
-**Phase:** **Road to completion — Phases A, B, and C1–C3 are DONE. NEXT UP: C4 — dissonance
-path + diegetic-correction event.** C3 (the parameter compiler) landed 2026-08-17,
-plan-to-floor in one session — floors row 27; the dated C3 build record in `decisions.md`
-carries the seven plan-batch rulings; believability confirmed no regression. **One live
-operator action stands: applying migrations 007 + 008 to the product `longmem` DB is Jack's**
-(builds touch scratches only; the product ledger sits at 001–006 with zero reflection or
-bundle rows).
+**Phase:** **Road to completion — Phases A, B, and C1–C4 are DONE. NEXT UP: C5 — client
+contract completion (the agent-state read route + async observes).** C4 (the dissonance
+path + diegetic-correction event) landed 2026-08-17, plan-to-floor in one session — floors
+row 28; the dated C4 build record in `decisions.md` carries the eight plan-batch rulings
+(NO migration — the `corrections` table waited since 001); believability confirmed no
+regression. **No operator action stands:** Jack applied migrations 007 + 008 to the product
+`longmem` DB himself the same morning (the reserved action, done — the product ledger now
+reads 001–008 with zero reflection, bundle, or corrections rows).
 The system is BUILT end to end on the final A1 seam — backend, C# client + console harness,
 Unity adapter + gray-box scene, The Ledger, eval-harness stages 1–4, deferred writes,
-reflection, the parameter compiler — schema at migrations 001–008. What is proven lives in
+reflection, the parameter compiler, the dissonance path — schema at migrations 001–008.
+What is proven lives in
 `docs\floors.md`, why in `decisions.md`, the narrative in `session-log.md`; this file
 carries only what is live.
 
@@ -52,11 +54,12 @@ re-openable: re-verifying one is a step, never an argument against a design impr
 *None open.*
 
 **Recently closed** (pointers only; `decisions.md`'s index is the full list, and the
-pre-prune litany sits verbatim in `session-log.md`'s archive, moved 2026-08-17): the
-status.md size tripwire — the session-effort audit's one adopted lever, options 2–6
-declined (2026-08-17, the dated entry); the C3 forks — seven ruled 2026-08-16/17 at the
-plan-mode batches (the dated build record); the C2 line — dossier, spec, and build-plan
-forks ruled 2026-08-15 (three dated entries); earlier closures: the dated entries.
+pre-prune litany sits verbatim in `session-log.md`'s archive, moved 2026-08-17): the C4
+forks — eight ruled 2026-08-17 at two plan-mode batches, incl. the reconstruction-role
+reuse AGAINST the recommendation, the second such divergence (the dated build record); the
+status.md size tripwire (2026-08-17, the dated entry); the C3 forks — seven ruled
+2026-08-16/17 (the dated build record); the C2 line — dossier, spec, and build-plan forks
+ruled 2026-08-15 (three dated entries); earlier closures: the dated entries.
 
 ## The roadmap (re-planned 2026-08-04; ordering delegated to Claude on efficiency grounds)
 
@@ -94,7 +97,11 @@ Ordered so shared machinery lands before its reusers.
   date (floors row 27; the dated C3 build record; spec: `parameter-compiler.md`, migration
   008). Ships default OFF per agent (the full modulator suite stays cut); the flip is a
   Phase D question.
-- **C4. Dissonance path + diegetic-correction event** (ONE session, ruled).
+- **C4. Dissonance path + diegetic-correction event.** ✅ LANDED 2026-08-17 in the ruled
+  ONE session, floor-verified the same date (floors row 28; the dated C4 build record;
+  spec: `dissonance.md`; NO migration — the `corrections` table waited since 001). Always
+  live (no kill-switch by ruling — the event is client-invoked; not sending it is the off
+  state).
 - **C5. Client contract completion** (one session): the agent-state read route (backend + C#) +
   async observes (fire-and-forget client observes; ruled in explicitly 2026-08-04).
 - **C6. Purge endpoint** — the ruled release-blocker; the sole sanctioned DELETE.
@@ -172,13 +179,16 @@ not vendored).
 
 **Carried, not fixed** (deliberately unscheduled, awaiting its own ruling):
 
-- **The walkers (ten since C3) share a fixed-name scratch DB** (`longmem_test`) they neither
+- **The walkers (eleven since C4) share a fixed-name scratch DB** (`longmem_test`) they neither
   create, migrate, nor drop, and some walker assertions are DB-global counts. The right fix —
   the suite's pid-scoped mechanism plus a `tests\run-walkers.ps1` runner — is a medium refactor
   of the verification apparatus itself, so it wants its own scoped task rather than riding an
-  audit. Two documented bites (detail verbatim in the session-log archive, moved 2026-08-17):
-  2026-08-12 (the DB found MISSING; psycopg_pool masked it as a 30 s `PoolTimeout`) and
-  2026-08-17 (`verify_reflection` is non-re-runnable on the persistent scratch — a fresh
-  pid-scoped scratch is that walker's documented precondition). *(The other 2026-07-28 carried
-  items — the auth honesty paragraph, the Unity MCP pin, the DLL staleness check — are
-  scheduled: Phase F.)*
+  audit. THREE documented bites (the first two verbatim in the session-log archive, moved
+  2026-08-17): 2026-08-12 (the DB found MISSING; psycopg_pool masked it as a 30 s
+  `PoolTimeout`), 2026-08-17 (`verify_reflection` is non-re-runnable on the persistent
+  scratch — a fresh pid-scoped scratch is that walker's documented precondition), and
+  2026-08-17 again at the C4 landing (the elder correction walkers' DB-global
+  corrections-emptiness asserts vs the re-opened `verify_reconstruction` — sweeps must run
+  fresh + serial, elder walkers first; the C4 build record has the detail). *(The other
+  2026-07-28 carried items — the auth honesty paragraph, the Unity MCP pin, the DLL
+  staleness check — are scheduled: Phase F.)*

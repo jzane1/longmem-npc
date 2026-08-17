@@ -48,6 +48,24 @@ namespace NpcMemory
         public string? EventId { get; set; }
     }
 
+    /// <summary>The in-world confrontation event (dissonance.md, C4
+    /// 2026-08-17) — the third diegetic event. References a target memory;
+    /// ChallengeTypology is REQUIRED by the wire contract
+    /// (observed|told|inferred|reflected); a null ChallengeWeight resolves
+    /// through the server-side default knob.</summary>
+    public sealed class DiegeticCorrectionEvent
+    {
+        public Guid AgentId { get; set; }
+        public Guid MemoryId { get; set; }
+        public string ChallengeText { get; set; } = "";
+        public string ChallengeTypology { get; set; } = "observed";
+        public double? ChallengeWeight { get; set; }
+        public DateTimeOffset ClientTimestamp { get; set; }
+        public JObject? SourceEvent { get; set; }
+        public Guid? ExpectedDetailId { get; set; }
+        public string? EventId { get; set; }
+    }
+
     public sealed class PinRequest
     {
         public bool Pinned { get; set; }
@@ -151,6 +169,35 @@ namespace NpcMemory
         public double EmbedMs { get; set; }
         public int EmbeddingTokens { get; set; }
         public double NlpMs { get; set; }
+        public double TotalMs { get; set; }
+    }
+
+    /// <summary>Result of the diegetic-correction event (dissonance.md, C4):
+    /// the decided verb, the head swap + correction record IDs, and every
+    /// resolved decision input (both sides recomputable client-side). The
+    /// retell prose rides in Content; its spend is counted under the
+    /// reconstruction role.</summary>
+    public sealed class DiegeticCorrectionResult
+    {
+        public Guid MemoryId { get; set; }
+        public Guid AgentId { get; set; }
+        public string Verb { get; set; } = "";
+        public Guid CorrectionId { get; set; }
+        public Guid DetailId { get; set; }
+        public Guid SupersededDetailId { get; set; }
+        public bool Pinned { get; set; }
+        public string Content { get; set; } = "";
+        public double Resistance { get; set; }
+        public double Challenge { get; set; }
+        public double ImportanceNorm { get; set; }
+        public double RigidityEffective { get; set; }
+        public double TypologyMultMemory { get; set; }
+        public double TypologyMultChallenge { get; set; }
+        public double ChallengeWeightEffective { get; set; }
+        public int EvictedCacheRows { get; set; }
+        public double RetellMs { get; set; }
+        public int RetellInputTokens { get; set; }
+        public int RetellOutputTokens { get; set; }
         public double TotalMs { get; set; }
     }
 
@@ -458,6 +505,19 @@ namespace NpcMemory
         public DateTimeOffset CreatedAt { get; set; }
     }
 
+    /// <summary>One diegetic confrontation record (C4, dissonance.md) —
+    /// the verb, the head it produced, and the client's in-world reference
+    /// verbatim; the unscored chain read is its inspector surface.</summary>
+    public sealed class CorrectionOut
+    {
+        public Guid CorrectionId { get; set; }
+        public Guid DetailId { get; set; }
+        public string Verb { get; set; } = "";
+        public JObject? SourceEvent { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+        public DateTimeOffset ValidAt { get; set; }
+    }
+
     public sealed class MemoryChainResult
     {
         public Guid MemoryId { get; set; }
@@ -481,6 +541,7 @@ namespace NpcMemory
         public List<DetailVersionOut> Details { get; set; } = new List<DetailVersionOut>();
         public List<FactVersionOut> Facts { get; set; } = new List<FactVersionOut>();
         public List<GistSpanOut> GistSpans { get; set; } = new List<GistSpanOut>();
+        public List<CorrectionOut> Corrections { get; set; } = new List<CorrectionOut>();
         public double TotalMs { get; set; }
     }
 

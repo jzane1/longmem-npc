@@ -75,10 +75,13 @@ def build_pool(database_uri: str) -> AsyncConnectionPool:
 
 
 async def fetch_agent(pool: AsyncConnectionPool, agent_id: UUID) -> dict | None:
+    """`rigidity` joined the SELECT with C4 (dissonance.md — the decision's
+    per-NPC scalar; NULL resolves via dissonance_rigidity_default). Additive:
+    every consumer reads this dict by key."""
     async with pool.connection() as conn, conn.cursor() as cur:
         await cur.execute(
-            "SELECT agent_id, diagnosticity_goal, config, seed_identity "
-            "FROM agents WHERE agent_id = %s",
+            "SELECT agent_id, diagnosticity_goal, config, seed_identity, "
+            "rigidity FROM agents WHERE agent_id = %s",
             (agent_id,),
         )
         row = await cur.fetchone()
@@ -89,6 +92,7 @@ async def fetch_agent(pool: AsyncConnectionPool, agent_id: UUID) -> dict | None:
         "diagnosticity_goal": row[1],
         "config": row[2] or {},
         "seed_identity": row[3],
+        "rigidity": row[4],
     }
 
 
@@ -651,6 +655,16 @@ async def fetch_memory_chain(pool: AsyncConnectionPool, memory_id: UUID) -> dict
             (memory_id,),
         )
         runs = await cur.fetchall()
+        # Diegetic confrontation records (corrections, schema since 001 —
+        # WRITTEN since C4, dissonance.md): the unscored chain read is the
+        # record's inspector surface (the enrichment-run-log precedent).
+        await cur.execute(
+            "SELECT correction_id, detail_id, verb, source_event, "
+            "created_at, valid_at FROM corrections WHERE memory_id = %s "
+            "ORDER BY valid_at, created_at",
+            (memory_id,),
+        )
+        corrections = await cur.fetchall()
     return {
         "memory_id": mem[0],
         "agent_id": mem[1],
@@ -725,6 +739,17 @@ async def fetch_memory_chain(pool: AsyncConnectionPool, memory_id: UUID) -> dict
                 "matched_category": s[3],
             }
             for s in spans
+        ],
+        "corrections": [
+            {
+                "correction_id": c[0],
+                "detail_id": c[1],
+                "verb": c[2],
+                "source_event": c[3],
+                "created_at": c[4],
+                "valid_at": c[5],
+            }
+            for c in corrections
         ],
     }
 
@@ -1110,6 +1135,130 @@ async def apply_authorial_correction(
         superseded_detail_id=superseded,
         fact_version_id=fact_version_id,
         superseded_fact_version_id=superseded_fact,
+        evicted_cache_rows=evicted,
+    )
+
+
+async def fetch_memory_dissonance_inputs(
+    pool: AsyncConnectionPool, memory_id: UUID
+) -> dict | None:
+    """The dissonance decision's inputs in one read (dissonance.md, C4): the
+    memories-row scalars (owner for the 404 ownership check; importance_raw /
+    typology for the formula, NULLs legal in the deferred window; pinned rides
+    the response) joined to the live telling head (the retell prompt's
+    current_telling). None = no such memory or no live head — the same thing
+    under the one-live-head construction."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT m.agent_id, m.importance_raw, m.typology, m.pinned, "
+            "d.detail_id, d.content "
+            "FROM memories m JOIN memory_details d "
+            "ON d.memory_id = m.memory_id AND d.invalid_at IS NULL "
+            "WHERE m.memory_id = %s",
+            (memory_id,),
+        )
+        row = await cur.fetchone()
+    if row is None:
+        return None
+    return {
+        "agent_id": row[0],
+        "importance_raw": row[1],
+        "typology": row[2],
+        "pinned": row[3],
+        "head_detail_id": row[4],
+        "head_content": row[5],
+    }
+
+
+@dataclass(frozen=True)
+class DiegeticCorrectionApplied:
+    """Row-level outcome of `apply_diegetic_correction` — the telling-chain
+    head swap plus the correction record (tellings-only by the C4 ruling:
+    no fact fields exist to report)."""
+
+    detail_id: UUID
+    superseded_detail_id: UUID
+    correction_id: UUID
+    evicted_cache_rows: int
+
+
+async def apply_diegetic_correction(
+    pool: AsyncConnectionPool,
+    *,
+    memory_id: UUID,
+    content: str,
+    verb: str,
+    valid_at: datetime,
+    source_event: dict | None = None,
+    expected_detail_id: UUID | None = None,
+) -> DiegeticCorrectionApplied | Literal["unknown_memory", "stale_head"]:
+    """The in-world confrontation's chain-preserving write (dissonance.md, C4;
+    the two-verb ruling in architecture.md §8): ONE transaction — supersede
+    the live telling head at the confrontation's world time, insert the new
+    head typed by the decided verb (`rationalization` |
+    `update_with_resentment`; migration 001's CHECK has admitted both since
+    day one), insert the `corrections` row (the confrontation record the
+    schema carried since 001 — detail_id references the new head, so its
+    INSERT follows), and evict every cache row for the memory (the standing
+    eviction invariant). The retell is generated by the CALLER before this
+    transaction — no network call rides inside it. The fact chain is
+    deliberately untouched (tellings-only, ruled 2026-08-17): the store keeps
+    recording what was experienced; the confrontation changes the story. No
+    drift check (event-driven writes are budget-exempt) and no pin check
+    (both correction verbs outrank pin; the new head inherits it because
+    memories.pinned is untouched). CAS semantics mirror the authorial verb:
+    `expected_detail_id` mismatch reports "stale_head" and changes nothing;
+    "unknown_memory" = no live telling head."""
+    try:
+        async with pool.connection() as conn:
+            async with conn.transaction():
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        "UPDATE memory_details SET invalid_at = %s "
+                        "WHERE memory_id = %s AND invalid_at IS NULL "
+                        "RETURNING detail_id",
+                        (valid_at, memory_id),
+                    )
+                    row = await cur.fetchone()
+                    if row is None:
+                        return "unknown_memory"
+                    superseded = row[0]
+                    if (
+                        expected_detail_id is not None
+                        and superseded != expected_detail_id
+                    ):
+                        raise _StaleHeadError
+                    await cur.execute(
+                        "INSERT INTO memory_details (memory_id, content, "
+                        "write_cause, valid_at) VALUES (%s, %s, %s, %s) "
+                        "RETURNING detail_id",
+                        (memory_id, content, verb, valid_at),
+                    )
+                    detail_id = (await cur.fetchone())[0]
+                    await cur.execute(
+                        "INSERT INTO corrections (memory_id, detail_id, verb, "
+                        "source_event, valid_at) VALUES (%s, %s, %s, %s, %s) "
+                        "RETURNING correction_id",
+                        (
+                            memory_id,
+                            detail_id,
+                            verb,
+                            Jsonb(source_event) if source_event is not None else None,
+                            valid_at,
+                        ),
+                    )
+                    correction_id = (await cur.fetchone())[0]
+                    await cur.execute(
+                        "DELETE FROM reconstruction_cache WHERE memory_id = %s",
+                        (memory_id,),
+                    )
+                    evicted = cur.rowcount
+    except _StaleHeadError:
+        return "stale_head"
+    return DiegeticCorrectionApplied(
+        detail_id=detail_id,
+        superseded_detail_id=superseded,
+        correction_id=correction_id,
         evicted_cache_rows=evicted,
     )
 

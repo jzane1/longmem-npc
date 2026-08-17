@@ -28,6 +28,7 @@ from app.config import load_settings
 from app.db import build_pool
 from app.deferred import DeferredWriteWorker
 from app.dialogue import DialogueService
+from app.dissonance import DissonanceCallError, DissonanceService
 from app.ingest import (
     CorrectionConflictError,
     CorrectionEmbedFailedError,
@@ -52,6 +53,8 @@ from app.schemas import (
     CorrectionResult,
     CreateAgentRequest,
     CreateAgentResult,
+    DiegeticCorrectionEvent,
+    DiegeticCorrectionResult,
     DialogueInitRequest,
     DialogueTurnRequest,
     DialogueTurnResult,
@@ -85,6 +88,10 @@ async def _lifespan(app: FastAPI):
     app.state.service = IngestService(pool, providers, settings)
     app.state.retrieval = RetrievalService(pool, providers, settings)
     app.state.dialogue = DialogueService(pool, providers, settings, app.state.retrieval)
+    # The dissonance seam (dissonance.md, the C4 rulings 2026-08-17): the
+    # diegetic-correction event's service — synchronous, no worker, nothing
+    # to start or stop.
+    app.state.dissonance = DissonanceService(pool, providers, settings)
     # The deferred-write worker (deferred-writes.md, ruled 2026-08-12): one
     # per process, stopped BEFORE the pool closes. It drains pending rows
     # regardless of the deferral kill-switch, so flipping the knob off never
@@ -247,6 +254,31 @@ async def scene_boundary(event: SceneBoundaryEvent) -> SceneResult:
         return await app.state.service.scene_boundary(event)
     except UnknownAgentError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post("/v1/events/diegetic-correction", response_model=DiegeticCorrectionResult)
+async def diegetic_correction(
+    event: DiegeticCorrectionEvent,
+) -> DiegeticCorrectionResult:
+    """The in-world confrontation (dissonance.md; the C4 rulings
+    2026-08-17) — the third diegetic event: references a target memory_id
+    (automatic discovery is CUT), decides defend-vs-update mechanically,
+    and EXTENDS the telling chain through the dissonance path — the
+    chain-preserving sibling of the authorial replace-model verb.
+    Fail-loud: 404 unknown agent / unknown-or-foreign memory · 409 stale
+    expected_detail_id · 422 malformed request (pydantic; naive timestamp;
+    unknown typology literal) · 502 retell failure with nothing written
+    (the all-or-nothing correction precedent). Pass-through by ruling."""
+    try:
+        return await app.state.dissonance.confront(event)
+    except UnknownAgentError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except UnknownMemoryError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except CorrectionConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except DissonanceCallError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @app.put("/v1/memories/{memory_id}/pin", response_model=PinResult)

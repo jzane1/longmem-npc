@@ -573,6 +573,94 @@ async def main(database_uri: str) -> None:
     )
 
     # ------------------------------------------------------------------ #
+    print("\n[13] C4 ruling 4: update_with_resentment takes the fixed-")
+    print("     constraint branch; rationalization never re-anchors")
+    agent_c4 = await make_agent(pool, "recon-walker-npc-c4", AGENT_CONFIG)
+    t_c4u = (
+        "The miller shorted me a full sack at the autumn weighing and "
+        "laughed about it with the carters."
+    )
+    t_c4r = (
+        "The reeve took my knife at the gate and never wrote it in the "
+        "ledger book that evening."
+    )
+    accepted = (
+        "The sack was full weight after all - the scale arm was bent, they "
+        "say. The miller laughed at something else."
+    )
+    defense = (
+        "The carters saw the reeve pocket it - no ledger line ever lies by accident."
+    )
+    up_id = await seed_memory(
+        ingest, agent_c4, t_c4u, NOW - timedelta(days=10), decay_class="semantic"
+    )
+    ra_id = await seed_memory(
+        ingest, agent_c4, t_c4r, NOW - timedelta(days=10), decay_class="semantic"
+    )
+    ra_orig_head = (await chain(pool, ra_id))[-1]
+    for mid, verb, content in (
+        (up_id, "update_with_resentment", accepted),
+        (ra_id, "rationalization", defense),
+    ):
+        live = (await chain(pool, mid))[-1]
+        async with pool.connection() as conn:
+            async with conn.transaction():
+                async with conn.cursor() as cur:
+                    await cur.execute(
+                        "UPDATE memory_details SET invalid_at = %s "
+                        "WHERE detail_id = %s",
+                        (basis2, live[4]),
+                    )
+                    await cur.execute(
+                        "INSERT INTO memory_details (memory_id, content, "
+                        "write_cause, valid_at) VALUES (%s, %s, %s, %s)",
+                        (mid, content, verb, basis2),
+                    )
+                    # Chain rows + eviction ONLY — no corrections record:
+                    # the anchor derives from the telling chain alone (the
+                    # exact claim under test), the record obligation is
+                    # verify_dissonance's scoped territory, and a record
+                    # written here would trip the elder walkers'
+                    # diegetic-only emptiness asserts on the shared scratch
+                    # (the documented DB-global-count fragility,
+                    # status.md's carried item).
+                    await cur.execute(
+                        "DELETE FROM reconstruction_cache WHERE memory_id = %s",
+                        (mid,),
+                    )
+    sources13 = await db.fetch_reconstruction_sources(pool, [up_id, ra_id])
+    check(
+        sources13[up_id].anchor_cause == "update_with_resentment"
+        and sources13[up_id].anchor_content == accepted,
+        "the accepted head IS the anchor (in the anchor set since the "
+        "authorial build; exercised live for the first time with C4)",
+    )
+    item13 = build_reconstruction_item(str(up_id), sources13[up_id], 0.5, accepted)
+    check(
+        item13.gist == accepted and item13.thinned_detail == "",
+        "constraint follows the update anchor: the accepted account is the "
+        "fixed constraint, no observation detail (C4 ruling 4, 2026-08-17)",
+    )
+    r13 = await retrieval.retrieve_dialogue_init(
+        request(agent_c4, None, basis2, query_text=t_c4u, identity_version=None)
+    )
+    m13 = by_id(r13)[up_id]
+    head13 = (await chain(pool, up_id))[-1]
+    check(
+        head13[0] == "reconstruction"
+        and m13.content == head13[1]
+        and m13.read_mode == "reconstructed",
+        "post-event read reconstructs FROM the accepted telling (cache was "
+        "evicted; write-back passes against the update anchor)",
+    )
+    check(
+        sources13[ra_id].anchor_cause == "original"
+        and sources13[ra_id].anchor_content == ra_orig_head[1],
+        "rationalization never re-anchors: the anchor stays the original "
+        "head (headroom spent, never blocked - 'the story has set')",
+    )
+
+    # ------------------------------------------------------------------ #
     print("\n[7] Drift refusal at the default threshold (+ refusal caching)")
     agent_d = await make_agent(pool, "recon-walker-npc-d", AGENT_CONFIG)
     drift_id = await seed_memory(

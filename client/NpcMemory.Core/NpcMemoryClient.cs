@@ -103,6 +103,14 @@ namespace NpcMemory
             SceneBoundaryEvent evt, CancellationToken ct = default) =>
             PostAsync<SceneResult>("/v1/events/scene-boundary", evt, DefaultTimeout, ct);
 
+        /// <summary>The diegetic-correction event (dissonance.md, C4): one
+        /// retell model call rides it server-side, so it takes the
+        /// observe-class timeout (the ReflectAsync precedent).</summary>
+        public Task<DiegeticCorrectionResult> DiegeticCorrectAsync(
+            DiegeticCorrectionEvent evt, CancellationToken ct = default) =>
+            PostAsync<DiegeticCorrectionResult>(
+                "/v1/events/diegetic-correction", evt, ObserveTimeout, ct);
+
         public Task<PinResult> SetPinAsync(
             Guid memoryId, bool pinned, CancellationToken ct = default) =>
             SendAsync<PinResult>(

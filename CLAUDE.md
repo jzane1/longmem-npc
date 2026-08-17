@@ -41,7 +41,9 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
   RENDER, TYPOLOGY, ESCALATION, DIALOGUE, RECONSTRUCTION), all six required in real mode. One
   documented limit: v1's single write call serves importance+render+typology, so those three vars
   must name the SAME model (`load_settings` errors if they diverge — never a silent pick).
-  The retrieval gate is non-LLM — there is no gate model. (`dialogue` streams pure prose — the dialogue turn's only model call; the `behavior`
+  The retrieval gate is non-LLM — there is no gate model. The diegetic-correction retell
+  reuses the RECONSTRUCTION role (C4, ruled 2026-08-17 — no new var; the defend-vs-update
+  decision itself is mechanical, no model call). (`dialogue` streams pure prose — the dialogue turn's only model call; the `behavior`
   role was removed by the A1 re-shape, 2026-08-04. Three more vars are judge-shaped — loaded in
   both modes, required by NEITHER, loud at first real use: `LONGMEM_MODEL_JUDGE`,
   eval-runner-only (B2, 2026-08-07); `LONGMEM_MODEL_REFLECTION`, the reflect verb's role

@@ -85,6 +85,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Phase C2 build record — reflection landed — 2026-08-15](#phase-c2-build-record--reflection-landed--2026-08-15)
 - [Phase C3 build record — the parameter compiler landed — 2026-08-17](#phase-c3-build-record--the-parameter-compiler-landed--2026-08-17)
 - [Session-effort audit — the status.md tripwire — 2026-08-17](#session-effort-audit--the-statusmd-tripwire--2026-08-17)
+- [Phase C4 build record — the dissonance path landed — 2026-08-17](#phase-c4-build-record--the-dissonance-path-landed--2026-08-17)
 
 ## Primary decisions
 
@@ -3610,3 +3611,68 @@ pointer form the file's own rule asks for), the CLAUDE.md tripwire text, and thi
 The audit's full data tables live in the audit session's scratchpad (evaporates ~5 days);
 everything load-bearing is in this entry, and the parse re-derives from the transcript
 store in ~2 minutes.
+
+## Phase C4 build record — the dissonance path landed — 2026-08-17
+
+**What landed (plan-to-floor in one session, the ONE-session scope ruled 2026-08-04):** the
+dissonance path + diegetic-correction event (`dissonance.md`; NO migration — the ruled
+per-target scope fact; the `corrections` table and both diegetic `write_cause` values had
+waited since 001). `POST /v1/events/diegetic-correction` (the fourteenth route, the third in
+the diegetic namespace) -> `DissonanceService.confront` (`app\dissonance.py`) -> the
+chain-preserving one-transaction write (`db.apply_diegetic_correction`: supersede the live
+telling head, insert the verb-typed head, insert the `corrections` record, evict the cache).
+Surfaces: the REPL `:confront`, the chain inspector's corrections block, the C# mirror
+(`DiegeticCorrectAsync` + `NpcSession.ConfrontAsync`) + interop beat [14]. Suite Set N;
+the eleventh walker (`verify_dissonance.py`); `verify_reconstruction` deliberately re-opened
+for ruling 4 and re-closed at 46 assertions (42 + the [13] section).
+
+**The eight rulings (Jack, at the session's two plan-mode fork batches, before any code):**
+
+1. **The defend-vs-update decision is mechanical** — no model call decides. `resistance =
+   importance_norm × typology_mult(memory.typology) × rigidity`; `challenge =
+   challenge_weight × typology_mult(challenge.typology)`; strict `>` updates, **ties
+   defend**. One multiplier table serves both sides ("'I saw it' resists harder than 'I
+   heard it,' on both sides"); every term a `SERVICE_DEFAULTS` knob, per-agent overridable;
+   0.0 is the per-side kill-switch shape.
+2. **The head text reuses the RECONSTRUCTION role** — **ruled against the recommendation**
+   (a new judge-shaped `LONGMEM_MODEL_DISSONANCE` var was recommended; the second such
+   divergence after the C2 trim, both rejecting new machinery where a leaner existing
+   mechanism carries the behavior). One single-item call through the existing provider
+   writes the stance-forked retelling; spend prices under the reconstruction keys (stated
+   in the spec); result fields are function-named (`retell_*`). Fail-loud 502,
+   nothing written (the authorial all-or-nothing precedent).
+3. **Tellings-only; NO new migration** — the explicit per-target scope fact, and the ruling
+   `fact-level-correction.md` reserved ("diegetic fact-writes need their own ruling"): they
+   do not happen. The fact basis/embedding never moves; retrieval keeps matching the
+   original account; a game wanting the confronter's account retrievable observes the
+   confrontation as an ordinary event. The fact-chain CHECK keeps rejecting the diegetic
+   verbs (walker-probed).
+4. **`update_with_resentment` anchors take the authorial fixed-constraint branch** (closes
+   the fork the 2026-07-17 authorial spec deferred "decided with the dissonance path"):
+   `FIXED_CONSTRAINT_ANCHORS = {authorial_correction, update_with_resentment}` at the
+   `build_reconstruction_item` branch and the stage-4 ablation partition; observation gist
+   is never re-injected over an accepted account; the ablation switch never blanks a
+   correction head (fork 11 inherited). `rationalization` still never anchors.
+5. **Route: `POST /v1/events/diegetic-correction`.**
+6. **Full surface scope in the one session**: C# mirror + interop beats, REPL `:confront`,
+   chain-inspector corrections block — all three taken.
+7. **The formula is §8 verbatim — no `typology_confidence` term** (the planning-surfaced
+   refinement consciously declined; Phase-D revisitable with measurements).
+8. **The two stale `architecture.md` lines fixed in the doc pass** (the `write_cause` enum
+   list and the drift-anchor set, both missing `enrichment` since C1 — verified against
+   migration 006 and the anchor SQL before editing).
+
+**Consciously declined at spec (recorded in `dissonance.md`):** a `dissonance_enabled`
+kill-switch (the event is client-invoked — not sending it is the off state; deliberately
+unlike the `*_worker_enabled` flags); persisted decision numbers (the response carries them;
+the `corrections` row is the record; widening it would be a migration).
+
+**A third documented bite of the carried walker item (DB-global counts on the shared
+scratch):** the first sweep failed at `verify_authorial_correction` — its "no corrections
+row (diegetic-only by CHECK)" assert is DB-global, and the re-opened `verify_reconstruction`
+[13] section had written correction records two walkers earlier. Resolved by the minimal
+footprint: [13] writes chain rows + eviction only (the anchor claim under test derives from
+the telling chain alone; the record obligation is `verify_dissonance`'s, scoped per-run).
+The elder walkers stay byte-untouched; the global-emptiness asserts in
+`verify_authorial_correction`/`verify_fact_correction` remain order-fragile by construction
+— recorded here for the carried item's own future task, not fixed at this ride-along.

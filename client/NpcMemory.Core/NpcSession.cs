@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
 
 namespace NpcMemory
 {
@@ -201,6 +202,32 @@ namespace NpcMemory
                     ClientTimestamp = Now(),
                     ExpectedDetailId = expectedDetailId,
                     Entities = entities,
+                },
+                ct);
+
+        /// <summary>The diegetic-correction event at the session's effective
+        /// time (dissonance.md, C4; the CorrectAsync time precedent): an
+        /// in-world confrontation of a memory — the server decides defend vs
+        /// fold mechanically and the reconstruction role writes the new
+        /// telling. The "observed" default is caller ergonomics; the wire
+        /// field itself is required.</summary>
+        public Task<DiegeticCorrectionResult> ConfrontAsync(
+            Guid memoryId,
+            string challengeText,
+            string challengeTypology = "observed",
+            double? challengeWeight = null,
+            JObject? sourceEvent = null,
+            CancellationToken ct = default) =>
+            _client.DiegeticCorrectAsync(
+                new DiegeticCorrectionEvent
+                {
+                    AgentId = AgentId,
+                    MemoryId = memoryId,
+                    ChallengeText = challengeText,
+                    ChallengeTypology = challengeTypology,
+                    ChallengeWeight = challengeWeight,
+                    ClientTimestamp = Now(),
+                    SourceEvent = sourceEvent,
                 },
                 ct);
 

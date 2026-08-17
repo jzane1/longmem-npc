@@ -1789,6 +1789,46 @@ session.
   - **Blocked:** nothing. **Abandoned:** nothing (options 2–6 were declined by ruling,
     not abandoned). Next: C4 per the roadmap, unchanged.
 
+- **2026-08-17 — C4: the dissonance path + diegetic-correction event, plan-to-floor in
+  the ruled ONE session (floors row 28).**
+  - **Landed:** everything the task named, on the eight plan-batch rulings (two
+    AskUserQuestion batches at plan mode, all settled before a line of code; the dated C4
+    build record). NO migration — the ruled per-target scope fact; the `corrections`
+    table and both diegetic `write_cause` values had waited in 001 since day one, and the
+    build's job was to make the mechanism real: `app\dissonance.py` (the mechanical
+    defend-vs-update formula with every term a knob; the stance-forked retell through the
+    RECONSTRUCTION role — ruling 2, taken AGAINST the recommended new judge-shaped var,
+    the second such divergence after the C2 trim), `db.apply_diegetic_correction` (the
+    chain-preserving transaction: supersede + verb-typed head + the corrections record +
+    eviction; CAS; no pin/drift/fact code by design), the fourteenth route
+    `POST /v1/events/diegetic-correction`, ruling 4 closing the fork the authorial spec
+    deferred (`FIXED_CONSTRAINT_ANCHORS` gains `update_with_resentment`;
+    `verify_reconstruction` deliberately re-opened, re-closed at 46), the REPL
+    `:confront`, the chain inspector's corrections block, the C# mirror + interop beats
+    32 → 36, suite Set N (23, all unmarked — the Set A diegetic pair landed after 28 days
+    specced), the eleventh walker (38), and the docs sweep incl. the two ruling-8
+    architecture.md `enrichment` fixes. Suite 172 full / 158 subset at the pins.
+    Believability: no regression (real-mode smoke vs the 2026-08-07 baseline — checks 6/0
+    both, gist 0.7667 → 0.825, keyword retention equal, the same single fabricated
+    entity).
+  - **Honest notes:** (1) The first walker sweep FAILED — the third documented bite of
+    the carried walker-scratch item: the re-opened `verify_reconstruction`'s [13] section
+    wrote correction records, and `verify_authorial_correction`'s "no corrections row"
+    assert is DB-global. Resolved minimally ([13] now writes chain rows + eviction only —
+    the anchor claim under test derives from the telling chain alone); the elder walkers
+    stay byte-untouched and order-fragile by construction (the carried item's own future
+    task; detail in the build record). (2) The floor-verifier's one finding — the product
+    ledger at 001–008 against the dispatch's 001–006 expectation — was adjudicated by
+    Jack the same day as HIS OWN morning apply of 007+008 (the reserved operator action,
+    performed ~90 min before this session's first tool call; ledger rows byte-exact, zero
+    content-table writes); the report converted to a clean pass and the standing operator
+    action is DONE. (3) A suite-hygiene false positive: the guard's SQL heuristic matched
+    the prompt constant `_TASK_UPDATE`; renamed `_TASK_ACCEPT` rather than widening the
+    guard. (4) The committed Unity DLL is now stale against `NpcMemory.Core` (the C#
+    mirror grew) — the staleness check stays Phase F's by ruling.
+  - **Blocked:** nothing. **Abandoned:** nothing. Next: C5 per the roadmap — the
+    agent-state read route (backend + C#) + async observes.
+
 
 ---
 

@@ -41,6 +41,7 @@ from app.config import Settings, load_settings
 from app.db import build_pool
 from app.deferred import DeferredWriteWorker
 from app.dialogue import DialogueService
+from app.dissonance import DissonanceService
 from app.ingest import IngestService, UnknownAgentError
 from app.nlp import warm_pipelines
 from app.providers import Providers, build_providers
@@ -51,6 +52,8 @@ from app.schemas import (
     CorrectionResult,
     DialogueTurnRequest,
     DialogueTurnResult,
+    DiegeticCorrectionEvent,
+    DiegeticCorrectionResult,
     IngestResult,
     ObserveEvent,
     PinResult,
@@ -79,6 +82,7 @@ class SessionRunner:
         reflection: ReflectionService | None = None,
         reflection_worker: ReflectionWorker | None = None,
         compiler_worker: CompilerWorker | None = None,
+        dissonance: DissonanceService | None = None,
     ):
         self._pool = pool
         self._owns_pool = owns_pool
@@ -103,6 +107,10 @@ class SessionRunner:
         # deterministic entry; the per-agent kill-switch (default 0.0) gates
         # the component entirely.
         self.compiler_worker = compiler_worker
+        # The dissonance seam (dissonance.md, C4 2026-08-17): the diegetic-
+        # correction event's service behind `:confront` — synchronous, no
+        # worker, nothing to start or stop.
+        self._dissonance = dissonance
         self.agent_id = agent_id
         self.phase_tag = phase_tag  # passthrough label on observe events
         self.identity_version: str | None = None  # frozen at scene boundaries
@@ -169,6 +177,7 @@ class SessionRunner:
         reflection_worker.start()
         compiler_worker = CompilerWorker(pool, providers, settings)
         compiler_worker.start()
+        dissonance = DissonanceService(pool, providers, settings)
         runner = cls(
             pool=pool,
             owns_pool=owns_pool,
@@ -181,6 +190,7 @@ class SessionRunner:
             reflection=reflection,
             reflection_worker=reflection_worker,
             compiler_worker=compiler_worker,
+            dissonance=dissonance,
         )
         # Session start is an implicit scene start: verify the agent loudly,
         # freeze the identity version (ensured directly — no boundary event is
@@ -333,6 +343,32 @@ class SessionRunner:
         return await self._ingest.correct(
             memory_id,
             CorrectionRequest(content=content, client_timestamp=self._now()),
+        )
+
+    async def confront(
+        self,
+        memory_id: UUID,
+        challenge_text: str,
+        *,
+        challenge_typology: str = "observed",
+        challenge_weight: float | None = None,
+    ) -> DiegeticCorrectionResult:
+        """The diegetic-correction event at the session's effective time
+        (dissonance.md; the :correct precedent — under time travel the
+        confrontation happens at as_of). The `observed` default is REPL
+        ergonomics only — the wire field stays required; the caller prints
+        the decided verb and both sides of the decision (debug surface)."""
+        if self._dissonance is None:
+            raise RuntimeError("this runner was constructed without dissonance")
+        return await self._dissonance.confront(
+            DiegeticCorrectionEvent(
+                agent_id=self.agent_id,
+                memory_id=memory_id,
+                challenge_text=challenge_text,
+                challenge_typology=challenge_typology,
+                challenge_weight=challenge_weight,
+                client_timestamp=self._now(),
+            )
         )
 
     async def reflect(self, consolidate: bool | None = None) -> ReflectResult:

@@ -293,6 +293,28 @@ SERVICE_DEFAULTS: dict[str, float] = {
     # live beliefs compile AND apply — enforced at work discovery and at the
     # consume fetch alike (integer-valued, cast at the call site).
     "compiler_window_k": 8.0,
+    # --- dissonance path (dissonance.md; the C4 rulings 2026-08-17) ----------
+    # Evidence-typology multipliers for the mechanical defend-vs-update
+    # decision (ruling 1): resistance = importance_norm * mult(memory.typology)
+    # * rigidity vs challenge = challenge_weight * mult(challenge.typology);
+    # strict > updates, ties defend. ONE table serves both sides ("'I saw it'
+    # resists harder than 'I heard it,' on both sides of a clash"). 0.0 is the
+    # per-side kill-switch shape: memory-side 0.0 => that class always folds;
+    # challenge-side 0.0 => that class never wins. Defaults are Phase-D tuning
+    # starting points, not measurements.
+    "dissonance_typology_observed": 1.0,
+    "dissonance_typology_told": 0.6,
+    "dissonance_typology_inferred": 0.4,
+    "dissonance_typology_reflected": 0.5,
+    # Used ONLY when agents.rigidity IS NULL (the column carries no default by
+    # design — the write path supplies it from integrator config); the resolved
+    # value clamps to [0.5, 2.0] mirroring the schema CHECK as defense.
+    "dissonance_rigidity_default": 1.0,
+    # When the event omits challenge_weight: a full-strength confrontation.
+    # Clamped [0.0, 1.0]. No dissonance_enabled kill-switch exists, consciously
+    # (the event is client-invoked — not sending it is the off state; the
+    # asymmetry vs the *_worker_enabled flags is deliberate, dissonance.md).
+    "dissonance_challenge_weight_default": 1.0,
 }
 
 # Prose-view weight clamp bounds (ruled at the split-brain build 2026-07-21;

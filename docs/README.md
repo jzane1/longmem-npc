@@ -68,6 +68,7 @@ spec is no longer a plan.
 | `deferred-writes.md` | deferred write processing: the pending window, the enrichment worker, the completion contract | 006 |
 | `reflection.md` | reflection (C2): the reflect verb + optional default-OFF worker, evidence-cited beliefs, identity consolidation, the mechanical component trim; dossier + spec + BUILD all 2026-08-15 | 007 |
 | `parameter-compiler.md` | the parameter compiler (C3): live beliefs compiled into per-scene-type weight-multiplier bundles, the standalone third worker (no endpoint), the all-mechanical staleness guard; rulings + BUILD 2026-08-17 | 008 |
+| `dissonance.md` | the dissonance path + diegetic-correction event (C4): the mechanical defend-vs-update formula, the chain-preserving confrontation verb (`rationalization` \| `update_with_resentment`), tellings-only; rulings + BUILD 2026-08-17 | — (the `corrections` table waited in 001) |
 
 **Note on `migration-01.md`:** it documents migration **001 only**. Migrations 002–008 (fact
 versions, fact entities, the lexical index, `escalation_failed`, deferred writes, reflection

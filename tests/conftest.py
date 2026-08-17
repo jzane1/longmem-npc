@@ -294,6 +294,17 @@ class Ctx:
             compiler_provider=provider,
         )
 
+    def dissonance(self, *, defaults: dict | None = None, **overrides):
+        """The diegetic-correction seam (Set N, dissonance.md). No provider
+        seam of its own: the retell rides the RECONSTRUCTION role (the C4
+        ruling), so `reconstruction=` in overrides swaps it like any other
+        role fake."""
+        from app.dissonance import DissonanceService
+
+        return DissonanceService(
+            self.pool, self.providers(**overrides), self._settings_with(defaults)
+        )
+
     # -- fixtures -----------------------------------------------------------
     async def make_agent(
         self,
@@ -327,6 +338,7 @@ class Ctx:
         pinned: bool = False,
         decay_class: str = "episodic",
         importance: float = 0.5,
+        typology: str = "observed",
         entities: list[str] | None = None,
         embedding=_UNSET,
         spans: tuple = (),
@@ -336,11 +348,12 @@ class Ctx:
     ) -> db.InsertOutcome:
         """Db-layer seed through the real atomic insert — no write-pass call,
         so unmarked scenarios never trigger the NLP loaders. Values are
-        explicit fixture facts (importance chosen, not hash-derived).
-        `embedding=None` seeds the embed-degradation row shape.
-        `component_spans` (Set L, reflection.md trim fixtures): (start, end,
-        component_id) triples — spans MATCHED to an existing component, the
-        trim rule's evidence unit."""
+        explicit fixture facts (importance chosen, not hash-derived;
+        `typology` joined with Set N — the dissonance formula's memory-side
+        evidence class is a fixture fact too). `embedding=None` seeds the
+        embed-degradation row shape. `component_spans` (Set L, reflection.md
+        trim fixtures): (start, end, component_id) triples — spans MATCHED to
+        an existing component, the trim rule's evidence unit."""
         vec = embed_text(text) if embedding is _UNSET else embedding
         plan = db.InsertPlan(
             agent_id=agent_id,
@@ -349,7 +362,7 @@ class Ctx:
             valid_at=valid_at,
             importance_raw=importance,
             scoring_failed=False,
-            typology="observed",
+            typology=typology,
             typology_confidence=0.9,
             typology_source="declared",
             provenance="lived",

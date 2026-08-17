@@ -99,6 +99,7 @@ eval-harness stage 1 and the table was never updated)*:
 | `SceneBoundaryAsync` | `POST /v1/events/scene-boundary` | 404 |
 | `SetPinAsync` | `PUT /v1/memories/{id}/pin` | 404 |
 | `CorrectAsync` | `POST /v1/memories/{id}/correction` | 404 / 409 CAS conflict / 422 / 502 fail-loud |
+| `DiegeticCorrectAsync` | `POST /v1/events/diegetic-correction` (C4, 2026-08-17 — `dissonance.md`) | 404 unknown/foreign memory / 409 CAS / 422 / 502 retell fail-loud |
 | `CreateAgentAsync` | `POST /v1/agents` (provisioning, fork 2) | 422 on an empty name |
 | `MemoryChainAsync` | `GET /v1/memories/{id}/chain` (fork 3, unscored) | 404 |
 | `AgentMemoriesAsync` | `GET /v1/agents/{id}/memories` (fork 3, unscored) | 404 |
@@ -126,7 +127,8 @@ snapshot refresh at boundaries, `_apply_turn_result` keyed on the SERVER's `gate
 resets on productive fetch; closed → untouched), recent-actions append-on-resolved-directive
 with the per-agent cap, scene-boundary reset of loaded set + streak + context + recent actions,
 `as_of` time travel riding both retrieval and observe timestamps. Surface: `SayAsync(text)`,
-`ObserveAsync(text)`, `SceneBoundaryAsync()`, `CorrectAsync(...)`, plus `OnDirective` and
+`ObserveAsync(text)`, `SceneBoundaryAsync()`, `CorrectAsync(...)`, `ConfrontAsync(...)` (C4 —
+the diegetic-correction event at the session's effective time), plus `OnDirective` and
 `OnReputationChanged(prev, after)` callbacks. The `(reconstructing…)` during-wait hook exists
 only under SSE (fork 1); until then the session surfaces the result's post-hoc reconstruction
 fields — no faked signal. *(**A1 re-shape, 2026-08-04:** the snapshot refresh, both callbacks,
@@ -142,7 +144,10 @@ boundary → reconstructed serve + call-free cache-hit reread → gate fire mid-
 warm-init (`DialogueInitAsync` at a jumped basis, then the on-camera-equivalent read hitting
 cache) → a `weight_overrides` divergence turn *(since the A1 re-shape 2026-08-04: the
 weights-on-speech pair — parity at default weights, then an override re-ranking the view that
-feeds the prose prompt over the same served set)*. Debug output mirrors the REPL's debug view
+feeds the prose prompt over the same served set)* → the reflect verb + its 409 floor (C2) →
+the compiled-parameter scene-type echo contract (C3) → the diegetic-correction event (C4:
+verb + IDs over the wire, both decision sides recomputed client-side from the echoed inputs,
+the chain read's correction record, the 409 CAS). Debug output mirrors the REPL's debug view
 (IDs, scores, gate line, both TTFT fields, cost row). Passing this end-to-end IS the interop
 go/no-go.
 

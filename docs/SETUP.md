@@ -149,19 +149,25 @@ python -m pytest tests -q -m "not nlp"   # 114, the turn-end subset — seconds,
 
 Postgres unreachable ⇒ every scenario skips loudly and the run exits green, by ruling.
 
-**The walkers** (ten structural done-when scripts) need a scratch DB you create yourself:
+**The walkers** (eleven structural done-when scripts) need a scratch DB you create yourself:
 
 ```powershell
 $scratch = "postgresql://longmem:change-me@localhost:5432/longmem_test"
 docker exec longmem-pg psql -U longmem -d postgres -c "CREATE DATABASE longmem_test"
 python db\migrate.py --database-uri $scratch
 python tests\verify_write_path.py --database-uri $scratch
-# ... verify_compiler (C3, 2026-08-17), verify_reflection (C2, 2026-08-15),
-#     verify_deferred_writes (C1, 2026-08-12), verify_read_path,
-#     verify_cli_harness, verify_gate, verify_reconstruction,
+# ... verify_dissonance (C4, 2026-08-17), verify_compiler (C3, 2026-08-17),
+#     verify_reflection (C2, 2026-08-15), verify_deferred_writes (C1, 2026-08-12),
+#     verify_read_path, verify_cli_harness, verify_gate, verify_reconstruction,
 #     verify_authorial_correction, verify_fact_correction
 docker exec longmem-pg psql -U longmem -d postgres -c "DROP DATABASE longmem_test WITH (FORCE)"
 ```
+
+Run them serially on a FRESH scratch, elder walkers before `verify_dissonance` — two of the
+correction walkers assert the corrections table is empty of diegetic rows, which is true in
+sweep order on a fresh scratch and false after a dissonance run (the shared-scratch
+fragility recorded in `status.md`'s carried item; `verify_reflection` additionally requires
+a fresh scratch for its own re-run).
 
 Each prints `ALL CHECKS PASSED (N assertions)` and exits non-zero on the first failure. Assertion
 counts grow whenever a layer is re-opened, so there is no single "current" number: each

@@ -81,6 +81,37 @@ class SceneBoundaryEvent(BaseModel):
         return value
 
 
+class DiegeticCorrectionEvent(BaseModel):
+    """The in-world confrontation event — POST /v1/events/diegetic-correction
+    (dissonance.md; the C4 rulings 2026-08-17; the third route in the
+    diegetic namespace). References a target `memory_id` by contract:
+    automatic conflict discovery is CUT (2026-08-04) — the game names what
+    was challenged. `challenge_typology` is REQUIRED (client declaration
+    wins; a default would be a hardcoded evidence class);
+    `challenge_weight` omitted resolves through
+    `dissonance_challenge_weight_default`. `client_timestamp` is the
+    confrontation's world time t_e — every stamp in the transaction.
+    `source_event` lands verbatim in `corrections.source_event`.
+    `expected_detail_id` mirrors the authorial CAS (409 on a moved head)."""
+
+    agent_id: UUID
+    memory_id: UUID
+    challenge_text: str = Field(min_length=1)
+    challenge_typology: Typology
+    challenge_weight: float | None = Field(default=None, ge=0.0, le=1.0)
+    client_timestamp: datetime
+    source_event: dict | None = None
+    expected_detail_id: UUID | None = None
+    event_id: str | None = None  # idempotency key: accepted, not enforced in v1
+
+    @field_validator("client_timestamp")
+    @classmethod
+    def _tz_aware(cls, value: datetime) -> datetime:
+        if value.tzinfo is None:
+            raise ValueError("timestamp must be timezone-aware")
+        return value
+
+
 class PinRequest(BaseModel):
     """Body of PUT /v1/memories/{memory_id}/pin."""
 
@@ -226,6 +257,38 @@ class CorrectionResult(BaseModel):
     embed_ms: float
     embedding_tokens: int
     nlp_ms: float = 0.0
+    total_ms: float
+
+
+class DiegeticCorrectionResult(BaseModel):
+    """Result of the diegetic-correction event (dissonance.md, C4) — flat,
+    instrumentation rides the response (the CorrectionResult no-runs-table
+    precedent; the `corrections` row is the persistent record). Every
+    resolved decision input is exposed so a structural test recomputes both
+    sides from fixture values by hand. Tellings-only by ruling: no fact
+    fields exist. `content` is the new head's retell — the reconstruction
+    role's prose (never a test surface); `retell_*` names the call by
+    function, its spend prices under the reconstruction role's keys."""
+
+    memory_id: UUID
+    agent_id: UUID
+    verb: Literal["rationalization", "update_with_resentment"]
+    correction_id: UUID
+    detail_id: UUID  # the new diegetic head
+    superseded_detail_id: UUID
+    pinned: bool  # inherited — pin is outranked, never consulted
+    content: str
+    resistance: float
+    challenge: float
+    importance_norm: float
+    rigidity_effective: float
+    typology_mult_memory: float
+    typology_mult_challenge: float
+    challenge_weight_effective: float
+    evicted_cache_rows: int
+    retell_ms: float
+    retell_input_tokens: int
+    retell_output_tokens: int
     total_ms: float
 
 
@@ -760,6 +823,21 @@ class EnrichmentRunOut(BaseModel):
     created_at: datetime
 
 
+class CorrectionOut(BaseModel):
+    """One diegetic confrontation record (corrections — schema since 001,
+    written since C4, dissonance.md): the verb, the head the confrontation
+    produced, and the client's in-world reference verbatim. The unscored
+    chain read is its inspector surface (the enrichment-run-log
+    precedent)."""
+
+    correction_id: UUID
+    detail_id: UUID  # the head this confrontation produced
+    verb: Literal["rationalization", "update_with_resentment"]
+    source_event: dict | None
+    created_at: datetime
+    valid_at: datetime
+
+
 class MemoryChainResult(BaseModel):
     """GET /v1/memories/{id}/chain — The Ledger's ground-truth-vs-telling
     read (unity-client.md fork 3, ruled 2026-07-27): the immutable
@@ -791,6 +869,9 @@ class MemoryChainResult(BaseModel):
     enrichment_pending: bool = False
     enrichment_attempts: int = 0
     enrichment_runs: list[EnrichmentRunOut] = Field(default_factory=list)
+    # Diegetic confrontation records (C4, dissonance.md) — defaulted, so
+    # every pre-C4 construction stands and the read stays additive.
+    corrections: list[CorrectionOut] = Field(default_factory=list)
     details: list[DetailVersionOut]
     facts: list[FactVersionOut]
     gist_spans: list[GistSpanOut]

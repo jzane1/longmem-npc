@@ -1,21 +1,24 @@
 # longmem-npc — Test suite spec
 
-**BUILT 2026-07-20 — 149 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation +
+**BUILT 2026-07-20 — 172 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation +
 hygiene + eval metrics + eval runner + judge + ablation + deferred writes + reflection + the
-parameter compiler; the
-Set A diegetic pair still lands with the dissonance mechanism). Count as of 2026-08-17: Set A 8,
+parameter compiler + dissonance; the
+Set A diegetic pair LANDED with the dissonance mechanism, 2026-08-17). Count as of 2026-08-17:
+Set A 8,
 Set B 7, Set C 7, Set D 20, degradation 12, hygiene 2, Set G eval metrics 8, **Set H eval
 runner 9** (stage 2, 2026-08-05), **Set I judge 16** (stage 3, 2026-08-07; +2 with the
 2026-08-12 workaround session; the reflection role's load-rule amendment rides the existing
 config scenarios, 2026-08-15), **Set J ablation 6** (stage 4, 2026-08-12 — its section is
 `eval-harness.md`'s stage-4 block), **Set K deferred writes 13** (Phase C1, 2026-08-12),
 **Set L reflection 20** (Phase C2, 2026-08-15), **Set M parameter compiler 21** (Phase C3,
-2026-08-17) — grown from the 38 built on 2026-07-20 by the
+2026-08-17), **Set N dissonance 23** (Phase C4, 2026-08-17) — grown from the 38 built on
+2026-07-20 by the
 route-contract scenarios that arrived with each later route, by the gap-closing and guard
 scenarios from the full-repo audit, and by the eval harness stages 1–4. **Fourteen carry the
-`nlp` marker** (Sets L and M add none), so the turn-end subset runs **135**. *(Counts corrected
+`nlp` marker** (Sets L, M, and N add none), so the turn-end subset runs **158**. *(Counts
+corrected
 2026-08-12 with the Set K landing — the 2026-08-07 header had drifted again by the stage-4 and
-workaround-session scenarios; updated 2026-08-17 with the Set M landing.)* Build rulings 2026-07-20
+workaround-session scenarios; updated 2026-08-17 with the Set M and Set N landings.)* Build rulings 2026-07-20
 (dated `decisions.md` entry): the suite-gate Stop hook runs the `-m "not nlp"` subset (the 7
 `nlp`-marked scenarios call the write pass at the service level and pay the lazy
 spaCy+fastcoref load; the full suite runs on demand + at floor verification); Postgres
@@ -59,8 +62,9 @@ Forked into **structural pairs by correction verb**, keyed on `write_cause` — 
   embedding is a pure function of text, so probe text == stored basis ⇒ cosine distance 0; a
   *fixture* property — production uses real embeddings).
 - **Diegetic pair:** chain intact; new head row typed `rationalization` or
-  `update_with_resentment`; correction record present; cache evicted. *(Lands when the dissonance
-  mechanism ships.)*
+  `update_with_resentment`; correction record present; cache evicted. *(LANDED 2026-08-17 with
+  the dissonance mechanism — the pair lives in Set N, `tests\test_set_n_dissonance.py`, both
+  verbs as the structural pair this section always specified.)*
 
 ## Set B — decay-only (~5 scenarios)
 
@@ -341,6 +345,43 @@ judge-shaped role surface. Its module docstring carries the persistent-scratch r
 section leaving an enabled agent with uncompiled pairs flips the kill-switch off, so re-runs
 stay deterministic). The nine prior walkers passing byte-untouched at their criteria are the
 zero-retrieval-change evidence.
+
+## Set N — dissonance *(added 2026-08-17 with Phase C4, `dissonance.md`)*
+
+Twenty-three scenarios in `tests\test_set_n_dissonance.py`, ALL unmarked. Memories seed at
+the db layer (`ctx.seed`, which grew a `typology` fixture param with this set; the deferred
+row via `ctx.seed_pending`); the event runs through `DissonanceService.confront` and the
+route through `httpx.ASGITransport`; the retell prose is never asserted (the fake
+reconstruction provider's output is checked for presence and distinctness only):
+
+- **The diegetic pair (the Set A slot, landed):** both verbs' chain shape — prior head
+  superseded at t_e, one live head typed by verb, the corrections record (verb + new-head
+  FK + `source_event` round-trip), cache evicted, the fact chain and observation
+  byte-untouched (tellings-only), coherent timeline under windowed SQL.
+- **The decision:** pure-function hand math (extremes, the exact tie defending, NULL
+  resolution through `importance_neutral` / `dissonance_rigidity_default` / the typology
+  fallback, every clamp), the per-agent knob override flipping the same fixture's verdict,
+  the 0.0 per-side kill-switch shape, and the seam echoing every resolved input.
+- **The ladder:** 404 unknown/foreign memory (ownership), 409 CAS with rollback proven by
+  row counts, 422 wire shapes (naive timestamp, unknown typology literal, out-of-range
+  weight), 502 failing AND malformed retells with nothing written; the route pass-through.
+- **Interactions:** pin outranked + inherited (event proceeds, `memories.pinned` untouched,
+  the new head frozen); anchor semantics (update re-anchors, rationalization never); two
+  events stacking heads and records; the deferred window (a pending row confronted, then
+  the drain's already-moved guard leaving the diegetic head standing, facts-only
+  completion); the ruling-4 fixed-constraint branch (pure assembly); the read-path effect
+  (the sanctioned mid-scene change, then byte-identical repeats); the chain inspector's
+  corrections block (present after an event, empty on authorial-only chains).
+
+The eleventh walker `tests\verify_dissonance.py` (38 criteria, lettered sections A–E)
+re-proves it against the scratch DB: the schema-in-waiting shape (corrections columns, CHECK
+teeth, the fact chain REJECTING the diegetic verbs, the ledger still at 008 — no migration
+by ruling), the verb ladder with hand math, chain/eviction/anchor, the read-path effect
+(including the session runner's `:confront` core under time travel), and the CAS/error
+ladder with rollback proof. No worker exists, so its persistent-scratch discipline is
+per-run fixture scoping (unique agent names, never a DB-global count) rather than a
+kill-switch flip. `verify_reconstruction` owns the ruling-4 constraint branch (its [13]
+section, added and re-closed with C4 at 46 assertions).
 
 ## Route contracts *(added as each route shipped; consolidated here 2026-07-28)*
 

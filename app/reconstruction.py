@@ -23,11 +23,14 @@ Design lines carried from the spec (built 2026-07-17):
     a transient embed outage never permanently pins a key); persistence
     failure -> serve the head, the next read retries the miss.
   - CONSTRAINT FOLLOWS THE ANCHOR (authorial-correction build, ruled
-    2026-07-17): an `authorial_correction`-anchored chain retells from the
-    corrected head as the fixed constraint — no observation-derived gist or
-    detail is re-injected (it may contain exactly the data the operator
-    corrected away); the band still keys the cache. Original-anchored chains
-    are unchanged.
+    2026-07-17; extended to `update_with_resentment` by C4 ruling 4,
+    2026-08-17 — dissonance.md): a correction-anchored chain
+    (`FIXED_CONSTRAINT_ANCHORS`) retells from that head as the fixed
+    constraint — no observation-derived gist or detail is re-injected (it
+    may contain exactly the data the operator corrected away, or details
+    the character conceded at a confrontation); the band still keys the
+    cache. Original-anchored chains are unchanged; `rationalization` heads
+    never anchor at all (the crystallization rule).
 
 Cache-hit corner (documented shape): after backwards time travel a cached
 telling can predate the current live head. The cache row is still served
@@ -108,6 +111,13 @@ _SYSTEM_TASK_NO_GIST = (
 )
 _BLOCK_IDENTITY = "[identity]\n{document}"
 
+# The anchor causes whose head IS the fixed constraint (constraint follows
+# the anchor): `authorial_correction` since the 2026-07-17 ruling;
+# `update_with_resentment` joined by C4 ruling 4 (2026-08-17, dissonance.md)
+# — an accepted in-world correction retells from the accepted account, and
+# original observation gist cannot resurrect details the character conceded.
+FIXED_CONSTRAINT_ANCHORS = frozenset({"authorial_correction", "update_with_resentment"})
+
 
 # ---------------------------------------------------------------------------
 # Pure functions (walker-assertable without a database or model call)
@@ -186,18 +196,20 @@ def build_reconstruction_item(
     gist_constraint: bool = True,
 ) -> ReconstructionItem:
     """The per-memory call inputs, anchor-cause-aware (constraint follows
-    the anchor — ruled 2026-07-17, authorial-correction.md): on an
-    `authorial_correction`-anchored chain the corrected head IS the fixed
-    facts (the gist slot), with no observation-derived detail re-injected;
-    original-anchored chains build byte-identically to the pre-correction
-    stage. Pure — walker-assertable without a database or model call.
+    the anchor — ruled 2026-07-17, authorial-correction.md; extended to
+    `update_with_resentment` by C4 ruling 4, dissonance.md): on a
+    correction-anchored chain (`FIXED_CONSTRAINT_ANCHORS`) that head IS the
+    fixed facts (the gist slot), with no observation-derived detail
+    re-injected; original-anchored chains build byte-identically to the
+    pre-correction stage. Pure — walker-assertable without a database or
+    model call.
 
     `gist_constraint=False` (stage-4 ablation OFF arm, ruled 2026-08-12)
     blanks the gist on ORIGINAL-anchored items only; a correction-anchored
-    chain keeps the corrected head regardless (fork 11 — blanking it would
-    delete the correction). The default keeps every existing call
-    byte-identical."""
-    if source.anchor_cause == "authorial_correction":
+    chain keeps the correction head regardless (fork 11 — blanking it would
+    delete the correction; the C4 extension inherits the rule). The default
+    keeps every existing call byte-identical."""
+    if source.anchor_cause in FIXED_CONSTRAINT_ANCHORS:
         return ReconstructionItem(
             memory_id=memory_id,
             gist=source.anchor_content,
@@ -428,7 +440,7 @@ class ReconstructionService:
                             s
                             for s in call_slots
                             if sources[s.row.memory_id].anchor_cause
-                            != "authorial_correction"
+                            not in FIXED_CONSTRAINT_ANCHORS
                         ],
                     ),
                     (
@@ -437,7 +449,7 @@ class ReconstructionService:
                             s
                             for s in call_slots
                             if sources[s.row.memory_id].anchor_cause
-                            == "authorial_correction"
+                            in FIXED_CONSTRAINT_ANCHORS
                         ],
                     ),
                 ]
