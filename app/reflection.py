@@ -307,7 +307,7 @@ class ReflectionService:
         provider = self._provider()  # ConfigError surfaces here, loud
         t0 = time.perf_counter()
         try:
-            call = await asyncio.to_thread(
+            call = await self._providers.gate.run(
                 provider.reflect,
                 system_prompt=system_prompt,
                 user_content=user_content,
@@ -397,7 +397,7 @@ class ReflectionService:
                 seed, current_document, [row.content for row in live_identity]
             )
             try:
-                cons_call = await asyncio.to_thread(
+                cons_call = await self._providers.gate.run(
                     provider.consolidate,
                     system_prompt=cons_system,
                     user_content=cons_user,

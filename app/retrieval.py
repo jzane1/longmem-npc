@@ -318,7 +318,7 @@ class RetrievalService:
         embed_tokens = 0
         degraded_reason: str | None = None
         try:
-            embed_result = await asyncio.to_thread(
+            embed_result = await self._providers.gate.run(
                 self._providers.embedding.embed, [request.query_text]
             )
             query_vector = embed_result.vectors[0]

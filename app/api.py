@@ -120,6 +120,7 @@ async def _lifespan(app: FastAPI):
         await app.state.compiler_worker.stop()
         await app.state.reflection_worker.stop()
         await app.state.deferred.stop()
+        providers.gate.shutdown()
         await pool.close()
 
 

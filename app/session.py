@@ -37,6 +37,7 @@ from psycopg_pool import AsyncConnectionPool
 
 from app import db, identity
 from app.compiler import CompilerWorker
+from app.concurrency import ModelCallGate
 from app.config import Settings, load_settings
 from app.db import build_pool
 from app.deferred import DeferredWriteWorker
@@ -141,6 +142,11 @@ class SessionRunner:
         # "(reconstructing…)" DURING a blocking mid-scene serve; the future
         # Unity hook attaches here. None => nothing fires (the load driver).
         self.on_reconstruct: Callable[[], None] | None = None
+        # The concurrency gate (C7) + ownership flag (the _owns_pool precedent):
+        # set post-construction by create(); close() shuts down the executor
+        # only when this runner built the providers bundle it rides on.
+        self._gate: ModelCallGate | None = None
+        self._owns_gate = False
 
     @classmethod
     async def create(
@@ -164,6 +170,7 @@ class SessionRunner:
         if pool is None:
             pool = build_pool(settings.database_uri)
             await pool.open()
+        owns_providers = providers is None
         providers = providers if providers is not None else build_providers(settings)
         if warm_nlp:
             await asyncio.to_thread(warm_pipelines)
@@ -192,6 +199,8 @@ class SessionRunner:
             compiler_worker=compiler_worker,
             dissonance=dissonance,
         )
+        runner._gate = providers.gate
+        runner._owns_gate = owns_providers
         # Session start is an implicit scene start: verify the agent loudly,
         # freeze the identity version (ensured directly — no boundary event is
         # emitted), and the scene basis.
@@ -402,5 +411,7 @@ class SessionRunner:
             await self.reflection_worker.stop()
         if self.deferred is not None:
             await self.deferred.stop()
+        if self._owns_gate and self._gate is not None:
+            self._gate.shutdown()
         if self._owns_pool:
             await self._pool.close()

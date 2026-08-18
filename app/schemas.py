@@ -706,6 +706,12 @@ class DialogueTurnInstrumentation(BaseModel):
     # is measured against THIS field; `first_word_ms` stays for series
     # continuity. 0.0 when no chunk ever arrived (the first_word_ms precedent).
     perceived_first_word_ms: float = 0.0
+    # Concurrency-cap queue wait (C7, 2026-08-18): ms this turn's PROSE call
+    # spent waiting for a ModelCallGate slot before the stream started — 0.0
+    # uncontended, > 0 when the cap is saturated. perceived_first_word_ms
+    # already folds this into the end-to-end TTFT; this isolates the queueing
+    # component. Defaulted: pre-C7 constructions stand.
+    gate_wait_ms: float = 0.0
     # Parameter-compiler consume terms (parameter-compiler.md, C3
     # 2026-08-17). Defaulted: pre-C3 constructions stand. `bundle_w_*` are
     # the COMPOSED multiplier products applied over the resolved base

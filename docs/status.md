@@ -1,17 +1,17 @@
 # longmem-npc — Status
 
 **Last updated:** 2026-08-18
-**Phase:** **Road to completion — Phases A, B, and C1–C6 are DONE. NEXT UP: C7 — the latency
-trio (concurrency cap + scene-boundary reconstruction pre-warm; then prompt caching).** C6 (the
-purge endpoint — the ruled release-blocker and the sole sanctioned content DELETE) landed
-2026-08-18, plan-to-floor in one session — floors row 30; the dated C6 build record carries the
-four plan-batch rulings (per-memory scope, the DELETE verb, no guard, NO migration by ruling)
-and closes the `parameter-compiler.md` C6 note as "purge does not reach reflections". **No
-operator action stands.**
+**Phase:** **Road to completion — Phases A, B, and C1–C6 DONE; C7 IN PROGRESS.** C7 is the
+latency **pair** now, not a trio: **Stage A (the concurrency cap, audit R8) landed 2026-08-18**,
+plan-to-floor — floors row 31; **Stage B (scene-boundary reconstruction pre-warm, probe-driven)
+is NEXT.** The third leg, **prompt caching, is DEFERRED to Phase D**: Anthropic's cacheable-prefix
+minimum is 4096 tokens on Haiku 4.5 but the dialogue/reconstruction heads are ~0.5–1K, so
+`cache_control` would silently never cache on the ruled Haiku slate (the dated 2026-08-18 C7
+rulings; the D1 model-slate lock is the natural revisit). **No operator action stands.**
 The system is BUILT end to end on the final A1 seam — backend, C# client + console harness,
 Unity adapter + gray-box scene, The Ledger, eval-harness stages 1–4, deferred writes,
 reflection, the parameter compiler, the dissonance path, the agent-state read + async observes,
-the purge endpoint — schema at migrations 001–008.
+the purge endpoint, the concurrency cap (C7-A) — schema at migrations 001–008.
 What is proven lives in
 `docs\floors.md`, why in `decisions.md`, the narrative in `session-log.md`; this file
 carries only what is live.
@@ -53,10 +53,11 @@ re-openable: re-verifying one is a step, never an argument against a design impr
 
 *None open.*
 
-**Recently closed** (pointers only): the C6 forks — four ruled 2026-08-18, all recommended
-options taken (the dated build record); the C5 forks — seven ruled 2026-08-17, all recommended
-(the build record). Full history — C1–C4, the status.md size tripwire, the C2/C3 lines, and the
-earlier closures — lives in `decisions.md`'s index and the `session-log.md` archive.
+**Recently closed** (pointers only): the C7 forks — three ruled 2026-08-18 (prompt caching
+DEFERRED on the Haiku-4096 finding; pre-warm probe-driven over the probe-free rec; guardrail
+reuses serve's drift budget — the dated C7 rulings); the C6 forks — four ruled 2026-08-18, all
+recommended (the build record). Full history — C1–C5, the status.md size tripwire, the C2/C3
+lines, and earlier closures — lives in `decisions.md`'s index and the `session-log.md` archive.
 
 ## The roadmap (re-planned 2026-08-04; ordering delegated to Claude on efficiency grounds)
 
@@ -82,34 +83,20 @@ believability didn't regress (the point of doing Phase B first).
 
 Ordered so shared machinery lands before its reusers.
 
-- **C1. Deferred write processing** (Engram-style). ✅ LANDED 2026-08-12, floor-verified
-  2026-08-13 (floors row 25; the three dated C1 entries; spec: `deferred-writes.md`,
-  migration 006). Ships default OFF — the flip is a Phase D question.
-- **C2. Reflection** — the biggest item. ✅ LANDED 2026-08-15, floor-verified the same date
-  (floors row 26; the three dated C2 entries; spec: `reflection.md`, migration 007). Ships
-  default OFF per agent (the endpoint is always live); the flip is a Phase D question.
-- **C3. Reflection → parameter compiler.** ✅ LANDED 2026-08-17, floor-verified the same
-  date (floors row 27; the dated C3 build record; spec: `parameter-compiler.md`, migration
-  008). Ships default OFF per agent (the full modulator suite stays cut); the flip is a
-  Phase D question.
-- **C4. Dissonance path + diegetic-correction event.** ✅ LANDED 2026-08-17 in the ruled
-  ONE session, floor-verified the same date (floors row 28; the dated C4 build record;
-  spec: `dissonance.md`; NO migration — the `corrections` table waited since 001). Always
-  live (no kill-switch by ruling — the event is client-invoked; not sending it is the off
-  state).
-- **C5. Client contract completion.** ✅ LANDED 2026-08-17 plan-to-floor in one session
-  (floors row 29; the dated C5 build record; NO spec doc by design — the contract lives in
-  `unity-client.md` + `architecture.md`; NO migration by ruling). The agent-state read
-  (`GET /v1/agents/{id}/state`, the FOURTH unscored member) + fire-and-forget observes
-  (`NpcSession`: fire + pending + drain + failure event; no auto-drain — "drain at scene
-  edges" is integrator guidance, E2 places the drains).
-- **C6. Purge endpoint** — the ruled release-blocker; the sole sanctioned content DELETE. ✅
-  LANDED 2026-08-18 plan-to-floor in one session (floors row 30; the dated C6 build record; NO
-  spec doc — the contract lives in `architecture.md` §12; NO migration by ruling — ledger stays
-  at 008). Per-memory `DELETE /v1/memories/{id}`; reflections survive (the C6 note closed); no
-  guard by ruling.
-- **C7. Latency trio** (~2 sessions): concurrency cap + scene-boundary reconstruction pre-warm;
-  then prompt caching / prompt-head rebuild. Last in the phase so Phase D measures them fresh.
+- **C1–C6 ✅ ALL LANDED** (each plan-to-floor + floor-verified; full records in `floors.md`
+  rows 25–30 + `decisions.md`): **C1** deferred writes (`deferred-writes.md`, migration 006,
+  default OFF); **C2** reflection (`reflection.md`, migration 007, default OFF per agent,
+  endpoint always live); **C3** parameter compiler (`parameter-compiler.md`, migration 008,
+  default OFF per agent); **C4** dissonance path + diegetic-correction event (`dissonance.md`,
+  no migration, always live — client-invoked); **C5** client contract completion (no spec doc,
+  no migration — the agent-state read, the FOURTH unscored member, + fire-and-forget observes,
+  drains at scene edges); **C6** purge endpoint (`architecture.md` §12, no migration — per-memory
+  `DELETE /v1/memories/{id}`, reflections survive, no guard).
+- **C7. Latency pair** (~1–2 sessions): **Stage A concurrency cap ✅ LANDED 2026-08-18** (floors
+  row 31; `ModelCallGate`; NO migration). **Stage B — scene-boundary reconstruction pre-warm
+  (probe-driven, reusing the init path + `serve`'s drift-budget refusal) — NEXT.** Prompt caching
+  **DEFERRED to Phase D** (the Haiku-4096 finding; the byte-stable head groundwork already
+  exists). Last built in the phase so Phase D measures fresh.
 
 ### Phase D — Optimization rounds (~1–2 sessions)
 
@@ -182,7 +169,7 @@ not vendored).
 
 **Carried, not fixed** (deliberately unscheduled, awaiting its own ruling):
 
-- **The walkers (thirteen since C6) share a fixed-name scratch DB** (`longmem_test`) they neither
+- **The walkers (fourteen since C7-A) share a fixed-name scratch DB** (`longmem_test`) they neither
   create, migrate, nor drop, and some walker assertions are DB-global counts. The right fix —
   the suite's pid-scoped mechanism plus a `tests\run-walkers.ps1` runner — is a medium refactor
   of the verification apparatus itself, so it wants its own scoped task rather than riding an

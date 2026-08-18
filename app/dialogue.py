@@ -376,6 +376,7 @@ class DialogueService:
         )
 
         loop = asyncio.get_running_loop()
+        gate = self._providers.gate
 
         # Prose leg: run the sync stream generator in a worker thread, bridge
         # its chunks onto an asyncio.Queue, yield them from this async
@@ -402,32 +403,40 @@ class DialogueService:
             except Exception as exc:  # noqa: BLE001 — signalled to the seam
                 loop.call_soon_threadsafe(queue.put_nowait, ("error", exc))
 
-        producer = loop.run_in_executor(None, _produce)
-
+        # Hold one concurrency slot for the whole stream (the C7 cap): a
+        # streaming NPC occupies a slot until its last chunk. gate_wait_ms is
+        # the queue time before the slot opened — perceived_first_word_ms folds
+        # it into the honest end-to-end TTFT. Released on EVERY exit, including a
+        # consumer that abandons the generator (GeneratorExit at the yield).
+        gate_wait_ms = await gate.acquire()
         content_parts: list[str] = []
         prose_result: ProseResult | None = None
         prose_error: Exception | None = None
         first_word_ms = 0.0
         perceived_first_word_ms = 0.0
         t_prose = time.perf_counter()
-        while True:
-            kind, payload = await queue.get()
-            if kind == "chunk":
-                if not content_parts:
-                    now = time.perf_counter()
-                    first_word_ms = _ms(now - t_prose)
-                    # Perceived TTFT: same instant, clocked from turn start —
-                    # retrieval-inclusive (the honest metric, audit 2026-07-22).
-                    perceived_first_word_ms = _ms(now - t_total)
-                content_parts.append(payload)
-                yield payload
-            elif kind == "done":
-                prose_result = payload
-                break
-            else:  # "error"
-                prose_error = payload
-                break
-        await producer  # let the worker thread finish cleanly
+        try:
+            producer = loop.run_in_executor(gate.executor, _produce)
+            while True:
+                kind, payload = await queue.get()
+                if kind == "chunk":
+                    if not content_parts:
+                        now = time.perf_counter()
+                        first_word_ms = _ms(now - t_prose)
+                        # Perceived TTFT: same instant, clocked from turn start —
+                        # retrieval- AND gate-wait-inclusive (the honest metric).
+                        perceived_first_word_ms = _ms(now - t_total)
+                    content_parts.append(payload)
+                    yield payload
+                elif kind == "done":
+                    prose_result = payload
+                    break
+                else:  # "error"
+                    prose_error = payload
+                    break
+            await producer  # let the worker thread finish cleanly
+        finally:
+            gate.release()
         prose_stream_ms = _ms(time.perf_counter() - t_prose)
 
         # --- content: never-blank-a-dialogue (keep-partial on mid-drop) --
@@ -468,6 +477,7 @@ class DialogueService:
                 sonnet_output_tokens=prose_out,
                 first_word_ms=first_word_ms,
                 perceived_first_word_ms=perceived_first_word_ms,
+                gate_wait_ms=gate_wait_ms,
                 prose_stream_ms=prose_stream_ms,
                 scene_type_resolved=scene_type_resolved,
                 scene_type_unknown=scene_type_unknown,

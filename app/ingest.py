@@ -209,7 +209,7 @@ async def run_write_call(
     call_confidence: float | None = None
     failure: str | None = None
     try:
-        write_result: WriteCallResult = await asyncio.to_thread(
+        write_result: WriteCallResult = await providers.gate.run(
             providers.write.render_and_score,
             observation_text=observation_text,
             diagnosticity_goal=diagnosticity_goal,
@@ -292,7 +292,7 @@ async def escalate_with_retry(
     aborting the write."""
     for _attempt in (1, 2):
         try:
-            return await asyncio.to_thread(
+            return await providers.gate.run(
                 providers.escalation.extract_gist,
                 observation_text=observation_text,
                 known_components=known_components,
@@ -487,7 +487,7 @@ class IngestService:
         location_text = event.location_description or event.location_name
         texts = [event.observation_text] + ([location_text] if location_text else [])
         try:
-            embed_result = await asyncio.to_thread(
+            embed_result = await self._providers.gate.run(
                 self._providers.embedding.embed, texts
             )
             embedding = embed_result.vectors[0]
@@ -729,7 +729,7 @@ class IngestService:
                 entities.append(name)
         t0 = time.perf_counter()
         try:
-            embed_result = await asyncio.to_thread(
+            embed_result = await self._providers.gate.run(
                 self._providers.embedding.embed, [request.content]
             )
         except ProviderCallError as exc:

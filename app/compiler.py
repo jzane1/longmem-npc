@@ -246,7 +246,7 @@ class CompilerService:
             )
             t_call = time.perf_counter()
             try:
-                call = await asyncio.to_thread(
+                call = await self._providers.gate.run(
                     provider.compile,
                     system_prompt=system_prompt,
                     user_content=user_content,

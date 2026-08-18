@@ -39,12 +39,14 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Protocol
 
+from app.concurrency import ModelCallGate
 from app.config import (
     EMBEDDING_DIM,
     EMBEDDING_MODEL,
     ENV_MODEL_COMPILER,
     ENV_MODEL_JUDGE,
     ENV_MODEL_REFLECTION,
+    MAX_CONCURRENT_MODEL_CALLS_DEFAULT,
     ConfigError,
     Settings,
 )
@@ -1548,10 +1550,20 @@ class Providers:
     reconstruction: ReconstructionProvider = field(
         default_factory=FakeReconstructionProvider
     )
+    # The concurrency cap (C7): one gate per process, carried here so every seam
+    # and worker reaches it as `providers.gate`. The default-factory keeps
+    # pre-existing direct Providers(...) constructions (the structural walkers)
+    # unchanged; build_providers always sizes it from settings.
+    gate: ModelCallGate = field(
+        default_factory=lambda: ModelCallGate(MAX_CONCURRENT_MODEL_CALLS_DEFAULT)
+    )
 
 
 def build_providers(settings: Settings) -> Providers:
-    """Provider selection by config; the services are identical under either."""
+    """Provider selection by config; the services are identical under either.
+    The concurrency gate is sized from settings and shared by both modes (fake
+    calls route through it too, so the gated path is exercised offline)."""
+    gate = ModelCallGate(settings.max_concurrent_model_calls)
     if settings.provider_mode == "real":
         return Providers(
             write=RealWriteProvider(settings),
@@ -1559,6 +1571,7 @@ def build_providers(settings: Settings) -> Providers:
             embedding=RealEmbeddingProvider(settings),
             dialogue=RealDialogueProvider(settings),
             reconstruction=RealReconstructionProvider(settings),
+            gate=gate,
         )
     return Providers(
         write=FakeWriteProvider(),
@@ -1566,6 +1579,7 @@ def build_providers(settings: Settings) -> Providers:
         embedding=FakeEmbeddingProvider(),
         dialogue=FakeProseProvider(),
         reconstruction=FakeReconstructionProvider(),
+        gate=gate,
     )
 
 

@@ -365,7 +365,7 @@ class DeferredWriteWorker:
         if not source.fact_has_embedding:
             t0 = time.perf_counter()
             try:
-                embed_result = await asyncio.to_thread(
+                embed_result = await self._providers.gate.run(
                     self._providers.embedding.embed, [source.observation_text]
                 )
                 repaired_embedding = embed_result.vectors[0]

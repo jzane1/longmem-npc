@@ -88,6 +88,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Phase C4 build record — the dissonance path landed — 2026-08-17](#phase-c4-build-record--the-dissonance-path-landed--2026-08-17)
 - [Phase C5 build record — client contract completion landed — 2026-08-17](#phase-c5-build-record--client-contract-completion-landed--2026-08-17)
 - [Phase C6 build record — the purge endpoint landed — 2026-08-18](#phase-c6-build-record--the-purge-endpoint-landed--2026-08-18)
+- [Phase C7 fork rulings and Stage A build record — the concurrency cap landed — 2026-08-18](#phase-c7-fork-rulings-and-stage-a-build-record--the-concurrency-cap-landed--2026-08-18)
 
 ## Primary decisions
 
@@ -3832,3 +3833,66 @@ only" list was stale for BOTH its entries — diegetic-correction (built C4) and
 reframed the whole two-item list to "Built since (previously deferred, documented only)" in the
 same pass rather than flip purge alone and leave a false "no handler in v1" beside diegetic.
 Recorded so the scope call is visible.
+
+## Phase C7 fork rulings and Stage A build record — the concurrency cap landed — 2026-08-18
+
+C7 was queued as the "latency **trio**" (concurrency cap + scene-boundary reconstruction pre-warm
++ prompt caching). Exploration surfaced one decisive fact that reshaped it, and Jack ruled three
+forks in one plan-batch (the settle-at-spec `AskUserQuestion` shape). C7 is now the latency
+**pair**; Stage A (the cap) landed this session, Stage B (the pre-warm) is next.
+
+1. **Prompt caching DEFERRED (leg 3 cut from C7).** Anthropic's minimum cacheable prefix is
+   **4096 tokens on Haiku 4.5** (non-monotonic: 1024 on Sonnet 5 / Opus 4.8, 512 on Opus 5), but
+   the dialogue and reconstruction prompt **heads are only ~0.5–1K tokens**, so `cache_control`
+   markup would **silently never cache** (`cache_creation_input_tokens: 0`, no error) on the
+   ruled Haiku-class slate. Caching buys nothing until the model slate moves — a **Phase D / D1**
+   question (D1 already owns "final model-slate confirmation"; a caching-capable model changes the
+   math). The byte-stable head it would attach to already exists (`_render_memories(loaded_order=…)`,
+   built as groundwork 2026-07-21), so the future build is small. Recommended and taken.
+
+2. **Pre-warm target — probe-driven (for Stage B).** At a scene boundary the server has the
+   incoming `identity_version` + `scene_started_at` + the agent's stored memories but NOT the next
+   utterance, so retrieval's relevance term is unknown. Jack chose the client to send an
+   anticipated-context probe on the boundary event (scored against it), **over my probe-free top-N
+   recommendation** — a conscious divergence: it is more precise and folds today's off-camera
+   warm-init trick (a throwaway `DialogueInitAsync`) into the boundary call itself. Stage B reuses
+   `retrieve_dialogue_init` (embed → fetch → score → `serve`) with the probe as the query.
+
+3. **Pre-warm cache-write guardrail — reuse `serve`'s drift-budget refusal (for Stage B).** The
+   2026-07-22 audit R8 asked for a gist-precision check at the pre-warm write. Because Stage B
+   reuses `ReconstructionService.serve` verbatim, it **inherits** serve's drift-budget refusal
+   (embedding distance candidate-vs-anchor > threshold → refuse the write-back, cache the prior
+   head), which satisfies R8's intent (don't bake in unmeasured drift) with **no new gate**. The
+   "no new moving parts" recommendation, taken.
+
+**Stage A — the concurrency cap (audit R8), built + floor-verified this session (floors row 31; NO
+spec doc — the plan was the spec; NO migration — the request-path wait rides
+`DialogueTurnInstrumentation`, the ledger stays 001–008).** There was no concurrency limiting
+anywhere: every provider call is a sync SDK call offloaded to the default asyncio thread pool
+(`min(32, cpu+4)`), and a streaming NPC holds a thread for its whole stream, so N concurrent NPCs
+could exhaust the pool, the DB pool, and the provider rate limit at once. Fix: one process-level
+**`ModelCallGate`** (`app\concurrency.py`) = `asyncio.Semaphore(cap)` (the exact logical cap + the
+queue-wait measure) + a bounded `ThreadPoolExecutor(max_workers=cap)` (so the default pool never
+binds first). It rides the **`Providers` bundle** via a default-factory (the fake-default
+precedent — the direct `Providers(...)` test constructions stand unchanged, `build_providers` sizes
+it from settings), so every seam + worker reaches it as `self._providers.gate` with ZERO
+service-constructor churn. All **13 provider call sites** reroute `asyncio.to_thread(provider…)` →
+`gate.run(provider…)`; the streaming prose leg holds one slot for its whole life (`gate.acquire()`
++ `run_in_executor(gate.executor, …)`, released in `finally`, GeneratorExit-safe). The local
+spaCy/fastcoref NLP passes are deliberately **not** gated (CPU-bound, already default-pool-bounded,
+and the knob names *model* calls). Knob **`LONGMEM_MAX_CONCURRENT_MODEL_CALLS`** (a `Settings` int
+on the `judge_max_tokens` precedent, env-validated ≥ 1, default 8 aligned with the DB pool
+`max_size`); **`gate_wait_ms`** on `DialogueTurnInstrumentation`; gate `shutdown()` at both
+teardowns (`_owns_gate` mirroring `_owns_pool`).
+
+Scope refinement recorded for honesty: the approved plan said "gate everything including NLP"; the
+build scoped the cap to *provider* calls (NLP is local CPU, already default-pool-bounded, and the
+knob's own name says model calls) — the floor-verifier confirmed this as sound, not a gap.
+
+**Verified (independent floor-verifier, PASS on all seven done-when criteria — floors row 31).**
+`verify_concurrency` **11/11** (the FOURTEENTH walker; A cap enforcement peak == cap, B
+release-on-exception, C the `gate_wait_ms` source 0.0 uncontended / 200 ms contended, D seam wiring
+`gate_wait_ms == 0.0` + byte-identical); `-m "not nlp"` **175 passed** (floor held) / 189 full; the
+wiring audit (all 13 gated, every remaining `to_thread` non-provider); the knob validation (int ≥ 1
+`ConfigError`, `ModelCallGate(0)` `ValueError`); no 009, ledger 008; `git diff app\` adds zero SQL
+writes (the invariant untouched); ruff clean.

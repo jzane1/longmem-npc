@@ -22,7 +22,6 @@ structurally by Set N and the walker.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import time
@@ -279,7 +278,7 @@ class DissonanceService:
         )
         t_call = time.perf_counter()
         try:
-            call = await asyncio.to_thread(
+            call = await self._providers.gate.run(
                 self._providers.reconstruction.reconstruct,
                 system_prompt=system_prompt,
                 user_content=user_content,

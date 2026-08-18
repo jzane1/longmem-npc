@@ -40,7 +40,6 @@ identifies the LIVE chain head, `content` the key's telling.
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import math
@@ -481,7 +480,7 @@ class ReconstructionService:
                     document, items, include_gist_constraint=include_gist
                 )
                 try:  # single attempt per group (ruled): read latency, not a lost write
-                    result = await asyncio.to_thread(
+                    result = await self._providers.gate.run(
                         self._providers.reconstruction.reconstruct,
                         system_prompt=system_prompt,
                         user_content=user_content,
@@ -517,7 +516,7 @@ class ReconstructionService:
                     for _, candidate, anchor in checked:
                         texts.extend((candidate, anchor))
                     try:
-                        embed_result = await asyncio.to_thread(
+                        embed_result = await self._providers.gate.run(
                             self._providers.embedding.embed, texts
                         )
                         vectors = embed_result.vectors
