@@ -45,8 +45,10 @@ embedding would make the memory vanish from the vector probe.
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from psycopg_pool import AsyncConnectionPool
@@ -69,14 +71,21 @@ from app.schemas import (
     CorrectionResult,
     CreateAgentRequest,
     CreateAgentResult,
+    DialogueInitRequest,
     IngestResult,
     Instrumentation,
     ObserveEvent,
     PinResult,
     PurgeResult,
     SceneBoundaryEvent,
+    ScenePrewarmInstrumentation,
     SceneResult,
 )
+
+if TYPE_CHECKING:
+    from app.retrieval import RetrievalService
+
+logger = logging.getLogger(__name__)
 
 # Sentinel decay class when the agent's config supplies neither a map entry
 # nor a default label: the write is never rejected, only flagged unknown.
@@ -347,11 +356,21 @@ class IngestService:
     """One instance per process; both callers share it."""
 
     def __init__(
-        self, pool: AsyncConnectionPool, providers: Providers, settings: Settings
+        self,
+        pool: AsyncConnectionPool,
+        providers: Providers,
+        settings: Settings,
+        retrieval: RetrievalService | None = None,
     ):
         self._pool = pool
         self._providers = providers
         self._settings = settings
+        # The retrieval service (C7-B): injected so the scene-boundary handler
+        # runs the probe-driven reconstruction pre-warm through the same init
+        # path a dialogue turn uses. Optional (default None) so the many direct
+        # IngestService(...) constructions that never pre-warm stand; both
+        # production sites pass it (retrieval is constructed just before).
+        self._retrieval = retrieval
 
     # ------------------------------------------------------------------ #
     # observe
@@ -598,12 +617,15 @@ class IngestService:
     # ------------------------------------------------------------------ #
 
     async def scene_boundary(self, event: SceneBoundaryEvent) -> SceneResult:
-        """Scene edge. Since the reconstruction build (2026-07-17) this
-        handler carries its first server-side consumer: the identity-document
-        recompile (render seed prose -> content hash -> upsert), returning
-        identity_version for the caller to freeze as scene state (the hybrid
-        plumbing ruling; the prompt-head rebuild remains a later
-        consumer)."""
+        """Scene edge. Recompiles the identity document (render seed prose ->
+        content hash -> upsert), returning identity_version for the caller to
+        freeze as scene state (the hybrid plumbing ruling). Since C7-B
+        (2026-08-18) it carries its SECOND consumer: when the event supplies a
+        probe (`prewarm_context`), the reconstruction pre-warm runs the
+        dialogue-init retrieval/reconstruction path at the FRESHLY recompiled
+        version + this boundary's basis, so the warm's cache write-backs land
+        under the exact composed keys the first on-camera turn will look up.
+        Absent probe => identity-recompile only (the off state)."""
         t_total = time.perf_counter()
         agent = await db.fetch_agent(self._pool, event.agent_id)
         if agent is None:
@@ -611,12 +633,61 @@ class IngestService:
         version, _rendered, created = await identity.ensure_identity_document(
             self._pool, event.agent_id, agent["seed_identity"]
         )
+        prewarm: ScenePrewarmInstrumentation | None = None
+        if event.prewarm_context and self._retrieval is not None:
+            prewarm = await self._prewarm_reconstruction(event, version)
         return SceneResult(
             agent_id=event.agent_id,
             accepted=True,
             total_ms=_ms(time.perf_counter() - t_total),
             identity_version=version,
             identity_document_new=created,
+            prewarm=prewarm,
+        )
+
+    async def _prewarm_reconstruction(
+        self, event: SceneBoundaryEvent, version: str
+    ) -> ScenePrewarmInstrumentation:
+        """The C7-B reconstruction pre-warm: reuse `retrieve_dialogue_init`
+        (embed -> fetch -> score -> serve) with the probe as the query, at the
+        recompiled identity version + the boundary basis, so serve's write-backs
+        warm the cache (and inherit serve's drift-budget refusal — R8). Best-
+        effort: any failure returns a degraded record, never raises, so a warm
+        failure can never fail the boundary. `self._retrieval` is guaranteed
+        non-None by the caller's guard."""
+        assert self._retrieval is not None
+        try:
+            result = await self._retrieval.retrieve_dialogue_init(
+                DialogueInitRequest(
+                    agent_id=event.agent_id,
+                    query_text=event.prewarm_context,
+                    identity_version=version,
+                    scene_started_at=event.client_timestamp,
+                    as_of=event.client_timestamp,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 — the boundary must survive a warm failure
+            logger.warning(
+                "scene-boundary pre-warm failed for agent %s: %s", event.agent_id, exc
+            )
+            return ScenePrewarmInstrumentation(
+                degraded=True, degraded_reason=f"pre-warm failed: {exc}"
+            )
+        instr = result.instrumentation
+        return ScenePrewarmInstrumentation(
+            embed_ms=instr.embed_ms,
+            reconstruction_ms=instr.reconstruction_ms,
+            candidate_count=instr.candidate_count,
+            cache_hits=instr.cache_hits,
+            cache_misses=instr.cache_misses,
+            write_backs=instr.write_backs,
+            drift_refusals=instr.drift_refusals,
+            embedding_tokens=instr.embedding_tokens,
+            reconstruction_input_tokens=instr.reconstruction_input_tokens,
+            reconstruction_output_tokens=instr.reconstruction_output_tokens,
+            reconstruction_embed_tokens=instr.reconstruction_embed_tokens,
+            degraded=instr.degraded,
+            degraded_reason=instr.degraded_reason,
         )
 
     # ------------------------------------------------------------------ #

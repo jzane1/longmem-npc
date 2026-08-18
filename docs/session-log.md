@@ -1898,6 +1898,52 @@ session.
   - **Blocked:** nothing. **Abandoned:** nothing. Next: C7 per the roadmap — the latency trio
     (concurrency cap + scene-boundary reconstruction pre-warm; then prompt caching).
 
+## **Phase C7 — the latency PAIR landed 2026-08-18 (a trio no more), plan-to-floor in one session (floors rows 31–32).**
+  - **The reframe (three forks ruled, one AskUserQuestion batch at plan mode):** exploration
+    surfaced that C7's third leg, **prompt caching, is inert on the ruled Haiku slate** —
+    Anthropic's cacheable-prefix minimum is 4096 tokens on Haiku 4.5 (non-monotonic: 1024 on
+    Sonnet 5 / Opus 4.8, 512 on Opus 5) while the dialogue/reconstruction heads are ~0.5–1K, so
+    `cache_control` would silently never cache (`cache_creation_input_tokens: 0`, no error). Ruled
+    **DEFERRED to Phase D / D1** (a caching-capable model changes the math; the byte-stable head
+    groundwork already exists). So C7 is the latency **pair**. The other two rulings: pre-warm
+    **probe-driven** (Jack's choice over my probe-free recommendation) and the R8 guardrail
+    **reuses `serve`'s drift-budget refusal** over a new gist-precision gate. All in `decisions.md`.
+  - **Stage A — the concurrency cap (audit R8; floors row 31):** there was NO concurrency limiting
+    anywhere; every provider call is a sync SDK call on the default thread pool, a streaming NPC
+    holding a thread for its whole stream. One process-level `ModelCallGate` (`asyncio.Semaphore(cap)`
+    + a bounded `ThreadPoolExecutor(max_workers=cap)`) carried on the `Providers` bundle via a
+    default-factory, so every seam + worker reaches it as `self._providers.gate` with ZERO
+    service-constructor churn. All 13 provider call sites → `gate.run`/`gate.acquire`; the prose
+    stream holds one slot for its life; local NLP stays on the default pool by design (the knob
+    names model calls). Knob `LONGMEM_MAX_CONCURRENT_MODEL_CALLS` (default 8 = the DB pool);
+    `gate_wait_ms` on the dialogue instrumentation; gate shutdown at both teardowns. NO migration.
+    The fourteenth walker `verify_concurrency.py` (11 assertions). Committed `ec5bf4b`.
+  - **Stage B — probe-driven scene-boundary pre-warm (floors row 32):** the scene-boundary
+    handler's second consumer. Optional `SceneBoundaryEvent.prewarm_context`; when present,
+    `_prewarm_reconstruction` reuses `retrieve_dialogue_init` (embed → fetch → score → `serve`) with
+    the probe as the query, at the freshly recompiled `identity_version` + the boundary basis, so
+    `serve`'s write-backs warm the cache under the exact composed keys the first on-camera read looks
+    up — folding the demo's off-camera warm-init trick into the boundary call. The R8 guardrail by
+    INHERITANCE (reuse `serve` → inherit its drift-budget refusal, no new gate). Fail-quiet (a broad
+    try/except → degraded record; the boundary never fails). `RetrievalService` injected into
+    `IngestService` (optional, default None; both sites build retrieval before ingest; a
+    `TYPE_CHECKING` import breaks the ingest↔retrieval cycle). Warm stats → new
+    `ScenePrewarmInstrumentation` on `SceneResult.prewarm`. NO migration. The fifteenth walker
+    `verify_prewarm.py` (14 assertions).
+  - **Honest notes:** (1) `verify_concurrency` A2 first asserted `pending == 2`, wrong — at the
+    settle point all N+2 tasks are pending (the admitted 2 are barrier-held in their threads, not
+    "done"); A1's `in_flight == cap` already proves the cap; fixed to `pending == cap + 2`. (2)
+    `verify_prewarm` B3 first asserted `reconstruction_ms == 0.0` on the cache-hit read — wrong:
+    `reconstruction_ms` times the whole serve stage (theta partition + cache fetch) even with zero
+    misses, so it is ~8 ms on a hit; the honest call-free signal is zero reconstruction TOKENS,
+    which `cache_misses == 0` corroborates. (3) A build refinement from the approved plan: it said
+    "gate everything including NLP"; the build scoped the cap to *provider* calls (NLP is local CPU,
+    already default-pool-bounded, and the knob's name says model calls) — the floor-verifier
+    confirmed this as sound, not a gap.
+  - **Blocked:** nothing. **Abandoned:** the prompt-caching leg (deferred, not abandoned — parked
+    for Phase D). **Next: Phase D** — full-system latency + believability passes, knob tuning, the
+    final model-slate confirmation (the natural revisit for prompt caching). Phase C is complete.
+
 
 ---
 

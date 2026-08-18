@@ -89,6 +89,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Phase C5 build record — client contract completion landed — 2026-08-17](#phase-c5-build-record--client-contract-completion-landed--2026-08-17)
 - [Phase C6 build record — the purge endpoint landed — 2026-08-18](#phase-c6-build-record--the-purge-endpoint-landed--2026-08-18)
 - [Phase C7 fork rulings and Stage A build record — the concurrency cap landed — 2026-08-18](#phase-c7-fork-rulings-and-stage-a-build-record--the-concurrency-cap-landed--2026-08-18)
+- [Phase C7 Stage B build record — the scene-boundary pre-warm landed — 2026-08-18](#phase-c7-stage-b-build-record--the-scene-boundary-pre-warm-landed--2026-08-18)
 
 ## Primary decisions
 
@@ -3896,3 +3897,44 @@ release-on-exception, C the `gate_wait_ms` source 0.0 uncontended / 200 ms conte
 wiring audit (all 13 gated, every remaining `to_thread` non-provider); the knob validation (int ≥ 1
 `ConfigError`, `ModelCallGate(0)` `ValueError`); no 009, ledger 008; `git diff app\` adds zero SQL
 writes (the invariant untouched); ruff clean.
+
+## Phase C7 Stage B build record — the scene-boundary pre-warm landed — 2026-08-18
+
+Stage B completes the buildable C7 (leg 3, prompt caching, deferred to Phase D — see the Stage A
+entry above). Built + floor-verified this session, plan-to-floor (floors row 32; NO spec doc — the
+approved plan was the spec; **NO migration** — an optional request field + reuse of `memories` / the
+vector index / `reconstruction_cache`, the ledger stays 001–008).
+
+**What it does.** `POST /v1/events/scene-boundary` (→ `IngestService.scene_boundary`) previously
+recompiled only the identity document; C7-B adds its second consumer. An optional
+`SceneBoundaryEvent.prewarm_context` carries an anticipated-context probe for the incoming scene (the
+probe-driven ruling). Present + non-empty => the new `_prewarm_reconstruction` runs the existing
+`RetrievalService.retrieve_dialogue_init` (embed -> fetch -> score -> `serve`) with the probe as the
+query, at the **freshly recompiled** `identity_version` + the boundary's `client_timestamp` as
+`scene_started_at`/`as_of`, so `serve`'s reconstruction write-backs land the cache under the exact
+composed keys `(identity_version, band)` the first on-camera read looks up. Warm stats fold into a new
+`ScenePrewarmInstrumentation` on `SceneResult.prewarm` (None unless a probe was sent — the off state,
+the C4/C5 client-invoked precedent). This folds the demo's off-camera warm-init trick (a throwaway
+`DialogueInitAsync`) into the boundary call itself.
+
+**The R8 guardrail by inheritance (the reuse-drift-budget ruling).** The pre-warm adds NO new gate:
+reusing `serve` verbatim inherits its drift-budget refusal (candidate-vs-anchor cosine >
+`drift_budget_threshold` -> refuse the write-back, cache the prior head), which satisfies R8's "don't
+bake in unmeasured drift" with no new moving parts. The floor-verifier confirmed the warm path routes
+through `serve` and adds no threshold/cosine/drift logic of its own.
+
+**Fail-quiet + wiring.** `_prewarm_reconstruction` wraps the warm in a broad `try/except` returning a
+degraded record, so a warm failure never fails the boundary (it still recompiles identity and
+returns). `RetrievalService` is injected into `IngestService` (optional param, default None, so the
+many direct `IngestService(...)` test constructions stand); both construction sites now build
+retrieval before ingest and pass it, and a `TYPE_CHECKING` import breaks the ingest<->retrieval cycle
+(`retrieval.py` imports `ingest.py` for its exception classes).
+
+**Verified (independent floor-verifier, PASS on all five done-when criteria — floors row 32).**
+`verify_prewarm` **14/14** (the FIFTEENTH walker; A a probe warms the cache cold->warm, B the next
+same-basis init is CALL-FREE — zero reconstruction tokens, the honest signal since `reconstruction_ms`
+still times the partition + cache fetch on a hit, C no-probe = the unchanged off state, D fail-quiet);
+the drift-budget refusal confirmed inherited structurally; `-m "not nlp"` **175 passed** (the pre-C7-B
+scene-boundary tests green) / 189 full; the C7-A floor re-checked (`verify_concurrency` 11/11); no
+009, ledger 008; the warm adds zero new SQL writes (only `serve`'s sanctioned write-back + cache
+writes); ruff clean.

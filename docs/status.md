@@ -1,17 +1,19 @@
 # longmem-npc — Status
 
 **Last updated:** 2026-08-18
-**Phase:** **Road to completion — Phases A, B, and C1–C6 DONE; C7 IN PROGRESS.** C7 is the
-latency **pair** now, not a trio: **Stage A (the concurrency cap, audit R8) landed 2026-08-18**,
-plan-to-floor — floors row 31; **Stage B (scene-boundary reconstruction pre-warm, probe-driven)
-is NEXT.** The third leg, **prompt caching, is DEFERRED to Phase D**: Anthropic's cacheable-prefix
-minimum is 4096 tokens on Haiku 4.5 but the dialogue/reconstruction heads are ~0.5–1K, so
-`cache_control` would silently never cache on the ruled Haiku slate (the dated 2026-08-18 C7
-rulings; the D1 model-slate lock is the natural revisit). **No operator action stands.**
+**Phase:** **Road to completion — Phases A, B, and all of C DONE. NEXT: Phase D (optimization).**
+C7 landed as the latency **pair** (a trio no more): **Stage A concurrency cap** (floors row 31)
+and **Stage B probe-driven scene-boundary reconstruction pre-warm** (floors row 32), both
+plan-to-floor 2026-08-18. The third leg, **prompt caching, is DEFERRED to Phase D**: Anthropic's
+cacheable-prefix minimum is 4096 tokens on Haiku 4.5 but the dialogue/reconstruction heads are
+~0.5–1K, so `cache_control` would silently never cache on the ruled Haiku slate (the dated
+2026-08-18 C7 rulings; the D1 model-slate lock is the natural revisit). **No operator action
+stands.**
 The system is BUILT end to end on the final A1 seam — backend, C# client + console harness,
 Unity adapter + gray-box scene, The Ledger, eval-harness stages 1–4, deferred writes,
 reflection, the parameter compiler, the dissonance path, the agent-state read + async observes,
-the purge endpoint, the concurrency cap (C7-A) — schema at migrations 001–008.
+the purge endpoint, the concurrency cap + scene-boundary pre-warm (C7) — schema at
+migrations 001–008.
 What is proven lives in
 `docs\floors.md`, why in `decisions.md`, the narrative in `session-log.md`; this file
 carries only what is live.
@@ -92,11 +94,11 @@ Ordered so shared machinery lands before its reusers.
   no migration — the agent-state read, the FOURTH unscored member, + fire-and-forget observes,
   drains at scene edges); **C6** purge endpoint (`architecture.md` §12, no migration — per-memory
   `DELETE /v1/memories/{id}`, reflections survive, no guard).
-- **C7. Latency pair** (~1–2 sessions): **Stage A concurrency cap ✅ LANDED 2026-08-18** (floors
-  row 31; `ModelCallGate`; NO migration). **Stage B — scene-boundary reconstruction pre-warm
-  (probe-driven, reusing the init path + `serve`'s drift-budget refusal) — NEXT.** Prompt caching
-  **DEFERRED to Phase D** (the Haiku-4096 finding; the byte-stable head groundwork already
-  exists). Last built in the phase so Phase D measures fresh.
+- **C7. Latency pair ✅ DONE** (plan-to-floor 2026-08-18): **Stage A concurrency cap** (floors row
+  31; `ModelCallGate`) + **Stage B probe-driven scene-boundary reconstruction pre-warm** (floors
+  row 32; reuses the init path + `serve`'s drift-budget refusal); NO migration either stage.
+  Prompt caching **DEFERRED to Phase D** (the Haiku-4096 finding; the byte-stable head groundwork
+  already exists). **Phase C is complete.**
 
 ### Phase D — Optimization rounds (~1–2 sessions)
 
@@ -169,7 +171,7 @@ not vendored).
 
 **Carried, not fixed** (deliberately unscheduled, awaiting its own ruling):
 
-- **The walkers (fourteen since C7-A) share a fixed-name scratch DB** (`longmem_test`) they neither
+- **The walkers (fifteen since C7-B) share a fixed-name scratch DB** (`longmem_test`) they neither
   create, migrate, nor drop, and some walker assertions are DB-global counts. The right fix —
   the suite's pid-scoped mechanism plus a `tests\run-walkers.ps1` runner — is a medium refactor
   of the verification apparatus itself, so it wants its own scoped task rather than riding an

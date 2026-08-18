@@ -174,8 +174,8 @@ class SessionRunner:
         providers = providers if providers is not None else build_providers(settings)
         if warm_nlp:
             await asyncio.to_thread(warm_pipelines)
-        ingest = IngestService(pool, providers, settings)
         retrieval = RetrievalService(pool, providers, settings)
+        ingest = IngestService(pool, providers, settings, retrieval)
         dialogue = DialogueService(pool, providers, settings, retrieval)
         deferred = DeferredWriteWorker(pool, providers, settings)
         deferred.start()

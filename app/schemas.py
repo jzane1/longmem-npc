@@ -66,12 +66,20 @@ class ObserveEvent(BaseModel):
 
 
 class SceneBoundaryEvent(BaseModel):
-    """Scene edge: accepted + instrumented only in v1; all consumers deferred."""
+    """Scene edge. Recompiles the identity document (2026-07-17); C7-B adds the
+    optional probe-driven reconstruction pre-warm."""
 
     agent_id: UUID
     client_timestamp: datetime
     scene_type: str | None = None  # integrator vocabulary; passthrough
     event_id: str | None = None
+    # Probe-driven reconstruction pre-warm (C7-B, 2026-08-18): an anticipated
+    # context probe for the incoming scene. Present + non-empty => the boundary
+    # runs the dialogue-init retrieval/reconstruction path at the recompiled
+    # identity version + this boundary's basis, warming the cache before the
+    # first on-camera turn. Absent/empty => identity-recompile-only (the off
+    # state; not sending it is off).
+    prewarm_context: str | None = None
 
     @field_validator("client_timestamp")
     @classmethod
@@ -214,19 +222,46 @@ class IngestResult(BaseModel):
     instrumentation: Instrumentation
 
 
+class ScenePrewarmInstrumentation(BaseModel):
+    """The scene-boundary reconstruction pre-warm's per-pass record (C7-B,
+    2026-08-18). Populated only when the boundary carried a probe; the fields
+    are the warm-relevant slice of the reused `retrieve_dialogue_init` pass
+    (`RetrievalInstrumentation`). `cache_misses == 0` with `reconstruction_ms`
+    near zero on the FIRST on-camera read at the same basis is the pre-warm's
+    success signal. All defaulted, so a hard warm failure returns a degraded
+    all-zero record rather than raising (the boundary must survive)."""
+
+    embed_ms: float = 0.0  # the probe embedding
+    reconstruction_ms: float = 0.0
+    candidate_count: int = 0  # memories scored into the warm top-k
+    cache_hits: int = 0  # already-warm past-theta slots
+    cache_misses: int = 0  # reconstructed this pass
+    write_backs: int = 0  # new head + cache rows written
+    drift_refusals: int = 0  # retellings refused (prior head cached instead)
+    embedding_tokens: int = 0
+    reconstruction_input_tokens: int = 0
+    reconstruction_output_tokens: int = 0
+    reconstruction_embed_tokens: int = 0  # drift-check embeddings
+    degraded: bool = False
+    degraded_reason: str | None = None
+
+
 class SceneResult(BaseModel):
     """Scene boundary result. Since the reconstruction build (2026-07-17) the
     handler recompiles the identity document server-side and returns its
     version — the boundary's first server-side consumer; the caller freezes
     `identity_version` as scene state (the caller-frozen-scene-state contract).
     `identity_document_new` is True when this version's row was inserted (an
-    unchanged seed re-hashes to the existing version)."""
+    unchanged seed re-hashes to the existing version). `prewarm` is the C7-B
+    reconstruction-pre-warm record — None unless the boundary carried a probe
+    (the off state)."""
 
     agent_id: UUID
     accepted: bool
     total_ms: float
     identity_version: str | None = None
     identity_document_new: bool = False
+    prewarm: ScenePrewarmInstrumentation | None = None
 
 
 class PinResult(BaseModel):

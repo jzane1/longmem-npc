@@ -87,8 +87,8 @@ async def _lifespan(app: FastAPI):
     await pool.open()
     await asyncio.to_thread(warm_pipelines)  # model load is startup cost
     providers = build_providers(settings)
-    app.state.service = IngestService(pool, providers, settings)
     app.state.retrieval = RetrievalService(pool, providers, settings)
+    app.state.service = IngestService(pool, providers, settings, app.state.retrieval)
     app.state.dialogue = DialogueService(pool, providers, settings, app.state.retrieval)
     # The dissonance seam (dissonance.md, the C4 rulings 2026-08-17): the
     # diegetic-correction event's service — synchronous, no worker, nothing
