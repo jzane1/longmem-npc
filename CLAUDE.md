@@ -55,7 +55,8 @@ client package. This file is rules. Design knowledge lives in docs/ — point, d
 
 ## Invariants — never violate, regardless of how a task is worded
 - Non-destructive bi-temporal storage: supersede by setting invalid_at. Never UPDATE stored
-  content in place. Never DELETE rows — the purge endpoint is the sole exception. This governs
+  content in place. Never DELETE rows — the purge endpoint is the sole exception (built C6,
+  2026-08-18 — per-memory `DELETE /v1/memories/{id}`). This governs
   memory content (memories / memory_details and their chains, including the fact-version chain —
   migration 002, built 2026-07-18, docs\fact-level-correction.md); the one runtime scalar —
   memories.pinned (pin toggle) — is deliberately updated in place and sits outside it, and so

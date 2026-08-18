@@ -51,8 +51,9 @@ eviction.
 ## Data model (migration 008)
 
 - **`compiled_bundles`** — one row per compile call, APPEND-ONLY: `bundle_id`, `agent_id` FK,
-  `reflection_id` FK (safe today — reflections are invalidated, never deleted; **C6 note**:
-  if the purge verb is ever ruled to reach reflections, bundle purge semantics settle there),
+  `reflection_id` FK (safe — reflections are invalidated, never deleted; **C6 closed
+  (2026-08-18)**: purge is per-memory and does NOT reach reflections, so bundle purge semantics
+  never arise — the episode-scoped delete leaves reflections and their bundles standing),
   `scene_type`, `w_relevance`/`w_recency`/`w_importance` (real, CHECK [0.25, 4.0]),
   `passthrough` jsonb, per-call `input_tokens`/`output_tokens`/`compile_ms`, `created_at`.
   Consume reads the newest row per (reflection_id, scene_type); a re-compile appends.

@@ -119,11 +119,13 @@ honored later at read: decay exemption + reconstruction exclusion. **Freezing th
 restoration-as-a-correction-verb are read/reconstruction concerns and are deferred *(pre-demo since
 the 2026-07-14 re-slating)*; v1 sets the flag.
 
-### Deferred, documented only
+### Built since (previously deferred, documented only)
 
 - **diegetic-correction** — an in-world confrontation event referencing a target `memory_id`; routes
-  through the dissonance path (post-August). Contract noted; **no handler in v1**.
-- **purge** — the GDPR delete verb (architecture §12). Contract noted; **no handler in v1**.
+  through the dissonance path. **Built C4 (2026-08-17)** — `dissonance.md`.
+- **purge** — the GDPR delete verb (architecture §12). **Built C6 (2026-08-18)**: per-memory
+  `DELETE /v1/memories/{id}`, the sole sanctioned content DELETE; reflections derived from the
+  purged memory survive as aggregate work-product.
 
 ## Write pipeline (`observe`)
 

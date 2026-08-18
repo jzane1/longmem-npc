@@ -1,9 +1,10 @@
 # longmem-npc — Test suite spec
 
-**BUILT 2026-07-20 — 182 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation +
+**BUILT 2026-07-20 — 189 pytest scenarios today** in `tests\test_*.py` (Sets A–D + degradation +
 hygiene + eval metrics + eval runner + judge + ablation + deferred writes + reflection + the
-parameter compiler + dissonance + agent state; the
-Set A diegetic pair LANDED with the dissonance mechanism, 2026-08-17). Count as of 2026-08-17:
+parameter compiler + dissonance + agent state + purge; the
+Set A diegetic pair LANDED with the dissonance mechanism, 2026-08-17; Set P purge landed with C6,
+2026-08-18). Count as of 2026-08-18:
 Set A 8,
 Set B 7, Set C 7, Set D 20, degradation 12, hygiene 2, Set G eval metrics 8, **Set H eval
 runner 9** (stage 2, 2026-08-05), **Set I judge 16** (stage 3, 2026-08-07; +2 with the
@@ -12,14 +13,15 @@ config scenarios, 2026-08-15), **Set J ablation 6** (stage 4, 2026-08-12 — its
 `eval-harness.md`'s stage-4 block), **Set K deferred writes 13** (Phase C1, 2026-08-12),
 **Set L reflection 20** (Phase C2, 2026-08-15), **Set M parameter compiler 21** (Phase C3,
 2026-08-17), **Set N dissonance 23** (Phase C4, 2026-08-17), **Set O agent state 10** (Phase
-C5, 2026-08-17) — grown from the 38 built on
+C5, 2026-08-17), **Set P purge 7** (Phase C6, 2026-08-18) — grown from the 38 built on
 2026-07-20 by the
 route-contract scenarios that arrived with each later route, by the gap-closing and guard
 scenarios from the full-repo audit, and by the eval harness stages 1–4. **Fourteen carry the
-`nlp` marker** (Sets L, M, N, and O add none), so the turn-end subset runs **168**. *(Counts
+`nlp` marker** (Sets L, M, N, O, and P add none), so the turn-end subset runs **175**. *(Counts
 corrected
 2026-08-12 with the Set K landing — the 2026-08-07 header had drifted again by the stage-4 and
-workaround-session scenarios; updated 2026-08-17 with the Set M, N, and O landings.)* Build rulings 2026-07-20
+workaround-session scenarios; updated 2026-08-17 with the Set M, N, and O landings; Set P with
+C6, 2026-08-18.)* Build rulings 2026-07-20
 (dated `decisions.md` entry): the suite-gate Stop hook runs the `-m "not nlp"` subset (the 7
 `nlp`-marked scenarios call the write pass at the service level and pay the lazy
 spaCy+fastcoref load; the full suite runs on demand + at floor verification); Postgres
@@ -418,6 +420,15 @@ precedent); it runs LAST in full sweeps (the newest — elder walkers first, fre
 C5's other half (fire-and-forget observes) is client-side C# — the console harness's beats
 [15]/[16] own both halves over the wire (36 → 50 checks).
 
+The thirteenth walker `tests\verify_purge.py` (21 criteria, lettered sections A–G) re-proves the
+purge (C6) against the scratch DB: the seven-table child-before-parent delete in one transaction,
+the honest per-table counts, the survival boundary (a co-resident memory, the agent, an
+identity_component whose only referencing gist span was purged, and a reflection whose
+`source_memory_ids` still names the purged memory — dangling by design), the unknown-id → None/404
+path, and the wire contract over `httpx.ASGITransport` (200 + counts / 404 / 422). Id-scoped
+assertions (never a DB-global count); it runs after the elder correction/reconstruction walkers in
+full sweeps (fresh + serial).
+
 ## Route contracts *(added as each route shipped; consolidated here 2026-07-28)*
 
 Every route in `app\api.py` has at least one HTTP-level scenario asserting its success payload,
@@ -438,6 +449,8 @@ rather than quietly implied by "every route", because that is what this section 
 - `POST /v1/events/observe` · `POST /v1/events/scene-boundary` (accepted + identity_version; 404)
 - `PUT /v1/memories/{id}/pin` (row moves both directions; 404) ·
   `POST /v1/memories/{id}/correction` (404/409/422/502)
+- `DELETE /v1/memories/{id}` (the purge verb — 200 + honest per-table counts, the memory gone;
+  404 unknown; 422 malformed id) — `tests\test_set_p_purge.py` + the `verify_purge` route section
 - `POST /v1/agents` (server-minted UUID, NULL knobs resolve; 422 on empty name)
 - `GET /v1/memories/{id}/chain` · `GET /v1/agents/{id}/memories` (unscored by contract; superseded
   rows present; 404) · `GET /ledger`

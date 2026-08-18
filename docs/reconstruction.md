@@ -191,7 +191,9 @@ format and quantum knob — suggested `{identity_version}|b{index}` with
 - **Eviction invariant (standing, generalized):** cache writes happen only in the reconstruction
   path; **any other writer to a chain — correction, diegetic write, purge — evicts all cache rows
   for that memory_id** (application code, not triggers). The authorial endpoint inherits
-  this obligation (built 2026-07-18).
+  this obligation (built 2026-07-18); **purge honors it too (C6, 2026-08-18)** — the per-memory
+  DELETE removes the memory's `reconstruction_cache` rows outright, as an ordered step of the
+  cascade rather than a separate eviction.
 
 ## Write-back & drift budget
 

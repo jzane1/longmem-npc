@@ -64,6 +64,7 @@ from app.schemas import (
     ObserveEvent,
     PinRequest,
     PinResult,
+    PurgeResult,
     ReconstructionMetricsResult,
     ReflectRequest,
     ReflectResult,
@@ -286,6 +287,21 @@ async def diegetic_correction(
 async def set_pin(memory_id: UUID, body: PinRequest) -> PinResult:
     try:
         return await app.state.service.set_pin(memory_id, body.pinned)
+    except UnknownMemoryError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.delete("/v1/memories/{memory_id}", response_model=PurgeResult)
+async def purge_memory(memory_id: UUID) -> PurgeResult:
+    """The purge verb (C6, ruled 2026-08-18): the sole sanctioned content
+    DELETE — the GDPR release-blocker. Hard-removes one memory and everything
+    beneath it (both chains, gist spans, corrections, caches, enrichment runs)
+    in one transaction, returning the per-table counts; reflections derived
+    from it survive by design (purge honesty). Per-memory and no-guard by
+    ruling (the integrator owns retention safety). 404 on unknown; 422 on a
+    malformed id (FastAPI); pass-through by the api.py contract."""
+    try:
+        return await app.state.service.purge_memory(memory_id)
     except UnknownMemoryError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

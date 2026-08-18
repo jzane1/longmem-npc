@@ -15,10 +15,15 @@ of a deferred row's chainless write-time scalars (importance/typology columns
 memory-content non-destructive invariant. (`apply_reputation_delta` was a
 sanctioned scalar until the A1 re-shape, 2026-08-04, removed the reputation
 system; the `agents.reputation` column stays in the schema, unwritten and
-unread.) The only DELETEs are the reconstruction-cache evictions in
-`apply_authorial_correction` and `apply_enrichment` — derived rows, not
-memory content (the standing eviction invariant, authorial-correction.md:
-any chain writer outside the reconstruction path evicts).
+unread.) DELETEs are of two kinds. The reconstruction-cache evictions in
+`apply_authorial_correction`, `apply_diegetic_correction`, `apply_enrichment`,
+and `apply_reflection` remove derived rows, not memory content (the standing
+eviction invariant, authorial-correction.md: any chain writer outside the
+reconstruction path evicts). The SOLE content DELETE is `purge_memory` (C6,
+ruled 2026-08-18) — the one sanctioned exception to never-DELETE: the GDPR
+purge verb hard-removes one memory and every row beneath it in one
+transaction; reflections derived from it survive as aggregate work-product
+(their un-FK'd `source_memory_ids` may dangle, by design).
 
 Two chains under one memory_id since migration 002: the telling chain
 (memory_details) and the fact chain (memory_fact_versions — basis text +
@@ -2602,3 +2607,98 @@ async def fetch_recent_compiler_runs(
         }
         for row in rows
     ]
+
+
+# ---------------------------------------------------------------------------
+# Purge (C6; the four rulings 2026-08-18 — per-memory scope, the DELETE verb,
+# no guard, NO migration). The release-blocker GDPR verb and the SOLE
+# sanctioned content DELETE (CLAUDE.md invariant; this module's header). One
+# memory and every row beneath it — both chains (memory_details +
+# memory_fact_versions), gist spans, corrections, caches, enrichment runs —
+# deleted child-before-parent in ONE transaction. No FK cascades (every
+# reference is bare NO ACTION), so the order is explicit and forced: corrections
+# reference memory_details AND memories, so they clear first; the six
+# memory-child tables clear before the memories row. Reflections derived from
+# the memory SURVIVE as aggregate work-product (their un-FK'd source_memory_ids
+# may dangle — purge honesty, migration-01.md:132); the agent, its identity,
+# reflections, and compiled bundles are untouched. Per-memory by ruling: purge
+# does NOT reach reflections (the parameter-compiler.md C6 note, closed
+# 2026-08-18).
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PurgeOutcome:
+    """The per-table row counts one purge removed — the walker/tests assert on
+    these and the endpoint echoes them. Returned only for a memory that
+    existed; an unknown id yields None (a 404), never a zero-count outcome."""
+
+    memory_id: UUID
+    corrections_deleted: int
+    cache_rows_evicted: int
+    fact_versions_deleted: int
+    enrichment_runs_deleted: int
+    gist_spans_deleted: int
+    details_deleted: int
+
+
+async def purge_memory(
+    pool: AsyncConnectionPool, memory_id: UUID
+) -> PurgeOutcome | None:
+    """Hard-delete one memory and everything beneath it in one transaction.
+    Returns None when the memory is unknown (→ 404) — nothing is deleted.
+
+    A SELECT ... FOR UPDATE opens the transaction: it is the clean unknown-id
+    check before any DELETE runs, and it locks the target so a concurrent
+    correction / enrichment / reconstruction on the same memory cannot
+    interleave with the delete. The child-before-parent order below is forced
+    by the schema's bare (NO ACTION) foreign keys."""
+    async with pool.connection() as conn:
+        async with conn.transaction():
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "SELECT 1 FROM memories WHERE memory_id = %s FOR UPDATE",
+                    (memory_id,),
+                )
+                if await cur.fetchone() is None:
+                    return None
+                await cur.execute(
+                    "DELETE FROM corrections WHERE memory_id = %s", (memory_id,)
+                )
+                corrections = cur.rowcount
+                await cur.execute(
+                    "DELETE FROM reconstruction_cache WHERE memory_id = %s",
+                    (memory_id,),
+                )
+                cache = cur.rowcount
+                await cur.execute(
+                    "DELETE FROM memory_fact_versions WHERE memory_id = %s",
+                    (memory_id,),
+                )
+                facts = cur.rowcount
+                await cur.execute(
+                    "DELETE FROM memory_enrichment_runs WHERE memory_id = %s",
+                    (memory_id,),
+                )
+                enrichment = cur.rowcount
+                await cur.execute(
+                    "DELETE FROM memory_gist_spans WHERE memory_id = %s",
+                    (memory_id,),
+                )
+                spans = cur.rowcount
+                await cur.execute(
+                    "DELETE FROM memory_details WHERE memory_id = %s", (memory_id,)
+                )
+                details = cur.rowcount
+                await cur.execute(
+                    "DELETE FROM memories WHERE memory_id = %s", (memory_id,)
+                )
+    return PurgeOutcome(
+        memory_id=memory_id,
+        corrections_deleted=corrections,
+        cache_rows_evicted=cache,
+        fact_versions_deleted=facts,
+        enrichment_runs_deleted=enrichment,
+        gist_spans_deleted=spans,
+        details_deleted=details,
+    )

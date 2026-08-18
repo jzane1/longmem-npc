@@ -545,16 +545,18 @@ is C2's RRR.
 
 ## 12. Integrator surface requirements
 
-**The shipped HTTP surface** *(fifteen routes; five landed 2026-07-23 and 2026-07-27 —
+**The shipped HTTP surface** *(sixteen routes; five landed 2026-07-23 and 2026-07-27 —
 `unity-client.md`; the metric read 2026-07-29 — `eval-harness.md`; the reflect verb
 2026-08-15 — `reflection.md`; this paragraph still said "twelve" and omitted reflect until
 2026-08-17, a C2 propagation miss corrected at the C3 build — C3 itself adds NO route by
 ruling; the diegetic-correction event joined with C4, 2026-08-17 — `dissonance.md`; the
-agent-state read with C5 the same day)*:
+agent-state read with C5 the same day; the purge verb with C6, 2026-08-18 — the release-blocker
+realized)*:
 `POST /v1/events/observe`,
 `POST /v1/events/scene-boundary`,
 **`POST /v1/events/diegetic-correction`** (the confrontation event — the dissonance path),
-`PUT /v1/memories/{id}/pin`, `POST /v1/memories/{id}/correction`, `POST /v1/dialogue/init`,
+`PUT /v1/memories/{id}/pin`, `POST /v1/memories/{id}/correction`,
+**`DELETE /v1/memories/{id}`** (the purge verb — the sole sanctioned content DELETE), `POST /v1/dialogue/init`,
 **`POST /v1/dialogue/turn`** (stateless — all scene state rides the request; the runner bookkeeping
 is the client's job), **`POST /v1/dialogue/turn/stream`** (its SSE twin, iterating the SAME
 async-generator seam — `chunk` / `reconstructing` / `result` / `error` events), **`POST /v1/agents`**
@@ -578,11 +580,13 @@ Docs are written as though a **hostile integrator** is reading them, answering o
 before they're asked: Whose Postgres is this? What happens on schema migration? What is the
 retention policy? Can a player's memories be deleted?
 
-- **Retention:** a tested **purge endpoint/script, no scheduler** — the tool provides the delete
-  verb, the schedule is the integrator's policy (this is the GDPR surface). Purge completeness
-  stated honestly: the endpoint deletes the original, its chains (telling **and fact versions** —
-  the latter specced 2026-07-18, `fact-level-correction.md`), and its caches; reflections
-  previously derived from purged episodes are aggregate work-product, and the docs say so.
+- **Retention:** a tested **purge endpoint (per-memory `DELETE /v1/memories/{id}`, built C6
+  2026-08-18), no scheduler** — the tool provides the delete verb, the schedule is the
+  integrator's policy (this is the GDPR surface). Purge completeness stated honestly: the endpoint
+  deletes the original, its chains (telling **and fact versions** — the latter specced 2026-07-18,
+  `fact-level-correction.md`), and its caches; reflections previously derived from purged episodes
+  are aggregate work-product left standing (their un-FK'd `source_memory_ids` may dangle), and the
+  docs say so.
 - Docs must draw the **verbatim/reconstructive read-mode boundary** (self-describing payloads carry
   it too), state per-field degradation for optional context fields, state the gate degradation
   ladder, and include a **"what this is not"** section.

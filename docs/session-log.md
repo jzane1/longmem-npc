@@ -1866,6 +1866,38 @@ session.
   - **Blocked:** nothing. **Abandoned:** nothing. Next: C6 per the roadmap — the purge
     endpoint, the ruled release-blocker and the sole sanctioned DELETE.
 
+## **Phase C6 — the purge endpoint landed 2026-08-18, plan-to-floor in one session (floors row 30).**
+  - **Landed:** everything the task named, on the four plan-batch rulings (one AskUserQuestion
+    batch at plan mode, all four recommended options taken — the dated C6 build record):
+    per-memory scope, the `DELETE` verb, no guard, NO migration (the ruled per-target scope
+    fact — the ledger stays at 008; purge only deletes from the existing 001–008 tables). The
+    release-blocker and the SOLE sanctioned CONTENT delete, live as a docs-only contract since
+    001. Backend: `db.purge_memory` (the seven-table child-before-parent delete in ONE
+    transaction — no FK cascades exist, so the order is forced: corrections before
+    memory_details, the six memory-child tables before the memories row; a `SELECT ... FOR
+    UPDATE` existence-lock opens it for the clean 404 + race safety; honest per-table `rowcount`
+    counts), `PurgeOutcome` + `PurgeResult`, `IngestService.purge_memory` (timed at the seam),
+    the sixteenth route `DELETE /v1/memories/{memory_id}`. The `db.py` header's sanctioned-write
+    enumeration gained purge as the FIRST content DELETE and, in the same edit, reconciled its
+    stale eviction-site list (two → four — C2/C4 had added `apply_reflection` /
+    `apply_diegetic_correction`). Reflections survive by design — the `parameter-compiler.md` C6
+    note is closed: purge does NOT reach reflections. Suite Set P (7, unmarked; 182 → 189 full /
+    168 → 175 subset), the thirteenth walker `verify_purge.py` (21 assertions, sections A–G,
+    id-scoped, incl. the wire contract over `httpx.ASGITransport`). Live beat green through real
+    uvicorn (fake mode, scratch DB): DELETE → 200 + counts → `/chain` 404 → reflection survives
+    → re-DELETE 404. Product `longmem` DB pristine (14 tables at 0, ledger 001–008).
+  - **Honest notes:** (1) Set P's first run FAILED — the seed inserted a second LIVE detail/fact
+    head, tripping the one-live-head partial unique index; fixed by seeding the second rows
+    superseded (`invalid_at` set), row counts unchanged. A staged-verification catch, not a
+    purge bug. (2) `write-path.md`'s "Deferred, documented only" list was stale for BOTH entries
+    (diegetic-correction built C4, purge now C6); reframed the whole two-item list honestly in
+    the same pass rather than flip one and leave a false "no handler in v1" beside it — flagged
+    for Jack. (3) `status.md` crossed the 12 KB tripwire (12518 B) on the C6 additions; trimmed
+    the redundant "Recently closed" pointer litany (it lives in `decisions.md`'s index) back
+    under the line (12266 B) — the tripwire's second firing.
+  - **Blocked:** nothing. **Abandoned:** nothing. Next: C7 per the roadmap — the latency trio
+    (concurrency cap + scene-boundary reconstruction pre-warm; then prompt caching).
+
 
 ---
 

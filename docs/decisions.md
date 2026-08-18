@@ -87,6 +87,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Session-effort audit — the status.md tripwire — 2026-08-17](#session-effort-audit--the-statusmd-tripwire--2026-08-17)
 - [Phase C4 build record — the dissonance path landed — 2026-08-17](#phase-c4-build-record--the-dissonance-path-landed--2026-08-17)
 - [Phase C5 build record — client contract completion landed — 2026-08-17](#phase-c5-build-record--client-contract-completion-landed--2026-08-17)
+- [Phase C6 build record — the purge endpoint landed — 2026-08-18](#phase-c6-build-record--the-purge-endpoint-landed--2026-08-18)
 
 ## Primary decisions
 
@@ -3777,3 +3778,57 @@ architecture.md, now corrected with C5's row and the header at fourteen);
 `architecture.md` §12's client paragraph moved twelve → thirteen verbs; `SETUP.md`'s harness
 line stopped pinning the check count (it said 32 while the gate stood at 36 — its second rot;
 now points at the line itself).
+
+## Phase C6 build record — the purge endpoint landed — 2026-08-18
+
+**Decided (plan-mode session, then built plan-to-floor the same day):** C6 — the purge endpoint,
+the ruled release-blocker and the SOLE sanctioned content DELETE — landed on the four plan-batch
+rulings below. No spec doc (the contract lives in `architecture.md` §12); NO migration (the
+ledger stays at 008 — purge only deletes from the existing 001–008 tables).
+
+**The four forks, ruled at plan mode (one AskUserQuestion batch; all four recommended options
+taken — the C5 pattern held):**
+1. **Scope — per-memory (episode).** `DELETE /v1/memories/{id}` deletes one memory and its seven
+   tables; reflections derived from it survive as aggregate work-product (their un-FK'd
+   `source_memory_ids` may dangle). This is the literal `architecture.md` §12 contract and the
+   precise answer to the hostile-integrator question "can a player's memories be deleted?".
+   Per-agent (whole NPC) and both-verbs were the priced alternatives — the latter the
+   architecturally complete option, its cost stated; per-memory is what the task named. This
+   CLOSES the `parameter-compiler.md` C6 note: purge does NOT reach reflections, so bundle purge
+   semantics never arise.
+2. **HTTP shape — the `DELETE` verb.** `DELETE /v1/memories/{memory_id}`, a 200 body with
+   per-table counts + total_ms. The "delete verb" the docs literally name; clean REST. (A
+   `POST .../purge` sub-resource and a CLI-only script were the alternatives.)
+3. **Safety — no guard.** Plain delete; the integrator owns retention safety (the documented
+   stance) and REST DELETE is already deliberate — "ceremony scores below absence." (A dry-run
+   preview flag and a confirm-echo were the priced alternatives.)
+4. **Migration — none.** Purge only deletes from the existing 001–008 tables; recorded as the
+   explicit per-target "no migration" scope fact, never inherited (a purge-audit /
+   proof-of-deletion table was the priced GDPR-compliance alternative, declined as unscoped).
+
+**Mechanics.** No FK in the schema declares ON DELETE — every reference is bare NO ACTION, so
+nothing cascades and the purge is an explicit child-before-parent set of DELETEs in one
+`conn.transaction()`, each scoped by the single `memory_id`, opened by a `SELECT ... FOR UPDATE`
+existence-lock (the clean unknown-id → None/404 before any DELETE runs, plus race safety against
+a concurrent correction/enrichment on the same row). Order: corrections (references
+memory_details AND memories) → reconstruction_cache → memory_fact_versions →
+memory_enrichment_runs → memory_gist_spans → memory_details → memories. The `db.py` header's
+sanctioned-write enumeration gained purge as the FIRST content DELETE and, in the same edit,
+reconciled its stale eviction-site list (two named → four real: `apply_reflection` and
+`apply_diegetic_correction` had joined with C2/C4). Backend seam: `db.purge_memory` +
+`PurgeOutcome`, `PurgeResult`, `IngestService.purge_memory` (timed), the sixteenth route.
+
+**Verified (independent floor-verifier, PASS on all eight criteria — floors row 30).**
+`verify_purge` (21 assertions, sections A–G, id-scoped) on a FRESH pid-scoped scratch;
+`-m "not nlp"` 175 passed twice (Set P's 7 among them; 182 → 189 full / 168 → 175 subset);
+migrate idempotent (8 applied, 0 pending; no 009); product `longmem` pristine (14 tables at 0,
+ledger 001–008) before and after; the only new content DELETEs are the seven inside
+`db.purge_memory`, transactional, touching nothing else (the four pre-existing DELETEs stay the
+cache evictions); SQL-containment + ruff clean; a live uvicorn beat (fake mode) DELETE → 200 +
+counts → `/chain` 404 → reflection survives → re-DELETE 404.
+
+**Doc-honesty note (carried to Jack, not a ruling):** `write-path.md`'s "Deferred, documented
+only" list was stale for BOTH its entries — diegetic-correction (built C4) and purge (now C6). I
+reframed the whole two-item list to "Built since (previously deferred, documented only)" in the
+same pass rather than flip purge alone and leave a false "no handler in v1" beside diegetic.
+Recorded so the scope call is visible.

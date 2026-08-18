@@ -293,6 +293,27 @@ class DiegeticCorrectionResult(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Purge (docs\architecture.md §12; the C6 rulings dated 2026-08-18)
+# ---------------------------------------------------------------------------
+
+
+class PurgeResult(BaseModel):
+    """Result of DELETE /v1/memories/{memory_id} (C6) — the per-table row
+    counts the purge removed, echoed for the caller and asserted by the
+    structural tests. Reflections derived from the memory are not touched, so
+    no reflection field appears; 404 (not this body) on an unknown id."""
+
+    memory_id: UUID
+    corrections_deleted: int
+    cache_rows_evicted: int
+    fact_versions_deleted: int
+    enrichment_runs_deleted: int
+    gist_spans_deleted: int
+    details_deleted: int
+    total_ms: float
+
+
+# ---------------------------------------------------------------------------
 # Reflection (docs\reflection.md; the C2 rulings dated 2026-08-15)
 # ---------------------------------------------------------------------------
 

@@ -1,17 +1,17 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-08-17
-**Phase:** **Road to completion — Phases A, B, and C1–C5 are DONE. NEXT UP: C6 — the purge
-endpoint (the ruled release-blocker; the sole sanctioned DELETE).** C5 (the agent-state
-read + async observes) landed 2026-08-17, plan-to-floor in one session — floors row 29; the
-dated C5 build record carries the seven plan-batch rulings (NO migration by ruling; the
-read joined the unscored carve-out as its FOURTH member; the C4 landing narrative moved to
-`session-log.md`'s archive at this wrap-up — the tripwire's first firing). **No operator
-action stands.**
+**Last updated:** 2026-08-18
+**Phase:** **Road to completion — Phases A, B, and C1–C6 are DONE. NEXT UP: C7 — the latency
+trio (concurrency cap + scene-boundary reconstruction pre-warm; then prompt caching).** C6 (the
+purge endpoint — the ruled release-blocker and the sole sanctioned content DELETE) landed
+2026-08-18, plan-to-floor in one session — floors row 30; the dated C6 build record carries the
+four plan-batch rulings (per-memory scope, the DELETE verb, no guard, NO migration by ruling)
+and closes the `parameter-compiler.md` C6 note as "purge does not reach reflections". **No
+operator action stands.**
 The system is BUILT end to end on the final A1 seam — backend, C# client + console harness,
 Unity adapter + gray-box scene, The Ledger, eval-harness stages 1–4, deferred writes,
-reflection, the parameter compiler, the dissonance path, the agent-state read + async
-observes — schema at migrations 001–008.
+reflection, the parameter compiler, the dissonance path, the agent-state read + async observes,
+the purge endpoint — schema at migrations 001–008.
 What is proven lives in
 `docs\floors.md`, why in `decisions.md`, the narrative in `session-log.md`; this file
 carries only what is live.
@@ -53,13 +53,10 @@ re-openable: re-verifying one is a step, never an argument against a design impr
 
 *None open.*
 
-**Recently closed** (pointers only; `decisions.md`'s index is the full list, and the
-pre-prune litany sits verbatim in `session-log.md`'s archive, moved 2026-08-17): the C5
-forks — seven ruled 2026-08-17 at two plan-mode batches, all recommended options taken
-(the dated build record); the C4 forks — eight ruled 2026-08-17, incl. the second
-divergence (the build record); the status.md size tripwire (2026-08-17); the C3 forks
-(2026-08-16/17); the C2 line (2026-08-15, three dated entries); earlier closures: the
-dated entries.
+**Recently closed** (pointers only): the C6 forks — four ruled 2026-08-18, all recommended
+options taken (the dated build record); the C5 forks — seven ruled 2026-08-17, all recommended
+(the build record). Full history — C1–C4, the status.md size tripwire, the C2/C3 lines, and the
+earlier closures — lives in `decisions.md`'s index and the `session-log.md` archive.
 
 ## The roadmap (re-planned 2026-08-04; ordering delegated to Claude on efficiency grounds)
 
@@ -106,7 +103,11 @@ Ordered so shared machinery lands before its reusers.
   (`GET /v1/agents/{id}/state`, the FOURTH unscored member) + fire-and-forget observes
   (`NpcSession`: fire + pending + drain + failure event; no auto-drain — "drain at scene
   edges" is integrator guidance, E2 places the drains).
-- **C6. Purge endpoint** — the ruled release-blocker; the sole sanctioned DELETE.
+- **C6. Purge endpoint** — the ruled release-blocker; the sole sanctioned content DELETE. ✅
+  LANDED 2026-08-18 plan-to-floor in one session (floors row 30; the dated C6 build record; NO
+  spec doc — the contract lives in `architecture.md` §12; NO migration by ruling — ledger stays
+  at 008). Per-memory `DELETE /v1/memories/{id}`; reflections survive (the C6 note closed); no
+  guard by ruling.
 - **C7. Latency trio** (~2 sessions): concurrency cap + scene-boundary reconstruction pre-warm;
   then prompt caching / prompt-head rebuild. Last in the phase so Phase D measures them fresh.
 
@@ -181,7 +182,7 @@ not vendored).
 
 **Carried, not fixed** (deliberately unscheduled, awaiting its own ruling):
 
-- **The walkers (twelve since C5) share a fixed-name scratch DB** (`longmem_test`) they neither
+- **The walkers (thirteen since C6) share a fixed-name scratch DB** (`longmem_test`) they neither
   create, migrate, nor drop, and some walker assertions are DB-global counts. The right fix —
   the suite's pid-scoped mechanism plus a `tests\run-walkers.ps1` runner — is a medium refactor
   of the verification apparatus itself, so it wants its own scoped task rather than riding an

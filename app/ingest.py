@@ -73,6 +73,7 @@ from app.schemas import (
     Instrumentation,
     ObserveEvent,
     PinResult,
+    PurgeResult,
     SceneBoundaryEvent,
     SceneResult,
 )
@@ -660,6 +661,31 @@ class IngestService:
         return PinResult(
             memory_id=memory_id,
             pinned=pinned,
+            total_ms=_ms(time.perf_counter() - t_total),
+        )
+
+    # ------------------------------------------------------------------ #
+    # purge — the sole sanctioned content DELETE (C6, the release-blocker)
+    # ------------------------------------------------------------------ #
+
+    async def purge_memory(self, memory_id: UUID) -> PurgeResult:
+        """Hard-delete one memory and everything beneath it (C6, ruled
+        2026-08-18): the GDPR delete verb and the ONLY content DELETE in the
+        store. Returns the per-table counts; raises UnknownMemoryError (→ 404)
+        on an unknown id, nothing deleted. Reflections derived from the memory
+        survive by design (purge honesty)."""
+        t_total = time.perf_counter()
+        outcome = await db.purge_memory(self._pool, memory_id)
+        if outcome is None:
+            raise UnknownMemoryError(f"unknown memory_id {memory_id}")
+        return PurgeResult(
+            memory_id=outcome.memory_id,
+            corrections_deleted=outcome.corrections_deleted,
+            cache_rows_evicted=outcome.cache_rows_evicted,
+            fact_versions_deleted=outcome.fact_versions_deleted,
+            enrichment_runs_deleted=outcome.enrichment_runs_deleted,
+            gist_spans_deleted=outcome.gist_spans_deleted,
+            details_deleted=outcome.details_deleted,
             total_ms=_ms(time.perf_counter() - t_total),
         )
 
