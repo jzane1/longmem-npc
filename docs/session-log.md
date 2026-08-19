@@ -1980,6 +1980,36 @@ session.
     batch-role reflect/compile validator) live in the session scratchpad, not the repo — throwaway
     measurement scripts, not product. **Next: Phase E (demo).**
 
+## **Phase E1 — the identity authoring guide + demo corpus landed 2026-08-19 (docs + data only, no code, no floor by ruling).**
+
+- **Session (2026-08-19).** Phase E opened; the delegated scope decision made: **three sessions**
+  (E1 authoring, E2 choreography + rehearsal, E3 record). Jack's four spec rulings (new
+  character, first-person paragraph seed, held-out run in-session, docs+data-only scope) in the
+  dated `decisions.md` entry.
+  - **Landed:** `docs\identity-authoring.md` (integrator guide, em-dash-free, indexed in
+    `docs\README.md`; §8 = the worked example with real numbers); the demo NPC **Branwen of the
+    Waystone Inn**; `data\eval\corpora\demo-waystone.jsonl` (9 observes, June in-world);
+    `data\eval\scenarios\demo-waystone.jsonl` (3 held-out probes: Halvard correction, drovers
+    drift, lodger abstention). Real-provider validation: coverage drift-validate 9/9 under
+    budget (p50 0.06 / p95 0.11 / max 0.121 vs 0.35); beat-condition (drovers probe, k=3)
+    membership every roll, 0.082 on a retell-mode roll; held-out judge-free run exit 0, 2/2
+    checks, fabrication 0.000, keyword retention 0.979, gist_p 0.720, detail recall 0.664.
+  - **The authoring loop earned its keep** (five corpus revisions, every failure caught
+    pre-recording): gist saturation made the chimney fire retell-flaky (8/9 checked, diagnosed
+    via kept scratch + forensic re-probe); the render witness-voices the NPC's own actions
+    (first-person authoring rule); the diagnosticity goal couples importance AND gist (widening
+    it fixed membership and simultaneously froze house-flavored texture); first-aged-read
+    retells are per-call bimodal (rich vs verbatim echo) — mitigated by the freeze/pin
+    property, handed to E2 as the inspect-then-re-provision rehearsal guard.
+  - **Blocked:** nothing.
+  - **Abandoned:** the chimney fire as the CERTIFIED drift target (echo-prone escalation
+    magnet) — switched to the turned-away drovers (drifted 6 of 7 rolls); the fire stays in the
+    corpus as the closing incident and a possible second take. Also surfaced, not built (scope
+    ruling): drift-validate does not echo the turn's `degraded_reasons` into its report.
+  - **Spend note:** ~10 small real-mode runs (drift-validate coverage/beat + one held-out run
+    + two forensic probes), cents each; runs-dir artifacts gitignored, numbers quoted in the
+    `decisions.md` entry and the guide. **Next: E2 (choreography + rehearsal).**
+
 
 ---
 
@@ -2550,3 +2580,36 @@ information-asymmetric cognition).
 faithful-vs-reconstructive dual read modes; the dormant-agent memory-injection overseer (next
 project; wake trigger = context match); local-model packaging (note: a second embedding model
 collides with the locked 1536 dimension).
+
+---
+
+## Archived from status.md at the E1 wrap-up (2026-08-19, size tripwire)
+
+*Moved verbatim; the live pointers stay in `status.md`.*
+
+### Cut from scope (ruled 2026-08-04)
+
+- The research track entirely: write-up, submission, asymmetry ablation, Bartlett-style judged
+  evals. (The stage-4 gist ablation SURVIVES — it answers R7, an engineering question.)
+- The behavior/action side of split-brain: the action directive, the reputation system whole,
+  the divergence record + its interview clip. NPC actions are the game developer's domain; the
+  NPC's own actions arrive as ordinary observes.
+- Graph/associative memory (too large a task for not enough benefit), recall-reinforced decay,
+  automatic conflict/staleness detection, habituation, the Whisper soft-steering hook +
+  safe-default action fallback.
+- The optional/stretch list: disclosure gate, faithful-vs-reconstructive dual read modes,
+  local-model packaging, the dormant-agent overseer (next project), the full modulator suite.
+- The mid-to-late-August demo date (see the framing section in `status.md`).
+
+### Roadmap Phase A — Re-shape the dialogue seam — DONE
+
+- **A1. Split-brain removal + weights-on-speech.** ✅ LANDED 2026-08-04, floor-verified
+  (floors row 21; Play-mode re-run closed 2026-08-05 — floors rows 19/21).
+
+### Roadmap Phase B — Finish the measurement rig — DONE
+
+- **B1. Eval-harness stage 2.** ✅ LANDED 2026-08-05, floor-verified (floors row 22).
+- **B2. Eval-harness stage 3.** ✅ LANDED 2026-08-07, floor-verified (floors row 23; first
+  real use 2026-08-12).
+- **B3. Eval-harness stage 4.** ✅ LANDED 2026-08-12, floor-verified (floors row 24; its
+  first real run decided R7).

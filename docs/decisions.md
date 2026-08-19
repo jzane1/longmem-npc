@@ -91,6 +91,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Phase C7 fork rulings and Stage A build record — the concurrency cap landed — 2026-08-18](#phase-c7-fork-rulings-and-stage-a-build-record--the-concurrency-cap-landed--2026-08-18)
 - [Phase C7 Stage B build record — the scene-boundary pre-warm landed — 2026-08-18](#phase-c7-stage-b-build-record--the-scene-boundary-pre-warm-landed--2026-08-18)
 - [Phase D1 — latency, believability, and the model-slate lock — 2026-08-19](#phase-d1--latency-believability-and-the-model-slate-lock--2026-08-19)
+- [Phase E1 rulings + build record — the authoring guide and demo corpus landed — 2026-08-19](#phase-e1-rulings--build-record--the-authoring-guide-and-demo-corpus-landed--2026-08-19)
 
 ## Primary decisions
 
@@ -4019,3 +4020,85 @@ E (demo) is next.**
 **Pending Jack actions (recorded, non-blocking to D1's landing):** sync the live `.env` batch roles
 (Opus 4.8); ratify or redirect the dissonance-multiplier defaults; the offline gold re-labeling if
 calibrated judged prose numbers are wanted on screen.
+
+## Phase E1 rulings + build record — the authoring guide and demo corpus landed — 2026-08-19
+
+**Context.** Phase E (demo) opened. Jack delegated the phase's session-splitting; the scope
+decision made and recorded: **Phase E runs as three sessions** — E1 (this session: the identity
+authoring guide + demo corpus + authoring-time validation), E2 (choreography + rehearsal; it owns
+the real code gaps: the corpus→demo-DB loader, the C# `prewarm_context` field, the `NpcMemoryNpc`
+fire-and-forget observe passthrough, the Ledger live-feed decision), E3 (record + edit).
+
+**Rulings (Jack, at spec — the plan-mode fork batch):**
+
+1. **The demo NPC is a NEW character/setting** — not the gray-box ford Keeper, not
+   fixture-adjacent. (Authored: **Branwen, keeper of the Waystone Inn** at the north-road
+   crossroads below Harrowmere — all proper nouns checked fresh against every fixture.)
+2. **Seed identity: short first-person paragraph** (4–6 sentences; on camera in the Ledger;
+   seed entities are fabrication-whitelisted) over the fixture one-liner or third person.
+3. **The judge-free held-out harness run happens in E1** (no `--judged` — kappa 0.37 stays
+   unquotable; on-screen numbers stay judge-free per D1), not deferred to E2.
+4. **E1 scope confirmed: docs + data files + validation runs only.** No code, no migration, and
+   **no floors.md row** (the D1 precedent — no layer built). The corpus→demo-DB loader is E2 work.
+
+**Landed.** `docs\identity-authoring.md` (the integrator guide, §8 = the demo NPC as worked
+example, em-dash-free per the 2026-08-13 public-prose ruling; indexed in `docs\README.md`);
+`data\eval\corpora\demo-waystone.jsonl` (1 scenario, 9 observes, June in-world, drift-corpus
+shape); `data\eval\scenarios\demo-waystone.jsonl` (3 scenarios, ALL `held_out: true`: the Halvard
+correction probe, the drovers drift probe, the nameless-lodger abstention probe — new files;
+nothing in the suite pins them, verified). Validation, real providers (runs-dir artifacts are
+gitignored; numbers quoted here): **coverage drift-validate** (k=9, age 60d): 9/9 reconstructed,
+0 over budget vs 0.35, distance p50 0.06 / p95 0.11 / max 0.121, self-check matched;
+**beat-condition drift-validate** (drovers probe, `--max-items 3`): target served top-3 on every
+roll, distance 0.082 on a retell-mode roll; **held-out run** (judge-free, real): exit 0, 2/2
+expected-ID checks, fabricated entities 0, fabrication_rate 0.000, keyword_retention 0.979,
+gist_precision 0.720, detail_recall 0.664. Suite subset green at every turn (Stop hook).
+
+**What the authoring loop found (five corpus revisions; each failure caught by drift-validate or
+a kept scratch DB, which is E1's whole point):**
+
+1. **Gist saturation makes a memory un-driftable and retell-flaky.** The chimney-fire observe
+   (authored as maximal drama) escalated to 11 gist spans covering 66% of its text; the leftover
+   detail was punctuation fragments, and on that degenerate input the Haiku retell sometimes
+   returned no usable retelling (the serve path's per-item salvage soft-degraded it to its live
+   head — honestly, but invisibly for a demo beat: the coverage report showed 8/9 checked).
+2. **The render witness-voices the NPC's own actions.** "Branwen turned two drovers away"
+   rendered as "I watched Branwen turn away those two drovers"; passive phrasing still rendered
+   "I watched as...". First person in the observe ("I turned away two drovers") renders owned.
+   Guide rule: first person for the NPC's own actions, third for what it witnessed — this also
+   binds E2's game-authored action-observes.
+3. **The diagnosticity goal couples importance AND gist.** The fire scored importance 0.32 under
+   "who owes the house and what news the road brings" and lost k=3 membership to fresher gossip;
+   widening the goal to "what threatens the house..." moved it to 0.72 — and simultaneously
+   promoted house-flavored texture into fixed gist (the coupling is structural: both stages read
+   the same signal). Texture that must drift has to be goal-orthogonal AND name/number-free.
+4. **Retell behavior at the first aged read is per-call bimodal** (temp-1.0, no sampling params):
+   some calls edit richly (0.05–0.20 distances), some echo the telling verbatim (distance 0.000),
+   correlated within a call. No corpus prose removes this. What saves the demo: importance, spans,
+   and the first retelling all FREEZE once rolled (write-time values; the reconstruction cache
+   pins the take by the constancy invariant) — so E2 rehearsal inspects the provisioned roll and
+   re-provisions/re-rolls until the take is good, after which it is byte-stable.
+5. **The certified drift target switched from the chimney fire to the turned-away drovers**
+   (the fire echoes on most rolls — an escalation magnet; the drovers memory drifted on 6 of 7
+   observed rolls across all its phrasings and is her OWN action, which ties into beat 3's
+   action-observe story). The fire stays in the corpus as the closing incident and remains a
+   viable second take if a rehearsal roll lands rich.
+
+**Production-vs-fixture note (explicit):** the corpus agent config carries no worker flags (the
+runner needs deterministic replay); the E2-provisioned demo agent adds
+`reflection_worker_enabled` / `compiler_worker_enabled` per the D1 ruling — same seed, goal,
+rigidity, and decay config, diverging on exactly those flags.
+
+**Surfaced for Jack (non-blocking):** the drift-validate report does not surface the turn's
+`degraded_reasons`, so a retell dropout shows only as items_checked < observes (finding 1 was
+diagnosed via a kept scratch + a forensic re-probe); a small runner improvement (echo the turn's
+degraded_reasons into the report) would make the next authoring loop cheaper. Out of E1 scope by
+ruling 4 — flagged, not built.
+
+**E2 handoff (recorded):** corpus→demo-DB loader carrying the SAME agent fields as the corpus
+block + the worker-enable flags; verify the provisioned roll (importance/spans/retell take) on
+the demo DB before recording, re-provision if bad; the beat utterance at k=3 with the certified
+drovers question (or k≥4 / a context nudge if choreography prefers the fire); Unity inspector +
+nameplate sync to Branwen; C# `SceneBoundaryEvent.PrewarmContext`; `NpcMemoryNpc`
+ObserveAndForget/Drain passthroughs; the Ledger live-feed decision + polish; the standing
+pending-Jack items (live `.env` Opus sync binds when the demo agent's workers turn on).
