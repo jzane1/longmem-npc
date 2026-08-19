@@ -1944,6 +1944,42 @@ session.
     for Phase D). **Next: Phase D** — full-system latency + believability passes, knob tuning, the
     final model-slate confirmation (the natural revisit for prompt caching). Phase C is complete.
 
+## **Phase D1 — latency, believability, and the model-slate lock landed 2026-08-19 (measure→rule→tune→re-verify, one session, no new code, no new floor).**
+  - **The shape.** D1 is the optimization phase: confirm the numbers that go on screen. The
+    measurement rig was already built, so this was a pure measure→rule→tune→re-verify pass — no
+    layer built, hence no floors row. Three forks settled at plan approval (the settle-at-spec
+    AskUserQuestion batch): stronger batch-role models; judge-free + judged believability; and
+    authority to flip worker defaults / lock knobs in D1 from the data. Real-providers-only; ~$2.5
+    total spend across five real-mode stages, each on a disposable pid-scoped scratch DB (product
+    `longmem` never touched — confirmed pristine, ledger 001–008, all tables 0 rows).
+  - **Landed — the numbers (all real mode, current slate).** (1) Latency (load driver, 60 turns):
+    perceived-first-word **p50 938 ms** / p95 1516 ms — matches the ruled 943 ms; Haiku holds the
+    sub-1s bar. (2) Believability (`run` judged.jsonl): gist_precision **0.765→0.823** up,
+    fabrication 0.043 low, latency 918 ms — **no regression** (reconstruction fired, 34 write-backs).
+    (3) Compare/Pareto (haiku vs sonnet5, judged): haiku 0.913/1020 ms/$0.93 vs sonnet5
+    0.954/2049 ms/$1.18; prose 44–4 sonnet5 — reaffirms the 2026-08-12 ruling, **haiku stands for
+    dialogue, latency rules**. (4) Batch roles (real reflect+compile, Opus 4.8): 3 coherent
+    evidence-cited beliefs in 17.8 s (~$0.033), 4 bundles in 7.8 s — **Opus 4.8 validated** for the
+    idle-time batch roles.
+  - **Landed — the config lock.** `.env.example` batch roles set to **Opus 4.8**
+    (`LONGMEM_MODEL_REFLECTION`/`_COMPILER` + 5.00/25.00 prices) — the real-mode slate is now exactly
+    two models (Haiku + Opus 4.8). `config.py` UNCHANGED: worker defaults stay OFF ("flip on the
+    data" → per-agent opt-in, not a global flip); dissonance multipliers kept; no knob change.
+    Prompt caching confirmed DEFERRED (Haiku 4096-token min > ~0.5–1K heads; re-verified vs current
+    Anthropic docs). `-m "not nlp"` 175 passed (no regression). Full rulings in the dated
+    `decisions.md` D1 entry.
+  - **Blocked / handed to Jack (non-blocking to the landing).** (1) The **dissonance multipliers**
+    have no objective tuning metric — the plan slated them for "tuning from measurements" but the
+    defend-vs-update split is a design prior, not a measured quantity, and no eval scores dissonance
+    correctness; kept the principled ordering unchanged, flagged for Jack's ratify/redirect (an
+    eyeball run available on request). (2) Judged **prose kappa stays 0.37** (< 0.6) — unquotable;
+    clearing it is Jack's offline re-labeling, non-blocking since the on-screen numbers are
+    judge-free. (3) Syncing the live `.env` batch roles is Jack's action (the C2 product-store
+    precedent).
+  - **Abandoned:** nothing. **Tooling note:** the D1 measurement harnesses (latency-driver wrapper,
+    batch-role reflect/compile validator) live in the session scratchpad, not the repo — throwaway
+    measurement scripts, not product. **Next: Phase E (demo).**
+
 
 ---
 

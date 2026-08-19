@@ -90,6 +90,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Phase C6 build record — the purge endpoint landed — 2026-08-18](#phase-c6-build-record--the-purge-endpoint-landed--2026-08-18)
 - [Phase C7 fork rulings and Stage A build record — the concurrency cap landed — 2026-08-18](#phase-c7-fork-rulings-and-stage-a-build-record--the-concurrency-cap-landed--2026-08-18)
 - [Phase C7 Stage B build record — the scene-boundary pre-warm landed — 2026-08-18](#phase-c7-stage-b-build-record--the-scene-boundary-pre-warm-landed--2026-08-18)
+- [Phase D1 — latency, believability, and the model-slate lock — 2026-08-19](#phase-d1--latency-believability-and-the-model-slate-lock--2026-08-19)
 
 ## Primary decisions
 
@@ -3938,3 +3939,83 @@ the drift-budget refusal confirmed inherited structurally; `-m "not nlp"` **175 
 scene-boundary tests green) / 189 full; the C7-A floor re-checked (`verify_concurrency` 11/11); no
 009, ledger 008; the warm adds zero new SQL writes (only `serve`'s sanctioned write-back + cache
 writes); ruff clean.
+
+## Phase D1 — latency, believability, and the model-slate lock — 2026-08-19
+
+**Context.** Phase D1 of the road-to-completion roadmap: the full-system latency + believability
+pass, knob tuning, and the final model-slate confirmation. Exit criterion: the numbers that go on
+screen in the demo. The measurement rig was already built (the load driver, the harness's
+`compare`/Pareto, judge-free metrics, the Opus judge), so D1 is a **measure → rule → tune →
+re-verify** pass, not a new-code build. Three forks were settled at plan approval (the
+settle-at-spec `AskUserQuestion` batch); Jack chose the fuller campaign on all three: **(1)**
+stronger models for the batch roles (reflection + compiler); **(2)** judge-free non-regression
+**and** judged believability; **(3)** authority to flip worker defaults and lock knob values in D1
+from the data, no separate ruling round. All runs are real-providers-only (ruled 2026-07-22).
+
+**The measurements (real mode, current slate; ~$2.5 total spend).**
+1. **Latency (the load driver, 60 turns).** perceived-first-word **p50 938 ms** / p95 1516 ms —
+   essentially identical to the ruled 943 ms and the 2026-08-07 baseline (928 ms). The Haiku slate
+   holds the sub-1 s bar (query_embed p50 267 ms warm, first_word p50 599 ms). Cost ≈ $0.12/100
+   turns all-in. Recorded gap: the synthetic driver stayed inside the decay band (0 reconstruction
+   write-backs), so it does not exercise reconstruction latency — a scripted time-jump session is
+   the follow-up if the demo needs reconstruction timing on screen.
+2. **Believability non-regression (`run` on judged.jsonl).** gist_precision **0.765 → 0.823** (up),
+   fabrication_rate 0.036 → 0.043 (flat, low), keyword_retention 0.887 → 0.848, detail_recall
+   0.695 → 0.660, fabricated_entities 2 → 1; perceived-first-word 918 ms. No regression — the small
+   down-moves are within documented real-mode single-run noise; reconstruction fired here (34
+   write-backs, so its cost/latency IS measured this run: $0.028).
+3. **Compare/Pareto + judged (haiku vs sonnet5, judged.jsonl).** haiku 0.913 acc / **1020 ms** /
+   $0.93 vs sonnet5 0.954 acc / **2049 ms** / $1.18 (both on the frontier this run — a genuine
+   trade-off). Prose pairwise: sonnet5 preferred **44–4** (4 tie), higher on all four dimensions.
+   This reaffirms the 2026-08-12 dialogue ruling on fresh data: sonnet5 has the real quality edge
+   (prose + slightly higher judged accuracy), haiku wins decisively on latency (2× under) at lower
+   cost — **haiku stands for dialogue, latency rules.**
+4. **Batch-role validation (real reflect + compile, Opus 4.8).** reflect synthesized 3 coherent,
+   identity-relevant, evidence-cited beliefs in 17.8 s (~$0.033, 2.8k in / 0.7k out); compile
+   produced 4 bundles in 7.8 s. Opus 4.8 is validated for both idle-time batch roles — the belief
+   quality is clearly there, and seconds-scale latency does not bind (the point of "stronger batch
+   roles").
+
+**The rulings (settled from the data, per the flip-in-D1 mandate).**
+1. **Model slate LOCKED.** Latency-bound roles (write triad, escalation, dialogue, reconstruction)
+   stay **Haiku 4.5** — confirmed. The two blank batch roles are assigned **Opus 4.8**
+   (`LONGMEM_MODEL_REFLECTION` / `LONGMEM_MODEL_COMPILER`), priced 5.00/25.00. The whole real-mode
+   slate is now exactly two models — Haiku for the latency-bound path, Opus 4.8 for the judge +
+   batch quality — so "stronger batch roles" adds no new moving part beyond a role assignment. The
+   lock lands in the tracked `.env.example`; **syncing the live `.env` is Jack's action** (the C2
+   "applying to the product store is Jack's, not the build's" precedent), and the roles are
+   loud-at-first-use if left unset, never silent.
+2. **The three worker defaults stay OFF — "flip on the data" resolves to per-agent opt-in.** The
+   data does not earn a *global* flip: deferred-writes trades observe-return latency the demo does
+   not stress, and a default-ON landing would force re-verifying every observe-exercising floor (the
+   C1 "substantially bigger landing" caveat); reflection/compiler-worker-ON means continuous
+   idle-time Opus spend for every agent. The demo enables reflection + compiler **per demo agent**
+   in E-phase. `config.py` is unchanged.
+3. **Prompt caching stays DEFERRED (the C7 deferral, D1-confirmed).** The Haiku cacheable-prefix
+   minimum is 4096 tokens (re-verified this session against current Anthropic docs) while the
+   dialogue/reconstruction heads are ~0.5–1K, so caching never fires on the latency-bound roles that
+   would benefit; the roles moving to Opus 4.8 are batch/idle-time with no stable reusable prefix.
+   Caching buys nothing on the locked slate. No `cache_control` built.
+4. **Dissonance multipliers KEPT — flagged, not tuned (a plan-vs-reality note for Jack).** The plan
+   slated the dissonance multipliers (`config.py` `dissonance_typology_*`) for D1 tuning "from
+   measurements," but there is **no objective metric to tune them against** — the defend-vs-update
+   split is a design prior (how defensible each memory type is: observed 1.0 > told 0.6 > reflected
+   0.5 > inferred 0.4), not a measured quantity, and no eval scores dissonance correctness. D1 keeps
+   the current principled ordering unchanged and surfaces this for Jack's ratification (the knob is
+   re-tunable at any time; an eyeball run of the defend/update beat is available on request).
+5. **Judged prose kappa stays unquotable (0.37 < 0.6), non-blocking.** The fresh compare's prose
+   verdicts (44–4) confirm the 2026-08-12 direction, but the reference-label kappa remains below the
+   0.6 bar (skewed marginals + tie-protocol at small n — the documented cause). Clearing it is
+   Jack's standing offline re-labeling task; it does NOT block D1, because the on-screen
+   believability numbers are judge-free (The Ledger) and the slate ruling is latency-driven
+   (structural, quotable).
+
+**Landed.** `.env.example` batch-role lock (models + prices + Phase-D1 comments); `config.py`
+untouched (no default flip, no knob change); `-m "not nlp"` **175 passed** (no regression); product
+`longmem` pristine (ledger 001–008, all product tables 0 rows). **No new floors row** — D1 built no
+new layer; it is a measurement + configuration-decision pass. **Phases C and D are complete; Phase
+E (demo) is next.**
+
+**Pending Jack actions (recorded, non-blocking to D1's landing):** sync the live `.env` batch roles
+(Opus 4.8); ratify or redirect the dissonance-multiplier defaults; the offline gold re-labeling if
+calibrated judged prose numbers are wanted on screen.

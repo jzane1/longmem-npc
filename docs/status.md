@@ -1,14 +1,15 @@
 # longmem-npc — Status
 
-**Last updated:** 2026-08-18
-**Phase:** **Road to completion — Phases A, B, and all of C DONE. NEXT: Phase D (optimization).**
-C7 landed as the latency **pair** (a trio no more): **Stage A concurrency cap** (floors row 31)
-and **Stage B probe-driven scene-boundary reconstruction pre-warm** (floors row 32), both
-plan-to-floor 2026-08-18. The third leg, **prompt caching, is DEFERRED to Phase D**: Anthropic's
-cacheable-prefix minimum is 4096 tokens on Haiku 4.5 but the dialogue/reconstruction heads are
-~0.5–1K, so `cache_control` would silently never cache on the ruled Haiku slate (the dated
-2026-08-18 C7 rulings; the D1 model-slate lock is the natural revisit). **No operator action
-stands.**
+**Last updated:** 2026-08-19
+**Phase:** **Road to completion — Phases A, B, C, and D DONE. NEXT: Phase E (demo).**
+D1 (optimization) landed 2026-08-19 as a measure→rule→tune→re-verify pass on the already-built
+rig (no new code): the load driver's latency series + the harness's compare/Pareto + judge-free
+and judged believability. CONFIRMED on the current slate — perceived-first-word **p50 938 ms**
+(Haiku holds the sub-1s bar), believability **no regression** (gist_precision 0.765→0.823).
+**Model slate LOCKED:** Haiku for the latency-bound roles; the two blank batch roles (reflection,
+compiler) assigned **Opus 4.8** in `.env.example` (validated: coherent, evidence-cited beliefs).
+Worker defaults stay OFF (per-agent opt-in); **prompt caching stays DEFERRED** (Haiku 4096-token
+min > ~0.5–1K heads). Full record in `decisions.md`'s 2026-08-19 D1 entry.
 The system is BUILT end to end on the final A1 seam — backend, C# client + console harness,
 Unity adapter + gray-box scene, The Ledger, eval-harness stages 1–4, deferred writes,
 reflection, the parameter compiler, the dissonance path, the agent-state read + async observes,
@@ -53,13 +54,19 @@ re-openable: re-verifying one is a step, never an argument against a design impr
 
 ## Open questions needing Jack's ruling
 
-*None open.*
+**Pending Jack (from the D1 landing, non-blocking):** (1) **ratify or redirect the
+dissonance-multiplier defaults** — D1 found no objective metric to tune them against, so the
+principled ordering was kept unchanged (an eyeball run of the defend/update beat is available on
+request); (2) sync the live `.env` batch roles to Opus 4.8; (3) offline gold re-labeling if
+calibrated judged-prose numbers are wanted on screen (kappa 0.37, unquotable — non-blocking; the
+on-screen numbers are judge-free).
 
-**Recently closed** (pointers only): the C7 forks — three ruled 2026-08-18 (prompt caching
-DEFERRED on the Haiku-4096 finding; pre-warm probe-driven over the probe-free rec; guardrail
-reuses serve's drift budget — the dated C7 rulings); the C6 forks — four ruled 2026-08-18, all
-recommended (the build record). Full history — C1–C5, the status.md size tripwire, the C2/C3
-lines, and earlier closures — lives in `decisions.md`'s index and the `session-log.md` archive.
+**Recently closed** (pointers only): the D1 forks — three settled at plan approval 2026-08-19
+(stronger batch roles; judge-free + judged believability; flip-in-D1-on-the-data → slate locked,
+workers stay OFF per-agent, caching deferred — the dated D1 entry); the C7 forks — three ruled
+2026-08-18; the C6 forks — four ruled 2026-08-18. Full history — C1–C5, the status.md size
+tripwire, the C2/C3 lines, and earlier closures — lives in `decisions.md`'s index and the
+`session-log.md` archive.
 
 ## The roadmap (re-planned 2026-08-04; ordering delegated to Claude on efficiency grounds)
 
@@ -94,17 +101,17 @@ Ordered so shared machinery lands before its reusers.
   no migration — the agent-state read, the FOURTH unscored member, + fire-and-forget observes,
   drains at scene edges); **C6** purge endpoint (`architecture.md` §12, no migration — per-memory
   `DELETE /v1/memories/{id}`, reflections survive, no guard).
-- **C7. Latency pair ✅ DONE** (plan-to-floor 2026-08-18): **Stage A concurrency cap** (floors row
-  31; `ModelCallGate`) + **Stage B probe-driven scene-boundary reconstruction pre-warm** (floors
-  row 32; reuses the init path + `serve`'s drift-budget refusal); NO migration either stage.
-  Prompt caching **DEFERRED to Phase D** (the Haiku-4096 finding; the byte-stable head groundwork
-  already exists). **Phase C is complete.**
+- **C7. Latency pair ✅ DONE** (plan-to-floor 2026-08-18): Stage A concurrency cap (floors row 31)
+  + Stage B probe-driven scene-boundary reconstruction pre-warm (floors row 32); NO migration.
+  Prompt caching was DEFERRED to Phase D (Haiku-4096 finding); D1 confirmed it stays deferred.
 
 ### Phase D — Optimization rounds (~1–2 sessions)
 
-- **D1.** Full-system latency + believability passes: the driver's latency series + the
-  harness's compare/Pareto runs; knob tuning; final model-slate confirmation. Exit criterion:
-  the numbers that go on screen in the demo.
+- **D1.** ✅ DONE 2026-08-19 (plan-to-landing, no new code — a measure→rule→tune→re-verify pass on
+  the built rig). Latency CONFIRMED (938 ms p50), believability NO REGRESSION, **model slate
+  LOCKED** (Haiku latency-bound + Opus 4.8 batch roles), workers stay OFF (per-agent opt-in),
+  prompt caching DEFERRED confirmed. NO new floors row (built no layer). Full record in
+  `decisions.md`. Exit criterion met: the on-screen latency + believability + cost numbers.
 
 ### Phase E — Demo (~3–4 sessions)
 
