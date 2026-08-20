@@ -852,6 +852,8 @@ def test_ledger_page_served(scene):
             assert "THE LEDGER" in page.text
             assert "/v1/agents/" in page.text  # polls the index route
             assert "/v1/memories/" in page.text  # polls the chain route
+            assert "/state" in page.text  # the identity pane (E2, 2026-08-19)
+            assert "/v1/ledger/turns" in page.text  # the live turn feed (E2)
 
     run_structural(scene, scenario)
 

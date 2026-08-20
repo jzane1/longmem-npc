@@ -74,7 +74,10 @@ register entry):
 - **The judged eval harness** — immediate-queue item 3, its own target (the Ledger binds the
   fields it will score, but builds no judge).
 - **The thread-pool cap** (ruled deferred post-demo 2026-07-23) and the **C1 pre-warm build**
-  (ruled post-demo 2026-07-22 — warm-init is choreography, below).
+  (ruled post-demo 2026-07-22 — warm-init is choreography, below). *(Superseded 2026-08-18:
+  C7-B landed the real pre-warm as `SceneBoundaryEvent.prewarm_context` — a probed boundary
+  warms the reconstruction cache at the fresh basis, and the warm-init choreography trick is
+  retired. The C# mirror landed with E2, 2026-08-19.)*
 - **No TTS/STT, no voice** — text is the demo surface.
 
 ## Mechanism
@@ -97,7 +100,7 @@ eval-harness stage 1 and the table was never updated; corrected again 2026-08-17
 | `DialogueTurnStreamAsync` | `POST /v1/dialogue/turn/stream` (SSE, fork 1) | 404 / 422 pre-stream; after the stream opens, an `error` **event** |
 | `DialogueInitAsync` | `POST /v1/dialogue/init` (the warm-init verb) | 404, 422 |
 | `ObserveAsync` | `POST /v1/events/observe` | 404 |
-| `SceneBoundaryAsync` | `POST /v1/events/scene-boundary` | 404 |
+| `SceneBoundaryAsync` | `POST /v1/events/scene-boundary` *(since E2 2026-08-19 the event carries the optional C7-B `prewarm_context` probe; `SceneResult.prewarm` — the 13-field `ScenePrewarmInstrumentation` — rides back, null without a probe)* | 404 |
 | `SetPinAsync` | `PUT /v1/memories/{id}/pin` | 404 |
 | `CorrectAsync` | `POST /v1/memories/{id}/correction` | 404 / 409 CAS conflict / 422 / 502 fail-loud |
 | `DiegeticCorrectAsync` | `POST /v1/events/diegetic-correction` (C4, 2026-08-17 — `dissonance.md`) | 404 unknown/foreign memory / 409 CAS / 422 / 502 retell fail-loud |
@@ -112,7 +115,9 @@ HTTP errors map to typed exceptions (the Python service-error precedent — neve
 never retried silently). Timeouts are per-route config: `init` must tolerate the cold
 reconstruction pre-warm (16.3 s real-mode against the sonnet-5 stopgap; *re-measured 2026-07-29
 on the ruled Haiku class — 8.1 s headline, 3.3–8.6 s across the cold snaps; (b2) done, the quote
-embargo is lifted, and the generous timeout stays safe*), `turn` the full turn (~30 s ceiling),
+embargo is lifted, and the generous timeout stays safe; with C7-B a probed scene boundary
+absorbs this cost at the cut, but an unprobed cold init can still pay it — the timeout
+stands*), `turn` the full turn (~30 s ceiling),
 `observe` ~10 s; fire-and-forget observe is the session's job, not hidden retry logic here
 (built with C5, 2026-08-17 — the "Async observes" subsection below).
 
@@ -162,8 +167,9 @@ queue, no pump, ~40 lines:
   subscriber.
 
 **No verb auto-drains, by ruling** — no hidden multi-second await inside an on-camera verb.
-Integrator guidance: **drain at scene edges** (the reflect-at-scene-edges shape); E2
-choreography places the actual drains. An un-drained observe is bi-temporally safe — it lands
+Integrator guidance: **drain at scene edges** (the reflect-at-scene-edges shape); the E2 beat
+script places the actual drains (`demo-beat-script.md` beat 3: an explicit Drain before the
+scene boundary). An un-drained observe is bi-temporally safe — it lands
 with the correct world time, it is merely not yet retrievable until it arrives. Orthogonal to
 C1's server-side deferred writes: deferral shortens the round trip, fire-and-forget hides it —
 they compose, and nothing backend changed for this half of C5.
@@ -184,7 +190,10 @@ the chain read's correction record, the 409 CAS) → the agent-state read (C5: t
 as stored, identity currency agreeing with the session's frozen version, the endpoint/worker
 split visible as empty run logs, the 404) → fire-and-forget observes (C5: fires return with
 calls in flight, a dialogue turn completes without draining, the drain joins, both rows land
-in CALL-time world order, and the bogus-agent failure path re-throws typed at drain). Debug
+in CALL-time world order, and the bogus-agent failure path re-throws typed at drain) → the
+scene-boundary pre-warm (E2, 2026-08-19 — `verify_prewarm.py` A/B/C mirrored over the C#
+wire: a probed boundary returns a clean prewarm record, the same-basis init is a call-free
+cache hit, a probe-less boundary carries no record). Debug
 output mirrors the REPL's debug view (IDs, scores, gate line, both TTFT fields, cost row).
 Passing this end-to-end IS the interop go/no-go.
 
@@ -215,8 +224,11 @@ a scene cut can land on a specific chain).
 
 ### Demo choreography hooks (ride here, no new backend)
 
-Off-camera warm-init during camera cuts (one throwaway `DialogueInitAsync` per scene-basis
-jump — kills the cold stall with zero pre-warm code); the game-authored action-observe beat +
+~~Off-camera warm-init during camera cuts (one throwaway `DialogueInitAsync` per scene-basis
+jump — kills the cold stall with zero pre-warm code)~~ *(retired: C7-B's probed scene
+boundary IS the pre-warm — the beat-2 boundary carries `prewarm_context` and the cold stall
+never reaches camera; harness beat [9] still exercises the old trick as a working pattern)*;
+the game-authored action-observe beat +
 async observes (the old pre-ship (d): the client fires observes without blocking dialogue —
 **built with C5, 2026-08-17**: `ObserveAndForget` + drain-at-scene-edges, the subsection
 above; the beat's driver staging stays E2's);

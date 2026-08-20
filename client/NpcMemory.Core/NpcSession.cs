@@ -295,9 +295,14 @@ namespace NpcMemory
         /// the identity document server-side), then refresh the frozen scene
         /// state — within the ending scene none of it moved. Since C3 the
         /// type also becomes session state riding the following turns
-        /// (a bare boundary clears it back to the default).</summary>
+        /// (a bare boundary clears it back to the default). A non-empty
+        /// prewarmContext rides as the C7-B reconstruction pre-warm probe;
+        /// the result's Prewarm record is null without one (the off
+        /// state).</summary>
         public async Task<SceneResult> SceneBoundaryAsync(
-            string? sceneType = null, CancellationToken ct = default)
+            string? sceneType = null,
+            string? prewarmContext = null,
+            CancellationToken ct = default)
         {
             var result = await _client
                 .SceneBoundaryAsync(
@@ -306,6 +311,7 @@ namespace NpcMemory
                         AgentId = AgentId,
                         ClientTimestamp = Now(),
                         SceneType = sceneType,
+                        PrewarmContext = prewarmContext,
                     },
                     ct);
             IdentityVersion = result.IdentityVersion;

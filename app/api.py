@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from collections import deque
 from contextlib import asynccontextmanager
 from uuid import UUID
 
@@ -60,6 +61,8 @@ from app.schemas import (
     DialogueTurnRequest,
     DialogueTurnResult,
     IngestResult,
+    LedgerTurnEntry,
+    LedgerTurnsResult,
     MemoryChainResult,
     ObserveEvent,
     PinRequest,
@@ -78,6 +81,24 @@ from app.schemas import (
 # server-side (coherent instrumentation and reconstruction write-backs, never
 # a half-run seam).
 _stream_tasks: set[asyncio.Task] = set()
+
+# The Ledger's live turn feed (E2, ruled 2026-08-19): both dialogue routes
+# tee their terminal DialogueTurnResult here, and GET /v1/ledger/turns serves
+# it. An explicit, ruled carve-out to the pass-through contract above — the
+# response stays byte-identical, but the route now records the result into
+# PROCESS MEMORY (never the DB; a dialogue turn still persists nothing).
+# Module-global like _stream_tasks, not app.state: the route-contract tests
+# drive the app without lifespan. The cap is a demo inspector surface, not
+# integrator config.
+_TURN_FEED_CAP = 256
+_turn_feed: deque[LedgerTurnEntry] = deque(maxlen=_TURN_FEED_CAP)
+_turn_seq = 0
+
+
+def _tee_turn(result: DialogueTurnResult) -> None:
+    global _turn_seq
+    _turn_seq += 1
+    _turn_feed.append(LedgerTurnEntry(seq=_turn_seq, result=result))
 
 
 @asynccontextmanager
@@ -163,6 +184,7 @@ async def dialogue_turn(request: DialogueTurnRequest) -> DialogueTurnResult:
                 result = item
         if result is None:  # the seam always yields a terminal result
             raise RuntimeError("dialogue turn produced no result")
+        _tee_turn(result)
         return result
     except UnknownAgentError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
@@ -196,6 +218,7 @@ async def dialogue_turn_stream(request: DialogueTurnRequest) -> StreamingRespons
                 on_reconstruct=lambda: queue.put_nowait(("reconstructing", None)),
             ):
                 if isinstance(item, DialogueTurnResult):
+                    _tee_turn(item)  # the pump completes even on disconnect
                     queue.put_nowait(("result", item))
                 else:
                     queue.put_nowait(("chunk", item))
@@ -406,6 +429,21 @@ async def ledger_page() -> FileResponse:
     surface, no second server). The page itself is `ledger\\index.html` —
     vanilla JS, no build step (fork 6)."""
     return FileResponse(_LEDGER_PATH, media_type="text/html")
+
+
+@app.get("/v1/ledger/turns", include_in_schema=False)
+async def ledger_turns(after: int = Query(default=0, ge=0)) -> LedgerTurnsResult:
+    """The Ledger's live turn feed (E2, ruled 2026-08-19): the teed
+    DialogueTurnResults newer than the caller's `after` cursor, oldest
+    first, each the turn response's serialization verbatim (IDs + scores —
+    the retrieval-read invariant holds). In-memory and process-local by the
+    same ruling: a restart starts empty, and nothing here touches the DB.
+    Schema-hidden like /ledger — a demo inspector surface, not integrator
+    API. `last_seq` is the next poll's cursor (equal to `after` when no
+    newer entries exist)."""
+    entries = [entry for entry in _turn_feed if entry.seq > after]
+    last_seq = entries[-1].seq if entries else max(_turn_seq, after)
+    return LedgerTurnsResult(entries=entries, last_seq=last_seq)
 
 
 @app.get("/v1/agents/{agent_id}/memories", response_model=AgentMemoriesResult)

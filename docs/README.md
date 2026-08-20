@@ -84,6 +84,9 @@ For the current schema, read the SQL.
   diagnosticity goal, config knobs, memory-prose register, `drift-validate`, and the held-out
   arm. Written Phase E1 (2026-08-19) and proven on the demo NPC. Read after `architecture.md`
   §4 and §9 for the concepts, before `eval-harness.md` for the tooling it drives.
+- **`demo-beat-script.md`** — the E3 recording's choreography: the three beats + close, the
+  rig, the timeline, and the rehearsal checklist (the inspect-then-re-provision guard).
+  Written Phase E2 (2026-08-19); reads on top of `identity-authoring.md` §6 and §8.
 - **`test-suite.md`** — what the tests must and must not assert. The one rule: structural only,
   never generated prose. Also the degradation-ladder and route-contract inventories.
 - **`SETUP.md`** — bring-up, tests, C# build, DLL refresh, Unity, teardown.

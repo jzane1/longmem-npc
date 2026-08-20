@@ -2010,6 +2010,34 @@ session.
     + two forensic probes), cents each; runs-dir artifacts gitignored, numbers quoted in the
     `decisions.md` entry and the guide. **Next: E2 (choreography + rehearsal).**
 
+## **Phase E2 — choreography + the code gaps landed 2026-08-19 (demo-scoped by ruling: no floors row; rehearsal staged, blocked on two Jack-side steps).**
+
+- **Session (2026-08-19).** Jack's four spec rulings (server tee + poll for the Ledger live
+  feed with the explicit pass-through carve-out; worker flags merged at load end via the new
+  `db.merge_agent_config` — the second sanctioned in-place write site; demo-scoped
+  verification, NO floors row; no migration confirmed) in the dated `decisions.md` entry.
+  - **Landed (code):** the Ledger live turn feed (`GET /v1/ledger/turns` + the tee at both
+    dialogue routes, in-memory only); **`app\demo_loader.py`** (`--fresh`-guarded corpus →
+    `longmem_demo` loader printing the provisioned-roll report + hand-off ids); C# prewarm
+    parity (`SceneBoundaryEvent.PrewarmContext`, `ScenePrewarmInstrumentation`,
+    `SceneResult.Prewarm`, the session param) + harness beat [17]; `NpcMemoryNpc`
+    ObserveAndForget/Drain/PendingObserves passthroughs; `NpcDemoDriver` beat controls;
+    the Unity scene retargeted to Branwen (attach-mode) + the stale plugin DLL refreshed
+    (was four phases behind — nothing C2+ compiled in Unity until now).
+  - **Landed (docs):** **`docs\demo-beat-script.md`** (three beats + close, timeline, rig,
+    rehearsal checklist); unity-client.md drift fixes (prewarm contract, warm-init trick
+    retired); architecture.md route census 16 → 17; SETUP.md §8 attach-mode + gate ordering.
+  - **Verified (build-time):** subset 177 green throughout; new `test_ledger_feed.py` +
+    `test_demo_loader.py`; the 17-beat harness GREEN (53 checks) vs a fake serve; Unity
+    batch compile + scene re-import clean; loader CLI smoke (refusal exit 2 + full roll);
+    a LIVE browser beat of the Ledger — identity pane + a real HTTP turn rendering through
+    the 2 s poll with no paste. All scratch DBs dropped after.
+  - **Blocked (the rehearsal, staged not run):** (a) the live `.env` lacks BOTH batch roles
+    (checked by key presence, values never echoed) — the demo agent's workers are ON by
+    ruling, so Jack's pending Opus sync now binds before the real rehearsal; (b) no Unity
+    MCP bridge this session — the interactive Play-mode gate + on-screen dry-run need an
+    editor session, ordering encoded in the beat script (gate BEFORE pasting the agent id).
+  - **Abandoned:** nothing. **Next: the real rehearsal (beat-script checklist), then E3.**
 
 ---
 
@@ -2019,6 +2047,37 @@ session.
 at the top of the living file — each a snapshot of what the current phase was when it was
 written. Kept verbatim: they are the most readable summary of each build era, and the
 session-log entries below them carry the detail. Newest first, as they were.*
+
+**(moved 2026-08-19 at the E2 wrap-up, the ≤12 KB tripwire — the E1 phase-header paragraph
+and the Phase C/D roadmap blocks, verbatim from `status.md`:)**
+
+**E1 landed 2026-08-19** (docs + data only, no code, no floor by ruling): the integrator
+authoring guide **`docs\identity-authoring.md`** + the demo NPC **Branwen of the Waystone Inn**
+(`data\eval\corpora\demo-waystone.jsonl` + 3 held-out probes in
+`data\eval\scenarios\demo-waystone.jsonl`), validated on real providers — coverage
+drift-validate 9/9 under budget (max 0.121 vs 0.35), beat-condition target certified (drovers,
+0.082), held-out run 2/2 checks, fabrication 0.000. Phase E was scoped at plan approval to
+**three sessions** (E1 authoring / E2 choreography + rehearsal / E3 record). Full record +
+the five authoring lessons in `decisions.md`'s E1 entry.
+
+- **C1–C6 ✅ ALL LANDED** (each plan-to-floor + floor-verified; full records in `floors.md`
+  rows 25–30 + `decisions.md`): **C1** deferred writes (`deferred-writes.md`, migration 006,
+  default OFF); **C2** reflection (`reflection.md`, migration 007, default OFF per agent,
+  endpoint always live); **C3** parameter compiler (`parameter-compiler.md`, migration 008,
+  default OFF per agent); **C4** dissonance path + diegetic-correction event (`dissonance.md`,
+  no migration, always live — client-invoked); **C5** client contract completion (no spec doc,
+  no migration — the agent-state read, the FOURTH unscored member, + fire-and-forget observes,
+  drains at scene edges); **C6** purge endpoint (`architecture.md` §12, no migration — per-memory
+  `DELETE /v1/memories/{id}`, reflections survive, no guard).
+- **C7. Latency pair ✅ DONE** (plan-to-floor 2026-08-18): Stage A concurrency cap (floors row 31)
+  + Stage B probe-driven scene-boundary reconstruction pre-warm (floors row 32); NO migration.
+  Prompt caching was DEFERRED to Phase D (Haiku-4096 finding); D1 confirmed it stays deferred.
+
+- **D1.** ✅ DONE 2026-08-19 (plan-to-landing, no new code — a measure→rule→tune→re-verify pass on
+  the built rig). Latency CONFIRMED (938 ms p50), believability NO REGRESSION, **model slate
+  LOCKED** (Haiku latency-bound + Opus 4.8 batch roles), workers stay OFF (per-agent opt-in),
+  prompt caching DEFERRED confirmed. NO new floors row (built no layer). Full record in
+  `decisions.md`. Exit criterion met: the on-screen latency + believability + cost numbers.
 
 **(moved 2026-08-17 at the C5 wrap-up, the ≤12 KB tripwire's first firing — the C4
 landing narrative + the closed operator action, verbatim from the phase header:)**

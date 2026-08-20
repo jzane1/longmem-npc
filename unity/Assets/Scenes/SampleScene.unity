@@ -540,13 +540,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::NpcMemory.Unity.NpcMemoryNpc
   baseUrl: http://127.0.0.1:8000
-  autoProvision: 1
-  agentIdOverride: 
-  agentName: graybox-keeper
-  seedIdentity: I keep the ford and remember who pays their toll.
-  diagnosticityGoal: what threatens the ford
-  episodicTauSeconds: 604800
-  semanticTauSeconds: 2592000
+  autoProvision: 0
+  agentIdOverride:
+  agentName: branwen-waystone
+  seedIdentity: I am Branwen, and I keep the Waystone Inn where the north road crosses the drove way below Harrowmere. My mother kept it before me, and her mother before that, and the long cellar under the taproom has never flooded on my watch. I know every regular by their knock, old Fenn the carter loudest of all, and I know what each one owes the house to the farthing. Travelers' news is half my trade; ale and a dry bed are the other half. I forget a face slower than the road forgets a wheel rut, and I forgive an unpaid debt slower still.
+  diagnosticityGoal: what threatens the house, who owes it, and what news the road brings
+  episodicTauSeconds: 864000
+  semanticTauSeconds: 15552000
   phaseTag: unity
 --- !u!4 &526319683
 Transform:
@@ -1105,7 +1105,7 @@ TextMesh:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2071529081}
-  m_Text: 
+  m_Text: Branwen
   m_OffsetZ: 0
   m_CharacterSize: 1
   m_LineSpacing: 1

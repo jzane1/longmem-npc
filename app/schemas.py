@@ -785,6 +785,26 @@ class DialogueTurnResult(BaseModel):
     instrumentation: DialogueTurnInstrumentation
 
 
+class LedgerTurnEntry(BaseModel):
+    """One teed dialogue turn in the Ledger's live feed (E2, ruled
+    2026-08-19). `result` is the DialogueTurnResult serialization VERBATIM —
+    the Ledger's turn panel renders it exactly as the paste/drop path would,
+    so a trimmed projection would break the page's field reads."""
+
+    seq: int
+    result: DialogueTurnResult
+
+
+class LedgerTurnsResult(BaseModel):
+    """Response of GET /v1/ledger/turns (E2, ruled 2026-08-19): the entries
+    newer than the caller's `after` cursor, plus `last_seq` for the next
+    poll. In-memory and process-local by ruling — nothing is persisted, and
+    a restart starts the feed empty at seq 0."""
+
+    entries: list[LedgerTurnEntry]
+    last_seq: int
+
+
 # ---------------------------------------------------------------------------
 # Agent provisioning + inspector reads (docs\unity-client.md, ruled
 # 2026-07-27 — forks 2 and 3: the integrator's minute-one route and The

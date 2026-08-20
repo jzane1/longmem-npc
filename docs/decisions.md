@@ -92,6 +92,7 @@ its surrounding spaces both become hyphens, so `Name — 2026-07-28` anchors as 
 - [Phase C7 Stage B build record — the scene-boundary pre-warm landed — 2026-08-18](#phase-c7-stage-b-build-record--the-scene-boundary-pre-warm-landed--2026-08-18)
 - [Phase D1 — latency, believability, and the model-slate lock — 2026-08-19](#phase-d1--latency-believability-and-the-model-slate-lock--2026-08-19)
 - [Phase E1 rulings + build record — the authoring guide and demo corpus landed — 2026-08-19](#phase-e1-rulings--build-record--the-authoring-guide-and-demo-corpus-landed--2026-08-19)
+- [Phase E2 rulings + build record — choreography, the code gaps, and the Ledger live feed — 2026-08-19](#phase-e2-rulings--build-record--choreography-the-code-gaps-and-the-ledger-live-feed--2026-08-19)
 
 ## Primary decisions
 
@@ -4102,3 +4103,91 @@ drovers question (or k≥4 / a context nudge if choreography prefers the fire); 
 nameplate sync to Branwen; C# `SceneBoundaryEvent.PrewarmContext`; `NpcMemoryNpc`
 ObserveAndForget/Drain passthroughs; the Ledger live-feed decision + polish; the standing
 pending-Jack items (live `.env` Opus sync binds when the demo agent's workers turn on).
+
+## Phase E2 rulings + build record — choreography, the code gaps, and the Ledger live feed — 2026-08-19
+
+**Context.** The E1 handoff executed: the beat script, the three code gaps, the Unity retarget,
+and the rehearsal staging. Verification was ruled demo-scoped (ruling 3 below), so no floors row
+and no floor-verifier dispatch; the build-time gates (suite, harness, Unity compile) all ran.
+
+**Rulings (Jack, at spec — the plan-mode fork batch):**
+
+1. **The Ledger live feed = server tee + poll.** The two dialogue routes tee each terminal
+   `DialogueTurnResult` into an in-process module-global ring buffer (cap 256, a module constant
+   — a demo inspector surface, not integrator config); the new schema-hidden
+   `GET /v1/ledger/turns?after=<seq>` serves it; the Ledger polls it on its existing 2 s poll.
+   **An explicit carve-out to the 2026-07-13 route pass-through ruling:** the response stays
+   byte-identical, but the dialogue routes now record the result in PROCESS MEMORY — never the
+   DB; a dialogue turn still persists nothing, and a restart starts the feed empty. Beat the
+   Unity-push shape (client changes, REPL blind) and keep-paste-drop (a manual step in every
+   take).
+2. **Worker flags land at the END of the load.** The loader inserts the agent with the corpus
+   config verbatim, replays deterministically (its in-process workers idle over the un-flagged
+   agent), then merges `reflection_worker_enabled: 1.0` + `compiler_worker_enabled: 1.0` via the
+   new **`db.merge_agent_config`** (`--no-workers` skips). **This sanctions a second in-place
+   write site: `agents.config`** — runtime config, not memory content (the `memories.pinned`
+   precedent); row-locked read-merge-write, in `db.py` because the SQL-containment hygiene test
+   binds. Beat flags-at-insert (workers could reflect mid-replay — a non-deterministic roll) and
+   the separate `--enable-workers` second step (an extra manual step per re-provision).
+3. **E2 verification is demo-scoped: NO floors row, no floor-verifier dispatch** (the E1
+   precedent, extended to a session that DOES land code). The new pytest coverage, the 17-beat
+   harness, and the Unity gates still ran at build time (the Landed section).
+4. **No new migration** (scope fact confirmed explicitly). Migrations stay 001–008; the worker
+   flags ride `agents.config` jsonb and the feed is in-memory only.
+
+**Landed (code).** `app\schemas.py` `LedgerTurnEntry`/`LedgerTurnsResult`; `app\api.py` the tee
+(`_tee_turn` at both dialogue routes — the SSE pump tees even on client disconnect) + the feed
+route; `app\db.py` `merge_agent_config`; **`app\demo_loader.py`** (`python -m app.demo_loader`,
+`--fresh` REQUIRED to act — the only destructive path; targets `longmem_demo` via
+`provision_scratch`, replays the corpus through `SessionRunner`, prints the provisioned-roll
+report + the agent-id/deep-link hand-off, merges the worker flags last); C# parity —
+`SceneBoundaryEvent.PrewarmContext`, the 13-field `ScenePrewarmInstrumentation`,
+`SceneResult.Prewarm`, `NpcSession.SceneBoundaryAsync(sceneType, prewarmContext, ct)` (naming
+falls out of the snake_case strategy, no attributes); harness beat **[17]** (verify_prewarm
+A/B/C over the C# wire); `NpcMemoryNpc` ObserveAndForget / DrainObservesAsync / PendingObserves
+passthroughs + the prewarm param (`OnObserveFailed` stays reachable via the public `Session` —
+events have no one-line forwarder; documented, not wrapped); `NpcDemoDriver` beat controls
+(correction, async observe + pending readout + explicit Drain, prewarm-carrying boundary,
+`sayK`, `jumpDays=60`); the Unity scene retarget (attach-mode `autoProvision: 0`, Branwen agent
+fields, nameplate `Branwen`); the Unity plugin DLL refreshed (was stale since 2026-08-04,
+pre-C2 — four phases behind); `ledger\index.html` the live turn-feed poller + the
+identity/state pane (`GET /v1/agents/{id}/state` — the seed identity on camera per E1 ruling 2)
++ the em-dash label sweep (the 2026-08-13 flagged residue, done — this page is on camera).
+
+**Landed (docs).** **`docs\demo-beat-script.md`** (the E2 deliverable: three beats + close,
+timeline, rig, rehearsal checklist; indexed in `docs\README.md`); `unity-client.md` drift fixes
+(the prewarm contract on the verb table, the C1-pre-warm bullet + warm-init hook marked
+superseded by C7-B, beat [17] in the harness chain, the drain placement resolved);
+`architecture.md` route census 16 → 17 + the feed paragraph; `SETUP.md` §8 attach-mode +
+gate-ordering rewrite.
+
+**Verification (build-time, demo-scoped by ruling 3).** Suite: `tests\test_ledger_feed.py` (seq
+monotonicity, `after` cursor, byte-identity vs both routes' responses, the cap) +
+`tests\test_demo_loader.py` (corpus-shape pure test + nlp-marked end-to-end on the suite
+scratch: five agent fields verbatim, 9 memories rolled, flags present/absent by path);
+`-m "not nlp"` subset green throughout (177 at wrap). The **17-beat console harness** GREEN
+against a fake-mode serve on a scratch DB (53 checks — beat [17]: probed boundary returns a
+clean prewarm record, same-basis init is a call-free cache hit, probe-less boundary carries no
+record). Unity: batch-mode compile + scene re-import clean (the adapter edits + refreshed DLL
+compile; the interactive Play-mode gate rides the rehearsal, below). Loader: fake-mode CLI
+smoke on a disposable DB (refusal path exit 2; full run printed the roll + hand-off), dropped
+after. The Ledger: a LIVE browser beat against a fake-mode serve on a scratch demo DB — the
+identity pane rendered Branwen's seed identity + worker flags + pressure, and a turn fired
+over plain HTTP rendered into the turn panel through the 2 s poll with no paste (the feed's
+end-to-end proof); scratch DB dropped after.
+
+**Rehearsal state — staged, blocked on two Jack-side steps (honest):** the real-provider
+rehearsal (beat-script checklist steps 0–6) did NOT run this session. (a) The live `.env`
+carries NEITHER `LONGMEM_MODEL_REFLECTION` nor `LONGMEM_MODEL_COMPILER` (presence checked
+without echoing values) — the demo agent's workers are ON by ruling, so the pending-Jack Opus
+sync now BINDS; running anyway would land a `failed` compiler run row and a loud reflect error
+on camera. (b) No Unity MCP bridge was connected this session, so the interactive Play-mode
+gate and the on-screen dry-run need an editor session; the ordering (gate BEFORE pasting the
+demo agent id — autoRun replays observes into whatever agent the adapter holds) is encoded in
+the beat script and `SETUP.md` §8. Everything up to those two steps is built and verified.
+
+**Surfaced (non-blocking):** the feed cap is a module constant by design (the C7 env-var shape
+is the promotion path if the never-hardcoded invariant is ever read strictly against a demo
+surface); the loader cannot probe "does a pinned take exist" without new SQL (the hygiene
+test), so `--fresh` being required-to-act IS the guard — a pinned take can only be destroyed
+deliberately.

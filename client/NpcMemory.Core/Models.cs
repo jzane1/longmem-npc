@@ -46,6 +46,13 @@ namespace NpcMemory
         public DateTimeOffset ClientTimestamp { get; set; }
         public string? SceneType { get; set; }
         public string? EventId { get; set; }
+
+        /// <summary>The C7-B reconstruction pre-warm probe (2026-08-18):
+        /// non-empty runs the dialogue-init retrieval/reconstruction path at
+        /// the boundary's fresh basis, warming the cache before the first
+        /// on-camera turn. Null or empty is the off state (identity
+        /// recompile only).</summary>
+        public string? PrewarmContext { get; set; }
     }
 
     /// <summary>The in-world confrontation event (dissonance.md, C4
@@ -141,6 +148,28 @@ namespace NpcMemory
         public Instrumentation Instrumentation { get; set; } = new Instrumentation();
     }
 
+    /// <summary>The scene-boundary pre-warm's per-pass record (C7-B,
+    /// 2026-08-18). CacheMisses == 0 with ReconstructionMs near zero on the
+    /// first same-basis read is the pre-warm's success signal; a hard warm
+    /// failure arrives as a degraded all-zero record, never an error (the
+    /// boundary must survive).</summary>
+    public sealed class ScenePrewarmInstrumentation
+    {
+        public double EmbedMs { get; set; }
+        public double ReconstructionMs { get; set; }
+        public int CandidateCount { get; set; }
+        public int CacheHits { get; set; }
+        public int CacheMisses { get; set; }
+        public int WriteBacks { get; set; }
+        public int DriftRefusals { get; set; }
+        public int EmbeddingTokens { get; set; }
+        public int ReconstructionInputTokens { get; set; }
+        public int ReconstructionOutputTokens { get; set; }
+        public int ReconstructionEmbedTokens { get; set; }
+        public bool Degraded { get; set; }
+        public string? DegradedReason { get; set; }
+    }
+
     public sealed class SceneResult
     {
         public Guid AgentId { get; set; }
@@ -148,6 +177,10 @@ namespace NpcMemory
         public double TotalMs { get; set; }
         public string? IdentityVersion { get; set; }
         public bool IdentityDocumentNew { get; set; }
+
+        /// <summary>Null unless the boundary carried a PrewarmContext probe
+        /// (the off state).</summary>
+        public ScenePrewarmInstrumentation? Prewarm { get; set; }
     }
 
     public sealed class PinResult

@@ -18,7 +18,7 @@ namespace NpcMemory.Harness
     /// weights-on-speech re-rank (A1 re-shape, 2026-08-04) -> the reflect
     /// verb (C2, 2026-08-15) -> the diegetic-correction event (C4,
     /// 2026-08-17) -> the agent-state read + fire-and-forget observes (C5,
-    /// 2026-08-17).
+    /// 2026-08-17) -> the scene-boundary pre-warm (C7-B, 2026-08-18).
     /// Structural asserts only: IDs, flags, byte-identity — never prose.
     /// </summary>
     internal static class Program
@@ -620,6 +620,39 @@ namespace NpcMemory.Harness
             Check(
                 doomed.PendingObserves == 0,
                 "failures clear on drain — the second drain is clean");
+
+            // -- [17] scene-boundary pre-warm (C7-B, 2026-08-18) -----------
+            // The probed boundary replaces beat [9]'s off-camera warm-init
+            // trick: the boundary itself warms the reconstruction cache, so
+            // the first same-basis read is call-free (verify_prewarm A/B/C
+            // mirrored over the C# wire).
+            Console.WriteLine("\n[17] Scene-boundary pre-warm: probe warms, init is call-free");
+            session.AsOf = t0.AddDays(120);
+            var probed = await session.SceneBoundaryAsync(
+                "ford-prewarm", prewarmContext: "the old days at the ford");
+            Check(
+                probed.Prewarm != null && !probed.Prewarm.Degraded,
+                "a probed boundary returns a clean prewarm record",
+                $"misses={probed.Prewarm?.CacheMisses} writeBacks={probed.Prewarm?.WriteBacks}");
+            var warmedInit = await client.DialogueInitAsync(new DialogueInitRequest
+            {
+                AgentId = created.AgentId,
+                QueryText = "the old days at the ford",
+                AsOf = session.AsOf,
+                IdentityVersion = session.IdentityVersion,
+                SceneStartedAt = session.SceneStartedAt,
+            });
+            Check(
+                warmedInit.Instrumentation.CacheMisses == 0
+                    && warmedInit.Instrumentation.CacheHits > 0
+                    && warmedInit.Instrumentation.ReconstructionInputTokens == 0
+                    && warmedInit.Instrumentation.ReconstructionOutputTokens == 0,
+                "the same-basis init is a call-free cache hit",
+                $"hits={warmedInit.Instrumentation.CacheHits}");
+            var bare = await session.SceneBoundaryAsync();
+            Check(
+                bare.Prewarm == null,
+                "a probe-less boundary carries no prewarm record (the off state)");
 
             // -- wrap-up ---------------------------------------------------
             Console.WriteLine(

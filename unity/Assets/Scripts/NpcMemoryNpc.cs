@@ -106,8 +106,25 @@ namespace NpcMemory.Unity
         public Task<IngestResult> ObserveAsync(string text) =>
             Session.ObserveAsync(text);
 
-        public Task<SceneResult> SceneBoundaryAsync(string sceneType = null) =>
-            Session.SceneBoundaryAsync(sceneType);
+        /// <summary>Fire-and-forget observe (C5): returns immediately, the
+        /// timestamp already stamped. Failures surface on the session's
+        /// OnObserveFailed event and re-throw at the next drain — subscribe
+        /// via Session.OnObserveFailed if the game wants the signal.</summary>
+        public void ObserveAndForget(string text) =>
+            Session.ObserveAndForget(text);
+
+        /// <summary>The explicit join for in-flight observes (no verb
+        /// auto-drains, by ruling — place drains at scene edges).</summary>
+        public Task DrainObservesAsync() =>
+            Session.DrainObservesAsync();
+
+        /// <summary>In-flight fire-and-forget observes (0 when idle).</summary>
+        public int PendingObserves =>
+            Session != null ? Session.PendingObserves : 0;
+
+        public Task<SceneResult> SceneBoundaryAsync(
+            string sceneType = null, string prewarmContext = null) =>
+            Session.SceneBoundaryAsync(sceneType, prewarmContext);
 
         public Task<CorrectionResult> CorrectAsync(Guid memoryId, string content) =>
             Session.CorrectAsync(memoryId, content);

@@ -137,6 +137,34 @@ async def insert_agent(
     return row[0]
 
 
+async def merge_agent_config(
+    pool: AsyncConnectionPool, agent_id: UUID, patch: dict
+) -> dict:
+    """Merge `patch` into agents.config in place and return the stored
+    result (E2 demo-loader ruling, 2026-08-19). agents.config is RUNTIME
+    CONFIG, not memory content — like the memories.pinned toggle it sits
+    outside the bi-temporal invariant, and this is the second sanctioned
+    in-place write site. One transaction, row-locked, so a concurrent merge
+    never loses keys. Raises LookupError on an unknown agent (the db layer
+    stays below app\\ingest.py, where UnknownAgentError — a LookupError
+    subclass — is defined; callers may re-wrap)."""
+    async with pool.connection() as conn, conn.cursor() as cur:
+        await cur.execute(
+            "SELECT config FROM agents WHERE agent_id = %s FOR UPDATE",
+            (agent_id,),
+        )
+        row = await cur.fetchone()
+        if row is None:
+            raise LookupError(f"unknown agent_id {agent_id}")
+        merged = dict(row[0] or {})
+        merged.update(patch)
+        await cur.execute(
+            "UPDATE agents SET config = %s WHERE agent_id = %s",
+            (Jsonb(merged), agent_id),
+        )
+    return merged
+
+
 async def fetch_live_components(
     pool: AsyncConnectionPool, agent_id: UUID
 ) -> list[dict]:

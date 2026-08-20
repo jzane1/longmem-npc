@@ -2,26 +2,31 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>The Ledger — longmem-npc memory inspector</title>
+<title>The Ledger: longmem-npc memory inspector</title>
 <!--
   The Ledger (docs\unity-client.md stage 3, ruled 2026-07-27): the
   designer-facing ground-truth-vs-telling inspector. One static file,
   vanilla JS, no build step (fork 6) — served by the API itself at
   GET /ledger (same origin, no CORS, no second server), reading only the
-  ruled inspector routes plus the judge-free metric read:
+  ruled inspector routes plus the judge-free metric read and the agent
+  state:
 
     GET /v1/agents/{id}/memories   — the index (live telling heads)
+    GET /v1/agents/{id}/state      — the identity/state pane (C5 read)
     GET /v1/memories/{id}/chain    — the full record (both chains + spans)
     GET /v1/memories/{id}/reconstruction-metrics — gist-precision /
       detail-recall / fabrication (eval-harness.md stage 1, 2026-07-29)
+    GET /v1/ledger/turns           — the live turn feed (E2, 2026-08-19)
 
   Superseded rows render greyed BUT PRESENT — the non-destructive record
   made visible. The per-turn score panel (read_mode/scores/IDs + both
-  views) is fed by pasting/dropping a DialogueTurnResult JSON — the
-  turn-feed v1 shape settled at build; a live feed rides the demo
-  choreography. All text renders via textContent (never innerHTML).
-  Deep-links (2026-08-13): ?agent=<uuid> preloads the index, and
-  &memory=<uuid> opens that memory's chain view directly.
+  views) has two feeds: the live poll over /v1/ledger/turns (the E2
+  ruling — the server tees each DialogueTurnResult in process memory),
+  and the v1 paste/drop of a DialogueTurnResult JSON, kept as the manual
+  path. All text renders via textContent (never innerHTML). Visible
+  labels avoid em dashes (the 2026-08-13 public-prose ruling — this page
+  is on camera). Deep-links (2026-08-13): ?agent=<uuid> preloads the
+  index, and &memory=<uuid> opens that memory's chain view directly.
 -->
 <style>
   :root {
@@ -118,7 +123,7 @@
 <body>
 <header>
   <h1>THE LEDGER</h1>
-  <span class="sub">longmem-npc — what the character actually remembers, and how</span>
+  <span class="sub">longmem-npc: what the character actually remembers, and how</span>
 </header>
 <main>
   <section id="indexPane">
@@ -130,6 +135,11 @@
         <span id="indexMeta" class="meta"></span>
       </div>
       <div id="indexErr" class="err"></div>
+      <div id="statePane" hidden>
+        <h2 id="stateName">the agent</h2>
+        <div class="card"><div class="cap">seed identity (the authored self)</div><div id="seedIdentity"></div></div>
+        <div id="stateMeta" class="meta"></div>
+      </div>
     </div>
     <ul id="memList"></ul>
   </section>
@@ -138,25 +148,26 @@
     <div id="chainWrap" hidden>
       <h2>ground truth vs current telling</h2>
       <div class="cols">
-        <div class="card"><div class="cap">the observation — immutable, gist marked</div><div id="obsText"></div></div>
+        <div class="card"><div class="cap">the observation: immutable, gist marked</div><div id="obsText"></div></div>
         <div class="card"><div class="cap" id="liveCap">current telling</div><div id="liveText"></div></div>
       </div>
-      <h2>the telling chain — superseded rows greyed, never dropped</h2>
+      <h2>the telling chain: superseded rows greyed, never dropped</h2>
       <div id="detailChain"></div>
-      <h2>the fact chain — what retrieval sees</h2>
+      <h2>the fact chain: what retrieval sees</h2>
       <div id="factChain"></div>
     </div>
-    <h2>last turn — read_mode / scores / IDs (paste or drop a DialogueTurnResult JSON)</h2>
-    <div id="dropzone">drop a turn-result .json here, or paste a DialogueTurnResult JSON anywhere on this page</div>
+    <h2>last turn: read_mode / scores / IDs (live while polling)</h2>
+    <div id="dropzone">live feed rides the poll; you can also drop a turn-result .json here or paste one anywhere on this page</div>
     <div id="turnErr" class="err"></div>
     <div id="turnPanel"></div>
   </section>
 </main>
 <footer>
-  read-only over GET /v1/agents/{id}/memories and GET /v1/memories/{id}/chain — unscored
-  inspector reads by ruled contract — plus GET /v1/memories/{id}/reconstruction-metrics, the
-  judge-free gist-precision / detail-recall / fabrication read (eval-harness.md stage 1,
-  bound 2026-07-29).
+  read-only over GET /v1/agents/{id}/memories, GET /v1/agents/{id}/state, and
+  GET /v1/memories/{id}/chain (unscored inspector reads by ruled contract), plus
+  GET /v1/memories/{id}/reconstruction-metrics, the judge-free gist-precision /
+  detail-recall / fabrication read (eval-harness.md stage 1, bound 2026-07-29), and
+  GET /v1/ledger/turns, the in-memory live turn feed (E2, 2026-08-19).
 </footer>
 <script>
 "use strict";
@@ -172,7 +183,7 @@ function el(tag, cls, text) {
 }
 
 function fmtTime(iso) {
-  return iso ? iso.replace("T", " ").replace(/\+00:00$/, "Z").slice(0, 20) : "—";
+  return iso ? iso.replace("T", " ").replace(/\+00:00$/, "Z").slice(0, 20) : "–";
 }
 
 async function fetchJson(path) {
@@ -189,6 +200,8 @@ async function loadIndex() {
   $("indexErr").textContent = "";
   try {
     const data = await fetchJson(`/v1/agents/${agent}/memories?limit=200`);
+    loadState(agent); // additive: the pane fills in when the read lands
+    pollTurns(); // additive: newest teed turn, live while polling
     $("indexMeta").textContent =
       `${data.memories.length}/${data.total_count} memories`;
     const list = $("memList");
@@ -221,6 +234,31 @@ function truncate(s, n) {
   return s.length > n ? s.slice(0, n - 1) + "…" : s;
 }
 
+// ---- the identity/state pane (C5 agent-state read; E2 2026-08-19 — the
+// seed identity is ruled on camera in the Ledger) --------------------------
+
+async function loadState(agent) {
+  try {
+    const s = await fetchJson(`/v1/agents/${agent}/state`);
+    $("statePane").hidden = false;
+    $("stateName").textContent = s.name || "the agent";
+    $("seedIdentity").textContent = s.seed_identity || "(no seed identity)";
+    const config = s.config || {};
+    const workers = [
+      ["reflection_worker_enabled", "reflection"],
+      ["compiler_worker_enabled", "compiler"],
+      ["deferred_writes_enabled", "deferred writes"],
+    ].filter(([key]) => config[key]).map(([, label]) => label);
+    $("stateMeta").textContent =
+      `identity ${s.identity_version ? s.identity_version.slice(0, 8) : "–"}`
+      + ` · reflection pressure ${s.reflection_pressure.toFixed(3)}`
+      + ` · workers: ${workers.length ? workers.join(", ") : "off"}`;
+  } catch (e) {
+    // Additive to the index, never in its way: a state-read failure
+    // leaves the pane as it was.
+  }
+}
+
 // ---- the chain ----------------------------------------------------------
 
 async function loadChain(memoryId) {
@@ -251,11 +289,11 @@ async function renderChainFor(memoryId) {
   nums.replaceChildren();
   addNum(nums, c.gist_spans.length, "gist spans (the fixed constraint)");
   addNum(nums, c.details.length, "telling versions");
-  addNum(nums, supersededTellings, "superseded — kept, never deleted");
+  addNum(nums, supersededTellings, "superseded: kept, never deleted");
   addNum(nums, c.facts.length, "fact versions");
   try {
     const m = await fetchJson(`/v1/memories/${memoryId}/reconstruction-metrics`);
-    const ratio = (v) => (v == null ? "—" : v.toFixed(2));
+    const ratio = (v) => (v == null ? "–" : v.toFixed(2));
     addNum(nums, ratio(m.gist_precision),
       `gist precision (${m.gist_facts_present}/${m.gist_facts_total} facts held)`);
     addNum(nums, ratio(m.detail_recall), "detail recall");
@@ -263,7 +301,7 @@ async function renderChainFor(memoryId) {
   } catch (e) {
     // The metric is additive to the record, not part of it: a metrics
     // failure must never hide the chain.
-    addNum(nums, "—", "metrics unavailable");
+    addNum(nums, "–", "metrics unavailable");
   }
 
   // Ground truth with gist spans marked (offsets into the immutable text).
@@ -286,8 +324,8 @@ async function renderChainFor(memoryId) {
   obs.append(document.createTextNode(c.observation_text.slice(cursor)));
 
   $("liveCap").textContent = live
-    ? `current telling — ${live.write_cause} @ ${fmtTime(live.valid_at)}`
-    : "current telling — NO LIVE HEAD";
+    ? `current telling: ${live.write_cause} @ ${fmtTime(live.valid_at)}`
+    : "current telling: NO LIVE HEAD";
   $("liveText").textContent = live ? live.content : "";
 
   renderChain($("detailChain"), c.details.map((d) => ({
@@ -331,7 +369,25 @@ function renderChain(host, rows) {
   }
 }
 
-// ---- the turn panel (feed v1: paste/drop a DialogueTurnResult) ----------
+// ---- the turn panel ------------------------------------------------------
+// Two feeds: the live poll over /v1/ledger/turns (E2, 2026-08-19 — the
+// server tees each DialogueTurnResult; entries are the turn response's
+// serialization verbatim), and the v1 paste/drop path, kept for manual use.
+
+let lastTurnSeq = 0;
+
+async function pollTurns() {
+  try {
+    const data = await fetchJson(`/v1/ledger/turns?after=${lastTurnSeq}`);
+    lastTurnSeq = data.last_seq;
+    if (data.entries.length) {
+      renderTurn(data.entries[data.entries.length - 1].result);
+    }
+  } catch (e) {
+    // The feed is additive: a feed failure never disturbs the panes, and
+    // the paste/drop path stays available.
+  }
+}
 
 function renderTurn(result) {
   $("turnErr").textContent = "";

@@ -545,13 +545,13 @@ is C2's RRR.
 
 ## 12. Integrator surface requirements
 
-**The shipped HTTP surface** *(sixteen routes; five landed 2026-07-23 and 2026-07-27 —
+**The shipped HTTP surface** *(seventeen routes; five landed 2026-07-23 and 2026-07-27 —
 `unity-client.md`; the metric read 2026-07-29 — `eval-harness.md`; the reflect verb
 2026-08-15 — `reflection.md`; this paragraph still said "twelve" and omitted reflect until
 2026-08-17, a C2 propagation miss corrected at the C3 build — C3 itself adds NO route by
 ruling; the diegetic-correction event joined with C4, 2026-08-17 — `dissonance.md`; the
 agent-state read with C5 the same day; the purge verb with C6, 2026-08-18 — the release-blocker
-realized)*:
+realized; the Ledger turn feed with E2, 2026-08-19)*:
 `POST /v1/events/observe`,
 `POST /v1/events/scene-boundary`,
 **`POST /v1/events/diegetic-correction`** (the confrontation event — the dissonance path),
@@ -563,9 +563,16 @@ async-generator seam — `chunk` / `reconstructing` / `result` / `error` events)
 (provisioning; UUID minted server-side), **`POST /v1/agents/{id}/reflect`** (the reflect verb),
 the two **inspector reads** (§6),
 **`GET /v1/memories/{id}/reconstruction-metrics`** (the judge-free metric read, §6),
-**`GET /v1/agents/{id}/state`** (the agent-state read, §6 — C5), and
+**`GET /v1/agents/{id}/state`** (the agent-state read, §6 — C5),
 **`GET /ledger`** (the static browser inspector, served BY the API so it shares the origin of the
-routes it polls — no CORS surface, no second server).
+routes it polls — no CORS surface, no second server), and
+**`GET /v1/ledger/turns`** (E2, 2026-08-19 — The Ledger's live turn feed: both dialogue routes
+tee their terminal `DialogueTurnResult` into an in-process ring buffer, cap 256, and this
+schema-hidden read serves entries after a `?after=<seq>` cursor, each the turn response's
+serialization verbatim. An explicit, ruled carve-out to the route pass-through contract: the
+response stays byte-identical, but the dialogue routes now record the result in PROCESS MEMORY —
+never the DB; a dialogue turn still persists nothing, and a restart starts the feed empty.
+A demo inspector surface like `/ledger`, not integrator API).
 
 **The client package** *(built 2026-07-27)*: `client\NpcMemory.Core` — netstandard2.1,
 engine-agnostic (**zero `UnityEngine` types** by ruling), one flat `NpcMemoryClient` covering all

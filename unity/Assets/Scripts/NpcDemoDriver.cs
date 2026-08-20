@@ -28,6 +28,29 @@ namespace NpcMemory.Unity
         [Tooltip("Run the scripted Play-mode verification beats on Start.")]
         public bool autoRun;
 
+        [Header("Demo beat controls (E2, 2026-08-19)")]
+        [Tooltip("Target memory UUID for the Correct button (paste from the "
+            + "demo loader's printed roll).")]
+        public string correctionMemoryId = "";
+
+        [TextArea]
+        [Tooltip("Override text the Correct button applies (falls back to "
+            + "the input field when empty).")]
+        public string correctionText = "";
+
+        [TextArea]
+        [Tooltip("C7-B pre-warm probe the Scene boundary button sends "
+            + "(empty = no probe).")]
+        public string prewarmContext =
+            "Do you remember the two drovers you turned away at the door in June?";
+
+        [Tooltip("Per-turn k for the Say button (0 = the server default). "
+            + "The beat condition is the utterance's, not the agent's.")]
+        public int sayK;
+
+        [Tooltip("Day count for the as-of jump button.")]
+        public int jumpDays = 60;
+
         private string _input = "What has happened at the ford lately?";
         private string _dialogue = "";
         private string _status = "(connecting…)";
@@ -165,9 +188,10 @@ namespace NpcMemory.Unity
         private void OnGUI()
         {
             // The dev-tool overlay IS the intended aesthetic (ruled 2026-07-22).
-            GUILayout.BeginArea(new Rect(12, 12, 560, 320), GUI.skin.box);
+            GUILayout.BeginArea(new Rect(12, 12, 560, 340), GUI.skin.box);
             GUILayout.Label($"longmem-npc — {_status}");
-            GUILayout.Label(_gateLine);
+            var pending = npc != null ? npc.PendingObserves : 0;
+            GUILayout.Label($"{_gateLine}   pending observes: {pending}");
             GUILayout.Space(6);
             GUILayout.Label(_dialogue, GUILayout.Height(140));
             GUILayout.Space(6);
@@ -179,8 +203,10 @@ namespace NpcMemory.Unity
                 RunUi(async () =>
                 {
                     _dialogue = "";
-                    var result = await npc.SayStreamAsync(
-                        _input, chunk => _dialogue += chunk);
+                    var result = await npc.Session.SayStreamAsync(
+                        _input,
+                        chunk => _dialogue += chunk,
+                        k: sayK > 0 ? (int?)sayK : null);
                     _gateLine = GateLine(result);
                 });
             }
@@ -188,14 +214,38 @@ namespace NpcMemory.Unity
             {
                 RunUi(async () => await npc.ObserveAsync(_input));
             }
+            if (GUILayout.Button("Observe (async)"))
+            {
+                // Fire-and-forget: returns immediately, drains at the edge.
+                npc.ObserveAndForget(_input);
+            }
+            if (GUILayout.Button("Drain"))
+            {
+                RunUi(async () => await npc.DrainObservesAsync());
+            }
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Correct"))
+            {
+                RunUi(async () =>
+                {
+                    var memoryId = Guid.Parse(correctionMemoryId.Trim());
+                    var content = string.IsNullOrEmpty(correctionText)
+                        ? _input
+                        : correctionText;
+                    await npc.CorrectAsync(memoryId, content);
+                });
+            }
             if (GUILayout.Button("Scene boundary"))
             {
-                RunUi(async () => await npc.SceneBoundaryAsync("graybox"));
+                RunUi(async () => await npc.SceneBoundaryAsync(
+                    "graybox",
+                    string.IsNullOrEmpty(prewarmContext) ? null : prewarmContext));
             }
-            if (GUILayout.Button("+46 days"))
+            if (GUILayout.Button($"+{jumpDays} days"))
             {
                 var now = npc.Session.AsOf ?? DateTimeOffset.UtcNow;
-                npc.SetAsOf(now.AddDays(46));
+                npc.SetAsOf(now.AddDays(jumpDays));
             }
             GUILayout.EndHorizontal();
             GUI.enabled = true;

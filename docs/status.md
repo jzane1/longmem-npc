@@ -1,15 +1,23 @@
 # longmem-npc — Status
 
 **Last updated:** 2026-08-19
-**Phase:** **Road to completion — Phases A–D DONE. Phase E (demo) IN PROGRESS: E1 ✅, next E2.**
-**E1 landed 2026-08-19** (docs + data only, no code, no floor by ruling): the integrator
-authoring guide **`docs\identity-authoring.md`** + the demo NPC **Branwen of the Waystone Inn**
-(`data\eval\corpora\demo-waystone.jsonl` + 3 held-out probes in
-`data\eval\scenarios\demo-waystone.jsonl`), validated on real providers — coverage
-drift-validate 9/9 under budget (max 0.121 vs 0.35), beat-condition target certified (drovers,
-0.082), held-out run 2/2 checks, fabrication 0.000. Phase E was scoped at plan approval to
-**three sessions** (E1 authoring / E2 choreography + rehearsal / E3 record). Full record +
-the five authoring lessons in `decisions.md`'s E1 entry.
+**Phase:** **Road to completion — Phases A–D DONE. Phase E (demo) IN PROGRESS: E1 ✅, E2 built
+(rehearsal staged, blocked on two Jack-side steps), then E3.**
+**E2 landed 2026-08-19** (demo-scoped by ruling: no floors row): the beat script
+**`docs\demo-beat-script.md`**, the corpus→demo-DB loader (`python -m app.demo_loader`,
+`--fresh`-guarded), the Ledger live turn feed (`GET /v1/ledger/turns` — the server tee, an
+explicit ruled carve-out to the route pass-through contract) + identity pane + em-dash label
+sweep, C# prewarm parity (`PrewarmContext` / `SceneResult.Prewarm`) + harness beat [17]
+(17 beats, 53 checks GREEN), the `NpcMemoryNpc` observe passthroughs, the Unity scene
+retargeted to Branwen (attach-mode; the stale plugin DLL refreshed). New in-place write site
+sanctioned: `agents.config` via `db.merge_agent_config` (the pinned-toggle precedent). **The
+real rehearsal is staged, not run** — see the pending items. Full record in `decisions.md`'s
+E2 entry.
+**E1 landed 2026-08-19** (docs + data, no floor by ruling): `identity-authoring.md` + Branwen
+of the Waystone Inn, validated on real providers, the drovers memory certified as the drift
+target. Phase E = three sessions by ruling (E1 / E2 / E3). The verbatim block moved to
+`session-log.md`'s archive at the E2 wrap-up (size tripwire); the five authoring lessons live
+in `decisions.md`'s E1 entry.
 D1 (optimization, 2026-08-19, no new code): perceived-first-word **p50 938 ms**, believability
 no regression (gist_precision 0.823), **model slate LOCKED** (Haiku latency-bound; Opus 4.8
 batch roles in `.env.example`), workers OFF per-agent, prompt caching DEFERRED — the D1 entry.
@@ -57,14 +65,26 @@ re-openable: re-verifying one is a step, never an argument against a design impr
 
 ## Open questions needing Jack's ruling
 
+**Pending Jack — the two steps blocking the E2 rehearsal (now binding):**
+(1) **sync the live `.env` batch roles to Opus 4.8** — the demo agent's workers are ON by
+ruling and the live `.env` carries NEITHER `LONGMEM_MODEL_REFLECTION` nor
+`LONGMEM_MODEL_COMPILER` (checked by key presence at the E2 wrap; values never echoed).
+Running the rehearsal without them lands a `failed` compiler run row + a loud reflect error
+on camera. (2) **an interactive Unity editor session** for the Play-mode gate + the on-screen
+dry-run (no Unity MCP bridge was connected in the E2 session) — the ordering is encoded in
+`demo-beat-script.md` step 1 and `SETUP.md` §8: gate BEFORE pasting the demo agent id.
+Then run the beat-script rehearsal checklist end to end (steps 0–6).
+
 **Pending Jack (from the D1 landing, non-blocking):** (1) **ratify or redirect the
 dissonance-multiplier defaults** — D1 found no objective metric to tune them against, so the
 principled ordering was kept unchanged (an eyeball run of the defend/update beat is available on
-request); (2) sync the live `.env` batch roles to Opus 4.8; (3) offline gold re-labeling if
+request); (2) offline gold re-labeling if
 calibrated judged-prose numbers are wanted on screen (kappa 0.37, unquotable — non-blocking; the
 on-screen numbers are judge-free).
 
-**Recently closed** (pointers only): the E1 forks — four ruled at plan approval 2026-08-19 (new
+**Recently closed** (pointers only): the E2 forks — four ruled at plan approval 2026-08-19
+(server tee + poll; worker flags at load end via `merge_agent_config`; demo-scoped, no floors
+row; no migration — the dated E2 entry); the E1 forks — four ruled at plan approval 2026-08-19 (new
 demo character; first-person paragraph seed; held-out run in E1; docs+data-only scope, no floors
 row — the dated E1 entry); the D1 forks — three settled at plan approval 2026-08-19
 (stronger batch roles; judge-free + judged believability; flip-in-D1-on-the-data → slate locked,
@@ -85,48 +105,27 @@ believability didn't regress (the point of doing Phase B first).
 A1 (2026-08-04, floors rows 19/21) and B1–B3 (2026-08-05/07/12, floors rows 22–24). The
 verbatim blocks moved to `session-log.md`'s archive at the E1 wrap-up (size tripwire).
 
-### Phase C — Build the kept components (~7–8 sessions)
+### Phases C + D — DONE
 
-Ordered so shared machinery lands before its reusers.
-
-- **C1–C6 ✅ ALL LANDED** (each plan-to-floor + floor-verified; full records in `floors.md`
-  rows 25–30 + `decisions.md`): **C1** deferred writes (`deferred-writes.md`, migration 006,
-  default OFF); **C2** reflection (`reflection.md`, migration 007, default OFF per agent,
-  endpoint always live); **C3** parameter compiler (`parameter-compiler.md`, migration 008,
-  default OFF per agent); **C4** dissonance path + diegetic-correction event (`dissonance.md`,
-  no migration, always live — client-invoked); **C5** client contract completion (no spec doc,
-  no migration — the agent-state read, the FOURTH unscored member, + fire-and-forget observes,
-  drains at scene edges); **C6** purge endpoint (`architecture.md` §12, no migration — per-memory
-  `DELETE /v1/memories/{id}`, reflections survive, no guard).
-- **C7. Latency pair ✅ DONE** (plan-to-floor 2026-08-18): Stage A concurrency cap (floors row 31)
-  + Stage B probe-driven scene-boundary reconstruction pre-warm (floors row 32); NO migration.
-  Prompt caching was DEFERRED to Phase D (Haiku-4096 finding); D1 confirmed it stays deferred.
-
-### Phase D — Optimization rounds (~1–2 sessions)
-
-- **D1.** ✅ DONE 2026-08-19 (plan-to-landing, no new code — a measure→rule→tune→re-verify pass on
-  the built rig). Latency CONFIRMED (938 ms p50), believability NO REGRESSION, **model slate
-  LOCKED** (Haiku latency-bound + Opus 4.8 batch roles), workers stay OFF (per-agent opt-in),
-  prompt caching DEFERRED confirmed. NO new floors row (built no layer). Full record in
-  `decisions.md`. Exit criterion met: the on-screen latency + believability + cost numbers.
+C1–C7 (floors rows 25–32, each plan-to-floor) and D1 (2026-08-19, measure-only: 938 ms p50
+confirmed, slate LOCKED, no floor). The verbatim blocks moved to `session-log.md`'s archive at
+the E2 wrap-up (size tripwire); full records in `floors.md` + `decisions.md`.
 
 ### Phase E — Demo (~3–4 sessions)
 
 - **E1. Identity authoring guide + demo corpus.** ✅ DONE 2026-08-19 (docs + data only; no
-  floors row by ruling). The guide (`identity-authoring.md`), Branwen of the Waystone Inn,
-  the held-out arm, and the real-provider validation — coverage 9/9 under budget, the drovers
-  memory certified as the beat-2 drift target in the beat's own condition. The un-driftable-
-  memory tripwire fired for real: five authored revisions, each failure caught at authoring
-  time (the E1 `decisions.md` entry has the lessons).
-- **E2. Choreography + rehearsal.** Final beat script (correction-override lead →
-  constancy-first drift on the certified drovers memory; the game-authored action-observe
-  beat — first-person observes, per the E1 render-voice finding), the Ledger live-feed
-  decision + small Ledger polish, rehearsal on the demo DB. E2 owns the code gaps: the
-  corpus→demo-DB loader (same agent fields + worker-enable flags), the C# `PrewarmContext`
-  field, the `NpcMemoryNpc` ObserveAndForget/Drain passthroughs. Rehearsal guard: inspect the
-  provisioned roll (importance/spans/retell take) and re-provision until good — the take then
-  pins by the constancy invariant. (With C7 landed, the off-camera warm-init trick is
-  unnecessary.)
+  floors row by ruling) — the header pointer above; the E1 `decisions.md` entry has the
+  five authoring lessons.
+- **E2. Choreography + rehearsal.** ✅ BUILT 2026-08-19 (demo-scoped by ruling — no floors
+  row; four spec rulings in the dated `decisions.md` entry). Landed: `demo-beat-script.md`
+  (correction-override lead → constancy-first drift on the certified drovers memory at k=3 →
+  the game-authored action-observe beat, first-person per the E1 render-voice finding, +
+  the rehearsal checklist), the corpus→demo-DB loader, the Ledger live feed + identity pane +
+  label sweep, the C# `PrewarmContext` mirror + harness beat [17], the `NpcMemoryNpc`
+  passthroughs, the Branwen scene retarget + DLL refresh. **The real rehearsal is staged,
+  not run** — blocked on the two pending-Jack steps above; the rehearsal guard (inspect the
+  provisioned roll, re-provision until good, the take pins by constancy) is encoded in the
+  beat script's checklist.
 - **E3. Record + edit** — Unity + The Ledger split-screen in OBS; real providers only.
 
 ### Phase F — Release (~3 sessions)

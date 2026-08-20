@@ -223,10 +223,16 @@ Open `unity\` with Unity 6. On first open it resolves packages, including the MC
 bridge from the git URL in `unity\Packages\manifest.json` (the resolved copy is gitignored).
 Newtonsoft.Json comes from `com.unity.nuget.newtonsoft-json`.
 
-The gray-box scene holds a Keeper capsule with `NpcMemoryNpc` (the adapter) and `NpcDemoDriver`
-(the IMGUI dev-tool overlay). Set the adapter's `baseUrl` to the running service; enable
-`autoRun` on the driver to play the scripted Play-mode verification beats, which log `[npc-demo]`
-receipts to the console.
+The gray-box scene holds the Branwen capsule (nameplate `Branwen` since E2, 2026-08-19) with
+`NpcMemoryNpc` (the adapter) and `NpcDemoDriver` (the IMGUI dev-tool overlay). The committed
+scene is attach-mode (`autoProvision` off): load the demo database first
+(`python -m app.demo_loader --fresh` — it prints the agent id), paste that id into the
+adapter's `agentIdOverride`, and set `baseUrl` to the running service. To play the scripted
+Play-mode verification beats instead, temporarily flip `autoProvision` AND `autoRun` on
+against a fake-mode serve on a scratch DB — the beats provision their own agent and log
+`[npc-demo]` receipts to the console. Do that gate BEFORE pasting a demo agent id: autoRun
+replays scripted observes into whatever agent the adapter holds
+(`docs\demo-beat-script.md` has the full rehearsal ordering).
 
 Scene-manipulation calls through the MCP bridge fail while the Editor is in Play mode — stop
 play first.
